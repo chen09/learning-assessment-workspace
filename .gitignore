@@ -1,0 +1,21 @@
+# Local continuity and operational notes
+handoff.md
+handoff-evidence/
+
+# Runtime configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Learner submissions and generated private media
+uploads/
+storage/
+data/
+
+# Common local/build artifacts
+node_modules/
+.next/
+dist/
+coverage/
+*.log
+.DS_Store
