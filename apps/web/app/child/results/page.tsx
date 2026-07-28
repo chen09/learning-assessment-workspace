@@ -1,7 +1,12 @@
 "use client";
 
 import { AlertCircle, Check, PenLine } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 import { AppShell } from "@/components/app-shell";
 import {
@@ -41,7 +46,14 @@ const demoResults: AttemptResult[] = [
   },
 ];
 
+const subscribeToHydration = () => () => undefined;
+
 export default function ChildResultsPage() {
+  const hydrated = useSyncExternalStore(
+    subscribeToHydration,
+    () => true,
+    () => false,
+  );
   const [results, setResults] = useState<AttemptResult[]>(demoResults);
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [complete, setComplete] = useState(true);
@@ -96,6 +108,10 @@ export default function ChildResultsPage() {
   const correctionCount = results.filter(
     (result) => result.outcome !== "correct",
   ).length;
+  const correctionButtonLabel =
+    !hydrated || correctionStatus === "working"
+      ? "Preparing corrections…"
+      : "Correct these answers";
 
   const beginCorrection = async () => {
     const token = getChildAccessToken();
@@ -183,14 +199,13 @@ export default function ChildResultsPage() {
       </section>
       {complete && correctionCount > 0 ? (
         <button
+          aria-busy={!hydrated || correctionStatus === "working"}
           className="button primary"
-          disabled={correctionStatus === "working"}
+          disabled={!hydrated || correctionStatus === "working"}
           onClick={() => void beginCorrection()}
           type="button"
         >
-          {correctionStatus === "working"
-            ? "Preparing corrections…"
-            : "Correct these answers"}
+          {correctionButtonLabel}
         </button>
       ) : null}
       {correctionStatus === "error" ? (
