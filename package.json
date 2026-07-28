@@ -25,7 +25,8 @@
     "supabase:start": "supabase start",
     "supabase:stop": "supabase stop",
     "supabase:reset": "supabase db reset",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "e2e:postgres": "playwright test --config playwright.postgres.config.ts"
   },
   "devDependencies": {
     "@playwright/test": "1.62.0",

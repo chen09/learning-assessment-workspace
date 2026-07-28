@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Camera, PenLine, Sparkles } from "lucide-react";
+import { ArrowRight, Camera, PenLine, Printer, ShieldCheck } from "lucide-react";
 
 import { Brand } from "@/components/brand";
 
@@ -21,12 +21,12 @@ export default function HomePage() {
         <div className="hero-copy">
           <p className="eyebrow">Made for learning together</p>
           <h1>
-            Practice that understands
-            <span>how your child works.</span>
+            Practice that
+            <span>fits your child.</span>
           </h1>
           <p>
-            Turn worksheets and learning goals into thoughtful practice. Type,
-            handwrite, print, photograph, and get feedback one clear step at a time.
+            Turn worksheets and learning goals into thoughtful practice. Children
+            can type, handwrite, or work on paper.
           </p>
           <div className="hero-actions">
             <Link className="button primary large" href="/parent/">
@@ -37,17 +37,8 @@ export default function HomePage() {
               Try a worksheet
             </Link>
           </div>
-          <div className="trust-row">
-            <span>Private by default</span>
-            <span>Parent confirmed</span>
-            <span>Built for paper too</span>
-          </div>
         </div>
-        <div className="hero-visual" aria-label="A sample family worksheet">
-          <div className="floating-note note-one">
-            <Camera size={18} aria-hidden="true" />
-            Paper scan ready
-          </div>
+        <figure className="hero-visual" aria-label="A sample family worksheet">
           <div className="worksheet-card">
             <div className="worksheet-top">
               <span>Today&apos;s practice</span>
@@ -65,15 +56,38 @@ export default function HomePage() {
             </div>
             <div className="worksheet-tools">
               <span>
-                <PenLine size={17} aria-hidden="true" /> Handwrite
+                <PenLine size={17} aria-hidden="true" /> Handwritten response
               </span>
-              <button type="button">Clear</button>
+              <span>Saved as you work</span>
             </div>
           </div>
-          <div className="floating-note note-two">
-            <Sparkles size={18} aria-hidden="true" />
-            Hint, not answer
-          </div>
+          <figcaption>
+            <strong>Math can stay handwritten.</strong>
+            <span>English answers can be typed or handwritten.</span>
+          </figcaption>
+        </figure>
+      </section>
+      <section className="landing-assurances" aria-label="How the workspace helps">
+        <div>
+          <ShieldCheck size={20} aria-hidden="true" />
+          <span>
+            <strong>Private by default</strong>
+            Student work stays inside the family.
+          </span>
+        </div>
+        <div>
+          <Printer size={20} aria-hidden="true" />
+          <span>
+            <strong>Works with paper</strong>
+            Print a worksheet and keep the familiar routine.
+          </span>
+        </div>
+        <div>
+          <Camera size={20} aria-hidden="true" />
+          <span>
+            <strong>Feedback after upload</strong>
+            Photograph each answer, then review the full result.
+          </span>
         </div>
       </section>
     </main>

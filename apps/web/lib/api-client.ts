@@ -134,6 +134,10 @@ export async function createChildSession(childId: string, pin: string) {
 }
 
 export async function getParentAccessToken() {
+  const fixtureToken = process.env.NEXT_PUBLIC_E2E_PARENT_TOKEN;
+  if (fixtureToken) {
+    return fixtureToken;
+  }
   const supabase = getSupabaseBrowserClient();
   const session = supabase ? await supabase.auth.getSession() : null;
   return session?.data.session?.access_token ?? null;
