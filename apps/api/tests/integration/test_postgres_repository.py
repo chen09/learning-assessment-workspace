@@ -1,0 +1,402 @@
+import os
+from uuid import uuid4
+
+import asyncpg
+import httpx
+import pytest
+
+from app.domain.errors import (
+    NotFoundError,
+    ResponseVersionConflict,
+    SubmittedAttemptImmutable,
+)
+from app.domain.models import (
+    CompleteReviewRequest,
+    CreateAssignmentRequest,
+    CreateDeletionRequest,
+    CreateFamilyInvitationRequest,
+    CreateImportRequest,
+    CreateUploadIntentRequest,
+    ImportPurpose,
+    ResponseKind,
+    SaveResponseRequest,
+    UploadBucket,
+)
+from app.repositories.postgres import PostgresRepository
+from app.services.child_sessions import ChildSessionService
+from app.services.database_jobs import DatabaseJobWorker
+
+DATABASE_URL = os.getenv("TEST_DATABASE_URL")
+
+pytestmark = pytest.mark.skipif(
+    not DATABASE_URL,
+    reason="TEST_DATABASE_URL is required for PostgreSQL integration tests.",
+)
+
+
+@pytest.mark.asyncio
+async def test_postgres_vertical_flow_and_family_isolation() -> None:
+    assert DATABASE_URL is not None
+    asyncpg_url = DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://", 1)
+    parent_a = uuid4()
+    parent_b = uuid4()
+    family_a = uuid4()
+    family_b = uuid4()
+    child_a = uuid4()
+    connection = await asyncpg.connect(asyncpg_url)
+    pin_hash = ChildSessionService("integration-secret").hash_pin("123456")
+    try:
+        await connection.executemany(
+            """
+            insert into auth.users (
+              id, instance_id, aud, role, email, encrypted_password,
+              email_confirmed_at, created_at, updated_at
+            ) values (
+              $1, '00000000-0000-0000-0000-000000000000',
+              'authenticated', 'authenticated', $2, '', now(), now(), now()
+            )
+            """,
+            [
+                (parent_a, f"{parent_a}@example.test"),
+                (parent_b, f"{parent_b}@example.test"),
+            ],
+        )
+        await connection.executemany(
+            "insert into public.families (id, name, created_by) values ($1, $2, $3)",
+            [
+                (family_a, "Integration family A", parent_a),
+                (family_b, "Integration family B", parent_b),
+            ],
+        )
+        await connection.executemany(
+            "insert into public.family_members (family_id, user_id) values ($1, $2)",
+            [(family_a, parent_a), (family_b, parent_b)],
+        )
+        await connection.execute(
+            """
+            insert into public.children (
+              id, family_id, nickname, grade_stage, pin_hash
+            ) values ($1, $2, 'Alex', 'Junior high 1', $3)
+            """,
+            child_a,
+            family_a,
+            pin_hash,
+        )
+    finally:
+        await connection.close()
+
+    repository = PostgresRepository(
+        DATABASE_URL,
+        supabase_url="http://127.0.0.1:54321",
+        service_role_key=os.getenv("SUPABASE_SERVICE_ROLE_KEY", ""),
+    )
+    uploaded_path: str | None = None
+    try:
+        request = CreateImportRequest(
+            family_id=family_a,
+            filenames=["lesson.pdf"],
+            purpose=ImportPurpose.GENERATE_SIMILAR,
+            title="Integration worksheet",
+            subject="English",
+        )
+        imported = await repository.create_import(
+            request,
+            "integration-import",
+            str(parent_a),
+        )
+        repeated = await repository.create_import(
+            request,
+            "integration-import",
+            str(parent_a),
+        )
+        assert repeated.id == imported.id
+        await repository.set_management_pin(
+            str(family_a),
+            str(parent_a),
+            "integration-management-pin-hash",
+        )
+        assert (
+            await repository.get_management_pin_hash(
+                str(family_a),
+                str(parent_a),
+            )
+            == "integration-management-pin-hash"
+        )
+        with pytest.raises(NotFoundError):
+            await repository.get_management_pin_hash(
+                str(family_a),
+                str(parent_b),
+            )
+        with pytest.raises(NotFoundError):
+            await repository.get_question_set_draft(
+                str(imported.question_set_id),
+                str(parent_b),
+            )
+        invited_email = f"{parent_b}@example.test"
+        invitation = await repository.create_family_invitation(
+            str(family_a),
+            CreateFamilyInvitationRequest(email=invited_email),
+            str(parent_a),
+            "integration-parent-invite",
+        )
+        pending = await repository.list_pending_invitations(invited_email)
+        assert [item.id for item in pending] == [invitation.id]
+        accepted_family = await repository.accept_family_invitation(
+            str(invitation.id),
+            invited_email,
+            str(parent_b),
+        )
+        assert accepted_family.id == family_a
+        worker = DatabaseJobWorker(
+            database_url=DATABASE_URL,
+            worker_name="integration-worker",
+        )
+        assert await worker.run_once() is True
+        retry_connection = await asyncpg.connect(asyncpg_url)
+        try:
+            failed_job_id = await retry_connection.fetchval(
+                """
+                update public.jobs
+                set status = 'failed', attempt_count = max_attempts
+                where type = 'extract_source' and subject_id = $1
+                returning id
+                """,
+                imported.id,
+            )
+        finally:
+            await retry_connection.close()
+        retried_job = await repository.retry_job(
+            str(failed_job_id),
+            str(parent_a),
+        )
+        assert retried_job.status.value == "queued"
+        assert retried_job.attempt_count == 0
+        assert await worker.run_once() is True
+        draft = await repository.get_question_set_draft(
+            str(imported.question_set_id),
+            str(parent_a),
+        )
+        assert draft.question_set.status.value == "needs_review"
+        assert len(draft.questions) == 3
+
+        confirmed = await repository.confirm_question_set(
+            str(imported.question_set_id),
+            "integration-confirm",
+            str(parent_a),
+        )
+        assignment = await repository.assign_question_set(
+            str(confirmed.id),
+            CreateAssignmentRequest(child_id=child_a),
+            "integration-assign",
+            str(parent_a),
+        )
+        listed_assignments = await repository.list_child_assignments(str(child_a))
+        assert listed_assignments[0].id == assignment.id
+        assert listed_assignments[0].question_count == 3
+        printable = await repository.get_printable_assignment(
+            str(assignment.id),
+            str(parent_a),
+        )
+        assert printable.template_version == "a4-v1"
+        assert len(printable.questions) == 3
+        with pytest.raises(NotFoundError):
+            await repository.get_printable_assignment(
+                str(assignment.id),
+                str(uuid4()),
+            )
+        work = await repository.start_assignment(str(assignment.id), str(child_a))
+        assert work is not None
+        service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        if service_role_key:
+            intent = await repository.create_child_upload_intent(
+                CreateUploadIntentRequest(
+                    family_id=family_a,
+                    bucket=UploadBucket.RESPONSES,
+                    object_id=work.attempt.id,
+                    filename="answer.png",
+                    content_type="image/png",
+                ),
+                str(child_a),
+                "integration-photo-upload",
+            )
+            uploaded_path = intent.path
+            async with httpx.AsyncClient() as client:
+                upload = await client.put(
+                    intent.upload_url,
+                    content=b"integration-image",
+                    headers={"Content-Type": "image/png"},
+                )
+            assert upload.is_success
+        first_question = work.questions[0]
+        saved = await repository.save_response(
+            str(work.attempt.id),
+            str(first_question.id),
+            str(child_a),
+            SaveResponseRequest(
+                kind=ResponseKind.CHOICE,
+                answer={"choices": [0]},
+                expected_version=0,
+            ),
+        )
+        assert saved.version == 1
+        with pytest.raises(ResponseVersionConflict):
+            await repository.save_response(
+                str(work.attempt.id),
+                str(first_question.id),
+                str(child_a),
+                SaveResponseRequest(
+                    kind=ResponseKind.CHOICE,
+                    answer={"choices": [0]},
+                    expected_version=0,
+                ),
+            )
+
+        receipt = await repository.submit_attempt(
+            str(work.attempt.id),
+            str(child_a),
+            "integration-submit",
+        )
+        repeated_receipt = await repository.submit_attempt(
+            str(work.attempt.id),
+            str(child_a),
+            "integration-submit",
+        )
+        assert repeated_receipt.job.id == receipt.job.id
+        assert await worker.run_once() is True
+        results = await repository.get_attempt_results(
+            str(work.attempt.id),
+            str(child_a),
+        )
+        assert results.complete is True
+        assert [result.outcome.value for result in results.results] == [
+            "incorrect",
+            "uncertain",
+            "uncertain",
+        ]
+        review_connection = await asyncpg.connect(asyncpg_url)
+        try:
+            await review_connection.execute(
+                """
+                update public.review_items
+                set due_on = current_date
+                where child_id = $1
+                """,
+                child_a,
+            )
+        finally:
+            await review_connection.close()
+        reviews = await repository.list_due_reviews(str(child_a))
+        assert len(reviews) == 1
+        completion = await repository.complete_review(
+            str(reviews[0].id),
+            str(child_a),
+            CompleteReviewRequest(outcome="correct"),
+        )
+        assert completion.old_interval_days == 1
+        assert completion.new_interval_days == 3
+        correction = await repository.create_correction(
+            str(work.attempt.id),
+            str(child_a),
+            "integration-correction",
+        )
+        assert len(correction.questions) == 3
+        correction_answers = [
+            (ResponseKind.CHOICE, {"choices": [1]}),
+            (ResponseKind.TEXT, {"text": "plays"}),
+            (ResponseKind.STROKES, {"strokes": []}),
+        ]
+        for question, (kind, answer) in zip(
+            correction.questions,
+            correction_answers,
+            strict=True,
+        ):
+            await repository.save_response(
+                str(correction.attempt.id),
+                str(question.id),
+                str(child_a),
+                SaveResponseRequest(
+                    kind=kind,
+                    answer=answer,
+                    expected_version=0,
+                ),
+            )
+        await repository.submit_attempt(
+            str(correction.attempt.id),
+            str(child_a),
+            "integration-correction-submit",
+        )
+        assert await worker.run_once() is True
+        correction_results = await repository.get_attempt_results(
+            str(correction.attempt.id),
+            str(child_a),
+        )
+        assert correction_results.complete is True
+        assert [result.outcome.value for result in correction_results.results] == [
+            "correct",
+            "correct",
+            "uncertain",
+        ]
+        child_history = await repository.list_child_history(str(child_a))
+        family_history = await repository.list_family_history(
+            str(family_a),
+            str(parent_a),
+        )
+        assert child_history[0].attempt_id == correction.attempt.id
+        assert family_history[0].child_nickname == "Alex"
+        joined_parent_history = await repository.list_family_history(
+            str(family_a),
+            str(parent_b),
+        )
+        assert joined_parent_history[0].assignment_id == assignment.id
+        deletion = await repository.create_deletion_request(
+            CreateDeletionRequest(
+                family_id=family_a,
+                target_type="child",
+                target_id=child_a,
+            ),
+            str(parent_a),
+            "integration-delete-child",
+        )
+        assert await repository.get_child(str(child_a)) is None
+        restored = await repository.restore_deletion_request(
+            str(deletion.id),
+            str(parent_a),
+        )
+        assert restored.restored_at is not None
+        assert await repository.get_child(str(child_a)) is not None
+        with pytest.raises(SubmittedAttemptImmutable):
+            await repository.save_response(
+                str(work.attempt.id),
+                str(first_question.id),
+                str(child_a),
+                SaveResponseRequest(
+                    kind=ResponseKind.CHOICE,
+                    answer={"choices": [0]},
+                    expected_version=1,
+                ),
+            )
+    finally:
+        await repository.close()
+        service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        if uploaded_path and service_role_key:
+            async with httpx.AsyncClient() as client:
+                await client.delete(
+                    "http://127.0.0.1:54321/storage/v1/object/"
+                    f"responses/{uploaded_path}",
+                    headers={
+                        "Authorization": f"Bearer {service_role_key}",
+                        "apikey": service_role_key,
+                    },
+                )
+        cleanup = await asyncpg.connect(asyncpg_url)
+        try:
+            await cleanup.execute(
+                "delete from public.families where id = any($1::uuid[])",
+                [family_a, family_b],
+            )
+            await cleanup.execute(
+                "delete from auth.users where id = any($1::uuid[])",
+                [parent_a, parent_b],
+            )
+        finally:
+            await cleanup.close()

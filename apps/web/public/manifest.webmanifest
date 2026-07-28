@@ -1,0 +1,17 @@
+{
+  "name": "Luma Family Learning",
+  "short_name": "Luma",
+  "description": "Family worksheets, feedback, corrections, and review.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f5ef",
+  "theme_color": "#f7f5ef",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

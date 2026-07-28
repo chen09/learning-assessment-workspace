@@ -1,0 +1,35 @@
+{
+  "name": "learning-assessment-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "npm@10.8.2",
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace @learning-assessment/web",
+    "build:web": "npm run build --workspace @learning-assessment/web",
+    "lint": "npm run lint --workspace @learning-assessment/web",
+    "typecheck": "npm run typecheck --workspace @learning-assessment/web",
+    "test:web": "npm run test --workspace @learning-assessment/web",
+    "test:api": "uv run --directory apps/api pytest",
+    "lint:api": "uv run --directory apps/api ruff check .",
+    "typecheck:api": "uv run --directory apps/api mypy app",
+    "openapi:generate": "PYTHONPATH=apps/api uv run --project apps/api python apps/api/scripts/export_openapi.py",
+    "openapi:check": "PYTHONPATH=apps/api uv run --project apps/api python apps/api/scripts/export_openapi.py --check",
+    "test": "npm run test:web && npm run test:api",
+    "check": "npm run lint && npm run typecheck && npm run lint:api && npm run typecheck:api && npm run test && npm run openapi:check && npm run build:web",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:reset": "supabase db reset",
+    "e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.0",
+    "jsdom": "27.4.0",
+    "supabase": "2.110.0"
+  }
+}

@@ -1,0 +1,2 @@
+-- Seed data is intentionally empty. Development fixtures are created through the
+-- public API so tests exercise the same behavior as the application.

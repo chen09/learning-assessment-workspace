@@ -1,0 +1,5 @@
+This directory is reserved for future Alembic-managed API-local schema.
+
+For the MVP, Supabase is the canonical PostgreSQL schema owner. Apply the
+versioned SQL under `supabase/migrations` with the Supabase CLI; do not create a
+second Alembic migration for the same tables.

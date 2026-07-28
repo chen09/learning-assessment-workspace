@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:web
+      - run: npm run build:web
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e
+
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+      - run: uv sync --project apps/api --all-groups
+      - run: npm run lint:api
+      - run: npm run typecheck:api
+      - run: npm run test:api
+      - run: npm run openapi:check
+
+  database:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+      - run: npm ci
+      - run: uv sync --project apps/api --all-groups
+      - run: npx supabase start
+      - run: npx supabase db lint --level warning
+      - run: npx supabase test db
+      - run: |
+          eval "$(npx supabase status -o env)"
+          SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY" \
+            uv run --directory apps/api pytest tests/integration/test_postgres_repository.py
+        env:
+          TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@127.0.0.1:54322/postgres
+      - if: always()
+        run: npx supabase stop

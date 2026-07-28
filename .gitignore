@@ -14,8 +14,26 @@ data/
 
 # Common local/build artifacts
 node_modules/
+*.tsbuildinfo
 .next/
+out/
 dist/
 coverage/
+playwright-report/
+test-results/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+__pycache__/
+*.pyc
 *.log
 .DS_Store
+
+# Local Supabase runtime
+supabase/.branches/
+supabase/.temp/
+
+# Required reproducibility files override local global ignore rules.
+!package-lock.json
+!supabase/config.toml
