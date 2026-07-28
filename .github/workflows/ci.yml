@@ -18,6 +18,10 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - uses: astral-sh/setup-uv@v9.0.0
+        with:
+          python-version: "3.13"
+      - run: uv sync --project apps/api --all-groups
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test:web
