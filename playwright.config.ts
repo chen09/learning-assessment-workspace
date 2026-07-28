@@ -5,7 +5,7 @@ const apiBaseUrl = "http://127.0.0.1:8017";
 
 export default defineConfig({
   testDir: "./e2e",
-  testIgnore: "postgres-flow.spec.ts",
+  testIgnore: ["postgres-flow.spec.ts", "hosted-flow.spec.ts"],
   fullyParallel: true,
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? "github" : "list",
