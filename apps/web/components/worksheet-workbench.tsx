@@ -59,8 +59,8 @@ type Answer = {
   tokens?: string[];
   text?: string;
   strokes?: Stroke[];
-  photoName?: string;
-  photoPath?: string;
+  photoNames?: string[];
+  photoPaths?: string[];
 };
 
 const demoQuestions: Question[] = [
@@ -181,7 +181,7 @@ export function WorksheetWorkbench() {
       const answer = answers[dirtyQuestionId];
       const queueKey = `${attemptId ?? "demo-attempt"}:${dirtyQuestionId}`;
       const kind: DraftSyncRequest["payload"]["kind"] =
-        answer?.photoPath
+        answer?.photoPaths?.length
           ? "photo"
           : answer?.tokens !== undefined
             ? "tokens"
@@ -194,7 +194,7 @@ export function WorksheetWorkbench() {
             : "strokes";
       const apiAnswer: Record<string, unknown> =
         kind === "photo"
-          ? { paths: [answer?.photoPath] }
+          ? { paths: answer.photoPaths }
           : kind === "tokens"
           ? { tokens: answer?.tokens ?? [] }
           : kind === "choice"
@@ -337,7 +337,7 @@ export function WorksheetWorkbench() {
               answer.tokens?.length ||
               answer.text?.trim() ||
               answer.strokes?.length ||
-              answer.photoName),
+              answer.photoNames?.length),
         );
       }).length,
     [answers, questions],
@@ -478,53 +478,94 @@ export function WorksheetWorkbench() {
       );
     }
     if (question.type === "photo") {
+      const photoNames = answer.photoNames ?? [];
+      const photoPaths = answer.photoPaths ?? [];
       return (
         <label className="photo-answer">
           <input
             accept="image/jpeg,image/png"
+            aria-label="Take a photo or choose images"
             capture="environment"
             onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) {
+              const selectedFiles = Array.from(event.target.files ?? []);
+              event.target.value = "";
+              if (selectedFiles.length > 0) {
                 if (attemptId && familyId && childToken) {
                   setSaveStatus("saving");
-                  const uploadKey = `response-${attemptId}-${question.id}-${file.lastModified}`;
-                  void createChildUploadIntent(
-                    {
-                      family_id: familyId,
-                      bucket: "responses",
-                      object_id: attemptId,
-                      filename: file.name,
-                      content_type:
-                        file.type === "image/png" ? "image/png" : "image/jpeg",
-                    },
-                    childToken,
-                    uploadKey,
-                  )
-                    .then(async (intent) => {
-                      await uploadToSignedUrl(intent, file);
+                  void (async () => {
+                    const uploadedNames: string[] = [];
+                    const uploadedPaths: string[] = [];
+                    try {
+                      for (const [index, file] of selectedFiles.entries()) {
+                        const uploadKey = `response-${attemptId}-${question.id}-${file.lastModified}-${index}`;
+                        const intent = await createChildUploadIntent(
+                          {
+                            family_id: familyId,
+                            bucket: "responses",
+                            object_id: attemptId,
+                            filename: file.name,
+                            content_type:
+                              file.type === "image/png"
+                                ? "image/png"
+                                : "image/jpeg",
+                          },
+                          childToken,
+                          uploadKey,
+                        );
+                        await uploadToSignedUrl(intent, file);
+                        uploadedNames.push(file.name);
+                        uploadedPaths.push(intent.path);
+                      }
                       updateAnswer(question.id, {
-                        photoName: file.name,
-                        photoPath: intent.path,
+                        photoNames: [...photoNames, ...uploadedNames],
+                        photoPaths: [...photoPaths, ...uploadedPaths],
                       });
-                    })
-                    .catch(() => {
-                      updateAnswer(question.id, { photoName: file.name });
+                    } catch {
+                      updateAnswer(question.id, {
+                        photoNames: [
+                          ...photoNames,
+                          ...selectedFiles.map((file) => file.name),
+                        ],
+                        photoPaths: [...photoPaths, ...uploadedPaths],
+                      });
                       setSaveStatus("offline");
-                    });
+                    }
+                  })();
                 } else {
-                  updateAnswer(question.id, { photoName: file.name });
+                  updateAnswer(question.id, {
+                    photoNames: [
+                      ...photoNames,
+                      ...selectedFiles.map((file) => file.name),
+                    ],
+                    photoPaths,
+                  });
                 }
               }
             }}
+            multiple
             type="file"
           />
           <Camera size={26} />
-          <strong>{answer.photoName ?? "Take a photo or choose an image"}</strong>
+          <strong>
+            {photoNames.length > 0
+              ? "Add more answer images"
+              : "Take a photo or choose images"}
+          </strong>
           <span>
-            Upload one question at a time. You can add more images in shooting
-            order.
+            Upload one question at a time. Images stay in shooting order.
           </span>
+          {photoNames.length > 0 ? (
+            <ol
+              aria-label="Uploaded answer images"
+              className="photo-file-list"
+            >
+              {photoNames.map((name, index) => (
+                <li key={`${name}-${index}`}>
+                  {index + 1}. {name}
+                </li>
+              ))}
+            </ol>
+          ) : null}
         </label>
       );
     }

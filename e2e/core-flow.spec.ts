@@ -52,12 +52,23 @@ test("child completes a mixed worksheet and opens corrections", async ({
   await expect(page.getByText("Saved")).toBeVisible();
 
   await page.getByRole("button", { name: "Next question" }).click();
-  await page.locator('input[type="file"]').setInputFiles({
-    name: "math-answer.png",
-    mimeType: "image/png",
-    buffer: Buffer.from("fixture"),
-  });
-  await expect(page.getByText("math-answer.png")).toBeVisible();
+  await page.getByLabel("Take a photo or choose images").setInputFiles([
+    {
+      name: "math-answer.png",
+      mimeType: "image/png",
+      buffer: Buffer.from("answer"),
+    },
+    {
+      name: "math-draft.png",
+      mimeType: "image/png",
+      buffer: Buffer.from("draft"),
+    },
+  ]);
+  await expect(
+    page
+      .getByRole("list", { name: "Uploaded answer images" })
+      .getByRole("listitem"),
+  ).toHaveText(["1. math-answer.png", "2. math-draft.png"]);
   await expect(page.getByText("Saved")).toBeVisible();
 
   await page.getByRole("button", { name: "Next question" }).click();
