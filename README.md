@@ -38,7 +38,8 @@ Copy the local URL, publishable key, service-role key, and database connection
 reported by `npx supabase status` into `.env`. Set
 `REPOSITORY_BACKEND=postgres` to exercise the real tenant, storage, job, and
 review flow; the default in-memory repository is only a deterministic UI/test
-fixture.
+fixture. If port 3000 is already used, set `WEB_PORT` to another local port
+before starting Compose.
 
 Run all repository checks with:
 
@@ -47,6 +48,12 @@ npm run check
 npm run e2e
 npx supabase test db
 ```
+
+The PostgreSQL browser flow additionally verifies real local Supabase Auth,
+PostgreSQL persistence, the database worker, and private tenant APIs. Load the
+local values reported by Supabase into the matching environment variables, then
+run `npm run e2e:postgres`. CI runs this flow automatically inside its isolated
+local Supabase stack.
 
 The local Supabase stack includes Auth, PostgreSQL, private Storage, and Mailpit.
 Its Studio is available at `http://127.0.0.1:54323`. The browser build reads

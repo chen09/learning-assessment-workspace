@@ -83,7 +83,7 @@ export function AuthPanel() {
         <Brand />
         <div>
           <p className="eyebrow">One family, one learning space</p>
-          <h1>Stay close to the work without doing it for them.</h1>
+          <h1>Stay close to their work.</h1>
           <p>
             Create, print, answer, photograph, review, and return to the right
             questions at the right time.
@@ -94,6 +94,9 @@ export function AuthPanel() {
 
       <section className="auth-panel">
         <div className="auth-panel-top">
+          <span className="auth-mobile-brand">
+            <Brand />
+          </span>
           <Link className="quiet-link" href="/">
             Back
           </Link>
@@ -158,13 +161,28 @@ export function AuthPanel() {
             </p>
           ) : null}
           <div className="auth-mode-row">
-            <button onClick={() => setMode("otp")} type="button">
+            <button
+              aria-pressed={mode === "otp"}
+              className={mode === "otp" ? "active" : undefined}
+              onClick={() => setMode("otp")}
+              type="button"
+            >
               One-time link
             </button>
-            <button onClick={() => setMode("password")} type="button">
+            <button
+              aria-pressed={mode === "password"}
+              className={mode === "password" ? "active" : undefined}
+              onClick={() => setMode("password")}
+              type="button"
+            >
               Password
             </button>
-            <button onClick={() => setMode("forgot")} type="button">
+            <button
+              aria-pressed={mode === "forgot"}
+              className={mode === "forgot" ? "active" : undefined}
+              onClick={() => setMode("forgot")}
+              type="button"
+            >
               Forgot password
             </button>
           </div>
@@ -184,7 +202,7 @@ export function AuthPanel() {
               onClick={() => void signInWithProvider("custom:line")}
               type="button"
             >
-              <LineChart size={17} /> LINE
+              <LineChart size={17} aria-hidden="true" /> LINE
             </button>
           </div>
           {!supabase ? (
@@ -192,6 +210,9 @@ export function AuthPanel() {
               Continue with the local family demo
             </Link>
           ) : null}
+          <p className="auth-child-note">
+            Children join from the family screen with their six-digit PIN.
+          </p>
         </div>
       </section>
     </main>

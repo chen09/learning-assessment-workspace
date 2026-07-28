@@ -7,7 +7,7 @@ RUN npm ci
 
 COPY apps/web apps/web
 EXPOSE 3000
-CMD ["npm", "run", "dev:web", "--", "--hostname", "0.0.0.0"]
+CMD ["npm", "run", "dev", "--workspace", "@learning-assessment/web", "--", "--hostname", "0.0.0.0"]
 
 FROM development AS build
 RUN npm run build:web
