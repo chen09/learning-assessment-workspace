@@ -55,6 +55,12 @@ local values reported by Supabase into the matching environment variables, then
 run `npm run e2e:postgres`. CI runs this flow automatically inside its isolated
 local Supabase stack.
 
+`npm run e2e:hosted` is a guarded, manual production smoke test. It requires the
+ignored hosted Supabase environment values and an explicit
+`HOSTED_E2E_CONFIRM=study.hypnochunk.com`; it creates a temporary verified
+parent, family, child, assignment, attempt, and grading job, then removes the
+temporary family and Auth user in a `finally` cleanup.
+
 The local Supabase stack includes Auth, PostgreSQL, private Storage, and Mailpit.
 Its Studio is available at `http://127.0.0.1:54323`. The browser build reads
 only `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and
