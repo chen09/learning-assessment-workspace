@@ -62,22 +62,25 @@ only `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and
 
 ## Deployment
 
-The Cloudflare Pages workflow is deliberately gated by the repository variable
-`CLOUDFLARE_DEPLOY_ENABLED=true`. It also needs the Pages project name, account
-ID, API token, Supabase public URL, and publishable key configured in GitHub.
-Until those values exist, pushes run CI but do not deploy.
+The production web app is connected directly to the GitHub `main` branch through
+Cloudflare Pages. Successful main-branch builds publish to
+`study.hypnochunk.com`; the Pages project keeps the Supabase browser settings and
+`NEXT_PUBLIC_API_URL=https://api.study.hypnochunk.com` as build variables. The
+gated `deploy-web.yml` workflow remains disabled as a manual fallback, so it
+does not duplicate the native Pages deployment.
 
 The production API template is in `deploy/compose.production.yaml` and binds
 FastAPI only to `127.0.0.1:8010`; the matching host Nginx template is under
-`deploy/nginx`. Before enabling it on the 8G VPS, add Swap, confirm at least 2GB
-free memory, create `api.study.hypnochunk.com`, and issue its certificate.
+`deploy/nginx`. The API and single-concurrency fixture worker run in Docker on
+the shared 8G VPS, behind the HTTPS-only `api.study.hypnochunk.com` virtual host.
+The host has persistent Swap and container memory limits. Hosted Supabase owns
+Auth, PostgreSQL, and private Storage; all nine repository migrations are
+applied.
 
-The repository is deployable but no production deployment is performed by
-default. Hosted Supabase migrations, SMTP, Google/LINE provider settings,
-Cloudflare Pages credentials, and the API DNS/certificate must be configured
-before enabling a family pilot. The real AI provider, generated listening
-audio, whole-page paper extraction, and public-library publication remain
-feature-gated until their evaluation thresholds are approved.
+This deployment is still a controlled pilot. Google/LINE provider setup, a real
+AI provider, generated listening audio, whole-page paper extraction, and
+public-library publication remain feature-gated until their integration or
+evaluation thresholds are approved.
 
 ## Data and privacy
 
