@@ -47,12 +47,20 @@ const demoResults: AttemptResult[] = [
 ];
 
 const subscribeToHydration = () => () => undefined;
+const getRequestedAttemptId = () =>
+  new URLSearchParams(window.location.search).get("attemptId");
+const getServerAttemptId = () => null;
 
 export default function ChildResultsPage() {
   const hydrated = useSyncExternalStore(
     subscribeToHydration,
     () => true,
     () => false,
+  );
+  const requestedAttemptId = useSyncExternalStore(
+    subscribeToHydration,
+    getRequestedAttemptId,
+    getServerAttemptId,
   );
   const [results, setResults] = useState<AttemptResult[]>(demoResults);
   const [attemptId, setAttemptId] = useState<string | null>(null);
@@ -62,7 +70,7 @@ export default function ChildResultsPage() {
   >("idle");
 
   useEffect(() => {
-    const id = new URLSearchParams(window.location.search).get("attemptId");
+    const id = requestedAttemptId;
     const token = getChildAccessToken();
     if (!id || !token) {
       return;
@@ -95,7 +103,7 @@ export default function ChildResultsPage() {
         window.clearTimeout(timer);
       }
     };
-  }, []);
+  }, [requestedAttemptId]);
 
   const score = useMemo(
     () =>
@@ -108,8 +116,14 @@ export default function ChildResultsPage() {
   const correctionCount = results.filter(
     (result) => result.outcome !== "correct",
   ).length;
+  const waitingForHostedResults = Boolean(
+    requestedAttemptId && !attemptId,
+  );
+  const visibleComplete = complete && !waitingForHostedResults;
+  const correctionActionReady =
+    hydrated && (!requestedAttemptId || Boolean(attemptId));
   const correctionButtonLabel =
-    !hydrated || correctionStatus === "working"
+    !correctionActionReady || correctionStatus === "working"
       ? "Preparing corrections…"
       : "Correct these answers";
 
@@ -139,22 +153,22 @@ export default function ChildResultsPage() {
       <header className="result-header">
         <div>
           <p className="eyebrow">
-            {complete ? "Results ready" : "Checking your work"}
+            {visibleComplete ? "Results ready" : "Checking your work"}
           </p>
-          <h1>{complete ? "Good work, Alex" : "Almost ready"}</h1>
+          <h1>{visibleComplete ? "Good work, Alex" : "Almost ready"}</h1>
           <p>
-            {complete
+            {visibleComplete
               ? `${correctionCount} answers are ready for one more try or a parent check.`
               : "The full result appears only after every answer is checked."}
           </p>
         </div>
         <div className="score-badge">
-          <strong>{complete ? score : "—"}</strong>
+          <strong>{visibleComplete ? score : "—"}</strong>
           <span>points</span>
         </div>
       </header>
       <section className="result-list" aria-live="polite">
-        {complete
+        {visibleComplete
           ? results.map((result, index) => {
               const isCorrect = result.outcome === "correct";
               const isIncorrect = result.outcome === "incorrect";
@@ -197,11 +211,15 @@ export default function ChildResultsPage() {
             })
           : null}
       </section>
-      {complete && correctionCount > 0 ? (
+      {visibleComplete && correctionCount > 0 ? (
         <button
-          aria-busy={!hydrated || correctionStatus === "working"}
+          aria-busy={
+            !correctionActionReady || correctionStatus === "working"
+          }
           className="button primary"
-          disabled={!hydrated || correctionStatus === "working"}
+          disabled={
+            !correctionActionReady || correctionStatus === "working"
+          }
           onClick={() => void beginCorrection()}
           type="button"
         >
