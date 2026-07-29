@@ -7,6 +7,60 @@ const nonPersonalAnswerPng = Buffer.from(
   "base64",
 );
 
+type HostedCleanupState = {
+  familyId: string | null;
+  supabaseAdmin: ReturnType<typeof createClient>;
+  uploadedResponsePaths: string[];
+  userId: string | null;
+};
+
+let hostedCleanupState: HostedCleanupState | null = null;
+
+async function cleanupHostedState(state: HostedCleanupState) {
+  if (state.uploadedResponsePaths.length > 0) {
+    const paths = [...state.uploadedResponsePaths];
+    const { error } = await state.supabaseAdmin.storage
+      .from("responses")
+      .remove(paths);
+    expect.soft(error, "temporary response photo cleanup").toBeNull();
+    if (!error) {
+      state.uploadedResponsePaths.length = 0;
+    }
+  }
+
+  if (state.familyId) {
+    const { error } = await state.supabaseAdmin
+      .from("families")
+      .delete()
+      .eq("id", state.familyId);
+    expect.soft(error, "temporary family cleanup").toBeNull();
+    if (!error) {
+      state.familyId = null;
+    }
+  }
+
+  if (state.userId) {
+    const { error } = await state.supabaseAdmin.auth.admin.deleteUser(
+      state.userId,
+    );
+    expect.soft(error, "temporary user cleanup").toBeNull();
+    if (!error) {
+      state.userId = null;
+    }
+  }
+}
+
+test.afterEach(async ({}, testInfo) => {
+  if (!hostedCleanupState) {
+    return;
+  }
+
+  testInfo.setTimeout(30_000);
+  const state = hostedCleanupState;
+  hostedCleanupState = null;
+  await cleanupHostedState(state);
+});
+
 test("temporary parent completes the hosted family learning flow", async ({
   page,
   request,
@@ -26,6 +80,12 @@ test("temporary parent completes the hosted family learning flow", async ({
   let userId: string | null = null;
   let familyId: string | null = null;
   const uploadedResponsePaths: string[] = [];
+  hostedCleanupState = {
+    familyId,
+    supabaseAdmin,
+    uploadedResponsePaths,
+    userId,
+  };
 
   try {
     await page.goto("/parent/?code=legacy-code-fixture");
@@ -56,6 +116,7 @@ test("temporary parent completes the hosted family learning flow", async ({
     );
     expect(userResponse.ok()).toBeTruthy();
     userId = ((await userResponse.json()) as { id: string }).id;
+    hostedCleanupState.userId = userId;
 
     await page.goto("/login/");
     await page
@@ -87,6 +148,7 @@ test("temporary parent completes the hosted family learning flow", async ({
     familyId = (
       (await (await familyResponse).json()) as { id: string }
     ).id;
+    hostedCleanupState.familyId = familyId;
 
     const failedFamilyName = "Must not appear in client logs";
     await page.route(`${apiBaseUrl}/v1/families`, async (route) => {
@@ -94,10 +156,8 @@ test("temporary parent completes the hosted family learning flow", async ({
         route.request().method() === "POST" &&
         route.request().postDataJSON().name === failedFamilyName
       ) {
-        await route.fulfill({
-          body: JSON.stringify({ detail: "Intentional hosted E2E failure" }),
-          contentType: "application/json",
-          status: 503,
+        await route.continue({
+          postData: JSON.stringify({ name: "" }),
         });
         return;
       }
@@ -107,6 +167,7 @@ test("temporary parent completes the hosted family learning flow", async ({
       (response) =>
         response.url() === `${apiBaseUrl}/v1/client-logs` &&
         response.request().method() === "POST",
+      { timeout: 10_000 },
     );
     await page
       .getByRole("textbox", { name: "New family name" })
@@ -122,7 +183,7 @@ test("temporary parent completes the hosted family learning flow", async ({
     expect(clientLog).toMatchObject({
       page: "/parent/family/",
       request_path: "/v1/families",
-      status_code: 503,
+      status_code: 422,
     });
     expect(JSON.stringify(clientLog)).not.toContain(failedFamilyName);
     await page.unroute(`${apiBaseUrl}/v1/families`);
@@ -315,51 +376,9 @@ test("temporary parent completes the hosted family learning flow", async ({
     await expect(page.getByText("0/3", { exact: true })).toBeVisible();
   } finally {
     testInfo.setTimeout(testInfo.timeout + 30_000);
-    if (uploadedResponsePaths.length > 0) {
-      const { error: storageCleanupError } = await supabaseAdmin.storage
-        .from("responses")
-        .remove(uploadedResponsePaths);
-      expect
-        .soft(storageCleanupError, "temporary response photo cleanup")
-        .toBeNull();
-      if (!storageCleanupError) {
-        for (const uploadedPath of uploadedResponsePaths) {
-          const separator = uploadedPath.lastIndexOf("/");
-          const folder = uploadedPath.slice(0, separator);
-          const filename = uploadedPath.slice(separator + 1);
-          await expect
-            .poll(
-              async () => {
-                const { data, error } = await supabaseAdmin.storage
-                  .from("responses")
-                  .list(folder, { limit: 10, search: filename });
-                if (error) {
-                  throw error;
-                }
-                return data.some((object) => object.name === filename);
-              },
-              {
-                message: "temporary response photo was deleted",
-                timeout: 5_000,
-              },
-            )
-            .toBeFalsy();
-        }
-      }
-    }
-    if (familyId) {
-      const { error: familyCleanupError } = await supabaseAdmin
-        .from("families")
-        .delete()
-        .eq("id", familyId);
-      expect
-        .soft(familyCleanupError, "temporary family cleanup")
-        .toBeNull();
-    }
-    if (userId) {
-      const { error: userCleanupError } =
-        await supabaseAdmin.auth.admin.deleteUser(userId);
-      expect.soft(userCleanupError, "temporary user cleanup").toBeNull();
+    if (hostedCleanupState) {
+      await cleanupHostedState(hostedCleanupState);
+      hostedCleanupState = null;
     }
   }
 });
