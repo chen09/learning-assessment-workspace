@@ -10,8 +10,8 @@ const nonPersonalAnswerPng = Buffer.from(
 test("temporary parent completes the hosted family learning flow", async ({
   page,
   request,
-}) => {
-  test.setTimeout(120_000);
+}, testInfo) => {
+  test.setTimeout(180_000);
 
   const supabaseUrl = process.env.SUPABASE_URL!;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -314,6 +314,7 @@ test("temporary parent completes the hosted family learning flow", async ({
     await expect(page).toHaveURL(/\/child\/work\/\?attemptId=/);
     await expect(page.getByText("0/3", { exact: true })).toBeVisible();
   } finally {
+    testInfo.setTimeout(testInfo.timeout + 30_000);
     if (uploadedResponsePaths.length > 0) {
       const { error: storageCleanupError } = await supabaseAdmin.storage
         .from("responses")
@@ -347,28 +348,18 @@ test("temporary parent completes the hosted family learning flow", async ({
       }
     }
     if (familyId) {
-      const familyCleanup = await request.delete(
-        `${supabaseUrl}/rest/v1/families?id=eq.${familyId}`,
-        {
-          headers: {
-            apikey: serviceRoleKey,
-            Authorization: `Bearer ${serviceRoleKey}`,
-          },
-        },
-      );
-      expect.soft(familyCleanup.ok(), "temporary family cleanup").toBeTruthy();
+      const { error: familyCleanupError } = await supabaseAdmin
+        .from("families")
+        .delete()
+        .eq("id", familyId);
+      expect
+        .soft(familyCleanupError, "temporary family cleanup")
+        .toBeNull();
     }
     if (userId) {
-      const userCleanup = await request.delete(
-        `${supabaseUrl}/auth/v1/admin/users/${userId}`,
-        {
-          headers: {
-            apikey: serviceRoleKey,
-            Authorization: `Bearer ${serviceRoleKey}`,
-          },
-        },
-      );
-      expect.soft(userCleanup.ok(), "temporary user cleanup").toBeTruthy();
+      const { error: userCleanupError } =
+        await supabaseAdmin.auth.admin.deleteUser(userId);
+      expect.soft(userCleanupError, "temporary user cleanup").toBeNull();
     }
   }
 });

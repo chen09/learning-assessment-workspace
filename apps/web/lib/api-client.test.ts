@@ -69,6 +69,10 @@ describe("parent API session refresh", () => {
       exp: Math.floor(Date.now() / 1000) + 3600,
       sub: "parent-1",
     });
+    let acceptLog: (response: Response) => void = () => undefined;
+    const logAcceptance = new Promise<Response>((resolve) => {
+      acceptLog = resolve;
+    });
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(
@@ -80,13 +84,21 @@ describe("parent API session refresh", () => {
           },
         ),
       )
-      .mockResolvedValueOnce(new Response(null, { status: 202 }));
+      .mockReturnValueOnce(logAcceptance);
 
-    await expect(
-      setManagementPin("family-1", "000000", currentToken),
-    ).rejects.toThrow();
+    let originalErrorReturned = false;
+    const failedRequest = setManagementPin(
+      "family-1",
+      "000000",
+      currentToken,
+    ).catch((error: unknown) => {
+      originalErrorReturned = true;
+      return error;
+    });
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(originalErrorReturned).toBe(false);
     expect(fetchMock.mock.calls[1]?.[0]).toBe(
       "http://127.0.0.1:8000/v1/client-logs",
     );
@@ -104,5 +116,8 @@ describe("parent API session refresh", () => {
     expect(JSON.stringify(report)).not.toContain("000000");
     expect(JSON.stringify(report)).not.toContain(currentToken);
     expect(JSON.stringify(report)).not.toContain("secret-login-code");
+
+    acceptLog(new Response(null, { status: 202 }));
+    expect(await failedRequest).toBeInstanceOf(Error);
   });
 });
