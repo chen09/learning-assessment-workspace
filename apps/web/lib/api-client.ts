@@ -120,6 +120,7 @@ async function reportClientApiError(
         occurred_at: new Date().toISOString(),
       }),
       keepalive: true,
+      signal: AbortSignal.timeout(2_000),
     });
   } catch {
     // Logging must never replace the original API failure.
@@ -148,7 +149,7 @@ async function apiRequest<T>(
   }
   if (!response.ok) {
     const detail = (await response.json().catch(() => null)) as unknown;
-    void reportClientApiError(path, init.method, response.status);
+    await reportClientApiError(path, init.method, response.status);
     throw new Error(
       typeof detail === "object" && detail
         ? JSON.stringify(detail)
