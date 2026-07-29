@@ -1,20 +1,30 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowRight, ShieldCheck, UsersRound } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
+import { useLanguage } from "@/components/language-provider";
 import { LanguageSwitcher } from "@/components/language-switcher";
 
 export function ParentDashboard() {
   return (
     <AppShell currentPath="/parent/" role="parent">
+      <ParentDashboardContent />
+    </AppShell>
+  );
+}
+
+function ParentDashboardContent() {
+  const { t } = useLanguage();
+
+  return (
+    <>
       <header className="page-header">
         <div>
-          <p className="eyebrow">Parent workspace</p>
-          <h1>Set up your family workspace</h1>
-          <p className="lede">
-            Add your family and children before creating their first practice
-            set.
-          </p>
+          <p className="eyebrow">{t("parentDashboard.eyebrow")}</p>
+          <h1>{t("parentDashboard.title")}</h1>
+          <p className="lede">{t("parentDashboard.description")}</p>
         </div>
         <LanguageSwitcher />
       </header>
@@ -24,31 +34,27 @@ export function ParentDashboard() {
           <UsersRound aria-hidden="true" />
         </span>
         <div>
-          <p className="kicker">First step</p>
-          <h2 id="attention-heading">Create or join a family</h2>
-          <p>
-            Family setup keeps each child&apos;s assignments, photos, results,
-            and review schedule separate.
-          </p>
+          <p className="kicker">{t("parentDashboard.firstStep")}</p>
+          <h2 id="attention-heading">
+            {t("parentDashboard.familyAction")}
+          </h2>
+          <p>{t("parentDashboard.familyDetails")}</p>
         </div>
         <Link className="text-link" href="/parent/family/">
-          Open family setup
+          {t("parentDashboard.openFamilySetup")}
           <ArrowRight size={16} aria-hidden="true" />
         </Link>
       </section>
 
       <section className="settings-card">
         <ShieldCheck aria-hidden="true" />
-        <p className="eyebrow">Private by default</p>
-        <h2>Your account is ready</h2>
-        <p>
-          Nothing from the sample family is attached to your account. Your
-          workspace starts empty and only shows the people you add or join.
-        </p>
+        <p className="eyebrow">{t("parentDashboard.private")}</p>
+        <h2>{t("parentDashboard.accountReady")}</h2>
+        <p>{t("parentDashboard.accountReadyDetails")}</p>
         <Link className="button primary" href="/parent/family/">
-          Continue to family setup
+          {t("parentDashboard.continueFamilySetup")}
         </Link>
       </section>
-    </AppShell>
+    </>
   );
 }

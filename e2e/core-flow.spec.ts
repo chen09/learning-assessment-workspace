@@ -1,5 +1,21 @@
 import { expect, test } from "@playwright/test";
 
+test("parent language choice translates onboarding and family setup", async ({
+  page,
+}) => {
+  await page.goto("/parent/");
+  await page.getByLabel("Language").selectOption("zh");
+
+  await expect(
+    page.getByRole("heading", { name: "设置家庭学习空间" }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "进入家庭设置" }).click();
+  await expect(page.getByText("家庭学习空间", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "孩子档案与 PIN" }),
+  ).toBeVisible();
+});
+
 test("parent imports material, reviews it, and reaches the printable set", async ({
   page,
 }) => {

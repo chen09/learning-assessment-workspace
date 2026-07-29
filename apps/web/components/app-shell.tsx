@@ -51,12 +51,17 @@ export function AppShell({ children, role, currentPath }: AppShellProps) {
 function AppShellContent({ children, role, currentPath }: AppShellProps) {
   const { t } = useLanguage();
   const navigation = role === "parent" ? parentNavigation : childNavigation;
+  const roleLabel = t(role === "parent" ? "role.parent" : "role.child");
 
   return (
     <div className={`app-frame ${role === "child" ? "child-frame" : ""}`}>
       <aside className="side-rail">
-        <Brand />
-        <nav aria-label={`${role} navigation`}>
+        <Brand tagline={t("brand.tagline")} />
+        <nav
+          aria-label={t(
+            role === "parent" ? "navigation.parent" : "navigation.child",
+          )}
+        >
           {navigation.map(({ href, labelKey, icon: Icon }) => (
             <Link
               className={currentPath === href ? "nav-link active" : "nav-link"}
@@ -71,20 +76,21 @@ function AppShellContent({ children, role, currentPath }: AppShellProps) {
         <div className="rail-foot">
           <span className="avatar">{role === "parent" ? "P" : "A"}</span>
           <span>
-            <strong>{role === "parent" ? "Parent" : "Alex"}</strong>
-            <small>
-              {t(role === "parent" ? "role.parent" : "role.child")}
-            </small>
+            <strong>{role === "parent" ? t("identity.parent") : "Alex"}</strong>
+            <small>{roleLabel}</small>
           </span>
         </div>
         {role === "child" ? (
           <Link className="quiet-link" href="/child/exit/">
-            Exit child mode
+            {t("action.exitChild")}
           </Link>
         ) : null}
       </aside>
       <main className="app-main">{children}</main>
-      <nav className="bottom-nav" aria-label={`${role} mobile navigation`}>
+      <nav
+        className="bottom-nav"
+        aria-label={t("navigation.mobile", { role: roleLabel })}
+      >
         {navigation.slice(0, 4).map(({ href, labelKey, icon: Icon }) => (
           <Link
             className={currentPath === href ? "active" : ""}
