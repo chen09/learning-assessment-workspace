@@ -5,6 +5,10 @@ import Link from "next/link";
 import { type FormEvent, useEffect, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
+import {
+  type Language,
+  useLanguage,
+} from "@/components/language-provider";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import {
   type ChildProfile,
@@ -24,7 +28,22 @@ import {
   updateChildPin,
 } from "@/lib/api-client";
 
+const languageLocales: Record<Language, string> = {
+  en: "en",
+  ja: "ja-JP",
+  zh: "zh-CN",
+};
+
 export default function FamilySettingsPage() {
+  return (
+    <AppShell currentPath="/parent/family/" role="parent">
+      <FamilySettingsContent />
+    </AppShell>
+  );
+}
+
+function FamilySettingsContent() {
+  const { language, t } = useLanguage();
   const [token, setToken] = useState<string | null>(null);
   const [families, setFamilies] = useState<Family[]>([]);
   const [pendingInvitations, setPendingInvitations] = useState<
@@ -237,31 +256,31 @@ export default function FamilySettingsPage() {
   };
 
   return (
-    <AppShell currentPath="/parent/family/" role="parent">
+    <>
       <header className="page-header">
         <div>
-          <p className="eyebrow">Family workspace</p>
+          <p className="eyebrow">{t("family.eyebrow")}</p>
           <h1>
             {selectedFamily?.name ??
-              (token ? "Create your family" : "Loading your workspace…")}
+              (token ? t("family.createTitle") : t("family.loadingTitle"))}
           </h1>
-          <p className="lede">
-            Parents share one family. Each member keeps an independent language
-            preference.
-          </p>
+          <p className="lede">{t("family.description")}</p>
         </div>
         <LanguageSwitcher />
       </header>
 
       {token ? (
         <>
-          <section className="filter-row" aria-label="Family switcher">
+          <section
+            className="filter-row"
+            aria-label={t("family.switcherLabel")}
+          >
             <select
-              aria-label="Current family"
+              aria-label={t("family.currentLabel")}
               onChange={(event) => void selectFamily(event.target.value)}
               value={familyId ?? ""}
             >
-              <option value="">Choose a family</option>
+              <option value="">{t("family.choose")}</option>
               {families.map((family) => (
                 <option key={family.id} value={family.id}>
                   {family.name}
@@ -270,13 +289,13 @@ export default function FamilySettingsPage() {
             </select>
             <form onSubmit={addFamily}>
               <input
-                aria-label="New family name"
+                aria-label={t("family.newNameLabel")}
                 onChange={(event) => setNewFamilyName(event.target.value)}
-                placeholder="New family name"
+                placeholder={t("family.newNamePlaceholder")}
                 value={newFamilyName}
               />
               <button className="button ghost" type="submit">
-                Add family
+                {t("family.add")}
               </button>
             </form>
           </section>
@@ -284,18 +303,19 @@ export default function FamilySettingsPage() {
             <section className="invite-ready" key={invitation.id}>
               <Shield />
               <span>
-                A family invitation for {invitation.email} expires{" "}
-                {new Intl.DateTimeFormat().format(
-                  new Date(invitation.expires_at),
-                )}
-                .
+                {t("family.invitation", {
+                  email: invitation.email,
+                  date: new Intl.DateTimeFormat(
+                    languageLocales[language],
+                  ).format(new Date(invitation.expires_at)),
+                })}
               </span>
               <button
                 className="button primary"
                 onClick={() => void acceptInvitation(invitation)}
                 type="button"
               >
-                Accept
+                {t("family.accept")}
               </button>
             </section>
           ))}
@@ -307,16 +327,16 @@ export default function FamilySettingsPage() {
           <div className="settings-heading">
             <UserRoundPlus />
             <div>
-              <p className="eyebrow">Children</p>
-              <h2>Profiles and PIN</h2>
+              <p className="eyebrow">{t("family.children")}</p>
+              <h2>{t("family.profilesPin")}</h2>
             </div>
           </div>
           {token && familyId ? (
             <div className="invite-form">
               <label>
-                Parent management PIN
+                {t("family.managementPin")}
                 <input
-                  aria-label="Parent management PIN"
+                  aria-label={t("family.managementPin")}
                   inputMode="numeric"
                   maxLength={6}
                   onChange={(event) =>
@@ -324,7 +344,7 @@ export default function FamilySettingsPage() {
                       event.target.value.replace(/\D/g, ""),
                     )
                   }
-                  placeholder="6 digits"
+                  placeholder={t("family.sixDigits")}
                   value={managementPin}
                 />
               </label>
@@ -339,14 +359,13 @@ export default function FamilySettingsPage() {
                 type="button"
               >
                 {managementUnlock
-                  ? "Management unlocked for 10 minutes"
+                  ? t("family.managementUnlocked")
                   : managementPinConfigured
-                    ? "Unlock PIN controls"
-                    : "Set management PIN"}
+                    ? t("family.unlockPin")
+                    : t("family.setManagementPin")}
               </button>
               <p className="settings-note">
-                A short management unlock is required before a child PIN can be
-                changed.
+                {t("family.managementNote")}
               </p>
             </div>
           ) : null}
@@ -358,7 +377,10 @@ export default function FamilySettingsPage() {
               <div>
                 <strong>{child.nickname}</strong>
                 <small>
-                  {child.grade_stage} · {child.ui_language.toUpperCase()} UI
+                  {child.grade_stage} ·{" "}
+                  {t("family.uiLanguage", {
+                    language: child.ui_language.toUpperCase(),
+                  })}
                 </small>
               </div>
               {familyId ? (
@@ -367,26 +389,28 @@ export default function FamilySettingsPage() {
                     className="quiet-link"
                     href={`/parent/create/?familyId=${encodeURIComponent(familyId)}&childId=${encodeURIComponent(child.id)}`}
                   >
-                    Create practice
+                    {t("family.createPractice")}
                   </Link>
                   <Link
                     className="quiet-link"
                     href={`/child/login/?childId=${encodeURIComponent(child.id)}`}
                   >
-                    Child sign in
+                    {t("family.childSignIn")}
                   </Link>
                 </div>
               ) : null}
               {pinEditor === child.id ? (
                 <div>
                   <input
-                    aria-label={`New PIN for ${child.nickname}`}
+                    aria-label={t("family.newPinFor", {
+                      name: child.nickname,
+                    })}
                     inputMode="numeric"
                     maxLength={6}
                     onChange={(event) =>
                       setNewPin(event.target.value.replace(/\D/g, ""))
                     }
-                    placeholder="6-digit PIN"
+                    placeholder={t("family.pinPlaceholder")}
                     value={newPin}
                   />
                   <button
@@ -395,7 +419,7 @@ export default function FamilySettingsPage() {
                     onClick={() => void savePin(child.id)}
                     type="button"
                   >
-                    Save PIN
+                    {t("family.savePin")}
                   </button>
                 </div>
               ) : (
@@ -405,7 +429,7 @@ export default function FamilySettingsPage() {
                   onClick={() => setPinEditor(child.id)}
                   type="button"
                 >
-                  Manage PIN
+                  {t("family.managePin")}
                 </button>
               )}
             </article>
@@ -413,7 +437,7 @@ export default function FamilySettingsPage() {
           {token && familyId ? (
             <form className="invite-form" onSubmit={addChild}>
               <label>
-                Child name
+                {t("family.childName")}
                 <input
                   onChange={(event) =>
                     setNewChild((current) => ({
@@ -426,7 +450,7 @@ export default function FamilySettingsPage() {
                 />
               </label>
               <label>
-                Grade
+                {t("family.grade")}
                 <input
                   onChange={(event) =>
                     setNewChild((current) => ({
@@ -439,7 +463,7 @@ export default function FamilySettingsPage() {
                 />
               </label>
               <label>
-                Six-digit PIN
+                {t("family.sixDigitPin")}
                 <input
                   inputMode="numeric"
                   maxLength={6}
@@ -455,7 +479,7 @@ export default function FamilySettingsPage() {
                 />
               </label>
               <button className="button ghost full-button" type="submit">
-                Add child
+                {t("family.addChild")}
               </button>
             </form>
           ) : null}
@@ -465,17 +489,14 @@ export default function FamilySettingsPage() {
           <div className="settings-heading">
             <MailPlus />
             <div>
-              <p className="eyebrow">Parents</p>
-              <h2>Invite another parent</h2>
+              <p className="eyebrow">{t("family.parents")}</p>
+              <h2>{t("family.inviteParent")}</h2>
             </div>
           </div>
-          <p className="settings-note">
-            A family can have up to four parents. Invitations expire after
-            seven days. The MVP does not send external email.
-          </p>
+          <p className="settings-note">{t("family.inviteNote")}</p>
           <form className="invite-form" onSubmit={invite}>
             <label>
-              Parent email
+              {t("family.parentEmail")}
               <input
                 onChange={(event) => {
                   setInviteEmail(event.target.value);
@@ -491,28 +512,25 @@ export default function FamilySettingsPage() {
               disabled={status === "working"}
               type="submit"
             >
-              Create invite
+              {t("family.createInvite")}
             </button>
           </form>
           {inviteSent ? (
             <div className="invite-ready" role="status">
               <Shield />
-              <span>
-                Invite created for {inviteEmail}. They can accept it after
-                signing in with that verified email.
-              </span>
+              <span>{t("family.inviteCreated", { email: inviteEmail })}</span>
             </div>
           ) : null}
         </section>
       </div>
       {status === "error" ? (
         <p className="form-error" role="alert">
-          The change could not be saved. Please check the details and try again.
+          {t("family.saveError")}
         </p>
       ) : null}
       <Link className="button ghost account-link" href="/parent/account/">
-        Open my sign-in and language settings
+        {t("family.accountSettings")}
       </Link>
-    </AppShell>
+    </>
   );
 }
