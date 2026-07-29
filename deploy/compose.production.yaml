@@ -10,9 +10,12 @@ services:
     environment:
       APP_ENV: production
       AI_PROVIDER: fixture
+      CLIENT_LOG_PATH: /var/log/learning-assessment/client-errors.jsonl
       REPOSITORY_BACKEND: postgres
     ports:
       - "127.0.0.1:8010:8000"
+    volumes:
+      - /opt/learning-assessment/logs:/var/log/learning-assessment
     restart: unless-stopped
     mem_limit: 768m
     cpus: 1.0

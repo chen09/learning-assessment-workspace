@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from app.api.assignments import router as assignments_router
 from app.api.attempts import router as attempts_router
 from app.api.children import router as children_router
+from app.api.client_logs import router as client_logs_router
 from app.api.deletions import router as deletions_router
 from app.api.demo import router as demo_router
 from app.api.families import router as families_router
@@ -24,6 +25,7 @@ from app.config import get_settings
 from app.repositories.memory import MemoryRepository
 from app.repositories.postgres import PostgresRepository
 from app.services.child_sessions import ChildSessionService
+from app.services.client_logs import ClientLogWriter
 from app.services.management_unlock import ManagementUnlockService
 from app.services.parent_auth import SupabaseParentAuthService
 
@@ -78,6 +80,11 @@ def create_app() -> FastAPI:
         publishable_key=settings.supabase_publishable_key,
         allow_fixture=settings.app_env in {"local", "test"},
     )
+    application.state.client_log_writer = ClientLogWriter(
+        settings.client_log_path,
+        max_bytes=settings.client_log_max_bytes,
+        backup_count=settings.client_log_backup_count,
+    )
     application.add_middleware(
         CORSMiddleware,
         allow_origins=list(settings.cors_origins),
@@ -91,6 +98,7 @@ def create_app() -> FastAPI:
         ],
     )
     application.include_router(children_router)
+    application.include_router(client_logs_router)
     application.include_router(assignments_router)
     application.include_router(attempts_router)
     application.include_router(demo_router)

@@ -326,6 +326,67 @@
         "title": "ChildSessionResponse",
         "type": "object"
       },
+      "ClientLogRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "error_code": {
+            "maxLength": 80,
+            "pattern": "^[a-z0-9_:-]+$",
+            "title": "Error Code",
+            "type": "string"
+          },
+          "event": {
+            "const": "api_request_failed",
+            "title": "Event",
+            "type": "string"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "page": {
+            "maxLength": 300,
+            "pattern": "^/[A-Za-z0-9_./-]*$",
+            "title": "Page",
+            "type": "string"
+          },
+          "request_method": {
+            "enum": [
+              "GET",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE"
+            ],
+            "title": "Request Method",
+            "type": "string"
+          },
+          "request_path": {
+            "maxLength": 300,
+            "pattern": "^/v1/[A-Za-z0-9_./-]*$",
+            "title": "Request Path",
+            "type": "string"
+          },
+          "status_code": {
+            "maximum": 599.0,
+            "minimum": 400.0,
+            "title": "Status Code",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "event",
+          "page",
+          "request_method",
+          "request_path",
+          "status_code",
+          "error_code",
+          "occurred_at"
+        ],
+        "title": "ClientLogRequest",
+        "type": "object"
+      },
       "CompleteReviewRequest": {
         "properties": {
           "outcome": {
@@ -2438,6 +2499,45 @@
         "summary": "Create Child Session",
         "tags": [
           "children"
+        ]
+      }
+    },
+    "/v1/client-logs": {
+      "post": {
+        "operationId": "create_client_log_v1_client_logs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientLogRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Client Log",
+        "tags": [
+          "client-logs"
         ]
       }
     },

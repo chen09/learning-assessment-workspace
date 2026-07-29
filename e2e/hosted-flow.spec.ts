@@ -88,6 +88,77 @@ test("temporary parent completes the hosted family learning flow", async ({
       (await (await familyResponse).json()) as { id: string }
     ).id;
 
+    const failedFamilyName = "Must not appear in client logs";
+    await page.route(`${apiBaseUrl}/v1/families`, async (route) => {
+      if (
+        route.request().method() === "POST" &&
+        route.request().postDataJSON().name === failedFamilyName
+      ) {
+        await route.fulfill({
+          body: JSON.stringify({ detail: "Intentional hosted E2E failure" }),
+          contentType: "application/json",
+          status: 503,
+        });
+        return;
+      }
+      await route.continue();
+    });
+    const clientLogResponse = page.waitForResponse(
+      (response) =>
+        response.url() === `${apiBaseUrl}/v1/client-logs` &&
+        response.request().method() === "POST",
+    );
+    await page
+      .getByRole("textbox", { name: "New family name" })
+      .fill(failedFamilyName);
+    await page.getByRole("button", { name: "Add family" }).click();
+    const loggedFailure = await clientLogResponse;
+    expect(loggedFailure.status()).toBe(202);
+    const clientLog = loggedFailure.request().postDataJSON() as {
+      page: string;
+      request_path: string;
+      status_code: number;
+    };
+    expect(clientLog).toMatchObject({
+      page: "/parent/family/",
+      request_path: "/v1/families",
+      status_code: 503,
+    });
+    expect(JSON.stringify(clientLog)).not.toContain(failedFamilyName);
+    await page.unroute(`${apiBaseUrl}/v1/families`);
+
+    let managementPinAttempts = 0;
+    const expiredParentToken = `header.${Buffer.from(
+      JSON.stringify({ exp: 1, sub: userId }),
+    ).toString("base64url")}.signature`;
+    await page.route(
+      `${apiBaseUrl}/v1/families/${familyId}/management-pin`,
+      async (route) => {
+        managementPinAttempts += 1;
+        if (managementPinAttempts === 1) {
+          await route.continue({
+            headers: {
+              ...route.request().headers(),
+              authorization: `Bearer ${expiredParentToken}`,
+            },
+          });
+          return;
+        }
+        await route.continue();
+      },
+    );
+    await page
+      .getByRole("textbox", { name: "Parent management PIN" })
+      .fill("000000");
+    await page.getByRole("button", { name: "Set management PIN" }).click();
+    await expect(
+      page.getByRole("button", { name: "Management unlocked" }),
+    ).toBeVisible();
+    expect(managementPinAttempts).toBe(2);
+    await page.unroute(
+      `${apiBaseUrl}/v1/families/${familyId}/management-pin`,
+    );
+
     const childResponse = page.waitForResponse(
       (response) =>
         response.url() ===

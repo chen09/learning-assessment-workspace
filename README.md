@@ -80,9 +80,11 @@ The production API template is in `deploy/compose.production.yaml` and binds
 FastAPI only to `127.0.0.1:8010`; the matching host Nginx template is under
 `deploy/nginx`. The API and single-concurrency fixture worker run in Docker on
 the shared 8G VPS, behind the HTTPS-only `api.study.hypnochunk.com` virtual host.
-The host has persistent Swap and container memory limits. Hosted Supabase owns
-Auth, PostgreSQL, and private Storage; all nine repository migrations are
-applied.
+The host has persistent Swap and container memory limits. Field-limited browser
+API errors are stored under `/opt/learning-assessment/logs` with bounded file
+rotation; request bodies, credentials, PINs, and URL query strings are excluded.
+Hosted Supabase owns Auth, PostgreSQL, and private Storage; all nine repository
+migrations are applied.
 
 This deployment is still a controlled pilot. Google/LINE provider setup, a real
 AI provider, generated listening audio, whole-page paper extraction, and

@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     child_session_secret: SecretStr = SecretStr("local-development-only-change-me")
     ai_provider: Literal["fixture"] = "fixture"
     repository_backend: Literal["memory", "postgres"] = "memory"
+    client_log_path: str = "/tmp/learning-assessment/client-errors.jsonl"
+    client_log_max_bytes: int = 5_000_000
+    client_log_backup_count: int = 3
 
 
 @lru_cache
