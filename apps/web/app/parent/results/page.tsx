@@ -1,85 +1,403 @@
 "use client";
 
-import { Check, CircleHelp, PenLine, ShieldCheck } from "lucide-react";
-import { useState } from "react";
+import {
+  AlertCircle,
+  Check,
+  CircleHelp,
+  Image as ImageIcon,
+  PenLine,
+  ShieldCheck,
+} from "lucide-react";
+import Image from "next/image";
+import {
+  useEffect,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { useLanguage } from "@/components/language-provider";
+import {
+  decideParentReview,
+  getParentAccessToken,
+  getParentAttemptReview,
+  type ParentAttemptReview,
+  type ParentReviewItem,
+} from "@/lib/api-client";
 
-export default function ParentResultsPage() {
-  const [decision, setDecision] = useState<"correct" | "incorrect" | null>(null);
+type Decision = "correct" | "incorrect";
+type Point = { x: number; y: number } | [number, number];
+type Stroke = {
+  points?: Point[];
+  width?: number;
+  eraser?: boolean;
+};
+
+const REVIEW_POLL_INTERVAL_MS = 2_000;
+const subscribeToHydration = () => () => undefined;
+const getRequestedAttemptId = () =>
+  new URLSearchParams(window.location.search).get("attemptId");
+const getServerAttemptId = () => null;
+
+function coordinates(point: Point) {
+  return Array.isArray(point)
+    ? { x: point[0], y: point[1] }
+    : { x: point.x, y: point.y };
+}
+
+function HandwritingPreview({
+  item,
+  label,
+}: {
+  item: ParentReviewItem;
+  label: string;
+}) {
+  const rawStrokes = item.response_answer.strokes;
+  const strokes = Array.isArray(rawStrokes)
+    ? (rawStrokes as Stroke[])
+    : [];
 
   return (
+    <div
+      aria-label={label}
+      className="handwriting-preview parent-handwriting-preview"
+    >
+      {strokes.length ? (
+        <svg
+          preserveAspectRatio="xMidYMid meet"
+          role="img"
+          viewBox="0 0 900 420"
+        >
+          {strokes.map((stroke, index) => {
+            const points = (stroke.points ?? [])
+              .map(coordinates)
+              .map((point) => `${point.x},${point.y}`)
+              .join(" ");
+            return (
+              <polyline
+                fill="none"
+                key={`${item.result_id}-${index}`}
+                points={points}
+                stroke={stroke.eraser ? "#fffdf8" : "#1f2833"}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={stroke.width ?? 2.5}
+              />
+            );
+          })}
+        </svg>
+      ) : (
+        <p>—</p>
+      )}
+    </div>
+  );
+}
+
+function PhotoPreview({
+  item,
+  label,
+}: {
+  item: ParentReviewItem;
+  label: string;
+}) {
+  const rawPaths = item.response_answer.paths;
+  const paths = Array.isArray(rawPaths)
+    ? rawPaths.filter((path): path is string => typeof path === "string")
+    : [];
+  const photoUrls = item.photo_urls ?? [];
+  return (
+    <div aria-label={label} className="photo-answer-preview">
+      {photoUrls.length ? (
+        <div className="photo-answer-grid">
+          {photoUrls.map((url, index) => (
+            <figure key={url}>
+              <Image
+                alt={`${label} ${index + 1}`}
+                height={1_600}
+                src={url}
+                unoptimized
+                width={1_200}
+              />
+              <figcaption>
+                {paths[index]?.split("/").at(-1) ?? `${index + 1}`}
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      ) : (
+        <div className="handwriting-preview">
+          <ImageIcon aria-hidden="true" />
+          {paths.length ? (
+            <ol>
+              {paths.map((path) => (
+                <li key={path}>{path.split("/").at(-1)}</li>
+              ))}
+            </ol>
+          ) : (
+            <p>—</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function ParentResultsPage() {
+  return (
     <AppShell currentPath="/parent/history/" role="parent">
+      <ParentResultsContent />
+    </AppShell>
+  );
+}
+
+function ParentResultsContent() {
+  const { t } = useLanguage();
+  const attemptId = useSyncExternalStore(
+    subscribeToHydration,
+    getRequestedAttemptId,
+    getServerAttemptId,
+  );
+  const [review, setReview] = useState<ParentAttemptReview | null>(null);
+  const [loadState, setLoadState] = useState<
+    "loading" | "ready" | "error"
+  >("loading");
+  const [decisions, setDecisions] = useState<Record<string, Decision>>({});
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [decisionErrorId, setDecisionErrorId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!attemptId) {
+      queueMicrotask(() => setLoadState("ready"));
+      return;
+    }
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const loadReview = async () => {
+      try {
+        const token = await getParentAccessToken();
+        if (!token) {
+          throw new Error("Parent session is unavailable.");
+        }
+        const payload = await getParentAttemptReview(attemptId, token);
+        if (cancelled) {
+          return;
+        }
+        setReview(payload);
+        setLoadState("ready");
+        if (!payload.complete) {
+          retryTimer = setTimeout(() => {
+            void loadReview();
+          }, REVIEW_POLL_INTERVAL_MS);
+        }
+      } catch {
+        if (!cancelled) {
+          setLoadState("error");
+        }
+      }
+    };
+
+    void loadReview();
+    return () => {
+      cancelled = true;
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+      }
+    };
+  }, [attemptId]);
+
+  const decide = async (item: ParentReviewItem, outcome: Decision) => {
+    setSavingId(item.result_id);
+    setDecisionErrorId(null);
+    try {
+      const token = await getParentAccessToken();
+      if (!token) {
+        throw new Error("Parent session is unavailable.");
+      }
+      const points = outcome === "correct" ? item.question_points : 0;
+      await decideParentReview(
+        item.result_id,
+        {
+          outcome,
+          awarded_points: points,
+          comment: null,
+        },
+        token,
+        `parent-review-${item.result_id}`,
+      );
+      setDecisions((current) => ({
+        ...current,
+        [item.result_id]: outcome,
+      }));
+      setReview((current) =>
+        current
+          ? {
+              ...current,
+              awarded_points: current.awarded_points + points,
+              correct_count:
+                current.correct_count + (outcome === "correct" ? 1 : 0),
+              correction_count:
+                current.correction_count + (outcome === "incorrect" ? 1 : 0),
+              pending_review_count: Math.max(
+                0,
+                current.pending_review_count - 1,
+              ),
+            }
+          : current,
+      );
+    } catch {
+      setDecisionErrorId(item.result_id);
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  return (
+    <>
       <header className="page-header">
         <div>
-          <p className="eyebrow">Alex · submitted today</p>
-          <h1>Review results</h1>
-          <p className="lede">
-            Only uncertain answers and items that need a parent are shown here.
-            Your decision overrides the automated result.
+          <p className="eyebrow">
+            {review
+              ? t("parentResults.eyebrow", {
+                  name: review.child_nickname,
+                  title: review.title,
+                })
+              : t("parentResults.wholeSet")}
           </p>
+          <h1>{t("parentResults.title")}</h1>
+          <p className="lede">{t("parentResults.description")}</p>
         </div>
         <LanguageSwitcher />
       </header>
-      <section className="review-result-grid">
-        <article className="parent-review-card">
-          <header>
-            <span><CircleHelp /></span>
-            <div>
-              <p>Question 3 · Handwriting</p>
-              <h2>Does this show the difference of squares correctly?</h2>
-            </div>
-          </header>
-          <div className="handwriting-preview" aria-label="Handwritten response preview">
-            <p>(a + b)(a − b)</p>
-            <p>= a² − ab + ab − b²</p>
-            <p>= a² − b²</p>
+
+      {loadState === "loading" ? (
+        <p role="status">{t("parentResults.loading")}</p>
+      ) : loadState === "error" ? (
+        <p className="form-error" role="alert">
+          {t("parentResults.error")}
+        </p>
+      ) : !attemptId ? (
+        <p className="empty-state">{t("parentResults.missingAttempt")}</p>
+      ) : review && !review.complete ? (
+        <p className="empty-state" role="status">
+          {t("parentResults.processing")}
+        </p>
+      ) : review ? (
+        <section className="review-result-grid">
+          <div>
+            {review.reviews.length === 0 ? (
+              <p className="empty-state">
+                {t("parentResults.allReviewed")}
+              </p>
+            ) : (
+              review.reviews.map((item) => {
+                const decision = decisions[item.result_id];
+                const typeLabel = t(
+                  item.response_kind === "photo"
+                    ? "parentResults.photo"
+                    : "parentResults.handwriting",
+                );
+                return (
+                  <article className="parent-review-card" key={item.result_id}>
+                    <header>
+                      <span>
+                        <CircleHelp />
+                      </span>
+                      <div>
+                        <p>
+                          {t("parentResults.question", {
+                            number: item.question_position,
+                            type: typeLabel,
+                          })}
+                        </p>
+                        <h2>{item.question_prompt}</h2>
+                      </div>
+                    </header>
+                    {item.response_kind === "photo" ? (
+                      <PhotoPreview
+                        item={item}
+                        label={t("parentResults.photoList")}
+                      />
+                    ) : (
+                      <HandwritingPreview
+                        item={item}
+                        label={t("parentResults.handwritingPreview")}
+                      />
+                    )}
+                    <div className="ai-observation">
+                      <PenLine />
+                      <p>{t("parentResults.parentNeeded")}</p>
+                    </div>
+                    {decision ? (
+                      <div className="confirmed-message" role="status">
+                        <ShieldCheck />
+                        {t(
+                          decision === "correct"
+                            ? "parentResults.savedCorrect"
+                            : "parentResults.savedIncorrect",
+                        )}
+                      </div>
+                    ) : (
+                      <div className="decision-row">
+                        <button
+                          className="button primary"
+                          disabled={savingId === item.result_id}
+                          onClick={() => void decide(item, "correct")}
+                          type="button"
+                        >
+                          <Check />
+                          {savingId === item.result_id
+                            ? t("parentResults.saving")
+                            : t("parentResults.markCorrect")}
+                        </button>
+                        <button
+                          className="button ghost"
+                          disabled={savingId === item.result_id}
+                          onClick={() => void decide(item, "incorrect")}
+                          type="button"
+                        >
+                          {t("parentResults.markIncorrect")}
+                        </button>
+                      </div>
+                    )}
+                    {decisionErrorId === item.result_id ? (
+                      <p className="form-error" role="alert">
+                        <AlertCircle />
+                        {t("parentResults.decisionError")}
+                      </p>
+                    ) : null}
+                  </article>
+                );
+              })
+            )}
           </div>
-          <div className="ai-observation">
-            <PenLine />
-            <p>
-              The final answer appears correct. One middle sign was hard to
-              read, so this was not marked wrong.
-            </p>
-          </div>
-          {decision ? (
-            <div className="confirmed-message" role="status">
-              <ShieldCheck />
-              Parent marked this {decision}.
-            </div>
-          ) : (
-            <div className="decision-row">
-              <button
-                className="button primary"
-                onClick={() => setDecision("correct")}
-                type="button"
-              >
-                <Check /> Mark correct
-              </button>
-              <button
-                className="button ghost"
-                onClick={() => setDecision("incorrect")}
-                type="button"
-              >
-                Needs correction
-              </button>
-            </div>
-          )}
-        </article>
-        <aside className="result-context">
-          <p className="eyebrow">Whole set</p>
-          <h2>6 / 8 points</h2>
-          <dl>
-            <div><dt>Correct</dt><dd>1</dd></div>
-            <div><dt>Correction</dt><dd>1</dd></div>
-            <div><dt>Parent review</dt><dd>{decision ? 0 : 1}</dd></div>
-          </dl>
-          <p>
-            Results were released only after every question finished grading.
-          </p>
-        </aside>
-      </section>
-    </AppShell>
+          <aside className="result-context">
+            <p className="eyebrow">{t("parentResults.wholeSet")}</p>
+            <h2>
+              {t("parentResults.score", {
+                awarded: review.awarded_points,
+                available: review.available_points,
+              })}
+            </h2>
+            <dl>
+              <div>
+                <dt>{t("parentResults.correct")}</dt>
+                <dd>{review.correct_count}</dd>
+              </div>
+              <div>
+                <dt>{t("parentResults.correction")}</dt>
+                <dd>{review.correction_count}</dd>
+              </div>
+              <div>
+                <dt>{t("parentResults.pending")}</dt>
+                <dd>{review.pending_review_count}</dd>
+              </div>
+            </dl>
+            <p>{t("parentResults.releaseNote")}</p>
+          </aside>
+        </section>
+      ) : null}
+    </>
   );
 }

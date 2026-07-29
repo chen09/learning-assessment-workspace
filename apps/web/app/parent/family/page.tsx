@@ -25,6 +25,7 @@ import {
   getParentAccessToken,
   setManagementPin,
   unlockFamilyManagement,
+  updateChildLanguage,
   updateChildPin,
 } from "@/lib/api-client";
 
@@ -33,6 +34,12 @@ const languageLocales: Record<Language, string> = {
   ja: "ja-JP",
   zh: "zh-CN",
 };
+
+const childLanguageOptions = [
+  { value: "zh", labelKey: "language.option.zh" },
+  { value: "ja", labelKey: "language.option.ja" },
+  { value: "en", labelKey: "language.option.en" },
+] as const;
 
 export default function FamilySettingsPage() {
   return (
@@ -58,7 +65,7 @@ function FamilySettingsContent() {
     nickname: "",
     grade_stage: "",
     pin: "",
-    ui_language: "en" as "zh" | "ja" | "en",
+    ui_language: language,
   });
   const [pinEditor, setPinEditor] = useState<string | null>(null);
   const [newPin, setNewPin] = useState("");
@@ -149,7 +156,7 @@ function FamilySettingsContent() {
         nickname: "",
         grade_stage: "",
         pin: "",
-        ui_language: "en",
+        ui_language: language,
       });
       setStatus("idle");
     } catch {
@@ -186,6 +193,29 @@ function FamilySettingsContent() {
       await updateChildPin(childId, newPin, token, managementUnlock);
       setPinEditor(null);
       setNewPin("");
+      setStatus("idle");
+    } catch {
+      setStatus("error");
+    }
+  };
+
+  const saveChildLanguage = async (
+    childId: string,
+    uiLanguage: Language,
+  ) => {
+    if (!token) {
+      return;
+    }
+    setStatus("working");
+    try {
+      const updated = await updateChildLanguage(
+        childId,
+        uiLanguage,
+        token,
+      );
+      setChildren((current) =>
+        current.map((child) => (child.id === childId ? updated : child)),
+      );
       setStatus("idle");
     } catch {
       setStatus("error");
@@ -382,6 +412,30 @@ function FamilySettingsContent() {
                     language: child.ui_language.toUpperCase(),
                   })}
                 </small>
+                <label className="member-language-control">
+                  <span className="sr-only">
+                    {t("family.languageFor", { name: child.nickname })}
+                  </span>
+                  <select
+                    aria-label={t("family.languageFor", {
+                      name: child.nickname,
+                    })}
+                    disabled={status === "working"}
+                    onChange={(event) =>
+                      void saveChildLanguage(
+                        child.id,
+                        event.target.value as Language,
+                      )
+                    }
+                    value={child.ui_language}
+                  >
+                    {childLanguageOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {t(option.labelKey)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               </div>
               {familyId ? (
                 <div>
@@ -477,6 +531,25 @@ function FamilySettingsContent() {
                   required
                   value={newChild.pin}
                 />
+              </label>
+              <label>
+                {t("family.childUiLanguage")}
+                <select
+                  aria-label={t("family.childUiLanguage")}
+                  onChange={(event) =>
+                    setNewChild((current) => ({
+                      ...current,
+                      ui_language: event.target.value as Language,
+                    }))
+                  }
+                  value={newChild.ui_language}
+                >
+                  {childLanguageOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {t(option.labelKey)}
+                    </option>
+                  ))}
+                </select>
               </label>
               <button className="button ghost full-button" type="submit">
                 {t("family.addChild")}

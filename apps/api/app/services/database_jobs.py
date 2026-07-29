@@ -6,6 +6,11 @@ import asyncpg
 import structlog
 
 from app.domain.models import Job, Question, SavedResponse
+from app.fixtures.english_lesson_one import (
+    lesson_one_question_specs,
+    lesson_one_source_summary,
+    matches_lesson_one_import,
+)
 from app.services.grading import FixtureGrader
 
 JobHandler = Callable[
@@ -65,7 +70,8 @@ async def fixture_job_handler(
     if job["type"] == "extract_source":
         imported = await connection.fetchrow(
             """
-            select i.id, i.family_id, i.question_set_id, qs.subject
+            select i.id, i.family_id, i.question_set_id, i.filenames,
+                   i.answer_filenames, i.reference_filenames, qs.subject
             from public.question_set_imports i
             join public.question_sets qs on qs.id = i.question_set_id
             where i.id = $1
@@ -75,49 +81,86 @@ async def fixture_job_handler(
         if imported is None:
             raise RuntimeError("The source import no longer exists.")
         subject = str(imported["subject"])
-        knowledge_tag_id = await connection.fetchval(
-            """
-            insert into public.knowledge_tags (
-              family_id, subject, code, label
-            ) values ($1, $2, $3, $4::jsonb)
-            on conflict (family_id, code) do update
-            set subject = excluded.subject
-            returning id
-            """,
-            imported["family_id"],
-            subject,
-            f"fixture:{subject.casefold().replace(' ', '-')}",
-            json.dumps({"en": f"{subject} foundations"}),
+        is_lesson_one = matches_lesson_one_import(
+            list(_json_value(imported["filenames"])),
+            list(_json_value(imported["answer_filenames"])),
         )
-        fixtures = (
+        if is_lesson_one:
+            fixture_rows = [
+                (
+                    spec.type.value,
+                    spec.prompt,
+                    list(spec.options) if spec.options else None,
+                    spec.answer_key,
+                    spec.points,
+                    spec.knowledge_code,
+                    spec.knowledge_label,
+                )
+                for spec in lesson_one_question_specs()
+            ]
+        else:
+            fixture_rows = [
+                (
+                    "single_choice",
+                    "Choose the sentence that uses the present simple correctly.",
+                    [
+                        "She walk to school every day.",
+                        "She walks to school every day.",
+                        "She walking to school every day.",
+                    ],
+                    {"choice": 1},
+                    1,
+                    f"fixture:{subject.casefold().replace(' ', '-')}",
+                    f"{subject} foundations",
+                ),
+                (
+                    "typed_text",
+                    "Complete: My brother ___ tennis on Sundays.",
+                    None,
+                    {"text": "plays"},
+                    1,
+                    f"fixture:{subject.casefold().replace(' ', '-')}",
+                    f"{subject} foundations",
+                ),
+                (
+                    "handwriting",
+                    "Write one similar sentence and underline the verb.",
+                    None,
+                    {"reference": "A grammatical present-simple sentence."},
+                    2,
+                    f"fixture:{subject.casefold().replace(' ', '-')}",
+                    f"{subject} foundations",
+                ),
+            ]
+        knowledge_tag_ids: dict[str, Any] = {}
+        for position, fixture in enumerate(fixture_rows, start=1):
             (
-                "single_choice",
-                "Choose the sentence that uses the present simple correctly.",
-                [
-                    "She walk to school every day.",
-                    "She walks to school every day.",
-                    "She walking to school every day.",
-                ],
-                {"choice": 1},
-                1,
-            ),
-            (
-                "typed_text",
-                "Complete: My brother ___ tennis on Sundays.",
-                None,
-                {"text": "plays"},
-                1,
-            ),
-            (
-                "handwriting",
-                "Write one similar sentence and underline the verb.",
-                None,
-                {"reference": "A grammatical present-simple sentence."},
-                2,
-            ),
-        )
-        for position, fixture in enumerate(fixtures, start=1):
-            question_type, prompt, options, answer_key, points = fixture
+                question_type,
+                prompt,
+                options,
+                answer_key,
+                points,
+                knowledge_code,
+                knowledge_label,
+            ) = fixture
+            knowledge_tag_id = knowledge_tag_ids.get(knowledge_code)
+            if knowledge_tag_id is None:
+                knowledge_tag_id = await connection.fetchval(
+                    """
+                    insert into public.knowledge_tags (
+                      family_id, subject, code, label
+                    ) values ($1, $2, $3, $4::jsonb)
+                    on conflict (family_id, code) do update
+                    set subject = excluded.subject,
+                        label = excluded.label
+                    returning id
+                    """,
+                    imported["family_id"],
+                    subject,
+                    knowledge_code,
+                    json.dumps({"en": knowledge_label}),
+                )
+                knowledge_tag_ids[knowledge_code] = knowledge_tag_id
             await connection.execute(
                 """
                 insert into public.questions (
@@ -148,10 +191,26 @@ async def fixture_job_handler(
         await connection.execute(
             """
             update public.question_sets
-            set status = 'needs_review', updated_at = now()
+            set status = 'needs_review',
+                source_summary = $2::jsonb,
+                updated_at = now()
             where id = $1
             """,
             imported["question_set_id"],
+            json.dumps(
+                lesson_one_source_summary(
+                    len(list(_json_value(imported["reference_filenames"])))
+                )
+                if is_lesson_one
+                else {
+                    "schema_version": "1.0",
+                    "artifact_kind": "fixture_generated_practice",
+                    "knowledge_points": [f"{subject} foundations"],
+                    "reference_file_count": len(
+                        list(_json_value(imported["reference_filenames"]))
+                    ),
+                }
+            ),
         )
         await connection.execute(
             """
@@ -165,7 +224,10 @@ async def fixture_job_handler(
             "adapter": "fixture-v1",
             "job_type": job["type"],
             "schema_version": "1.0",
-            "question_count": len(fixtures),
+            "question_count": len(fixture_rows),
+            "source_material_count": len(
+                list(_json_value(imported["reference_filenames"]))
+            ),
             "status": "needs_review",
         }
     if job["type"] == "grade_submission":

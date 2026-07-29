@@ -92,7 +92,7 @@ class Child(BaseModel):
     family_id: UUID
     nickname: str
     grade_stage: str
-    ui_language: str = "en"
+    ui_language: Literal["zh", "ja", "en"] = "en"
 
 
 class CreateChildRequest(BaseModel):
@@ -104,6 +104,10 @@ class CreateChildRequest(BaseModel):
 
 class UpdateChildPinRequest(BaseModel):
     pin: str = Field(pattern=r"^\d{6}$")
+
+
+class UpdateChildLanguageRequest(BaseModel):
+    ui_language: Literal["zh", "ja", "en"]
 
 
 class ManagementPinRequest(BaseModel):
@@ -134,6 +138,7 @@ class QuestionSet(BaseModel):
     title: str
     subject: str
     status: QuestionSetStatus
+    source_summary: dict[str, Any] = Field(default_factory=dict)
 
 
 class Question(BaseModel):
@@ -218,6 +223,7 @@ class Attempt(BaseModel):
 
 
 class AssignmentWork(BaseModel):
+    title: str
     assignment: Assignment
     attempt: Attempt
     questions: list[QuestionView]
@@ -280,6 +286,33 @@ class AttemptResults(BaseModel):
     attempt_id: UUID
     complete: bool
     results: list[QuestionResult]
+
+
+class ParentReviewItem(BaseModel):
+    result_id: UUID
+    question_id: UUID
+    question_position: int
+    question_prompt: str
+    question_type: QuestionType
+    question_points: float
+    response_kind: ResponseKind
+    response_answer: dict[str, Any]
+    photo_urls: list[str] = Field(default_factory=list)
+    automated_outcome: GradingOutcome
+    automated_feedback: dict[str, Any]
+
+
+class ParentAttemptReview(BaseModel):
+    attempt_id: UUID
+    child_nickname: str
+    title: str
+    complete: bool
+    awarded_points: float
+    available_points: float
+    correct_count: int
+    correction_count: int
+    pending_review_count: int
+    reviews: list[ParentReviewItem]
 
 
 class ReviewItemView(BaseModel):
@@ -355,6 +388,10 @@ class CreateImportRequest(BaseModel):
     family_id: UUID
     filenames: list[str] = Field(min_length=1, max_length=30)
     source_paths: list[str] = Field(default_factory=list, max_length=30)
+    answer_filenames: list[str] = Field(default_factory=list, max_length=10)
+    answer_source_paths: list[str] = Field(default_factory=list, max_length=10)
+    reference_filenames: list[str] = Field(default_factory=list, max_length=30)
+    reference_source_paths: list[str] = Field(default_factory=list, max_length=30)
     purpose: ImportPurpose
     title: str = Field(min_length=1, max_length=160)
     subject: str = Field(min_length=1, max_length=80)
@@ -366,6 +403,10 @@ class QuestionSetImport(BaseModel):
     question_set_id: UUID
     filenames: list[str]
     source_paths: list[str] = Field(default_factory=list)
+    answer_filenames: list[str] = Field(default_factory=list)
+    answer_source_paths: list[str] = Field(default_factory=list)
+    reference_filenames: list[str] = Field(default_factory=list)
+    reference_source_paths: list[str] = Field(default_factory=list)
     purpose: ImportPurpose
     status: QuestionSetStatus = QuestionSetStatus.NEEDS_REVIEW
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
@@ -374,6 +415,16 @@ class QuestionSetImport(BaseModel):
 class QuestionSetDraft(BaseModel):
     question_set: QuestionSet
     questions: list[Question]
+
+
+class FamilyLibraryQuestionSet(BaseModel):
+    id: UUID
+    family_id: UUID
+    title: str
+    subject: str
+    status: QuestionSetStatus
+    question_count: int = Field(ge=0)
+    source_summary: dict[str, Any] = Field(default_factory=dict)
 
 
 class CreateAssignmentRequest(BaseModel):
@@ -413,6 +464,8 @@ class UploadIntent(BaseModel):
 class CreateLibrarySubmissionRequest(BaseModel):
     family_id: UUID
     question_set_id: UUID
+    rights_confirmed: Literal[True]
+    privacy_confirmed: Literal[True]
 
 
 class LibrarySubmission(BaseModel):

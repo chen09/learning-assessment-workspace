@@ -5,10 +5,23 @@ import { Delete, LockKeyhole } from "lucide-react";
 import { useState } from "react";
 
 import { Brand } from "@/components/brand";
+import {
+  LanguageProvider,
+  useLanguage,
+} from "@/components/language-provider";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { createChildSession } from "@/lib/api-client";
 
 export default function ChildLoginPage() {
+  return (
+    <LanguageProvider storageKey="demo-child">
+      <ChildLoginContent />
+    </LanguageProvider>
+  );
+}
+
+function ChildLoginContent() {
+  const { t } = useLanguage();
   const [pin, setPin] = useState("");
   const [status, setStatus] = useState<"idle" | "opening" | "error">("idle");
   const ready = pin.length === 6;
@@ -44,15 +57,20 @@ export default function ChildLoginPage() {
   return (
     <main className="child-entry">
       <header>
-        <Brand />
+        <Brand tagline={t("brand.tagline")} />
         <LanguageSwitcher />
       </header>
       <section className="pin-card">
         <span className="pin-avatar">A</span>
-        <p className="eyebrow">Alex</p>
-        <h1>Enter your six-digit PIN</h1>
-        <p>A parent can reset this PIN from Family settings.</p>
-        <div className="pin-dots" aria-label={`${pin.length} of 6 digits entered`}>
+        <p className="eyebrow">{t("childLogin.eyebrow")}</p>
+        <h1>{t("childLogin.title")}</h1>
+        <p>{t("childLogin.help")}</p>
+        <div
+          className="pin-dots"
+          aria-label={t("childLogin.digitsEntered", {
+            count: pin.length,
+          })}
+        >
           {Array.from({ length: 6 }, (_, index) => (
             <i className={index < pin.length ? "filled" : ""} key={index} />
           ))}
@@ -77,7 +95,7 @@ export default function ChildLoginPage() {
             0
           </button>
           <button
-            aria-label="Delete last digit"
+            aria-label={t("childLogin.deleteDigit")}
             onClick={() => setPin((current) => current.slice(0, -1))}
             type="button"
           >
@@ -92,16 +110,18 @@ export default function ChildLoginPage() {
             type="button"
           >
             <LockKeyhole />
-            {status === "opening" ? "Opening…" : "Open my work"}
+            {status === "opening"
+              ? t("childLogin.opening")
+              : t("childLogin.openWork")}
           </button>
         ) : null}
         {status === "error" ? (
           <p className="form-error" role="alert">
-            That PIN did not work. Please try again.
+            {t("childLogin.error")}
           </p>
         ) : null}
         <Link className="quiet-link parent-return" href="/parent/">
-          Return to parent mode
+          {t("childLogin.returnParent")}
         </Link>
       </section>
     </main>

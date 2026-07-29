@@ -18,6 +18,7 @@ from app.domain.models import (
     CreateImportRequest,
     CreateUploadIntentRequest,
     ImportPurpose,
+    ParentDecisionRequest,
     ResponseKind,
     SaveResponseRequest,
     UploadBucket,
@@ -179,6 +180,40 @@ async def test_postgres_vertical_flow_and_family_isolation() -> None:
         assert draft.question_set.status.value == "needs_review"
         assert len(draft.questions) == 3
 
+        lesson_import = await repository.create_import(
+            CreateImportRequest(
+                family_id=family_a,
+                filenames=["english_lesson1_similar_practice.pdf"],
+                source_paths=["family/import/questions.pdf"],
+                answer_filenames=[
+                    "english_lesson1_similar_answer_key.pdf"
+                ],
+                answer_source_paths=["family/import/answer-key.pdf"],
+                reference_filenames=["lesson1-source.pdf"],
+                reference_source_paths=["family/import/reference.pdf"],
+                purpose=ImportPurpose.USE_AS_QUESTIONS,
+                title="Lesson 1 同レベル変形練習",
+                subject="English",
+            ),
+            "integration-lesson-one-import",
+            str(parent_a),
+        )
+        assert lesson_import.answer_filenames == [
+            "english_lesson1_similar_answer_key.pdf"
+        ]
+        assert lesson_import.reference_source_paths == [
+            "family/import/reference.pdf"
+        ]
+        assert await worker.run_once() is True
+        lesson_draft = await repository.get_question_set_draft(
+            str(lesson_import.question_set_id),
+            str(parent_a),
+        )
+        assert len(lesson_draft.questions) == 49
+        assert lesson_draft.questions[0].prompt.endswith(
+            "Emma ___ Leo are in the music club."
+        )
+
         confirmed = await repository.confirm_question_set(
             str(imported.question_set_id),
             "integration-confirm",
@@ -227,6 +262,16 @@ async def test_postgres_vertical_flow_and_family_isolation() -> None:
                     headers={"Content-Type": "image/png"},
                 )
             assert upload.is_success
+            await repository.save_response(
+                str(work.attempt.id),
+                str(work.questions[2].id),
+                str(child_a),
+                SaveResponseRequest(
+                    kind=ResponseKind.PHOTO,
+                    answer={"paths": [uploaded_path]},
+                    expected_version=0,
+                ),
+            )
         first_question = work.questions[0]
         saved = await repository.save_response(
             str(work.attempt.id),
@@ -268,11 +313,25 @@ async def test_postgres_vertical_flow_and_family_isolation() -> None:
             str(child_a),
         )
         assert results.complete is True
-        assert [result.outcome.value for result in results.results] == [
-            "incorrect",
-            "uncertain",
-            "uncertain",
-        ]
+        assert [result.outcome.value for result in results.results] == (
+            ["incorrect", "uncertain", "needs_parent_review"]
+            if uploaded_path
+            else ["incorrect", "uncertain", "uncertain"]
+        )
+        if uploaded_path:
+            photo_review = await repository.get_parent_attempt_review(
+                str(work.attempt.id),
+                str(parent_a),
+            )
+            assert photo_review.pending_review_count == 1
+            assert photo_review.reviews[0].response_kind == ResponseKind.PHOTO
+            assert len(photo_review.reviews[0].photo_urls) == 1
+            async with httpx.AsyncClient() as client:
+                preview = await client.get(
+                    photo_review.reviews[0].photo_urls[0]
+                )
+            assert preview.is_success
+            assert preview.content == b"integration-image"
         review_connection = await asyncpg.connect(asyncpg_url)
         try:
             await review_connection.execute(
@@ -334,8 +393,42 @@ async def test_postgres_vertical_flow_and_family_isolation() -> None:
         assert [result.outcome.value for result in correction_results.results] == [
             "correct",
             "correct",
-            "uncertain",
+            "needs_parent_review",
         ]
+        parent_review = await repository.get_parent_attempt_review(
+            str(correction.attempt.id),
+            str(parent_a),
+        )
+        assert parent_review.child_nickname == "Alex"
+        assert parent_review.complete is True
+        assert parent_review.awarded_points == 2
+        assert parent_review.available_points == 4
+        assert parent_review.pending_review_count == 1
+        assert parent_review.reviews[0].response_kind == ResponseKind.STROKES
+        assert parent_review.reviews[0].response_answer == {"strokes": []}
+        with pytest.raises(NotFoundError):
+            await repository.get_parent_attempt_review(
+                str(correction.attempt.id),
+                str(uuid4()),
+            )
+        parent_decision = await repository.decide_grading_result(
+            str(parent_review.reviews[0].result_id),
+            ParentDecisionRequest(
+                outcome="correct",
+                awarded_points=2,
+                comment="Work checked by a parent.",
+            ),
+            str(parent_a),
+        )
+        assert parent_decision.parent_outcome == "correct"
+        resolved_parent_review = await repository.get_parent_attempt_review(
+            str(correction.attempt.id),
+            str(parent_a),
+        )
+        assert resolved_parent_review.awarded_points == 4
+        assert resolved_parent_review.correct_count == 3
+        assert resolved_parent_review.pending_review_count == 0
+        assert resolved_parent_review.reviews == []
         child_history = await repository.list_child_history(str(child_a))
         family_history = await repository.list_family_history(
             str(family_a),

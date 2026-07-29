@@ -5,6 +5,11 @@ import { useState } from "react";
 
 import { Brand } from "@/components/brand";
 import {
+  LanguageProvider,
+  useLanguage,
+} from "@/components/language-provider";
+import { LanguageSwitcher } from "@/components/language-switcher";
+import {
   clearChildAccessToken,
   getActiveChildProfile,
   getParentAccessToken,
@@ -13,6 +18,15 @@ import {
 import { clearPendingDrafts } from "@/lib/draft-queue";
 
 export default function ExitChildModePage() {
+  return (
+    <LanguageProvider storageKey="demo-child">
+      <ExitChildModeContent />
+    </LanguageProvider>
+  );
+}
+
+function ExitChildModeContent() {
+  const { t } = useLanguage();
   const [pin, setPin] = useState("");
   const [status, setStatus] = useState<"idle" | "working" | "error">("idle");
 
@@ -38,16 +52,22 @@ export default function ExitChildModePage() {
   return (
     <main className="child-entry">
       <header>
-        <Brand />
+        <Brand tagline={t("brand.tagline")} />
+        <LanguageSwitcher />
       </header>
       <section className="pin-card">
         <span className="pin-avatar">
           <LockKeyhole />
         </span>
-        <p className="eyebrow">Parent check</p>
-        <h1>Enter your management PIN</h1>
-        <p>Child answers stay open until a parent unlocks this shared device.</p>
-        <div className="pin-dots" aria-label={`${pin.length} of 6 digits entered`}>
+        <p className="eyebrow">{t("childExit.eyebrow")}</p>
+        <h1>{t("childExit.title")}</h1>
+        <p>{t("childExit.help")}</p>
+        <div
+          className="pin-dots"
+          aria-label={t("childExit.digitsEntered", {
+            count: pin.length,
+          })}
+        >
           {Array.from({ length: 6 }, (_, index) => (
             <i className={index < pin.length ? "filled" : ""} key={index} />
           ))}
@@ -72,7 +92,7 @@ export default function ExitChildModePage() {
             0
           </button>
           <button
-            aria-label="Delete last digit"
+            aria-label={t("childExit.deleteDigit")}
             onClick={() => setPin((current) => current.slice(0, -1))}
             type="button"
           >
@@ -87,12 +107,14 @@ export default function ExitChildModePage() {
             type="button"
           >
             <LockKeyhole />
-            {status === "working" ? "Checking…" : "Return to parent mode"}
+            {status === "working"
+              ? t("childExit.checking")
+              : t("childExit.returnParent")}
           </button>
         ) : null}
         {status === "error" ? (
           <p className="form-error" role="alert">
-            A signed-in parent and the correct management PIN are required.
+            {t("childExit.error")}
           </p>
         ) : null}
       </section>

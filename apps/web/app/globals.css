@@ -190,6 +190,13 @@ button {
   padding: 2.5rem clamp(1.5rem, 4vw, 4.5rem) 4rem;
 }
 
+.shell-tools {
+  display: flex;
+  justify-content: flex-end;
+  min-height: 2.7rem;
+  margin-bottom: 1rem;
+}
+
 .page-header {
   display: flex;
   align-items: flex-start;
@@ -1768,6 +1775,12 @@ button {
     padding: 1.5rem 1rem 2rem;
   }
 
+  .shell-tools {
+    position: relative;
+    z-index: 2;
+    margin-bottom: 0.75rem;
+  }
+
   .bottom-nav {
     position: fixed;
     z-index: 10;
@@ -2287,6 +2300,51 @@ button {
   line-height: 1.55;
 }
 
+.source-purpose-options {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+  border: 0;
+  padding: 0;
+}
+
+.source-purpose-options legend {
+  margin-bottom: 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.source-purpose-options label {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  cursor: pointer;
+  padding: 1rem;
+}
+
+.source-purpose-options label:has(input:checked) {
+  border-color: #9cabe8;
+  background: var(--blue-soft);
+}
+
+.source-purpose-options input {
+  margin-top: 0.2rem;
+}
+
+.source-purpose-options span,
+.source-purpose-options small {
+  display: block;
+}
+
+.source-purpose-options small {
+  margin-top: 0.3rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
 .drop-zone {
   display: grid;
   min-height: 15rem;
@@ -2539,6 +2597,11 @@ button {
   gap: 1rem;
 }
 
+.review-result-grid > div {
+  display: grid;
+  gap: 1rem;
+}
+
 .parent-review-card > header {
   display: flex;
   align-items: center;
@@ -2586,6 +2649,52 @@ button {
 
 .handwriting-preview p {
   margin-bottom: 0.75rem;
+}
+
+.parent-handwriting-preview {
+  min-height: 14rem;
+  padding: 0;
+  overflow: hidden;
+  transform: none;
+}
+
+.parent-handwriting-preview svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 14rem;
+}
+
+.photo-answer-preview {
+  margin: 1.2rem 0;
+}
+
+.photo-answer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr));
+  gap: 1rem;
+}
+
+.photo-answer-grid figure {
+  margin: 0;
+}
+
+.photo-answer-grid img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 34rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: #fff;
+  object-fit: contain;
+}
+
+.photo-answer-grid figcaption {
+  margin-top: 0.45rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+  overflow-wrap: anywhere;
 }
 
 .ai-observation {
@@ -2653,6 +2762,20 @@ button {
 
 .member-row > div {
   display: grid;
+}
+
+.member-language-control {
+  margin-top: 0.55rem;
+}
+
+.member-language-control select {
+  min-height: 2.3rem;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  background: var(--surface);
+  padding: 0 0.7rem;
+  font-size: 0.72rem;
+  font-weight: 700;
 }
 
 .member-row small,

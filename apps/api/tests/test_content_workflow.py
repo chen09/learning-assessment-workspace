@@ -53,6 +53,124 @@ def test_import_stays_in_review_then_can_be_confirmed_and_assigned() -> None:
     assert assigned.json()["status"] == "assigned"
 
 
+def test_lesson_one_import_keeps_answer_key_private_and_creates_real_questions() -> None:
+    client = TestClient(create_app())
+    fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+    body = {
+        "family_id": fixture["family"]["id"],
+        "filenames": ["english_lesson1_similar_practice.pdf"],
+        "source_paths": ["family/import/questions.pdf"],
+        "answer_filenames": ["english_lesson1_similar_answer_key.pdf"],
+        "answer_source_paths": ["family/import/answer-key.pdf"],
+        "reference_filenames": ["lesson1-textbook-and-examples.pdf"],
+        "reference_source_paths": ["family/import/reference.pdf"],
+        "purpose": "use_as_questions",
+        "title": "Lesson 1 同レベル変形練習",
+        "subject": "English",
+    }
+
+    imported = client.post(
+        "/v1/question-sets/imports",
+        headers={
+            **PARENT_HEADERS,
+            "Idempotency-Key": "import-real-lesson-one",
+        },
+        json=body,
+    )
+
+    assert imported.status_code == 202
+    assert imported.json()["filenames"] == body["filenames"]
+    assert imported.json()["answer_filenames"] == body["answer_filenames"]
+    assert imported.json()["answer_source_paths"] == body["answer_source_paths"]
+    assert imported.json()["reference_filenames"] == body["reference_filenames"]
+    assert (
+        imported.json()["reference_source_paths"]
+        == body["reference_source_paths"]
+    )
+
+    draft = client.get(
+        f"/v1/question-sets/{imported.json()['question_set_id']}",
+        headers=PARENT_HEADERS,
+    )
+    assert draft.status_code == 200
+    questions = draft.json()["questions"]
+    assert draft.json()["question_set"]["source_summary"] == {
+        "schema_version": "1.0",
+        "unit": "Lesson 1 · What Are Your Plans for the Vacation?",
+        "artifact_kind": "ai_generated_practice",
+        "knowledge_points": [
+            "and / but / or / so",
+            "imperative + and / or",
+            "when / while / after / before",
+            "present tense in future time clauses",
+            "How / What exclamations",
+        ],
+        "reference_file_count": 1,
+    }
+    assert len(questions) == 49
+    assert questions[0]["prompt"].endswith(
+        "Emma ___ Leo are in the music club."
+    )
+    assert questions[0]["options"] == ["and", "but", "so"]
+    assert questions[0]["answer_key"] == {"choice": 0}
+    assert questions[-1]["prompt"].endswith(
+        "We saw a waterfall. How beautiful ___!"
+    )
+    assert questions[-1]["answer_key"] == {"choice": 1}
+
+    library = client.get(
+        f"/v1/library/families/{fixture['family']['id']}/question-sets",
+        headers=PARENT_HEADERS,
+    )
+    assert library.status_code == 200
+    lesson_item = next(
+        item
+        for item in library.json()
+        if item["id"] == imported.json()["question_set_id"]
+    )
+    assert lesson_item["title"] == "Lesson 1 同レベル変形練習"
+    assert lesson_item["question_count"] == 49
+    assert lesson_item["status"] == "needs_review"
+    assert lesson_item["source_summary"]["artifact_kind"] == (
+        "ai_generated_practice"
+    )
+
+    client.post(
+        f"/v1/question-sets/{imported.json()['question_set_id']}/confirm",
+        headers={
+            **PARENT_HEADERS,
+            "Idempotency-Key": "confirm-real-lesson-one",
+        },
+    )
+    assignment = client.post(
+        f"/v1/question-sets/{imported.json()['question_set_id']}/assignments",
+        headers={
+            **PARENT_HEADERS,
+            "Idempotency-Key": "assign-real-lesson-one",
+        },
+        json={
+            "child_id": fixture["child"]["id"],
+            "mode": "exam",
+            "time_limit_seconds": 2700,
+        },
+    ).json()
+    child_session = client.post(
+        f"/v1/children/{fixture['child']['id']}/sessions",
+        json={"pin": "123456"},
+    ).json()
+    work = client.post(
+        f"/v1/assignments/{assignment['id']}/start",
+        headers={
+            "Authorization": f"Bearer {child_session['access_token']}",
+        },
+    )
+
+    assert work.status_code == 200
+    assert len(work.json()["questions"]) == 49
+    assert all("answer_key" not in question for question in work.json()["questions"])
+    assert "answer" not in str(work.json()).casefold()
+
+
 def test_upload_intent_is_private_and_scoped_to_the_family() -> None:
     client = TestClient(create_app())
     fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
@@ -127,15 +245,26 @@ def test_library_submission_enters_review_instead_of_becoming_public() -> None:
     client = TestClient(create_app())
     fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
 
+    missing_confirmations = client.post(
+        "/v1/library/submissions",
+        headers={**PARENT_HEADERS, "Idempotency-Key": "publish-without-rights"},
+        json={
+            "family_id": fixture["family"]["id"],
+            "question_set_id": fixture["question_set"]["id"],
+        },
+    )
     response = client.post(
         "/v1/library/submissions",
         headers={**PARENT_HEADERS, "Idempotency-Key": "publish-demo-set"},
         json={
             "family_id": fixture["family"]["id"],
             "question_set_id": fixture["question_set"]["id"],
+            "rights_confirmed": True,
+            "privacy_confirmed": True,
         },
     )
 
+    assert missing_confirmations.status_code == 422
     assert response.status_code == 202
     assert response.json()["status"] == "pending_review"
     assert response.json()["published_at"] is None

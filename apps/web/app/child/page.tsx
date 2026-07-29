@@ -5,6 +5,7 @@ import { ArrowRight, BookOpen, Clock3, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
+import { useLanguage } from "@/components/language-provider";
 import {
   type ChildAssignmentSummary,
   getChildAccessToken,
@@ -38,6 +39,15 @@ function assignmentHref(assignment: ChildAssignmentSummary) {
 }
 
 export default function ChildHomePage() {
+  return (
+    <AppShell currentPath="/child/" role="child">
+      <ChildHomeContent />
+    </AppShell>
+  );
+}
+
+function ChildHomeContent() {
+  const { t } = useLanguage();
   const [assignments, setAssignments] = useState<ChildAssignmentSummary[]>([
     demoAssignment,
   ]);
@@ -64,17 +74,39 @@ export default function ChildHomePage() {
   }, []);
 
   const current = assignments[0];
+  const assignmentSummary = t(
+    assignments.length === 1
+      ? "childHome.assignmentOne"
+      : "childHome.assignmentMany",
+    { count: assignments.length },
+  );
+  const reviewSummary = t(
+    reviewCount === 1 ? "childHome.reviewOne" : "childHome.reviewMany",
+    { count: reviewCount },
+  );
+  const currentStatusLabel =
+    current?.status === "assigned"
+      ? t("childHome.start")
+      : current?.status === "submitted"
+        ? t("childHome.status.submitted")
+        : current?.status === "grading"
+          ? t("childHome.status.grading")
+          : current?.status === "results_ready"
+            ? t("childHome.status.resultsReady")
+            : current?.status === "completed"
+              ? t("childHome.status.completed")
+              : t("childHome.status.inProgress");
 
   return (
-    <AppShell currentPath="/child/" role="child">
+    <>
       <header className="child-welcome">
         <div>
-          <p className="eyebrow">Today</p>
-          <h1>Ready for a small win?</h1>
-          <p>
-            {assignments.length} assignment{assignments.length === 1 ? "" : "s"}{" "}
-            and {reviewCount} review question{reviewCount === 1 ? "" : "s"}.
-          </p>
+          <p className="eyebrow">{t("childHome.today")}</p>
+          <h1>{t("childHome.title")}</h1>
+          <p>{t("childHome.summary", {
+            assignments: assignmentSummary,
+            reviews: reviewSummary,
+          })}</p>
         </div>
         <span className="child-mascot" aria-hidden="true">
           A
@@ -85,27 +117,36 @@ export default function ChildHomePage() {
         <section className="continue-card">
           <div className="continue-copy">
             <span className="status-pill warm">
-              {current.status === "assigned" ? "Start" : current.status}
+              {currentStatusLabel}
             </span>
-            <p>{current.mode === "exam" ? "Exam mode" : "Practice mode"}</p>
+            <p>
+              {current.mode === "exam"
+                ? t("childHome.examMode")
+                : t("childHome.practiceMode")}
+            </p>
             <h2>{current.title}</h2>
             <div className="continue-meta">
               <span>
-                <BookOpen size={16} /> {current.question_count} questions
+                <BookOpen size={16} />{" "}
+                {t("childHome.questions", {
+                  count: current.question_count,
+                })}
               </span>
               <span>
                 <Clock3 size={16} />{" "}
                 {current.time_limit_seconds
-                  ? `${Math.ceil(current.time_limit_seconds / 60)} min`
-                  : "no timer"}
+                  ? t("childHome.minutes", {
+                      count: Math.ceil(current.time_limit_seconds / 60),
+                    })
+                  : t("childHome.noTimer")}
               </span>
             </div>
             <Link className="button primary large" href={assignmentHref(current)}>
               {["grading", "results_ready", "submitted", "completed"].includes(
                 current.status,
               )
-                ? "View status"
-                : "Open work"}{" "}
+                ? t("childHome.viewStatus")
+                : t("childHome.openWork")}{" "}
               <ArrowRight size={17} />
             </Link>
           </div>
@@ -118,9 +159,9 @@ export default function ChildHomePage() {
       ) : (
         <section className="continue-card">
           <div className="continue-copy">
-            <span className="status-pill">All clear</span>
-            <h2>No assigned work is waiting.</h2>
-            <p>A parent can assign the next practice from the family workspace.</p>
+            <span className="status-pill">{t("childHome.allClear")}</span>
+            <h2>{t("childHome.noAssigned")}</h2>
+            <p>{t("childHome.parentCanAssign")}</p>
           </div>
         </section>
       )}
@@ -130,19 +171,21 @@ export default function ChildHomePage() {
           <Sparkles size={22} />
         </div>
         <div>
-          <p className="eyebrow">Today&apos;s review</p>
-          <h2>{reviewCount} short questions</h2>
-          <p>You can skip today. Missed work will be rescheduled gently.</p>
+          <p className="eyebrow">{t("childHome.todayReview")}</p>
+          <h2>{t("childHome.shortQuestions", { count: reviewCount })}</h2>
+          <p>{t("childHome.reviewNote")}</p>
         </div>
         <Link className="button ghost" href="/child/review/">
-          {reviewCount > 0 ? "Start review" : "View review"}
+          {reviewCount > 0
+            ? t("childHome.startReview")
+            : t("childHome.viewReview")}
         </Link>
       </section>
       {!connected ? (
         <p className="settings-note">
-          Showing the local demo until a child signs in with a real profile.
+          {t("childHome.localDemo")}
         </p>
       ) : null}
-    </AppShell>
+    </>
   );
 }

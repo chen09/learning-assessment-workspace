@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 import secrets
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -40,11 +41,14 @@ from app.domain.models import (
     DemoBootstrap,
     Family,
     FamilyInvitation,
+    FamilyLibraryQuestionSet,
     HistoryItem,
     Job,
     LibrarySubmission,
+    ParentAttemptReview,
     ParentDecision,
     ParentDecisionRequest,
+    ParentReviewItem,
     PrintableAssignment,
     Question,
     QuestionResult,
@@ -59,6 +63,8 @@ from app.domain.models import (
     SubmissionReceipt,
     UploadIntent,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _uuid(value: str | UUID) -> UUID:
@@ -107,6 +113,10 @@ def _question_set(row: RowMapping) -> QuestionSet:
         title=row["title"],
         subject=row["subject"],
         status=row["status"],
+        source_summary=cast(
+            dict[str, Any],
+            row.get("source_summary") or {},
+        ),
     )
 
 
@@ -190,6 +200,44 @@ class PostgresRepository:
 
     async def close(self) -> None:
         await self._engine.dispose()
+
+    async def _sign_response_photo_urls(
+        self,
+        paths: list[str],
+    ) -> dict[str, str]:
+        if not paths or not self._service_role_key:
+            return {}
+        endpoint = f"{self._supabase_url}/storage/v1/object/sign/responses"
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                response = await client.post(
+                    endpoint,
+                    headers={
+                        "Authorization": f"Bearer {self._service_role_key}",
+                        "apikey": self._service_role_key,
+                        "Content-Type": "application/json",
+                    },
+                    json={"expiresIn": 300, "paths": paths},
+                )
+                response.raise_for_status()
+                payload = cast(list[dict[str, Any]], response.json())
+        except (httpx.HTTPError, TypeError, ValueError):
+            logger.warning(
+                "Could not create signed response-photo URLs.",
+                exc_info=True,
+            )
+            return {}
+
+        signed_urls: dict[str, str] = {}
+        for item in payload:
+            path = item.get("path")
+            signed_path = item.get("signedURL") or item.get("signedUrl")
+            if not isinstance(path, str) or not isinstance(signed_path, str):
+                continue
+            if signed_path.startswith("/"):
+                signed_path = f"{self._supabase_url}/storage/v1{signed_path}"
+            signed_urls[path] = signed_path
+        return signed_urls
 
     async def _is_parent(
         self,
@@ -473,6 +521,50 @@ class PostgresRepository:
             )
         return Child(**dict(row))
 
+    async def update_child_language(
+        self,
+        child_id: str,
+        ui_language: str,
+        parent_id: str | None = None,
+    ) -> Child:
+        async with self._engine.begin() as connection:
+            child_result = await connection.execute(
+                text(
+                    """
+                    select id, family_id, nickname, grade_stage, ui_language
+                    from public.children
+                    where id = :child_id and deleted_at is null
+                    """
+                ),
+                {"child_id": _uuid(child_id)},
+            )
+            child = child_result.mappings().one_or_none()
+            if child is None:
+                raise NotFoundError
+            if parent_id is not None:
+                await self._require_parent(
+                    connection,
+                    parent_id,
+                    child["family_id"],
+                )
+            result = await connection.execute(
+                text(
+                    """
+                    update public.children
+                    set ui_language = :ui_language,
+                        updated_at = now()
+                    where id = :child_id
+                    returning id, family_id, nickname, grade_stage, ui_language
+                    """
+                ),
+                {
+                    "child_id": _uuid(child_id),
+                    "ui_language": ui_language,
+                },
+            )
+            row = result.mappings().one()
+        return Child(**dict(row))
+
     async def set_management_pin(
         self,
         family_id: str,
@@ -625,10 +717,11 @@ class PostgresRepository:
             assignment_result = await connection.execute(
                 text(
                     """
-                    select id, family_id, question_set_id, child_id, status, mode,
-                           time_limit_seconds
-                    from public.assignments
-                    where id = :assignment_id and child_id = :child_id
+                    select a.id, a.family_id, a.question_set_id, a.child_id,
+                           a.status, a.mode, a.time_limit_seconds, qs.title
+                    from public.assignments a
+                    join public.question_sets qs on qs.id = a.question_set_id
+                    where a.id = :assignment_id and a.child_id = :child_id
                     for update
                     """
                 ),
@@ -723,6 +816,7 @@ class PostgresRepository:
         assignment_data["status"] = AssignmentStatus.IN_PROGRESS
         questions = [_question(row) for row in question_rows]
         return AssignmentWork(
+            title=str(assignment_row["title"]),
             assignment=_assignment(cast(RowMapping, assignment_data)),
             attempt=_attempt(attempt_row),
             questions=[
@@ -1051,6 +1145,182 @@ class PostgresRepository:
             results=results,
         )
 
+    async def get_parent_attempt_review(
+        self,
+        attempt_id: str,
+        parent_id: str,
+    ) -> ParentAttemptReview:
+        attempt_uuid = _uuid(attempt_id)
+        async with self._engine.connect() as connection:
+            attempt_result = await connection.execute(
+                text(
+                    """
+                    select at.family_id, at.assignment_id, c.nickname,
+                           qs.title
+                    from public.attempts at
+                    join public.assignments a on a.id = at.assignment_id
+                    join public.children c on c.id = at.child_id
+                    join public.question_sets qs on qs.id = a.question_set_id
+                    where at.id = :attempt_id
+                    """
+                ),
+                {"attempt_id": attempt_uuid},
+            )
+            attempt_row = attempt_result.mappings().one_or_none()
+            if attempt_row is None:
+                raise NotFoundError
+            await self._require_parent(
+                connection,
+                parent_id,
+                attempt_row["family_id"],
+            )
+            result_rows = (
+                await connection.execute(
+                    text(
+                        """
+                        select q.id as question_id, q.position,
+                               q.type as question_type, q.prompt,
+                               q.points as question_points,
+                               qr.id as result_id, qr.outcome,
+                               qr.awarded_points, qr.feedback,
+                               qr.parent_outcome, qr.parent_awarded_points,
+                               r.kind as response_kind, r.answer as response_answer
+                        from public.questions q
+                        join public.assignments a
+                          on a.question_set_id = q.question_set_id
+                        join public.attempts at on at.assignment_id = a.id
+                        left join public.question_results qr
+                          on qr.attempt_id = at.id and qr.question_id = q.id
+                        left join public.responses r
+                          on r.attempt_id = at.id and r.question_id = q.id
+                        where at.id = :attempt_id
+                          and (
+                            at.kind <> 'correction'
+                            or exists (
+                              select 1
+                              from public.correction_links cl
+                              join public.question_results original
+                                on original.id = cl.original_result_id
+                              where cl.correction_attempt_id = at.id
+                                and original.question_id = q.id
+                            )
+                          )
+                        order by q.position
+                        """
+                    ),
+                    {"attempt_id": attempt_uuid},
+                )
+            ).mappings().all()
+            requested_photo_paths: list[str] = []
+            for row in result_rows:
+                if row["response_kind"] != "photo":
+                    continue
+                answer = row["response_answer"]
+                if not isinstance(answer, dict):
+                    continue
+                raw_paths = answer.get("paths")
+                if not isinstance(raw_paths, list):
+                    continue
+                requested_photo_paths.extend(
+                    path for path in raw_paths if isinstance(path, str)
+                )
+            valid_photo_paths: set[str] = set()
+            if requested_photo_paths:
+                asset_rows = (
+                    await connection.execute(
+                        text(
+                            """
+                            select object_path
+                            from public.assets
+                            where family_id = :family_id
+                              and bucket_id = 'responses'
+                              and object_path = any(
+                                cast(:object_paths as text[])
+                              )
+                            """
+                        ),
+                        {
+                            "family_id": attempt_row["family_id"],
+                            "object_paths": requested_photo_paths,
+                        },
+                    )
+                ).scalars()
+                valid_photo_paths = set(asset_rows)
+
+        signed_photo_urls = await self._sign_response_photo_urls(
+            sorted(valid_photo_paths)
+        )
+        reviews: list[ParentReviewItem] = []
+        awarded_points = 0.0
+        correct_count = 0
+        correction_count = 0
+        graded_count = 0
+        for row in result_rows:
+            if row["result_id"] is None:
+                continue
+            graded_count += 1
+            final_outcome = row["parent_outcome"] or row["outcome"]
+            final_points = (
+                row["parent_awarded_points"]
+                if row["parent_outcome"] is not None
+                else row["awarded_points"]
+            )
+            awarded_points += _float(final_points) or 0
+            correct_count += final_outcome == "correct"
+            correction_count += final_outcome == "incorrect"
+            if (
+                row["parent_outcome"] is None
+                and row["outcome"] in {"uncertain", "needs_parent_review"}
+                and row["response_kind"] is not None
+            ):
+                reviews.append(
+                    ParentReviewItem(
+                        result_id=row["result_id"],
+                        question_id=row["question_id"],
+                        question_position=row["position"],
+                        question_prompt=_localized_text(row["prompt"]),
+                        question_type=row["question_type"],
+                        question_points=float(row["question_points"]),
+                        response_kind=row["response_kind"],
+                        response_answer=cast(
+                            dict[str, Any],
+                            row["response_answer"],
+                        ),
+                        photo_urls=[
+                            signed_photo_urls[path]
+                            for path in cast(
+                                dict[str, Any],
+                                row["response_answer"],
+                            ).get("paths", [])
+                            if (
+                                isinstance(path, str)
+                                and path in signed_photo_urls
+                            )
+                        ]
+                        if row["response_kind"] == "photo"
+                        else [],
+                        automated_outcome=row["outcome"],
+                        automated_feedback=cast(
+                            dict[str, Any],
+                            row["feedback"],
+                        ),
+                    )
+                )
+        return ParentAttemptReview(
+            attempt_id=attempt_uuid,
+            child_nickname=attempt_row["nickname"],
+            title=attempt_row["title"],
+            complete=bool(result_rows) and graded_count == len(result_rows),
+            awarded_points=awarded_points,
+            available_points=sum(
+                float(row["question_points"]) for row in result_rows
+            ),
+            correct_count=correct_count,
+            correction_count=correction_count,
+            pending_review_count=len(reviews),
+            reviews=reviews,
+        )
+
     async def create_correction(
         self,
         attempt_id: str,
@@ -1160,11 +1430,16 @@ class PostgresRepository:
             assignment_result = await connection.execute(
                 text(
                     """
-                    update public.assignments
-                    set status = 'correcting', updated_at = now()
-                    where id = :assignment_id
-                    returning id, family_id, question_set_id, child_id, status,
-                              mode, time_limit_seconds
+                    with updated as (
+                      update public.assignments
+                      set status = 'correcting', updated_at = now()
+                      where id = :assignment_id
+                      returning id, family_id, question_set_id, child_id, status,
+                                mode, time_limit_seconds
+                    )
+                    select updated.*, qs.title
+                    from updated
+                    join public.question_sets qs on qs.id = updated.question_set_id
                     """
                 ),
                 {"assignment_id": original["assignment_id"]},
@@ -1189,6 +1464,7 @@ class PostgresRepository:
             ).mappings().all()
         questions = [_question(row) for row in question_rows]
         return AssignmentWork(
+            title=str(assignment_row["title"]),
             assignment=_assignment(assignment_row),
             attempt=_attempt(correction_row),
             questions=[
@@ -1223,10 +1499,11 @@ class PostgresRepository:
                 await connection.execute(
                     text(
                         """
-                        select id, family_id, question_set_id, child_id, status,
-                               mode, time_limit_seconds
-                        from public.assignments
-                        where id = :assignment_id
+                        select a.id, a.family_id, a.question_set_id, a.child_id,
+                               a.status, a.mode, a.time_limit_seconds, qs.title
+                        from public.assignments a
+                        join public.question_sets qs on qs.id = a.question_set_id
+                        where a.id = :assignment_id
                         """
                     ),
                     {"assignment_id": attempt_row["assignment_id"]},
@@ -1263,6 +1540,7 @@ class PostgresRepository:
             ).mappings().all()
         questions = [_question(row) for row in question_rows]
         return AssignmentWork(
+            title=str(assignment_row["title"]),
             assignment=_assignment(assignment_row),
             attempt=_attempt(attempt_row),
             questions=[
@@ -1792,7 +2070,9 @@ class PostgresRepository:
                     text(
                         """
                         select id, family_id, question_set_id, filenames,
-                               source_paths, purpose, status, created_at
+                               source_paths, answer_filenames,
+                               answer_source_paths, reference_filenames,
+                               reference_source_paths, purpose, status, created_at
                         from public.question_set_imports where id = :id
                         """
                     ),
@@ -1828,13 +2108,19 @@ class PostgresRepository:
                     """
                     insert into public.question_set_imports (
                       family_id, question_set_id, created_by, filenames,
-                      source_paths, purpose, status
+                      source_paths, answer_filenames, answer_source_paths,
+                      reference_filenames, reference_source_paths, purpose,
+                      status
                     ) values (
                       :family_id, :question_set_id, :parent_id, :filenames,
-                      :source_paths, :purpose, 'processing'
+                      :source_paths, :answer_filenames, :answer_source_paths,
+                      :reference_filenames, :reference_source_paths, :purpose,
+                      'processing'
                     )
                     returning id, family_id, question_set_id, filenames,
-                              source_paths, purpose, status, created_at
+                              source_paths, answer_filenames,
+                              answer_source_paths, reference_filenames,
+                              reference_source_paths, purpose, status, created_at
                     """
                 ),
                 {
@@ -1843,6 +2129,16 @@ class PostgresRepository:
                     "parent_id": _uuid(parent_id),
                     "filenames": json.dumps(request.filenames),
                     "source_paths": json.dumps(request.source_paths),
+                    "answer_filenames": json.dumps(request.answer_filenames),
+                    "answer_source_paths": json.dumps(
+                        request.answer_source_paths
+                    ),
+                    "reference_filenames": json.dumps(
+                        request.reference_filenames
+                    ),
+                    "reference_source_paths": json.dumps(
+                        request.reference_source_paths
+                    ),
                     "purpose": request.purpose.value,
                 },
             )
@@ -1879,7 +2175,7 @@ class PostgresRepository:
             result = await connection.execute(
                 text(
                     """
-                    select id, family_id, title, subject, status
+                    select id, family_id, title, subject, status, source_summary
                     from public.question_sets
                     where id = :question_set_id and deleted_at is null
                     """
@@ -1908,6 +2204,37 @@ class PostgresRepository:
             question_set=_question_set(row),
             questions=[_question(question) for question in question_rows],
         )
+
+    async def list_family_question_sets(
+        self,
+        family_id: str,
+        parent_id: str,
+    ) -> list[FamilyLibraryQuestionSet]:
+        async with self._engine.connect() as connection:
+            await self._require_parent(connection, parent_id, _uuid(family_id))
+            rows = (
+                await connection.execute(
+                    text(
+                        """
+                        select qs.id, qs.family_id, qs.title, qs.subject,
+                               qs.status, qs.source_summary,
+                               count(q.id)::integer as question_count
+                        from public.question_sets qs
+                        left join public.questions q
+                          on q.question_set_id = qs.id
+                        where qs.family_id = :family_id
+                          and qs.deleted_at is null
+                        group by qs.id
+                        order by qs.created_at desc
+                        """
+                    ),
+                    {"family_id": _uuid(family_id)},
+                )
+            ).mappings().all()
+        return [
+            FamilyLibraryQuestionSet(**dict(row))
+            for row in rows
+        ]
 
     async def confirm_question_set(
         self,

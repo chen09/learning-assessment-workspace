@@ -5,6 +5,89 @@ from app.main import create_app
 PARENT_HEADERS = {"Authorization": "Bearer parent-fixture"}
 
 
+def test_parent_sets_child_ui_language_used_by_the_next_child_session() -> None:
+    client = TestClient(create_app())
+    family = client.post(
+        "/v1/families",
+        headers={
+            **PARENT_HEADERS,
+            "Idempotency-Key": "create-family-language",
+        },
+        json={"name": "Language family"},
+    )
+    child = client.post(
+        f"/v1/families/{family.json()['id']}/children",
+        headers={
+            **PARENT_HEADERS,
+            "Idempotency-Key": "create-child-language",
+        },
+        json={
+            "nickname": "Alex",
+            "grade_stage": "Junior high 1",
+            "pin": "123456",
+            "ui_language": "en",
+        },
+    )
+
+    updated = client.put(
+        f"/v1/children/{child.json()['id']}/language",
+        headers=PARENT_HEADERS,
+        json={"ui_language": "zh"},
+    )
+    child_session = client.post(
+        f"/v1/children/{child.json()['id']}/sessions",
+        json={"pin": "123456"},
+    )
+
+    assert updated.status_code == 200
+    assert updated.json()["ui_language"] == "zh"
+    assert child_session.status_code == 201
+    assert child_session.json()["ui_language"] == "zh"
+
+
+def test_child_changes_own_ui_language_for_future_sessions() -> None:
+    client = TestClient(create_app())
+    family = client.post(
+        "/v1/families",
+        headers={
+            **PARENT_HEADERS,
+            "Idempotency-Key": "create-family-child-language",
+        },
+        json={"name": "Child language family"},
+    )
+    child = client.post(
+        f"/v1/families/{family.json()['id']}/children",
+        headers={
+            **PARENT_HEADERS,
+            "Idempotency-Key": "create-own-language-child",
+        },
+        json={
+            "nickname": "Emi",
+            "grade_stage": "Grade 5",
+            "pin": "123456",
+            "ui_language": "en",
+        },
+    )
+    session = client.post(
+        f"/v1/children/{child.json()['id']}/sessions",
+        json={"pin": "123456"},
+    )
+
+    updated = client.put(
+        "/v1/children/me/language",
+        headers={"Authorization": f"Bearer {session.json()['access_token']}"},
+        json={"ui_language": "ja"},
+    )
+    next_session = client.post(
+        f"/v1/children/{child.json()['id']}/sessions",
+        json={"pin": "123456"},
+    )
+
+    assert updated.status_code == 200
+    assert updated.json()["ui_language"] == "ja"
+    assert next_session.json()["ui_language"] == "ja"
+
+
 def test_parent_creates_family_and_child_then_rotates_child_pin() -> None:
     client = TestClient(create_app())
     family_headers = {

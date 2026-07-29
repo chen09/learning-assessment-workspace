@@ -4,10 +4,20 @@ import { Check, Clock3 } from "lucide-react";
 import { useSyncExternalStore } from "react";
 
 import { AppShell } from "@/components/app-shell";
+import { useLanguage } from "@/components/language-provider";
 
 const subscribeToHydration = () => () => undefined;
 
 export default function SubmittedPage() {
+  return (
+    <AppShell currentPath="/child/work/" role="child">
+      <SubmittedContent />
+    </AppShell>
+  );
+}
+
+function SubmittedContent() {
+  const { t } = useLanguage();
   const hydrated = useSyncExternalStore(
     subscribeToHydration,
     () => true,
@@ -26,20 +36,16 @@ export default function SubmittedPage() {
   };
 
   return (
-    <AppShell currentPath="/child/work/" role="child">
-      <section className="submitted-card">
+    <section className="submitted-card">
         <span className="submitted-check">
           <Check size={34} aria-hidden="true" />
         </span>
-        <p className="eyebrow">All handed in</p>
-        <h1>Your work is being checked</h1>
-        <p>
-          You finished the whole set. Results appear together when every answer
-          is ready.
-        </p>
+        <p className="eyebrow">{t("submitted.eyebrow")}</p>
+        <h1>{t("submitted.title")}</h1>
+        <p>{t("submitted.description")}</p>
         <div className="grading-line">
           <Clock3 size={18} aria-hidden="true" />
-          Usually a few minutes
+          {t("submitted.duration")}
         </div>
         <button
           aria-busy={!hydrated}
@@ -48,9 +54,10 @@ export default function SubmittedPage() {
           onClick={openResults}
           type="button"
         >
-          {hydrated ? "View results" : "Preparing results…"}
+          {hydrated
+            ? t("submitted.viewResults")
+            : t("submitted.preparing")}
         </button>
-      </section>
-    </AppShell>
+    </section>
   );
 }

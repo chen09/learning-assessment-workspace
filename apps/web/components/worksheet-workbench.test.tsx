@@ -1,9 +1,14 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { WorksheetWorkbench } from "@/components/worksheet-workbench";
 
 describe("WorksheetWorkbench", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    window.localStorage.setItem("luma-language:demo-child", "en");
+  });
+
   it("autosaves an answer and lets the child move to the next question", async () => {
     render(<WorksheetWorkbench />);
 
@@ -55,5 +60,23 @@ describe("WorksheetWorkbench", () => {
     expect(uploadedImages).toHaveTextContent(
       "1. answer-page.jpg2. draft-page.jpg",
     );
+  });
+
+  it("localizes worksheet controls without translating question content", () => {
+    window.localStorage.setItem("luma-language:demo-child", "ja");
+
+    render(<WorksheetWorkbench />);
+
+    expect(
+      screen.getByRole("heading", {
+        name: "Choose the correct expansion of (a + b)(a − b).",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "次の問題" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("自動保存")).toBeInTheDocument();
+    expect(screen.getByText("回答済み")).toBeInTheDocument();
+    expect(screen.queryByText("Next question")).not.toBeInTheDocument();
   });
 });

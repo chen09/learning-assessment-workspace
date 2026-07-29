@@ -9,9 +9,11 @@ import {
 } from "react";
 
 import { AppShell } from "@/components/app-shell";
+import { useLanguage } from "@/components/language-provider";
 import {
   type AttemptResult,
   createCorrectionAttempt,
+  getActiveChildProfile,
   getAttemptResults,
   getChildAccessToken,
 } from "@/lib/api-client";
@@ -52,6 +54,15 @@ const getRequestedAttemptId = () =>
 const getServerAttemptId = () => null;
 
 export default function ChildResultsPage() {
+  return (
+    <AppShell currentPath="/child/history/" role="child">
+      <ChildResultsContent />
+    </AppShell>
+  );
+}
+
+function ChildResultsContent() {
+  const { t } = useLanguage();
   const hydrated = useSyncExternalStore(
     subscribeToHydration,
     () => true,
@@ -68,6 +79,22 @@ export default function ChildResultsPage() {
   const [correctionStatus, setCorrectionStatus] = useState<
     "idle" | "working" | "error"
   >("idle");
+  const [childName, setChildName] = useState("Alex");
+
+  useEffect(() => {
+    let active = true;
+    const profile = getActiveChildProfile();
+    if (profile) {
+      queueMicrotask(() => {
+        if (active) {
+          setChildName(profile.nickname);
+        }
+      });
+    }
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     const id = requestedAttemptId;
@@ -124,8 +151,8 @@ export default function ChildResultsPage() {
     hydrated && (!requestedAttemptId || Boolean(attemptId));
   const correctionButtonLabel =
     !correctionActionReady || correctionStatus === "working"
-      ? "Preparing corrections…"
-      : "Correct these answers";
+      ? t("results.preparingCorrections")
+      : t("results.correctAnswers");
 
   const beginCorrection = async () => {
     const token = getChildAccessToken();
@@ -149,22 +176,31 @@ export default function ChildResultsPage() {
   };
 
   return (
-    <AppShell currentPath="/child/history/" role="child">
+    <>
       <header className="result-header">
         <div>
           <p className="eyebrow">
-            {visibleComplete ? "Results ready" : "Checking your work"}
+            {visibleComplete ? t("results.ready") : t("results.checking")}
           </p>
-          <h1>{visibleComplete ? "Good work, Alex" : "Almost ready"}</h1>
+          <h1>
+            {visibleComplete
+              ? t("results.goodWork", { name: childName })
+              : t("results.almostReady")}
+          </h1>
           <p>
             {visibleComplete
-              ? `${correctionCount} answers are ready for one more try or a parent check.`
-              : "The full result appears only after every answer is checked."}
+              ? t(
+                  correctionCount === 1
+                    ? "results.correctionOne"
+                    : "results.correctionMany",
+                  { count: correctionCount },
+                )
+              : t("results.fullResult")}
           </p>
         </div>
         <div className="score-badge">
           <strong>{visibleComplete ? score : "—"}</strong>
-          <span>points</span>
+          <span>{t("results.points")}</span>
         </div>
       </header>
       <section className="result-list" aria-live="polite">
@@ -194,16 +230,22 @@ export default function ChildResultsPage() {
                     )}
                   </span>
                   <div>
-                    <p>Question {index + 1}</p>
+                    <p>
+                      {t("results.question", { number: index + 1 })}
+                    </p>
                     <h2>
                       {isCorrect
-                        ? "Correct"
+                        ? t("results.correct")
                         : isIncorrect
-                          ? "Try once more"
-                          : "Waiting for a parent"}
+                          ? t("results.tryAgain")
+                          : t("results.parentCheck")}
                     </h2>
                     {result.feedback.action ? (
-                      <p className="result-hint">{result.feedback.action}</p>
+                      <p className="result-hint">
+                        {result.id === "demo-incorrect"
+                          ? t("results.demoAction")
+                          : result.feedback.action}
+                      </p>
                     ) : null}
                   </div>
                 </article>
@@ -228,9 +270,9 @@ export default function ChildResultsPage() {
       ) : null}
       {correctionStatus === "error" ? (
         <p className="form-error" role="alert">
-          Corrections could not be opened. Please try again.
+          {t("results.openError")}
         </p>
       ) : null}
-    </AppShell>
+    </>
   );
 }

@@ -11,6 +11,7 @@ handoff-evidence/
 uploads/
 storage/
 data/
+private-sources/
 
 # Common local/build artifacts
 node_modules/

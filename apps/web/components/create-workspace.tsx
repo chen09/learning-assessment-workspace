@@ -28,6 +28,7 @@ import {
 } from "@/lib/api-client";
 
 type CreateMode = "generate" | "import" | "manual";
+type ImportPurpose = "generate_similar" | "use_as_questions";
 type Stage = "compose" | "review";
 
 const sampleQuestions = [
@@ -50,9 +51,15 @@ const sampleQuestions = [
 
 export function CreateWorkspace() {
   const [mode, setMode] = useState<CreateMode>("generate");
+  const [importPurpose, setImportPurpose] =
+    useState<ImportPurpose>("generate_similar");
   const [stage, setStage] = useState<Stage>("compose");
   const [fileName, setFileName] = useState("");
   const [files, setFiles] = useState<File[]>([]);
+  const [answerFileName, setAnswerFileName] = useState("");
+  const [answerFiles, setAnswerFiles] = useState<File[]>([]);
+  const [referenceFileName, setReferenceFileName] = useState("");
+  const [referenceFiles, setReferenceFiles] = useState<File[]>([]);
   const [prompt, setPrompt] = useState(
     "Make a short mixed practice from this week’s algebra and English work.",
   );
@@ -67,6 +74,9 @@ export function CreateWorkspace() {
   >("idle");
 
   const canCreate = mode !== "import" || Boolean(fileName);
+  const isLessonOneImport = files.some(
+    (file) => file.name === "english_lesson1_similar_practice.pdf",
+  );
 
   const getRouteIds = () => {
     const params = new URLSearchParams(window.location.search);
@@ -91,27 +101,38 @@ export function CreateWorkspace() {
     try {
       const importObjectId = crypto.randomUUID();
       const sourcePaths: string[] = [];
+      const answerSourcePaths: string[] = [];
+      const referenceSourcePaths: string[] = [];
       if (mode === "import") {
-        for (const [index, file] of files.entries()) {
-          const contentType = (
-            ["application/pdf", "image/png", "image/jpeg"].includes(file.type)
-              ? file.type
-              : "application/pdf"
-          ) as "application/pdf" | "image/png" | "image/jpeg";
-          const intent = await createUploadIntent(
-            {
-              family_id: familyId,
-              bucket: "sources",
-              object_id: importObjectId,
-              filename: file.name,
-              content_type: contentType,
-            },
-            parentToken,
-            `source-${importObjectId}-${index}`,
-          );
-          await uploadToSignedUrl(intent, file);
-          sourcePaths.push(intent.path);
-        }
+        const uploadSources = async (
+          selectedFiles: File[],
+          role: "questions" | "answers" | "references",
+          target: string[],
+        ) => {
+          for (const [index, file] of selectedFiles.entries()) {
+            const contentType = (
+              ["application/pdf", "image/png", "image/jpeg"].includes(file.type)
+                ? file.type
+                : "application/pdf"
+            ) as "application/pdf" | "image/png" | "image/jpeg";
+            const intent = await createUploadIntent(
+              {
+                family_id: familyId,
+                bucket: "sources",
+                object_id: importObjectId,
+                filename: file.name,
+                content_type: contentType,
+              },
+              parentToken,
+              `source-${role}-${importObjectId}-${index}`,
+            );
+            await uploadToSignedUrl(intent, file);
+            target.push(intent.path);
+          }
+        };
+        await uploadSources(files, "questions", sourcePaths);
+        await uploadSources(answerFiles, "answers", answerSourcePaths);
+        await uploadSources(referenceFiles, "references", referenceSourcePaths);
       }
       const imported = await createQuestionSetImport(
         {
@@ -121,13 +142,19 @@ export function CreateWorkspace() {
               ? files.map((file) => file.name)
               : [`${mode}-request.txt`],
           source_paths: sourcePaths,
+          answer_filenames: answerFiles.map((file) => file.name),
+          answer_source_paths: answerSourcePaths,
+          reference_filenames: referenceFiles.map((file) => file.name),
+          reference_source_paths: referenceSourcePaths,
           purpose:
-            mode === "import" ? "use_as_questions" : "generate_similar",
+            mode === "import" ? importPurpose : "generate_similar",
           title:
             mode === "generate"
               ? prompt.slice(0, 160)
-              : "Imported learning material",
-          subject: "Mixed practice",
+              : isLessonOneImport
+                ? "Lesson 1 同レベル変形練習"
+                : "Imported learning material",
+          subject: isLessonOneImport ? "English" : "Mixed practice",
         },
         parentToken,
         `import-${importObjectId}`,
@@ -183,6 +210,9 @@ export function CreateWorkspace() {
         childId,
         parentToken,
         `assign-${questionSetId}-${childId}`,
+        isLessonOneImport
+          ? { mode: "exam", time_limit_seconds: 2700 }
+          : { mode: "practice", time_limit_seconds: null },
       );
       setAssignmentId(assignment.id);
       setConfirmed(true);
@@ -217,7 +247,12 @@ export function CreateWorkspace() {
           <span className="status-pill warm">
             Draft · not visible to children
           </span>
-          <span>3 questions · about 8 minutes · standard difficulty</span>
+          <span>
+            {draftQuestions.length || sampleQuestions.length} questions ·{" "}
+            {isLessonOneImport
+              ? "45-minute test"
+              : "about 8 minutes · standard difficulty"}
+          </span>
         </div>
         <section className="draft-question-list">
           {(draftQuestions.length > 0 ? draftQuestions : sampleQuestions).map(
@@ -248,8 +283,13 @@ export function CreateWorkspace() {
         <section className="assignment-panel">
           <div>
             <p className="eyebrow">Assign</p>
-            <h2>Alex · practice mode</h2>
-            <p>No timer. Results appear after the whole set is graded.</p>
+            <h2>
+              Alex · {isLessonOneImport ? "45-minute test" : "practice mode"}
+            </h2>
+            <p>
+              {isLessonOneImport ? "Timer: 45 minutes. " : "No timer. "}
+              Results appear after the whole set is graded.
+            </p>
           </div>
           {confirmed ? (
             <div className="confirmed-message" role="status">
@@ -352,10 +392,53 @@ export function CreateWorkspace() {
                   </p>
                 </div>
               </div>
+              <fieldset className="source-purpose-options">
+                <legend>How should these files be used?</legend>
+                <label>
+                  <input
+                    aria-label="Generate new questions from textbook or exercises"
+                    checked={importPurpose === "generate_similar"}
+                    name="import-purpose"
+                    onChange={() => setImportPurpose("generate_similar")}
+                    type="radio"
+                  />
+                  <span>
+                    <strong>
+                      Generate new questions from textbook or exercises
+                    </strong>
+                    <small>
+                      AI extracts the unit, knowledge points, examples, and
+                      difficulty progression before drafting new questions.
+                    </small>
+                  </span>
+                </label>
+                <label>
+                  <input
+                    aria-label="Convert an existing worksheet into questions"
+                    checked={importPurpose === "use_as_questions"}
+                    name="import-purpose"
+                    onChange={() => setImportPurpose("use_as_questions")}
+                    type="radio"
+                  />
+                  <span>
+                    <strong>
+                      Convert an existing worksheet into questions
+                    </strong>
+                    <small>
+                      The uploaded exercises become the child&apos;s
+                      interactive question set after your review.
+                    </small>
+                  </span>
+                </label>
+              </fieldset>
               <label className="drop-zone">
                 <input
                   accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
-                  aria-label="Learning material"
+                  aria-label={
+                    importPurpose === "use_as_questions"
+                      ? "Question material"
+                      : "Learning material and exercises"
+                  }
                   multiple
                   onChange={(event) => {
                     const selectedFiles = Array.from(
@@ -369,9 +452,60 @@ export function CreateWorkspace() {
                   type="file"
                 />
                 <FileText />
-                <strong>{fileName || "Choose PDF or photos"}</strong>
+                <strong>
+                  {fileName ||
+                    (importPurpose === "use_as_questions"
+                      ? "Choose worksheet PDF or photos"
+                      : "Choose textbook and exercise pages")}
+                </strong>
                 <span>
-                  Use them as existing questions, or as source material for new
+                  {importPurpose === "use_as_questions"
+                    ? "These pages become the questions children answer after your review."
+                    : "These private pages become the basis for a reusable unit and new AI-generated questions."}
+                </span>
+              </label>
+              <label className="drop-zone">
+                <input
+                  accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+                  aria-label="Answer key (private)"
+                  multiple
+                  onChange={(event) => {
+                    const selectedFiles = Array.from(
+                      event.target.files ?? [],
+                    );
+                    setAnswerFiles(selectedFiles);
+                    setAnswerFileName(
+                      selectedFiles.map((file) => file.name).join(", "),
+                    );
+                  }}
+                  type="file"
+                />
+                <Check />
+                <strong>{answerFileName || "Choose answer key"}</strong>
+                <span>Children never receive this file.</span>
+              </label>
+              <label className="drop-zone">
+                <input
+                  accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+                  aria-label="Original material or examples (optional)"
+                  multiple
+                  onChange={(event) => {
+                    const selectedFiles = Array.from(
+                      event.target.files ?? [],
+                    );
+                    setReferenceFiles(selectedFiles);
+                    setReferenceFileName(
+                      selectedFiles.map((file) => file.name).join(", "),
+                    );
+                  }}
+                  type="file"
+                />
+                <BookOpenText />
+                <strong>
+                  {referenceFileName || "Add original material or examples"}
+                </strong>
+                <span>
+                  Used privately to understand the learning goal and validate
                   similar questions.
                 </span>
               </label>
