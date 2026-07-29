@@ -10,6 +10,12 @@ import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 type AuthMode = "otp" | "password" | "forgot";
 
+function getCallbackUrl(nextPath: string) {
+  const callbackUrl = new URL("/auth/callback/", window.location.origin);
+  callbackUrl.searchParams.set("next", nextPath);
+  return callbackUrl.toString();
+}
+
 export function AuthPanel() {
   const [mode, setMode] = useState<AuthMode>("otp");
   const [email, setEmail] = useState("");
@@ -35,7 +41,7 @@ export function AuthPanel() {
 
     if (mode === "forgot") {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/login/?mode=update-password`,
+        redirectTo: getCallbackUrl("/parent/account/"),
       });
       finish(error ? error.message : "Password reset instructions sent.");
       return;
@@ -56,7 +62,7 @@ export function AuthPanel() {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/parent/`,
+        emailRedirectTo: getCallbackUrl("/parent/"),
         shouldCreateUser: true,
       },
     });
@@ -70,7 +76,7 @@ export function AuthPanel() {
     }
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: `${window.location.origin}/parent/` },
+      options: { redirectTo: getCallbackUrl("/parent/") },
     });
     if (error) {
       setNotice(error.message);
