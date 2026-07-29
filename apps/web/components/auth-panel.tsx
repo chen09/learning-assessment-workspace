@@ -53,7 +53,7 @@ export function AuthPanel() {
         password,
       });
       if (!error) {
-        window.location.assign("/parent/");
+        window.location.assign("/parent/family/");
       }
       finish(error ? error.message : "Signed in.");
       return;
@@ -62,7 +62,7 @@ export function AuthPanel() {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: getCallbackUrl("/parent/"),
+        emailRedirectTo: getCallbackUrl("/parent/family/"),
         shouldCreateUser: true,
       },
     });
@@ -76,7 +76,7 @@ export function AuthPanel() {
     }
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: getCallbackUrl("/parent/") },
+      options: { redirectTo: getCallbackUrl("/parent/family/") },
     });
     if (error) {
       setNotice(error.message);

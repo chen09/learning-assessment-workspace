@@ -6,10 +6,10 @@ test("parent imports material, reviews it, and reaches the printable set", async
   await page.goto("/");
   await page.getByRole("link", { name: "Open demo" }).click();
   await expect(
-    page.getByRole("heading", { name: "Good afternoon, Maya" }),
+    page.getByRole("heading", { name: "Set up your family workspace" }),
   ).toBeVisible();
 
-  await page.getByRole("link", { name: "Create practice" }).click();
+  await page.goto("/parent/create/");
   await page.getByRole("button", { name: "Import material" }).click();
   await page.getByLabel("Learning material").setInputFiles({
     name: "english-lesson.pdf",

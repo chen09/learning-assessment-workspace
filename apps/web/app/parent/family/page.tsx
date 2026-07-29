@@ -24,23 +24,6 @@ import {
   updateChildPin,
 } from "@/lib/api-client";
 
-const demoChildren: ChildProfile[] = [
-  {
-    id: "alex",
-    family_id: "demo",
-    nickname: "Alex",
-    grade_stage: "Junior high 1",
-    ui_language: "en",
-  },
-  {
-    id: "emi",
-    family_id: "demo",
-    nickname: "Emi",
-    grade_stage: "Grade 5",
-    ui_language: "ja",
-  },
-];
-
 export default function FamilySettingsPage() {
   const [token, setToken] = useState<string | null>(null);
   const [families, setFamilies] = useState<Family[]>([]);
@@ -48,7 +31,7 @@ export default function FamilySettingsPage() {
     PendingInvitation[]
   >([]);
   const [familyId, setFamilyId] = useState<string | null>(null);
-  const [children, setChildren] = useState<ChildProfile[]>(demoChildren);
+  const [children, setChildren] = useState<ChildProfile[]>([]);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteSent, setInviteSent] = useState(false);
   const [newFamilyName, setNewFamilyName] = useState("");
@@ -68,6 +51,7 @@ export default function FamilySettingsPage() {
   useEffect(() => {
     void getParentAccessToken().then(async (parentToken) => {
       if (!parentToken) {
+        window.location.replace("/login/");
         return;
       }
       const loadedFamilies = await getFamilies(parentToken);
@@ -257,7 +241,10 @@ export default function FamilySettingsPage() {
       <header className="page-header">
         <div>
           <p className="eyebrow">Family workspace</p>
-          <h1>{selectedFamily?.name ?? "Maya's family"}</h1>
+          <h1>
+            {selectedFamily?.name ??
+              (token ? "Create your family" : "Loading your workspace…")}
+          </h1>
           <p className="lede">
             Parents share one family. Each member keeps an independent language
             preference.

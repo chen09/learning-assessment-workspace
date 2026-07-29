@@ -36,7 +36,7 @@ describe("AuthPanel", () => {
     expect(signInWithOtp).toHaveBeenCalledWith({
       email: "parent@example.com",
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback/?next=%2Fparent%2F`,
+        emailRedirectTo: `${window.location.origin}/auth/callback/?next=%2Fparent%2Ffamily%2F`,
         shouldCreateUser: true,
       },
     });
