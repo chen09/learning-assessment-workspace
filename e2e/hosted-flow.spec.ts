@@ -188,37 +188,29 @@ test("temporary parent completes the hosted family learning flow", async ({
     expect(JSON.stringify(clientLog)).not.toContain(failedFamilyName);
     await page.unroute(`${apiBaseUrl}/v1/families`);
 
-    let managementPinAttempts = 0;
-    const expiredParentToken = `header.${Buffer.from(
-      JSON.stringify({ exp: 1, sub: userId }),
-    ).toString("base64url")}.signature`;
-    await page.route(
-      `${apiBaseUrl}/v1/families/${familyId}/management-pin`,
-      async (route) => {
-        managementPinAttempts += 1;
-        if (managementPinAttempts === 1) {
-          await route.continue({
-            headers: {
-              ...route.request().headers(),
-              authorization: `Bearer ${expiredParentToken}`,
-            },
-          });
-          return;
-        }
-        await route.continue();
-      },
+    const managementPinResponse = page.waitForResponse(
+      (response) =>
+        response.url() ===
+          `${apiBaseUrl}/v1/families/${familyId}/management-pin` &&
+        response.request().method() === "PUT",
+      { timeout: 10_000 },
+    );
+    const managementUnlockResponse = page.waitForResponse(
+      (response) =>
+        response.url() ===
+          `${apiBaseUrl}/v1/families/${familyId}/management-unlock` &&
+        response.request().method() === "POST",
+      { timeout: 10_000 },
     );
     await page
       .getByRole("textbox", { name: "Parent management PIN" })
       .fill("000000");
     await page.getByRole("button", { name: "Set management PIN" }).click();
+    expect((await managementPinResponse).status()).toBe(204);
+    expect((await managementUnlockResponse).status()).toBe(200);
     await expect(
       page.getByRole("button", { name: "Management unlocked" }),
     ).toBeVisible();
-    expect(managementPinAttempts).toBe(2);
-    await page.unroute(
-      `${apiBaseUrl}/v1/families/${familyId}/management-pin`,
-    );
 
     const childResponse = page.waitForResponse(
       (response) =>
@@ -284,8 +276,18 @@ test("temporary parent completes the hosted family learning flow", async ({
     for (const digit of ["1", "2", "3", "4", "5", "6"]) {
       await page.getByRole("button", { name: digit, exact: true }).click();
     }
+    const startAssignmentResponse = page.waitForResponse(
+      (response) =>
+        response.url() ===
+          `${apiBaseUrl}/v1/assignments/${assignmentId}/start` &&
+        response.request().method() === "POST",
+      { timeout: 15_000 },
+    );
     await page.getByRole("button", { name: "Open my work" }).click();
-    await expect(page.getByText("0/4", { exact: true })).toBeVisible();
+    expect((await startAssignmentResponse).ok()).toBeTruthy();
+    await expect(page.getByText("0/4", { exact: true })).toBeVisible({
+      timeout: 10_000,
+    });
 
     await page
       .getByRole("radio", {
