@@ -30,12 +30,15 @@ from app.domain.models import (
     DemoBootstrap,
     Family,
     FamilyInvitation,
+    FamilyLibraryQuestionSet,
     HistoryItem,
     Job,
     JobStatus,
     LibrarySubmission,
+    ParentAttemptReview,
     ParentDecision,
     ParentDecisionRequest,
+    ParentReviewItem,
     PrintableAssignment,
     Question,
     QuestionResult,
@@ -51,6 +54,11 @@ from app.domain.models import (
     SaveResponseRequest,
     SubmissionReceipt,
     UploadIntent,
+)
+from app.fixtures.english_lesson_one import (
+    lesson_one_question_specs,
+    lesson_one_source_summary,
+    matches_lesson_one_import,
 )
 
 
@@ -230,6 +238,22 @@ class MemoryRepository:
         await self.reset_child_pin_failures(child_id)
         return child
 
+    async def update_child_language(
+        self,
+        child_id: str,
+        ui_language: str,
+        parent_id: str | None = None,
+    ) -> Child:
+        child = self.children.get(child_id)
+        if child is None or (
+            parent_id is not None
+            and parent_id
+            not in self.family_parents.get(str(child.family_id), set())
+        ):
+            raise NotFoundError
+        child.ui_language = ui_language  # type: ignore[assignment]
+        return child
+
     async def set_management_pin(
         self,
         family_id: str,
@@ -313,6 +337,7 @@ class MemoryRepository:
             key=lambda question: question.position,
         )
         return AssignmentWork(
+            title=self.question_sets[str(assignment.question_set_id)].title,
             assignment=assignment,
             attempt=attempt,
             questions=[
@@ -696,6 +721,84 @@ class MemoryRepository:
             results=results,
         )
 
+    async def get_parent_attempt_review(
+        self,
+        attempt_id: str,
+        parent_id: str,
+    ) -> ParentAttemptReview:
+        attempt = self.attempts.get(attempt_id)
+        if (
+            attempt is None
+            or parent_id
+            not in self.family_parents.get(str(attempt.family_id), set())
+        ):
+            raise NotFoundError
+        assignment = self.assignments[str(attempt.assignment_id)]
+        child = self.children[str(attempt.child_id)]
+        question_set = self.question_sets[str(assignment.question_set_id)]
+        questions = sorted(
+            self.questions_for_attempt(attempt_id),
+            key=lambda question: question.position,
+        )
+        results = {
+            str(result.question_id): result
+            for result in self.question_results.get(attempt_id, [])
+        }
+        reviews: list[ParentReviewItem] = []
+        awarded_points = 0.0
+        correct_count = 0
+        correction_count = 0
+        for question in questions:
+            result = results.get(str(question.id))
+            if result is None:
+                continue
+            decision = self.parent_decisions.get(str(result.id))
+            final_outcome = (
+                decision.parent_outcome if decision is not None else result.outcome
+            )
+            final_points = (
+                decision.parent_awarded_points
+                if decision is not None
+                else result.awarded_points
+            )
+            awarded_points += final_points or 0
+            correct_count += final_outcome == "correct"
+            correction_count += final_outcome == "incorrect"
+            if (
+                decision is None
+                and result.outcome
+                in {"uncertain", "needs_parent_review"}
+            ):
+                response = self.responses.get((attempt_id, str(question.id)))
+                if response is not None:
+                    reviews.append(
+                        ParentReviewItem(
+                            result_id=result.id,
+                            question_id=question.id,
+                            question_position=question.position,
+                            question_prompt=question.prompt,
+                            question_type=question.type,
+                            question_points=question.points,
+                            response_kind=response.kind,
+                            response_answer=response.answer,
+                            photo_urls=[],
+                            automated_outcome=result.outcome,
+                            automated_feedback=result.feedback,
+                        )
+                    )
+        return ParentAttemptReview(
+            attempt_id=attempt.id,
+            child_nickname=child.nickname,
+            title=question_set.title,
+            complete=len(results) == len(questions),
+            awarded_points=awarded_points,
+            available_points=sum(question.points for question in questions),
+            correct_count=correct_count,
+            correction_count=correction_count,
+            pending_review_count=len(reviews),
+            reviews=reviews,
+        )
+
     async def create_correction(
         self,
         attempt_id: str,
@@ -733,12 +836,20 @@ class MemoryRepository:
             )
             self.attempts[str(correction.id)] = correction
             self.correction_idempotency[record_key] = str(correction.id)
-            result_ids = {
-                str(result.question_id)
-                for result in self.question_results.get(attempt_id, [])
-                if result.outcome.value
-                in {"incorrect", "uncertain", "needs_parent_review"}
-            }
+            result_ids: set[str] = set()
+            for result in self.question_results.get(attempt_id, []):
+                decision = self.parent_decisions.get(str(result.id))
+                final_outcome = (
+                    decision.parent_outcome
+                    if decision is not None
+                    else result.outcome
+                )
+                if final_outcome in {
+                    "incorrect",
+                    "uncertain",
+                    "needs_parent_review",
+                }:
+                    result_ids.add(str(result.question_id))
             self.correction_question_ids[str(correction.id)] = result_ids
         assignment = self.assignments[str(original.assignment_id)]
         assignment.status = AssignmentStatus.CORRECTING
@@ -751,6 +862,7 @@ class MemoryRepository:
         if not questions:
             raise NotFoundError
         return AssignmentWork(
+            title=self.question_sets[str(assignment.question_set_id)].title,
             assignment=assignment,
             attempt=correction,
             questions=[
@@ -781,6 +893,7 @@ class MemoryRepository:
                 if str(question.id) in correction_ids
             ]
         return AssignmentWork(
+            title=self.question_sets[str(assignment.question_set_id)].title,
             assignment=assignment,
             attempt=attempt,
             questions=[
@@ -803,49 +916,80 @@ class MemoryRepository:
         if existing_id is not None:
             return self.imports[existing_id]
 
+        is_lesson_one = matches_lesson_one_import(
+            request.filenames,
+            request.answer_filenames,
+        )
         question_set = QuestionSet(
             family_id=request.family_id,
             title=request.title,
             subject=request.subject,
             status=QuestionSetStatus.NEEDS_REVIEW,
+            source_summary=(
+                lesson_one_source_summary(len(request.reference_filenames))
+                if is_lesson_one
+                else {}
+            ),
         )
-        questions = [
-            Question(
-                family_id=request.family_id,
-                question_set_id=question_set.id,
-                position=1,
-                type=QuestionType.SINGLE_CHOICE,
-                prompt="Choose the sentence that uses the present simple correctly.",
-                options=[
-                    "She walk to school every day.",
-                    "She walks to school every day.",
-                    "She walking to school every day.",
-                ],
-                answer_key={"choice": 1},
-            ),
-            Question(
-                family_id=request.family_id,
-                question_set_id=question_set.id,
-                position=2,
-                type=QuestionType.TYPED_TEXT,
-                prompt="Complete: My brother ___ tennis on Sundays.",
-                answer_key={"text": "plays"},
-            ),
-            Question(
-                family_id=request.family_id,
-                question_set_id=question_set.id,
-                position=3,
-                type=QuestionType.HANDWRITING,
-                prompt="Write one similar sentence and underline the verb.",
-                answer_key={"reference": "A grammatical present-simple sentence."},
-                points=2,
-            ),
-        ]
+        if is_lesson_one:
+            questions = [
+                Question(
+                    family_id=request.family_id,
+                    question_set_id=question_set.id,
+                    position=position,
+                    type=spec.type,
+                    prompt=spec.prompt,
+                    options=list(spec.options) if spec.options else None,
+                    answer_key=spec.answer_key,
+                    points=spec.points,
+                )
+                for position, spec in enumerate(
+                    lesson_one_question_specs(),
+                    start=1,
+                )
+            ]
+        else:
+            questions = [
+                Question(
+                    family_id=request.family_id,
+                    question_set_id=question_set.id,
+                    position=1,
+                    type=QuestionType.SINGLE_CHOICE,
+                    prompt="Choose the sentence that uses the present simple correctly.",
+                    options=[
+                        "She walk to school every day.",
+                        "She walks to school every day.",
+                        "She walking to school every day.",
+                    ],
+                    answer_key={"choice": 1},
+                ),
+                Question(
+                    family_id=request.family_id,
+                    question_set_id=question_set.id,
+                    position=2,
+                    type=QuestionType.TYPED_TEXT,
+                    prompt="Complete: My brother ___ tennis on Sundays.",
+                    answer_key={"text": "plays"},
+                ),
+                Question(
+                    family_id=request.family_id,
+                    question_set_id=question_set.id,
+                    position=3,
+                    type=QuestionType.HANDWRITING,
+                    prompt="Write one similar sentence and underline the verb.",
+                    answer_key={"reference": "A grammatical present-simple sentence."},
+                    points=2,
+                ),
+            ]
         imported = QuestionSetImport(
             family_id=request.family_id,
             question_set_id=question_set.id,
             filenames=request.filenames,
             source_paths=request.source_paths,
+            answer_filenames=request.answer_filenames,
+            answer_source_paths=request.answer_source_paths,
+            reference_filenames=request.reference_filenames,
+            reference_source_paths=request.reference_source_paths,
             purpose=request.purpose,
         )
         self.question_sets[str(question_set.id)] = question_set
@@ -871,6 +1015,30 @@ class MemoryRepository:
             key=lambda question: question.position,
         )
         return QuestionSetDraft(question_set=question_set, questions=questions)
+
+    async def list_family_question_sets(
+        self,
+        family_id: str,
+        parent_id: str,
+    ) -> list[FamilyLibraryQuestionSet]:
+        if family_id not in self.families:
+            raise NotFoundError
+        return [
+            FamilyLibraryQuestionSet(
+                id=question_set.id,
+                family_id=question_set.family_id,
+                title=question_set.title,
+                subject=question_set.subject,
+                status=question_set.status,
+                question_count=sum(
+                    question.question_set_id == question_set.id
+                    for question in self.questions.values()
+                ),
+                source_summary=question_set.source_summary,
+            )
+            for question_set in reversed(list(self.question_sets.values()))
+            if str(question_set.family_id) == family_id
+        ]
 
     async def confirm_question_set(
         self,
@@ -1008,6 +1176,8 @@ class MemoryRepository:
             None,
         )
         if result is None:
+            raise NotFoundError
+        if parent_id not in self.family_parents.get(str(result.family_id), set()):
             raise NotFoundError
         decision = ParentDecision(
             result=result,

@@ -4,9 +4,34 @@ from fastapi import APIRouter, Depends, Header, HTTPException, status
 
 from app.api.dependencies import Repository, get_repository, require_parent
 from app.domain.errors import NotFoundError
-from app.domain.models import CreateLibrarySubmissionRequest, LibrarySubmission
+from app.domain.models import (
+    CreateLibrarySubmissionRequest,
+    FamilyLibraryQuestionSet,
+    LibrarySubmission,
+)
 
 router = APIRouter(prefix="/v1/library", tags=["library"])
+
+
+@router.get(
+    "/families/{family_id}/question-sets",
+    response_model=list[FamilyLibraryQuestionSet],
+)
+async def list_family_question_sets(
+    family_id: str,
+    repository: Annotated[Repository, Depends(get_repository)],
+    parent_id: Annotated[str, Depends(require_parent)],
+) -> list[FamilyLibraryQuestionSet]:
+    try:
+        return await repository.list_family_question_sets(
+            family_id,
+            parent_id,
+        )
+    except (NotFoundError, ValueError) as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The family is not available.",
+        ) from error
 
 
 @router.post(

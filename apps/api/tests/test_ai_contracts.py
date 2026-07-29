@@ -9,6 +9,7 @@ from app.ai.contracts import (
 )
 from app.ai.fixture import FixtureAIAdapter
 from app.domain.models import (
+    GradingOutcome,
     Job,
     Question,
     QuestionType,
@@ -128,3 +129,73 @@ def test_fixture_grader_supports_multiple_choice_and_word_order(
 
     assert result.outcome == "correct"
     assert result.awarded_points == question.points
+
+
+@pytest.mark.parametrize(
+    ("answer_key", "actual_text"),
+    [
+        ({"text": "She goes home."}, "  SHE   GOES HOME.  "),
+        ({"text": "ABC 123"}, "ＡＢＣ　１２３"),
+        ({"texts": ["do not", "don't"]}, "DON'T"),
+    ],
+)
+def test_fixture_grader_normalizes_exact_text_and_accepts_alternatives(
+    answer_key: dict[str, object],
+    actual_text: str,
+) -> None:
+    job = Job(
+        family_id="00000000-0000-0000-0000-000000000001",
+        subject_id="00000000-0000-0000-0000-000000000002",
+    )
+    question = Question(
+        family_id=job.family_id,
+        question_set_id="00000000-0000-0000-0000-000000000003",
+        position=1,
+        type=QuestionType.TYPED_TEXT,
+        prompt="Fixture",
+        answer_key=answer_key,
+    )
+    response = SavedResponse(
+        family_id=job.family_id,
+        attempt_id=job.subject_id,
+        question_id=question.id,
+        kind=ResponseKind.TEXT,
+        answer={"text": actual_text},
+    )
+
+    result = FixtureGrader().grade(job, question, response)
+
+    assert result.outcome == GradingOutcome.CORRECT
+    assert result.awarded_points == question.points
+
+
+@pytest.mark.parametrize("response_kind", [ResponseKind.STROKES, ResponseKind.PHOTO])
+def test_fixture_grader_routes_visual_answers_to_parent_review(
+    response_kind: ResponseKind,
+) -> None:
+    job = Job(
+        family_id="00000000-0000-0000-0000-000000000001",
+        subject_id="00000000-0000-0000-0000-000000000002",
+    )
+    question = Question(
+        family_id=job.family_id,
+        question_set_id="00000000-0000-0000-0000-000000000003",
+        position=1,
+        type=QuestionType.HANDWRITING,
+        prompt="Show your work.",
+        answer_key={"reference": "Parent review"},
+    )
+    response = SavedResponse(
+        family_id=job.family_id,
+        attempt_id=job.subject_id,
+        question_id=question.id,
+        kind=response_kind,
+        answer={"strokes": []} if response_kind == ResponseKind.STROKES else {"paths": []},
+    )
+
+    result = FixtureGrader().grade(job, question, response)
+
+    assert result.outcome == GradingOutcome.NEEDS_PARENT_REVIEW
+    assert result.awarded_points is None
+    assert result.confidence == 0
+    assert result.feedback["summary"] == "Waiting for a parent to review."

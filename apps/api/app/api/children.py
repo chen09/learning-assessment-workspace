@@ -7,20 +7,61 @@ from app.api.dependencies import (
     Repository,
     get_child_session_service,
     get_repository,
+    require_child,
     require_management_unlock,
     require_parent,
 )
 from app.domain.errors import NotFoundError
 from app.domain.models import (
     Child,
+    ChildSessionClaims,
     ChildSessionRequest,
     ChildSessionResponse,
     ManagementUnlockClaims,
+    UpdateChildLanguageRequest,
     UpdateChildPinRequest,
 )
 from app.services.child_sessions import ChildSessionService
 
 router = APIRouter(prefix="/v1/children", tags=["children"])
+
+
+@router.put("/me/language", response_model=Child)
+async def update_own_child_language(
+    request: UpdateChildLanguageRequest,
+    repository: Annotated[Repository, Depends(get_repository)],
+    child: Annotated[ChildSessionClaims, Depends(require_child)],
+) -> Child:
+    try:
+        return await repository.update_child_language(
+            str(child.child_id),
+            request.ui_language,
+        )
+    except NotFoundError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The child is not available.",
+        ) from error
+
+
+@router.put("/{child_id}/language", response_model=Child)
+async def update_child_language(
+    child_id: UUID,
+    request: UpdateChildLanguageRequest,
+    repository: Annotated[Repository, Depends(get_repository)],
+    parent_id: Annotated[str, Depends(require_parent)],
+) -> Child:
+    try:
+        return await repository.update_child_language(
+            str(child_id),
+            request.ui_language,
+            parent_id,
+        )
+    except NotFoundError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The child is not available.",
+        ) from error
 
 
 @router.put("/{child_id}/pin", response_model=Child)

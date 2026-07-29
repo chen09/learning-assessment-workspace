@@ -18,6 +18,8 @@ vi.mock("@/lib/api-client", async (importOriginal) => {
 
 describe("ChildResultsPage", () => {
   beforeEach(() => {
+    window.localStorage.clear();
+    window.localStorage.setItem("luma-language:demo-child", "en");
     window.history.replaceState({}, "", "/child/results/");
   });
 
@@ -43,5 +45,25 @@ describe("ChildResultsPage", () => {
     expect(
       screen.queryByRole("button", { name: "Correct these answers" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows result and correction states in Chinese", async () => {
+    window.localStorage.setItem("luma-language:demo-child", "zh");
+
+    render(<ChildResultsPage />);
+
+    expect(
+      await screen.findByRole("heading", { name: "做得好，Alex" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "再试一次" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "等待家长确认" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "订正这些题" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Good work, Alex")).not.toBeInTheDocument();
   });
 });

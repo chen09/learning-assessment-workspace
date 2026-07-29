@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   BookOpen,
@@ -14,8 +14,15 @@ import {
 import { Brand } from "@/components/brand";
 import {
   LanguageProvider,
+  type Language,
   useLanguage,
 } from "@/components/language-provider";
+import { LanguageSwitcher } from "@/components/language-switcher";
+import {
+  getActiveChildProfile,
+  getChildAccessToken,
+  updateOwnChildLanguage,
+} from "@/lib/api-client";
 
 const parentNavigation = [
   { href: "/parent/", labelKey: "nav.home", icon: House },
@@ -50,8 +57,33 @@ export function AppShell({ children, role, currentPath }: AppShellProps) {
 
 function AppShellContent({ children, role, currentPath }: AppShellProps) {
   const { t } = useLanguage();
+  const [childName, setChildName] = useState("Alex");
   const navigation = role === "parent" ? parentNavigation : childNavigation;
   const roleLabel = t(role === "parent" ? "role.parent" : "role.child");
+
+  useEffect(() => {
+    let active = true;
+    if (role === "child") {
+      const profile = getActiveChildProfile();
+      if (profile) {
+        queueMicrotask(() => {
+          if (active) {
+            setChildName(profile.nickname);
+          }
+        });
+      }
+    }
+    return () => {
+      active = false;
+    };
+  }, [role]);
+
+  const persistChildLanguage = async (language: Language) => {
+    const childToken = getChildAccessToken();
+    if (childToken) {
+      await updateOwnChildLanguage(language, childToken);
+    }
+  };
 
   return (
     <div className={`app-frame ${role === "child" ? "child-frame" : ""}`}>
@@ -74,9 +106,15 @@ function AppShellContent({ children, role, currentPath }: AppShellProps) {
           ))}
         </nav>
         <div className="rail-foot">
-          <span className="avatar">{role === "parent" ? "P" : "A"}</span>
+          <span className="avatar">
+            {role === "parent"
+              ? "P"
+              : childName.slice(0, 1).toUpperCase()}
+          </span>
           <span>
-            <strong>{role === "parent" ? t("identity.parent") : "Alex"}</strong>
+            <strong>
+              {role === "parent" ? t("identity.parent") : childName}
+            </strong>
             <small>{roleLabel}</small>
           </span>
         </div>
@@ -86,7 +124,14 @@ function AppShellContent({ children, role, currentPath }: AppShellProps) {
           </Link>
         ) : null}
       </aside>
-      <main className="app-main">{children}</main>
+      <main className="app-main">
+        {role === "child" ? (
+          <div className="shell-tools">
+            <LanguageSwitcher onLanguageChange={persistChildLanguage} />
+          </div>
+        ) : null}
+        {children}
+      </main>
       <nav
         className="bottom-nav"
         aria-label={t("navigation.mobile", { role: roleLabel })}

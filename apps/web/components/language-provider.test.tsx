@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   LanguageProvider,
@@ -21,6 +21,11 @@ function LanguageProbe() {
 }
 
 describe("LanguageProvider", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    document.documentElement.lang = "en";
+  });
+
   it("switches language and persists the member preference", () => {
     render(
       <LanguageProvider>
@@ -33,5 +38,18 @@ describe("LanguageProvider", () => {
     expect(screen.getByText("ホーム")).toBeInTheDocument();
     expect(screen.getByText("ja")).toBeInTheDocument();
     expect(window.localStorage.getItem("luma-language:public")).toBe("ja");
+  });
+
+  it("applies a stored preference to the document language", () => {
+    window.localStorage.setItem("luma-language:public", "zh");
+
+    render(
+      <LanguageProvider>
+        <LanguageProbe />
+      </LanguageProvider>,
+    );
+
+    expect(screen.getByText("zh")).toBeInTheDocument();
+    expect(document.documentElement.lang).toBe("zh");
   });
 });

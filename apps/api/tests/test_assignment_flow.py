@@ -54,6 +54,7 @@ def test_child_pin_opens_a_scoped_assignment_session() -> None:
     _fixture, child_headers, work = start_fixture_assignment(client)
     assignments = client.get("/v1/assignments", headers=child_headers)
 
+    assert work["title"] == "Algebra and English warm-up"
     assert work["assignment"]["status"] == "in_progress"
     assert work["attempt"]["sequence"] == 1
     assert len(work["questions"]) == 3
@@ -184,19 +185,44 @@ def test_submission_is_immutable_and_fixture_grading_releases_full_results() -> 
     assert [result["outcome"] for result in results.json()["results"]] == [
         "correct",
         "incorrect",
-        "uncertain",
+        "needs_parent_review",
     ]
-    correction = client.post(
-        f"/v1/attempts/{attempt_id}/correction",
-        headers={
-            **child_headers,
-            "Idempotency-Key": "correct-demo-attempt",
-        },
+    parent_results = client.get(
+        f"/v1/grading-results/attempts/{attempt_id}",
+        headers=PARENT_HEADERS,
     )
-    assert correction.status_code == 200
-    assert correction.json()["assignment"]["status"] == "correcting"
-    assert len(correction.json()["questions"]) == 2
+    child_cannot_open_parent_results = client.get(
+        f"/v1/grading-results/attempts/{attempt_id}",
+        headers=child_headers,
+    )
 
+    assert parent_results.status_code == 200
+    assert parent_results.json()["child_nickname"] == "Alex"
+    assert parent_results.json()["title"] == "Algebra and English warm-up"
+    assert parent_results.json()["awarded_points"] == 1
+    assert parent_results.json()["available_points"] == 4
+    assert parent_results.json()["correct_count"] == 1
+    assert parent_results.json()["correction_count"] == 1
+    assert parent_results.json()["pending_review_count"] == 1
+    assert parent_results.json()["reviews"] == [
+        {
+            "result_id": results.json()["results"][2]["id"],
+            "question_id": questions[2]["id"],
+            "question_position": 3,
+            "question_prompt": "Show why (a + b)(a - b) = a² - b².",
+            "question_type": "handwriting",
+            "question_points": 2,
+            "response_kind": "strokes",
+            "response_answer": answers[2][1],
+            "photo_urls": [],
+            "automated_outcome": "needs_parent_review",
+            "automated_feedback": {
+                "summary": "Waiting for a parent to review.",
+                "action": "A parent can mark this answer correct or incorrect.",
+            },
+        }
+    ]
+    assert child_cannot_open_parent_results.status_code == 401
     uncertain_result_id = results.json()["results"][2]["id"]
     parent_decision = client.post(
         f"/v1/grading-results/{uncertain_result_id}/parent-decision",
@@ -211,6 +237,27 @@ def test_submission_is_immutable_and_fixture_grading_releases_full_results() -> 
     assert parent_decision.status_code == 200
     assert parent_decision.json()["parent_outcome"] == "correct"
     assert parent_decision.json()["parent_awarded_points"] == 2
+    resolved_parent_results = client.get(
+        f"/v1/grading-results/attempts/{attempt_id}",
+        headers=PARENT_HEADERS,
+    )
+    assert resolved_parent_results.status_code == 200
+    assert resolved_parent_results.json()["awarded_points"] == 3
+    assert resolved_parent_results.json()["correct_count"] == 2
+    assert resolved_parent_results.json()["pending_review_count"] == 0
+    assert resolved_parent_results.json()["reviews"] == []
+    correction = client.post(
+        f"/v1/attempts/{attempt_id}/correction",
+        headers={
+            **child_headers,
+            "Idempotency-Key": "correct-demo-attempt",
+        },
+    )
+    assert correction.status_code == 200
+    assert correction.json()["assignment"]["status"] == "correcting"
+    assert [question["id"] for question in correction.json()["questions"]] == [
+        questions[1]["id"]
+    ]
 
 
 def test_parent_can_manually_retry_a_failed_background_job() -> None:

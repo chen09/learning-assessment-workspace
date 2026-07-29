@@ -48,6 +48,14 @@ multiple knowledge points. Irrelevant pages can be excluded. Cross-subject
 content becomes separate drafts. Answer pages are private references and are
 never shown to a child.
 
+Uploaded textbook pages and their exercises form a reusable private source
+bundle. The system preserves their unit, knowledge points, examples, difficulty
+progression, file roles, and provenance so the same family can generate
+different question sets later without treating the generated worksheet as the
+original source. Cross-family sharing copies structured knowledge metadata and
+reviewed generated questions by default. Raw source files can be shared only
+after an explicit confirmation that the uploader has redistribution rights.
+
 AI drafts question text, type, answer or reference answer, points, rubric,
 primary and secondary knowledge tags, and difficulty. Difficulty choices are
 reinforcement, standard, challenge, and adaptive mix; difficulty is not measured

@@ -51,7 +51,7 @@ test("parent imports material, reviews it, and reaches the printable set", async
 
   await page.goto("/parent/create/");
   await page.getByRole("button", { name: "Import material" }).click();
-  await page.getByLabel("Learning material").setInputFiles({
+  await page.getByLabel("Learning material and exercises").setInputFiles({
     name: "english-lesson.pdf",
     mimeType: "application/pdf",
     buffer: Buffer.from("fixture"),
@@ -130,6 +130,97 @@ test("child completes a mixed worksheet and opens corrections", async ({
   await expect(page).toHaveURL(/\/child\/work\/\?correction=demo$/);
 });
 
+test("child screens stay responsive across Chinese, Japanese, and English", async ({
+  page,
+}, testInfo) => {
+  const expectNoHorizontalOverflow = async () => {
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+        ),
+      )
+      .toBe(true);
+  };
+
+  await page.goto("/child/");
+  await page.getByLabel("Language").selectOption("zh");
+  await expect(
+    page.getByRole("heading", {
+      name: "准备好取得一个小进步了吗？",
+    }),
+  ).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("lang", "zh");
+
+  if (testInfo.project.name === "mobile") {
+    await expect(page.locator(".side-rail")).toBeHidden();
+    await expect(page.locator(".bottom-nav")).toBeVisible();
+  } else {
+    await expect(page.locator(".side-rail")).toBeVisible();
+    await expect(page.locator(".bottom-nav")).toBeHidden();
+  }
+  await expectNoHorizontalOverflow();
+
+  await page.goto("/child/login/");
+  await expect(
+    page.getByRole("heading", { name: "输入六位 PIN" }),
+  ).toBeVisible();
+  await expectNoHorizontalOverflow();
+
+  await page.goto("/child/work/");
+  await expect(page.getByText("今日练习")).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: "Choose the correct expansion of (a + b)(a − b).",
+    }),
+  ).toBeVisible();
+  await page.getByLabel("语言").selectOption("ja");
+  await expect(page.getByText("今日の練習")).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("lang", "ja");
+  await expectNoHorizontalOverflow();
+
+  await page.goto("/child/submitted/");
+  await expect(
+    page.getByRole("heading", { name: "答えを採点しています" }),
+  ).toBeVisible();
+
+  await page.goto("/child/results/");
+  await expect(
+    page.getByRole("heading", { name: "よくできました、Alex" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "もう一度", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "保護者の確認待ち" }),
+  ).toBeVisible();
+
+  await page.goto("/child/review/");
+  await expect(page.getByText("今日の復習", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "今日はスキップ" }),
+  ).toBeVisible();
+
+  await page.goto("/child/history/");
+  await expect(
+    page.getByRole("heading", { name: "学習履歴" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Past tense practice" }),
+  ).toBeVisible();
+
+  await page.goto("/child/exit/");
+  await expect(
+    page.getByRole("heading", { name: "保護者管理 PIN を入力" }),
+  ).toBeVisible();
+  await page.getByLabel("言語").selectOption("en");
+  await expect(
+    page.getByRole("heading", { name: "Enter your management PIN" }),
+  ).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expectNoHorizontalOverflow();
+});
+
 test("parent creation reaches child grading and correction through the API", async ({
   page,
   request,
@@ -169,6 +260,7 @@ test("parent creation reaches child grading and correction through the API", asy
   await page.getByRole("textbox", { name: "Child name" }).fill("Alex API");
   await page.getByRole("textbox", { name: "Grade" }).fill("Junior high 1");
   await page.getByRole("textbox", { name: "Six-digit PIN" }).fill("123456");
+  await page.getByLabel("Child UI language").selectOption("zh");
   await page.getByRole("button", { name: "Add child" }).click();
   const child = (await (await childResponse).json()) as {
     id: string;
@@ -201,6 +293,19 @@ test("parent creation reaches child grading and correction through the API", asy
   }
   await page.getByRole("button", { name: "Open my work" }).click();
   await expect(page.getByText("0/3", { exact: true })).toBeVisible();
+  await expect(page.getByText("今日练习")).toBeVisible();
+
+  const languageResponse = page.waitForResponse(
+    (response) =>
+      response.url() === `${apiBaseUrl}/v1/children/me/language` &&
+      response.request().method() === "PUT",
+  );
+  await page.getByLabel("语言").selectOption("ja");
+  expect((await languageResponse).ok()).toBeTruthy();
+  await expect(page.getByText("今日の練習")).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("今日の練習")).toBeVisible();
+  await page.getByLabel("言語").selectOption("en");
 
   await page
     .getByRole("radio", {
@@ -242,9 +347,33 @@ test("parent creation reaches child grading and correction through the API", asy
   await expect(page.getByText("Try once more")).toBeVisible();
   await expect(page.getByText("Waiting for a parent")).toBeVisible();
 
+  const attemptId = new URL(page.url()).searchParams.get("attemptId");
+  expect(attemptId).toBeTruthy();
+  await page.goto(
+    `/parent/results/?attemptId=${encodeURIComponent(attemptId!)}`,
+  );
+  await expect(
+    page.getByRole("heading", { name: "Review answers" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: "Write one similar sentence and underline the verb.",
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel("Child's handwritten answer"),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Mark correct" }).click();
+  await expect(
+    page.getByText("A parent marked this answer correct."),
+  ).toBeVisible();
+
+  await page.goto(
+    `/child/results/?attemptId=${encodeURIComponent(attemptId!)}`,
+  );
   await page.getByRole("button", { name: "Correct these answers" }).click();
   await expect(page).toHaveURL(/\/child\/work\/\?attemptId=/);
-  await expect(page.getByText("0/2", { exact: true })).toBeVisible();
+  await expect(page.getByText("0/1", { exact: true })).toBeVisible();
   await expect(
     page.getByRole("heading", {
       name: "Complete: My brother ___ tennis on Sundays.",

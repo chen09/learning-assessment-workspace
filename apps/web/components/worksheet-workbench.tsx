@@ -19,6 +19,7 @@ import {
   HandwritingCanvas,
   type Stroke,
 } from "@/components/handwriting-canvas";
+import { useLanguage } from "@/components/language-provider";
 import {
   type DraftSyncRequest,
   removePendingDraftsByPrefix,
@@ -109,6 +110,16 @@ const demoQuestions: Question[] = [
 ];
 
 export function WorksheetWorkbench() {
+  return (
+    <AppShell currentPath="/child/work/" role="child">
+      <WorksheetWorkbenchContent />
+    </AppShell>
+  );
+}
+
+function WorksheetWorkbenchContent() {
+  const { t } = useLanguage();
+  const [title, setTitle] = useState("Algebra & English warm-up");
   const [questions, setQuestions] = useState<Question[]>(demoQuestions);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [mode, setMode] = useState<"focus" | "sheet">("focus");
@@ -141,6 +152,7 @@ export function WorksheetWorkbench() {
       : startAssignment(assignmentId!, token);
     void loadWork
       .then((work) => {
+        setTitle(work.title);
         setChildToken(token);
         setAttemptId(work.attempt.id);
         setFamilyId(work.assignment.family_id);
@@ -162,7 +174,7 @@ export function WorksheetWorkbench() {
                 : question.type === "typed_text"
                   ? "text"
                   : question.type,
-            subject: "Assigned practice",
+            subject: "",
             prompt: question.prompt,
             options: question.options ?? undefined,
             points: question.points,
@@ -354,7 +366,7 @@ export function WorksheetWorkbench() {
     if (question.type === "multiple_choice") {
       return (
         <fieldset className="choice-list">
-          <legend>Choose every correct answer</legend>
+          <legend>{t("worksheet.multipleChoice")}</legend>
           {question.options?.map((option, index) => {
             const selected = answer.choices?.includes(index) ?? false;
             return (
@@ -395,9 +407,9 @@ export function WorksheetWorkbench() {
       );
       return (
         <div className="typed-answer">
-          <label>Build the sentence</label>
+          <label>{t("worksheet.buildSentence")}</label>
           <p>
-            {selectedTokens.join(" ") || "Choose words below…"}
+            {selectedTokens.join(" ") || t("worksheet.chooseWords")}
           </p>
           <div className="header-actions">
             {available.map((token) => (
@@ -419,7 +431,7 @@ export function WorksheetWorkbench() {
               onClick={() => updateAnswer(question.id, { tokens: [] })}
               type="button"
             >
-              Reset
+              {t("worksheet.reset")}
             </button>
           </div>
         </div>
@@ -448,13 +460,20 @@ export function WorksheetWorkbench() {
                 type="button"
               >
                 <Volume2 size={17} />
-                Play at 0.85×
+                {t("worksheet.playSlow")}
               </button>
-              <span>{playCounts[question.id] ?? 0} / 2 plays used</span>
+              <span>
+                {t("worksheet.playsUsed", {
+                  count: playCounts[question.id] ?? 0,
+                  limit: 2,
+                })}
+              </span>
             </div>
           ) : null}
           <fieldset className="choice-list">
-            <legend className="sr-only">Choose one answer</legend>
+            <legend className="sr-only">
+              {t("worksheet.singleChoice")}
+            </legend>
             {question.options?.map((option, index) => (
               <label
                 className={answer.choice === index ? "choice active" : "choice"}
@@ -484,7 +503,7 @@ export function WorksheetWorkbench() {
         <label className="photo-answer">
           <input
             accept="image/jpeg,image/png"
-            aria-label="Take a photo or choose images"
+            aria-label={t("worksheet.photoInput")}
             capture="environment"
             onChange={(event) => {
               const selectedFiles = Array.from(event.target.files ?? []);
@@ -548,15 +567,13 @@ export function WorksheetWorkbench() {
           <Camera size={26} />
           <strong>
             {photoNames.length > 0
-              ? "Add more answer images"
-              : "Take a photo or choose images"}
+              ? t("worksheet.addMoreImages")
+              : t("worksheet.photoInput")}
           </strong>
-          <span>
-            Upload one question at a time. Images stay in shooting order.
-          </span>
+          <span>{t("worksheet.photoHelp")}</span>
           {photoNames.length > 0 ? (
             <ol
-              aria-label="Uploaded answer images"
+              aria-label={t("worksheet.uploadedImages")}
               className="photo-file-list"
             >
               {photoNames.map((name, index) => (
@@ -572,17 +589,19 @@ export function WorksheetWorkbench() {
     if (question.type === "text") {
       return (
         <div className="typed-answer">
-          <label htmlFor={`${question.id}-answer`}>Your answer</label>
+          <label htmlFor={`${question.id}-answer`}>
+            {t("worksheet.yourAnswer")}
+          </label>
           <input
             autoComplete="off"
             id={`${question.id}-answer`}
             onChange={(event) =>
               updateAnswer(question.id, { text: event.target.value })
             }
-            placeholder="Type here…"
+            placeholder={t("worksheet.typeHere")}
             value={answer.text ?? ""}
           />
-          <p>You can also switch this question to handwriting from the menu.</p>
+          <p>{t("worksheet.handwritingAlternative")}</p>
         </div>
       );
     }
@@ -597,10 +616,19 @@ export function WorksheetWorkbench() {
     <article className="question-card" key={question.id}>
       <header>
         <div>
-          <p className="eyebrow">{question.subject}</p>
+          <p className="eyebrow">
+            {question.subject || t("worksheet.assignedPractice")}
+          </p>
           <span>
-            Question {question.number} · {question.points}{" "}
-            {question.points === 1 ? "point" : "points"}
+            {t("worksheet.questionMeta", {
+              number: question.number,
+              points: t(
+                question.points === 1
+                  ? "worksheet.pointOne"
+                  : "worksheet.pointMany",
+                { count: question.points },
+              ),
+            })}
           </span>
         </div>
       </header>
@@ -610,11 +638,11 @@ export function WorksheetWorkbench() {
   );
 
   return (
-    <AppShell currentPath="/child/work/" role="child">
+    <>
       <header className="work-header">
         <div>
-          <p className="eyebrow">Today&apos;s practice</p>
-          <h2>Algebra &amp; English warm-up</h2>
+          <p className="eyebrow">{t("worksheet.todayPractice")}</p>
+          <h2>{title}</h2>
         </div>
         <div className="work-status">
           <button
@@ -627,7 +655,7 @@ export function WorksheetWorkbench() {
               ? `${Math.floor(secondsRemaining / 60)}:${String(
                   secondsRemaining % 60,
                 ).padStart(2, "0")}`
-              : "Practice mode"}
+              : t("worksheet.practiceMode")}
           </button>
           <span
             className={`save-state ${saveStatus}`}
@@ -635,16 +663,16 @@ export function WorksheetWorkbench() {
           >
             <Cloud aria-hidden="true" size={15} />
             {saveStatus === "saving"
-              ? "Saving…"
+              ? t("worksheet.saving")
               : saveStatus === "saved"
-                ? "Saved"
+                ? t("worksheet.saved")
                 : saveStatus === "offline"
-                  ? "Saved on this device"
-                  : "Saves automatically"}
+                  ? t("worksheet.savedDevice")
+                  : t("worksheet.autoSave")}
           </span>
-          <div className="mode-switch" aria-label="Worksheet layout">
+          <div className="mode-switch" aria-label={t("worksheet.layout")}>
             <button
-              aria-label="Focus mode"
+              aria-label={t("worksheet.focusMode")}
               className={mode === "focus" ? "active" : ""}
               onClick={() => setMode("focus")}
               type="button"
@@ -652,7 +680,7 @@ export function WorksheetWorkbench() {
               <Focus size={17} />
             </button>
             <button
-              aria-label="Worksheet mode"
+              aria-label={t("worksheet.sheetMode")}
               className={mode === "sheet" ? "active" : ""}
               onClick={() => setMode("sheet")}
               type="button"
@@ -669,13 +697,15 @@ export function WorksheetWorkbench() {
             <strong>
               {answeredCount}/{questions.length}
             </strong>
-            <span>answered</span>
+            <span>{t("worksheet.answered")}</span>
           </div>
           <ol>
             {questions.map((question, index) => (
               <li key={question.id}>
                 <button
-                  aria-label={`Go to question ${question.number}`}
+                  aria-label={t("worksheet.goToQuestion", {
+                    number: question.number,
+                  })}
                   className={[
                     index === currentIndex ? "current" : "",
                     answers[question.id] ? "answered" : "",
@@ -695,8 +725,8 @@ export function WorksheetWorkbench() {
           </ol>
           <p>
             {examMode
-              ? "Exam timer · auto-submit at zero"
-              : "No timer · Take your time"}
+              ? t("worksheet.examTimer")
+              : t("worksheet.noTimer")}
           </p>
         </aside>
 
@@ -713,7 +743,7 @@ export function WorksheetWorkbench() {
               type="button"
             >
               <ArrowLeft size={17} aria-hidden="true" />
-              Previous
+              {t("worksheet.previous")}
             </button>
             {currentIndex < questions.length - 1 ? (
               <button
@@ -725,7 +755,7 @@ export function WorksheetWorkbench() {
                 }
                 type="button"
               >
-                Next question
+                {t("worksheet.next")}
                 <ArrowRight size={17} aria-hidden="true" />
               </button>
             ) : (
@@ -736,13 +766,13 @@ export function WorksheetWorkbench() {
                 }}
                 type="button"
               >
-                Submit all answers
+                {t("worksheet.submit")}
                 <Send size={16} aria-hidden="true" />
               </button>
             )}
           </footer>
         </section>
       </div>
-    </AppShell>
+    </>
   );
 }

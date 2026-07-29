@@ -223,6 +223,7 @@ test("temporary parent completes the hosted family learning flow", async ({
       .getByRole("textbox", { name: "Grade" })
       .fill("Junior high 1");
     await page.getByRole("textbox", { name: "Six-digit PIN" }).fill("123456");
+    await page.getByLabel("Child UI language").selectOption("zh");
     await page.getByRole("button", { name: "Add child" }).click();
     const childId = (
       (await (await childResponse).json()) as { id: string }
@@ -288,6 +289,18 @@ test("temporary parent completes the hosted family learning flow", async ({
     await expect(page.getByText("0/4", { exact: true })).toBeVisible({
       timeout: 10_000,
     });
+    await expect(page.getByText("今日练习")).toBeVisible();
+    await expect(page.locator("html")).toHaveAttribute("lang", "zh");
+
+    const childLanguageResponse = page.waitForResponse(
+      (response) =>
+        response.url() === `${apiBaseUrl}/v1/children/me/language` &&
+        response.request().method() === "PUT",
+      { timeout: 15_000 },
+    );
+    await page.getByLabel("语言").selectOption("en");
+    expect((await childLanguageResponse).ok()).toBeTruthy();
+    await expect(page.getByText("Today's practice")).toBeVisible();
 
     await page
       .getByRole("radio", {
@@ -367,15 +380,65 @@ test("temporary parent completes the hosted family learning flow", async ({
       page.getByRole("heading", { name: "Your work is being checked" }),
     ).toBeVisible();
 
+    const completedResults = page.waitForResponse(
+      async (response) => {
+        if (
+          response.request().method() !== "GET" ||
+          !/\/v1\/attempts\/[^/]+\/results$/.test(response.url()) ||
+          response.status() !== 200
+        ) {
+          return false;
+        }
+        const payload = (await response.json()) as { complete?: boolean };
+        return payload.complete === true;
+      },
+      { timeout: 45_000 },
+    );
     await page.getByRole("button", { name: "View results" }).click();
+    await completedResults;
     await expect(page).toHaveURL(/\/child\/results\/\?attemptId=/);
     await expect(page.getByText("Try once more")).toBeVisible({
       timeout: 45_000,
     });
     await expect(page.getByText("Waiting for a parent")).toHaveCount(2);
+
+    const attemptId = new URL(page.url()).searchParams.get("attemptId");
+    expect(attemptId).toBeTruthy();
+    await page.goto(
+      `/parent/results/?attemptId=${encodeURIComponent(attemptId!)}`,
+    );
+    await expect(
+      page.getByRole("heading", { name: "Review answers" }),
+    ).toBeVisible();
+    await expect(
+      page.getByLabel("Child's handwritten answer"),
+    ).toBeVisible();
+    const photoPreview = page.getByRole("img", {
+      name: "Uploaded answer photos 1",
+    });
+    await expect(photoPreview).toBeVisible();
+    await expect
+      .poll(
+        () =>
+          photoPreview.evaluate(
+            (image) => (image as HTMLImageElement).naturalWidth,
+          ),
+        { message: "The private signed photo preview should load." },
+      )
+      .toBeGreaterThan(0);
+
+    await page.getByRole("button", { name: "Mark correct" }).first().click();
+    await page.getByRole("button", { name: "Mark correct" }).first().click();
+    await expect(
+      page.getByText("A parent marked this answer correct."),
+    ).toHaveCount(2);
+
+    await page.goto(
+      `/child/results/?attemptId=${encodeURIComponent(attemptId!)}`,
+    );
     await page.getByRole("button", { name: "Correct these answers" }).click();
     await expect(page).toHaveURL(/\/child\/work\/\?attemptId=/);
-    await expect(page.getByText("0/3", { exact: true })).toBeVisible();
+    await expect(page.getByText("0/1", { exact: true })).toBeVisible();
   } finally {
     testInfo.setTimeout(testInfo.timeout + 30_000);
     if (hostedCleanupState) {

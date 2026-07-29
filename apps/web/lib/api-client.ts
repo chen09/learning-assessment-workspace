@@ -17,6 +17,7 @@ export type ApiQuestion = {
 };
 
 export type AssignmentWork = {
+  title: string;
   assignment: {
     id: string;
     family_id: string;
@@ -220,6 +221,29 @@ export async function createChildSession(childId: string, pin: string) {
   return session;
 }
 
+export async function updateOwnChildLanguage(
+  uiLanguage: "zh" | "ja" | "en",
+  childToken: string,
+) {
+  const child = await apiRequest<ChildProfile>(
+    "/v1/children/me/language",
+    {
+      method: "PUT",
+      body: JSON.stringify({ ui_language: uiLanguage }),
+    },
+    childToken,
+    false,
+  );
+  const activeProfile = getActiveChildProfile();
+  if (activeProfile) {
+    window.localStorage.setItem(
+      CHILD_PROFILE_KEY,
+      JSON.stringify({ ...activeProfile, ui_language: uiLanguage }),
+    );
+  }
+  return child;
+}
+
 export async function getParentAccessToken() {
   const fixtureToken = process.env.NEXT_PUBLIC_E2E_PARENT_TOKEN;
   if (fixtureToken) {
@@ -241,6 +265,20 @@ export type ChildProfile = {
   nickname: string;
   grade_stage: string;
   ui_language: "zh" | "ja" | "en";
+};
+
+export type FamilyQuestionSet = {
+  id: string;
+  family_id: string;
+  title: string;
+  subject: string;
+  status: "draft" | "processing" | "needs_review" | "confirmed";
+  question_count: number;
+  source_summary: {
+    artifact_kind?: string;
+    knowledge_points?: string[];
+    reference_file_count?: number;
+  };
 };
 
 export async function getFamilies(parentToken: string) {
@@ -273,6 +311,17 @@ export async function getChildren(
 ) {
   return apiRequest<ChildProfile[]>(
     `/v1/families/${encodeURIComponent(familyId)}/children`,
+    { method: "GET" },
+    parentToken,
+  );
+}
+
+export async function getFamilyQuestionSets(
+  familyId: string,
+  parentToken: string,
+) {
+  return apiRequest<FamilyQuestionSet[]>(
+    `/v1/library/families/${encodeURIComponent(familyId)}/question-sets`,
     { method: "GET" },
     parentToken,
   );
@@ -312,6 +361,21 @@ export async function updateChildPin(
       method: "PUT",
       headers: { "X-Management-Unlock": managementUnlock },
       body: JSON.stringify({ pin }),
+    },
+    parentToken,
+  );
+}
+
+export async function updateChildLanguage(
+  childId: string,
+  uiLanguage: "zh" | "ja" | "en",
+  parentToken: string,
+) {
+  return apiRequest<ChildProfile>(
+    `/v1/children/${encodeURIComponent(childId)}/language`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ ui_language: uiLanguage }),
     },
     parentToken,
   );
@@ -507,6 +571,84 @@ export type AttemptResult = {
     action?: string;
   };
 };
+
+export type ParentReviewItem = {
+  result_id: string;
+  question_id: string;
+  question_position: number;
+  question_prompt: string;
+  question_type:
+    | "single_choice"
+    | "multiple_choice"
+    | "typed_text"
+    | "word_order"
+    | "handwriting"
+    | "photo"
+    | "listening";
+  question_points: number;
+  response_kind: "choice" | "text" | "tokens" | "strokes" | "photo";
+  response_answer: Record<string, unknown>;
+  photo_urls: string[];
+  automated_outcome:
+    | "correct"
+    | "incorrect"
+    | "uncertain"
+    | "needs_parent_review";
+  automated_feedback: {
+    summary?: string;
+    action?: string;
+  };
+};
+
+export type ParentAttemptReview = {
+  attempt_id: string;
+  child_nickname: string;
+  title: string;
+  complete: boolean;
+  awarded_points: number;
+  available_points: number;
+  correct_count: number;
+  correction_count: number;
+  pending_review_count: number;
+  reviews: ParentReviewItem[];
+};
+
+export async function getParentAttemptReview(
+  attemptId: string,
+  parentToken: string,
+) {
+  return apiRequest<ParentAttemptReview>(
+    `/v1/grading-results/attempts/${encodeURIComponent(attemptId)}`,
+    { method: "GET" },
+    parentToken,
+  );
+}
+
+export async function decideParentReview(
+  resultId: string,
+  payload: {
+    outcome: "correct" | "incorrect";
+    awarded_points: number;
+    comment: string | null;
+  },
+  parentToken: string,
+  idempotencyKey: string,
+) {
+  return apiRequest<{
+    parent_outcome: "correct" | "incorrect";
+    parent_awarded_points: number | null;
+    parent_comment: string | null;
+    reviewed_at: string;
+  }>(
+    `/v1/grading-results/${encodeURIComponent(resultId)}/parent-decision`,
+    {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify(payload),
+    },
+    parentToken,
+  );
+}
 
 export async function getAttemptResults(
   attemptId: string,
@@ -705,6 +847,10 @@ export async function createQuestionSetImport(
     family_id: string;
     filenames: string[];
     source_paths?: string[];
+    answer_filenames?: string[];
+    answer_source_paths?: string[];
+    reference_filenames?: string[];
+    reference_source_paths?: string[];
     purpose: "use_as_questions" | "generate_similar";
     title: string;
     subject: string;
@@ -765,6 +911,10 @@ export async function assignQuestionSet(
   childId: string,
   parentToken: string,
   idempotencyKey: string,
+  options: {
+    mode: "practice" | "exam";
+    time_limit_seconds: number | null;
+  } = { mode: "practice", time_limit_seconds: null },
 ) {
   return apiRequest<{ id: string; status: string }>(
     `/v1/question-sets/${encodeURIComponent(questionSetId)}/assignments`,
@@ -773,8 +923,7 @@ export async function assignQuestionSet(
       headers: { "Idempotency-Key": idempotencyKey },
       body: JSON.stringify({
         child_id: childId,
-        mode: "practice",
-        time_limit_seconds: null,
+        ...options,
       }),
     },
     parentToken,

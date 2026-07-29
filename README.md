@@ -83,7 +83,7 @@ the shared 8G VPS, behind the HTTPS-only `api.study.hypnochunk.com` virtual host
 The host has persistent Swap and container memory limits. Field-limited browser
 API errors are stored under `/opt/learning-assessment/logs` with bounded file
 rotation; request bodies, credentials, PINs, and URL query strings are excluded.
-Hosted Supabase owns Auth, PostgreSQL, and private Storage; all nine repository
+Hosted Supabase owns Auth, PostgreSQL, and private Storage; all ten repository
 migrations are applied.
 
 This deployment is still a controlled pilot. Google/LINE provider setup, a real

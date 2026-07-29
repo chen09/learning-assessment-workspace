@@ -8,7 +8,11 @@ const languageLabels: Record<Language, string> = {
   zh: "中文",
 };
 
-export function LanguageSwitcher() {
+export function LanguageSwitcher({
+  onLanguageChange,
+}: {
+  onLanguageChange?: (language: Language) => void | Promise<void>;
+} = {}) {
   const { language, setLanguage, t } = useLanguage();
 
   return (
@@ -16,7 +20,13 @@ export function LanguageSwitcher() {
       <span className="sr-only">{t("language.label")}</span>
       <select
         aria-label={t("language.label")}
-        onChange={(event) => setLanguage(event.target.value as Language)}
+        onChange={(event) => {
+          const nextLanguage = event.target.value as Language;
+          setLanguage(nextLanguage);
+          void (async () => {
+            await onLanguageChange?.(nextLanguage);
+          })().catch(() => undefined);
+        }}
         value={language}
       >
         {Object.entries(languageLabels).map(([value, label]) => (

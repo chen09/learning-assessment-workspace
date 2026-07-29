@@ -7,7 +7,7 @@ import { PwaRegistration } from "@/components/pwa-registration";
 
 export const metadata: Metadata = {
   title: {
-    default: "Luma · Family learning",
+    default: "Luma",
     template: "%s · Luma",
   },
   description:

@@ -14,6 +14,8 @@ import {
   useState,
 } from "react";
 
+import { useLanguage } from "@/components/language-provider";
+
 type Point = {
   x: number;
   y: number;
@@ -31,6 +33,7 @@ type HandwritingCanvasProps = {
 };
 
 export function HandwritingCanvas({ onChange }: HandwritingCanvasProps) {
+  const { t } = useLanguage();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawingRef = useRef<Stroke | null>(null);
   const [strokes, setStrokes] = useState<Stroke[]>([]);
@@ -142,7 +145,10 @@ export function HandwritingCanvas({ onChange }: HandwritingCanvasProps) {
   };
 
   const clear = () => {
-    if (strokes.length > 0 && !window.confirm("Clear all handwriting?")) {
+    if (
+      strokes.length > 0 &&
+      !window.confirm(t("handwriting.clearConfirm"))
+    ) {
       return;
     }
     setStrokes([]);
@@ -152,10 +158,13 @@ export function HandwritingCanvas({ onChange }: HandwritingCanvasProps) {
 
   return (
     <div className="handwriting">
-      <div className="canvas-toolbar" aria-label="Handwriting tools">
+      <div
+        className="canvas-toolbar"
+        aria-label={t("handwriting.tools")}
+      >
         <div className="pen-widths">
           <button
-            aria-label="Thin pen"
+            aria-label={t("handwriting.thinPen")}
             className={!eraser && width === 2.5 ? "active" : ""}
             onClick={() => {
               setEraser(false);
@@ -166,7 +175,7 @@ export function HandwritingCanvas({ onChange }: HandwritingCanvasProps) {
             <i className="thin-dot" />
           </button>
           <button
-            aria-label="Thick pen"
+            aria-label={t("handwriting.thickPen")}
             className={!eraser && width === 5 ? "active" : ""}
             onClick={() => {
               setEraser(false);
@@ -177,7 +186,7 @@ export function HandwritingCanvas({ onChange }: HandwritingCanvasProps) {
             <i className="thick-dot" />
           </button>
           <button
-            aria-label="Eraser"
+            aria-label={t("handwriting.eraser")}
             className={eraser ? "active" : ""}
             onClick={() => setEraser(true)}
             type="button"
@@ -186,19 +195,33 @@ export function HandwritingCanvas({ onChange }: HandwritingCanvasProps) {
           </button>
         </div>
         <div>
-          <button aria-label="Undo" disabled={!strokes.length} onClick={undo} type="button">
+          <button
+            aria-label={t("handwriting.undo")}
+            disabled={!strokes.length}
+            onClick={undo}
+            type="button"
+          >
             <RotateCcw size={17} />
           </button>
-          <button aria-label="Redo" disabled={!redoStack.length} onClick={redo} type="button">
+          <button
+            aria-label={t("handwriting.redo")}
+            disabled={!redoStack.length}
+            onClick={redo}
+            type="button"
+          >
             <RotateCw size={17} />
           </button>
-          <button aria-label="Clear handwriting" onClick={clear} type="button">
+          <button
+            aria-label={t("handwriting.clear")}
+            onClick={clear}
+            type="button"
+          >
             <Trash2 size={17} />
           </button>
         </div>
       </div>
       <canvas
-        aria-label="Handwriting answer area"
+        aria-label={t("handwriting.area")}
         height={420}
         onPointerCancel={finishStroke}
         onPointerDown={startStroke}
@@ -207,7 +230,7 @@ export function HandwritingCanvas({ onChange }: HandwritingCanvasProps) {
         ref={canvasRef}
         width={900}
       />
-      <p>Use a finger or stylus. Your work saves as you write.</p>
+      <p>{t("handwriting.help")}</p>
     </div>
   );
 }

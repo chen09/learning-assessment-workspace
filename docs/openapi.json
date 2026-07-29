@@ -81,9 +81,14 @@
             },
             "title": "Questions",
             "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
           }
         },
         "required": [
+          "title",
           "assignment",
           "attempt",
           "questions"
@@ -193,6 +198,11 @@
           },
           "ui_language": {
             "default": "en",
+            "enum": [
+              "zh",
+              "ja",
+              "en"
+            ],
             "title": "Ui Language",
             "type": "string"
           }
@@ -541,6 +551,22 @@
       },
       "CreateImportRequest": {
         "properties": {
+          "answer_filenames": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Answer Filenames",
+            "type": "array"
+          },
+          "answer_source_paths": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Answer Source Paths",
+            "type": "array"
+          },
           "family_id": {
             "format": "uuid",
             "title": "Family Id",
@@ -557,6 +583,22 @@
           },
           "purpose": {
             "$ref": "#/components/schemas/ImportPurpose"
+          },
+          "reference_filenames": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 30,
+            "title": "Reference Filenames",
+            "type": "array"
+          },
+          "reference_source_paths": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 30,
+            "title": "Reference Source Paths",
+            "type": "array"
           },
           "source_paths": {
             "items": {
@@ -596,15 +638,27 @@
             "title": "Family Id",
             "type": "string"
           },
+          "privacy_confirmed": {
+            "const": true,
+            "title": "Privacy Confirmed",
+            "type": "boolean"
+          },
           "question_set_id": {
             "format": "uuid",
             "title": "Question Set Id",
             "type": "string"
+          },
+          "rights_confirmed": {
+            "const": true,
+            "title": "Rights Confirmed",
+            "type": "boolean"
           }
         },
         "required": [
           "family_id",
-          "question_set_id"
+          "question_set_id",
+          "rights_confirmed",
+          "privacy_confirmed"
         ],
         "title": "CreateLibrarySubmissionRequest",
         "type": "object"
@@ -823,6 +877,51 @@
           "invited_by"
         ],
         "title": "FamilyInvitation",
+        "type": "object"
+      },
+      "FamilyLibraryQuestionSet": {
+        "properties": {
+          "family_id": {
+            "format": "uuid",
+            "title": "Family Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "question_count": {
+            "minimum": 0.0,
+            "title": "Question Count",
+            "type": "integer"
+          },
+          "source_summary": {
+            "additionalProperties": true,
+            "title": "Source Summary",
+            "type": "object"
+          },
+          "status": {
+            "$ref": "#/components/schemas/QuestionSetStatus"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "family_id",
+          "title",
+          "subject",
+          "status",
+          "question_count"
+        ],
+        "title": "FamilyLibraryQuestionSet",
         "type": "object"
       },
       "GradingOutcome": {
@@ -1126,6 +1225,68 @@
         "title": "ManagementUnlockResponse",
         "type": "object"
       },
+      "ParentAttemptReview": {
+        "properties": {
+          "attempt_id": {
+            "format": "uuid",
+            "title": "Attempt Id",
+            "type": "string"
+          },
+          "available_points": {
+            "title": "Available Points",
+            "type": "number"
+          },
+          "awarded_points": {
+            "title": "Awarded Points",
+            "type": "number"
+          },
+          "child_nickname": {
+            "title": "Child Nickname",
+            "type": "string"
+          },
+          "complete": {
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "correct_count": {
+            "title": "Correct Count",
+            "type": "integer"
+          },
+          "correction_count": {
+            "title": "Correction Count",
+            "type": "integer"
+          },
+          "pending_review_count": {
+            "title": "Pending Review Count",
+            "type": "integer"
+          },
+          "reviews": {
+            "items": {
+              "$ref": "#/components/schemas/ParentReviewItem"
+            },
+            "title": "Reviews",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "attempt_id",
+          "child_nickname",
+          "title",
+          "complete",
+          "awarded_points",
+          "available_points",
+          "correct_count",
+          "correction_count",
+          "pending_review_count",
+          "reviews"
+        ],
+        "title": "ParentAttemptReview",
+        "type": "object"
+      },
       "ParentDecision": {
         "properties": {
           "parent_awarded_points": {
@@ -1215,6 +1376,72 @@
           "outcome"
         ],
         "title": "ParentDecisionRequest",
+        "type": "object"
+      },
+      "ParentReviewItem": {
+        "properties": {
+          "automated_feedback": {
+            "additionalProperties": true,
+            "title": "Automated Feedback",
+            "type": "object"
+          },
+          "automated_outcome": {
+            "$ref": "#/components/schemas/GradingOutcome"
+          },
+          "photo_urls": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Photo Urls",
+            "type": "array"
+          },
+          "question_id": {
+            "format": "uuid",
+            "title": "Question Id",
+            "type": "string"
+          },
+          "question_points": {
+            "title": "Question Points",
+            "type": "number"
+          },
+          "question_position": {
+            "title": "Question Position",
+            "type": "integer"
+          },
+          "question_prompt": {
+            "title": "Question Prompt",
+            "type": "string"
+          },
+          "question_type": {
+            "$ref": "#/components/schemas/QuestionType"
+          },
+          "response_answer": {
+            "additionalProperties": true,
+            "title": "Response Answer",
+            "type": "object"
+          },
+          "response_kind": {
+            "$ref": "#/components/schemas/ResponseKind"
+          },
+          "result_id": {
+            "format": "uuid",
+            "title": "Result Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "result_id",
+          "question_id",
+          "question_position",
+          "question_prompt",
+          "question_type",
+          "question_points",
+          "response_kind",
+          "response_answer",
+          "automated_outcome",
+          "automated_feedback"
+        ],
+        "title": "ParentReviewItem",
         "type": "object"
       },
       "PrintableAssignment": {
@@ -1387,6 +1614,11 @@
             "title": "Id",
             "type": "string"
           },
+          "source_summary": {
+            "additionalProperties": true,
+            "title": "Source Summary",
+            "type": "object"
+          },
           "status": {
             "$ref": "#/components/schemas/QuestionSetStatus"
           },
@@ -1430,6 +1662,20 @@
       },
       "QuestionSetImport": {
         "properties": {
+          "answer_filenames": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Answer Filenames",
+            "type": "array"
+          },
+          "answer_source_paths": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Answer Source Paths",
+            "type": "array"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -1459,6 +1705,20 @@
             "format": "uuid",
             "title": "Question Set Id",
             "type": "string"
+          },
+          "reference_filenames": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reference Filenames",
+            "type": "array"
+          },
+          "reference_source_paths": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reference Source Paths",
+            "type": "array"
           },
           "source_paths": {
             "items": {
@@ -1737,6 +1997,24 @@
           "job"
         ],
         "title": "SubmissionReceipt",
+        "type": "object"
+      },
+      "UpdateChildLanguageRequest": {
+        "properties": {
+          "ui_language": {
+            "enum": [
+              "zh",
+              "ja",
+              "en"
+            ],
+            "title": "Ui Language",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ui_language"
+        ],
+        "title": "UpdateChildLanguageRequest",
         "type": "object"
       },
       "UpdateChildPinRequest": {
@@ -2361,6 +2639,134 @@
         "summary": "Get Attempt Work",
         "tags": [
           "attempts"
+        ]
+      }
+    },
+    "/v1/children/me/language": {
+      "put": {
+        "operationId": "update_own_child_language_v1_children_me_language_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateChildLanguageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Child"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Own Child Language",
+        "tags": [
+          "children"
+        ]
+      }
+    },
+    "/v1/children/{child_id}/language": {
+      "put": {
+        "operationId": "update_child_language_v1_children__child_id__language_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "child_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Child Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateChildLanguageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Child"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Child Language",
+        "tags": [
+          "children"
         ]
       }
     },
@@ -3314,6 +3720,65 @@
         ]
       }
     },
+    "/v1/grading-results/attempts/{attempt_id}": {
+      "get": {
+        "operationId": "get_parent_attempt_review_v1_grading_results_attempts__attempt_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attempt_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Attempt Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParentAttemptReview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Parent Attempt Review",
+        "tags": [
+          "grading-results"
+        ]
+      }
+    },
     "/v1/grading-results/{result_id}/parent-decision": {
       "post": {
         "operationId": "decide_result_v1_grading_results__result_id__parent_decision_post",
@@ -3678,6 +4143,68 @@
         "summary": "Retry Job",
         "tags": [
           "jobs"
+        ]
+      }
+    },
+    "/v1/library/families/{family_id}/question-sets": {
+      "get": {
+        "operationId": "list_family_question_sets_v1_library_families__family_id__question_sets_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "family_id",
+            "required": true,
+            "schema": {
+              "title": "Family Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FamilyLibraryQuestionSet"
+                  },
+                  "title": "Response List Family Question Sets V1 Library Families  Family Id  Question Sets Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Family Question Sets",
+        "tags": [
+          "library"
         ]
       }
     },

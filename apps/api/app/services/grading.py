@@ -1,3 +1,4 @@
+import unicodedata
 from datetime import UTC, datetime
 
 from app.domain.models import (
@@ -11,6 +12,11 @@ from app.domain.models import (
 )
 
 
+def normalize_exact_text(value: object) -> str:
+    normalized = unicodedata.normalize("NFKC", str(value))
+    return " ".join(normalized.split()).casefold()
+
+
 class FixtureGrader:
     """Deterministic grader for development and contract tests only."""
 
@@ -22,16 +28,24 @@ class FixtureGrader:
         question: Question,
         response: SavedResponse | None,
     ) -> QuestionResult:
-        if response is None or response.kind in {
-            ResponseKind.STROKES,
-            ResponseKind.PHOTO,
-        }:
+        if response is None:
             outcome = GradingOutcome.UNCERTAIN
             awarded_points = None
             confidence = 0.35
             feedback = {
-                "summary": "I could not read this reliably.",
-                "action": "Ask a parent to review it or upload a clearer answer.",
+                "summary": "No answer was available to grade.",
+                "action": "Ask the child to answer this question.",
+            }
+        elif response.kind in {
+            ResponseKind.STROKES,
+            ResponseKind.PHOTO,
+        }:
+            outcome = GradingOutcome.NEEDS_PARENT_REVIEW
+            awarded_points = None
+            confidence = 0
+            feedback = {
+                "summary": "Waiting for a parent to review.",
+                "action": "A parent can mark this answer correct or incorrect.",
             }
         elif response.kind == ResponseKind.CHOICE:
             choices = response.answer.get("choices", [])
@@ -55,9 +69,17 @@ class FixtureGrader:
                 }
             )
         elif response.kind == ResponseKind.TEXT:
-            expected_text = str(question.answer_key.get("text", "")).strip().casefold()
-            actual_text = str(response.answer.get("text", "")).strip().casefold()
-            correct = actual_text == expected_text
+            alternatives = question.answer_key.get("texts")
+            if isinstance(alternatives, list):
+                expected_texts = {
+                    normalize_exact_text(value) for value in alternatives
+                }
+            else:
+                expected_texts = {
+                    normalize_exact_text(question.answer_key.get("text", ""))
+                }
+            actual_text = normalize_exact_text(response.answer.get("text", ""))
+            correct = actual_text in expected_texts
             outcome = (
                 GradingOutcome.CORRECT if correct else GradingOutcome.INCORRECT
             )
