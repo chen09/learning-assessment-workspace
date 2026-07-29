@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
+import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
+
+const nonPersonalAnswerPng = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+  "base64",
+);
 
 test("temporary parent completes the hosted family learning flow", async ({
   page,
@@ -14,8 +20,12 @@ test("temporary parent completes the hosted family learning flow", async ({
   const runId = randomUUID();
   const email = `hosted-smoke-${runId}@example.test`;
   const password = `Hosted-${runId}-9a`;
+  const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
   let userId: string | null = null;
   let familyId: string | null = null;
+  const uploadedResponsePaths: string[] = [];
 
   try {
     const healthResponse = await request.get(`${apiBaseUrl}/healthz`);
@@ -81,10 +91,33 @@ test("temporary parent completes the hosted family learning flow", async ({
     await page.goto(
       `/parent/create/?familyId=${encodeURIComponent(familyId)}&childId=${encodeURIComponent(childId)}`,
     );
+    const importResponse = page.waitForResponse(
+      (response) =>
+        response.url() === `${apiBaseUrl}/v1/question-sets/imports` &&
+        response.request().method() === "POST",
+    );
     await page.getByRole("button", { name: "Create review draft" }).click();
+    const questionSetId = (
+      (await (await importResponse).json()) as { question_set_id: string }
+    ).question_set_id;
     await expect(
       page.getByRole("heading", { name: "Review before assigning" }),
     ).toBeVisible({ timeout: 30_000 });
+    const { error: photoQuestionError } = await supabaseAdmin
+      .from("questions")
+      .insert({
+        family_id: familyId,
+        question_set_id: questionSetId,
+        position: 4,
+        type: "photo",
+        prompt: {
+          en: "Solve 3(x − 2) = 12 on paper, then photograph your work.",
+        },
+        answer_key: { reference: "x = 6" },
+        rubric: { en: "Show the equation steps and final value." },
+        points: 2,
+      });
+    expect(photoQuestionError).toBeNull();
 
     const assignmentResponse = page.waitForResponse(
       (response) =>
@@ -104,7 +137,7 @@ test("temporary parent completes the hosted family learning flow", async ({
       await page.getByRole("button", { name: digit, exact: true }).click();
     }
     await page.getByRole("button", { name: "Open my work" }).click();
-    await expect(page.getByText("0/3", { exact: true })).toBeVisible();
+    await expect(page.getByText("0/4", { exact: true })).toBeVisible();
 
     await page
       .getByRole("radio", {
@@ -127,6 +160,58 @@ test("temporary parent completes the hosted family learning flow", async ({
     });
     await page.mouse.up();
     await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Next question" }).click();
+
+    const uploadIntentResponse = page.waitForResponse(
+      (response) =>
+        response.url() === `${apiBaseUrl}/v1/uploads/child-intents` &&
+        response.request().method() === "POST",
+    );
+    const storageUploadResponse = page.waitForResponse(
+      (response) =>
+        response
+          .url()
+          .includes("/storage/v1/object/upload/sign/responses/") &&
+        response.request().method() === "PUT",
+    );
+    const photoSaveResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes("/v1/attempts/") &&
+        response.url().includes("/responses/") &&
+        response.request().method() === "PUT" &&
+        (response.request().postDataJSON() as { kind?: string }).kind ===
+          "photo",
+    );
+    await page
+      .getByLabel("Take a photo or choose images")
+      .setInputFiles({
+        name: "non-personal-answer.png",
+        mimeType: "image/png",
+        buffer: nonPersonalAnswerPng,
+      });
+    const uploadIntent = (await (await uploadIntentResponse).json()) as {
+      path: string;
+    };
+    uploadedResponsePaths.push(uploadIntent.path);
+    expect((await storageUploadResponse).ok()).toBeTruthy();
+    expect((await photoSaveResponse).ok()).toBeTruthy();
+    await expect(
+      page
+        .getByRole("list", { name: "Uploaded answer images" })
+        .getByRole("listitem"),
+    ).toHaveText(["1. non-personal-answer.png"]);
+
+    const { data: storedPhoto, error: storedPhotoError } =
+      await supabaseAdmin.storage
+        .from("responses")
+        .download(uploadIntent.path);
+    expect(storedPhotoError).toBeNull();
+    expect(storedPhoto?.size).toBeGreaterThan(0);
+    const anonymousPhotoResponse = await request.get(
+      `${supabaseUrl}/storage/v1/object/responses/${uploadIntent.path}`,
+    );
+    expect(anonymousPhotoResponse.ok()).toBeFalsy();
+
     await page.getByRole("button", { name: "Submit all answers" }).click();
     await expect(
       page.getByRole("heading", { name: "Your work is being checked" }),
@@ -137,11 +222,43 @@ test("temporary parent completes the hosted family learning flow", async ({
     await expect(page.getByText("Try once more")).toBeVisible({
       timeout: 45_000,
     });
-    await expect(page.getByText("Waiting for a parent")).toBeVisible();
+    await expect(page.getByText("Waiting for a parent")).toHaveCount(2);
     await page.getByRole("button", { name: "Correct these answers" }).click();
     await expect(page).toHaveURL(/\/child\/work\/\?attemptId=/);
-    await expect(page.getByText("0/2", { exact: true })).toBeVisible();
+    await expect(page.getByText("0/3", { exact: true })).toBeVisible();
   } finally {
+    if (uploadedResponsePaths.length > 0) {
+      const { error: storageCleanupError } = await supabaseAdmin.storage
+        .from("responses")
+        .remove(uploadedResponsePaths);
+      expect
+        .soft(storageCleanupError, "temporary response photo cleanup")
+        .toBeNull();
+      if (!storageCleanupError) {
+        for (const uploadedPath of uploadedResponsePaths) {
+          const separator = uploadedPath.lastIndexOf("/");
+          const folder = uploadedPath.slice(0, separator);
+          const filename = uploadedPath.slice(separator + 1);
+          await expect
+            .poll(
+              async () => {
+                const { data, error } = await supabaseAdmin.storage
+                  .from("responses")
+                  .list(folder, { limit: 10, search: filename });
+                if (error) {
+                  throw error;
+                }
+                return data.some((object) => object.name === filename);
+              },
+              {
+                message: "temporary response photo was deleted",
+                timeout: 5_000,
+              },
+            )
+            .toBeFalsy();
+        }
+      }
+    }
     if (familyId) {
       const familyCleanup = await request.delete(
         `${supabaseUrl}/rest/v1/families?id=eq.${familyId}`,

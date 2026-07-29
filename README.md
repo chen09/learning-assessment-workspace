@@ -58,8 +58,9 @@ local Supabase stack.
 `npm run e2e:hosted` is a guarded, manual production smoke test. It requires the
 ignored hosted Supabase environment values and an explicit
 `HOSTED_E2E_CONFIRM=study.hypnochunk.com`; it creates a temporary verified
-parent, family, child, assignment, attempt, and grading job, then removes the
-temporary family and Auth user in a `finally` cleanup.
+parent, family, child, assignment, attempt, private response photo, and grading
+job. It verifies that anonymous Storage access fails, then removes the exact
+Storage object, temporary family, and Auth user in a `finally` cleanup.
 
 The local Supabase stack includes Auth, PostgreSQL, private Storage, and Mailpit.
 Its Studio is available at `http://127.0.0.1:54323`. The browser build reads
