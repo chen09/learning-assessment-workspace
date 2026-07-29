@@ -119,7 +119,6 @@ async function reportClientApiError(
         error_code: `http_${statusCode}`,
         occurred_at: new Date().toISOString(),
       }),
-      keepalive: true,
       signal: AbortSignal.timeout(2_000),
     });
   } catch {

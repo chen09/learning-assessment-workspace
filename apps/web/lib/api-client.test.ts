@@ -102,6 +102,7 @@ describe("parent API session refresh", () => {
     expect(fetchMock.mock.calls[1]?.[0]).toBe(
       "http://127.0.0.1:8000/v1/client-logs",
     );
+    expect(fetchMock.mock.calls[1]?.[1]?.keepalive).toBeUndefined();
     const report = JSON.parse(
       String(fetchMock.mock.calls[1]?.[1]?.body),
     ) as Record<string, unknown>;
