@@ -69,9 +69,9 @@ function AppShellContent({ children, role, currentPath }: AppShellProps) {
           ))}
         </nav>
         <div className="rail-foot">
-          <span className="avatar">{role === "parent" ? "M" : "A"}</span>
+          <span className="avatar">{role === "parent" ? "P" : "A"}</span>
           <span>
-            <strong>{role === "parent" ? "Maya" : "Alex"}</strong>
+            <strong>{role === "parent" ? "Parent" : "Alex"}</strong>
             <small>
               {t(role === "parent" ? "role.parent" : "role.child")}
             </small>

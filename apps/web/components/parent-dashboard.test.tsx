@@ -4,16 +4,16 @@ import { describe, expect, it } from "vitest";
 import { ParentDashboard } from "@/components/parent-dashboard";
 
 describe("ParentDashboard", () => {
-  it("leads with child status and the actions that need attention", () => {
+  it("sends a newly signed-in parent to real family setup", () => {
     render(<ParentDashboard />);
 
     expect(
-      screen.getByRole("heading", { name: "Good afternoon, Maya" }),
+      screen.getByRole("heading", { name: "Set up your family workspace" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Alex")).toBeInTheDocument();
-    expect(screen.getByText("2 items need you")).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "Review uncertain answers" }),
-    ).toHaveAttribute("href", "/parent/results");
+      screen.getByRole("link", { name: "Open family setup" }),
+    ).toHaveAttribute("href", "/parent/family");
+    expect(screen.queryByText("Maya")).not.toBeInTheDocument();
+    expect(screen.queryByText("Alex")).not.toBeInTheDocument();
   });
 });
