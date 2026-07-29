@@ -47,10 +47,90 @@ function apiBaseUrl() {
   );
 }
 
+function readJwtSessionIdentity(token: string) {
+  try {
+    const encodedPayload = token.split(".")[1];
+    if (!encodedPayload) {
+      return null;
+    }
+    const normalized = encodedPayload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(
+      normalized.length + ((4 - (normalized.length % 4)) % 4),
+      "=",
+    );
+    const payload = JSON.parse(atob(padded)) as {
+      exp?: unknown;
+      sub?: unknown;
+    };
+    return typeof payload.exp === "number" && typeof payload.sub === "string"
+      ? { expiresAt: payload.exp, subject: payload.sub }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+async function refreshExpiredParentToken(staleToken: string) {
+  const identity = readJwtSessionIdentity(staleToken);
+  if (!identity || identity.expiresAt > Date.now() / 1000) {
+    return null;
+  }
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) {
+    return null;
+  }
+  try {
+    const current = await supabase.auth.getSession();
+    if (current.data.session?.user.id !== identity.subject) {
+      return null;
+    }
+    if (current.data.session.access_token !== staleToken) {
+      return current.data.session.access_token;
+    }
+    const refreshed = await supabase.auth.refreshSession();
+    return refreshed.data.session?.user.id === identity.subject
+      ? refreshed.data.session.access_token
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+async function reportClientApiError(
+  path: string,
+  method: string | undefined,
+  statusCode: number,
+) {
+  if (typeof window === "undefined" || path === "/v1/client-logs") {
+    return;
+  }
+  const requestPath = path.split("?")[0] ?? "/v1/unknown";
+  const requestMethod = (method ?? "GET").toUpperCase();
+  try {
+    await fetch(`${apiBaseUrl()}/v1/client-logs`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        event: "api_request_failed",
+        page: window.location.pathname,
+        request_method: requestMethod,
+        request_path: requestPath,
+        status_code: statusCode,
+        error_code: `http_${statusCode}`,
+        occurred_at: new Date().toISOString(),
+      }),
+      keepalive: true,
+    });
+  } catch {
+    // Logging must never replace the original API failure.
+  }
+}
+
 async function apiRequest<T>(
   path: string,
   init: RequestInit,
   accessToken?: string,
+  allowParentRefresh = true,
 ): Promise<T> {
   const response = await fetch(`${apiBaseUrl()}${path}`, {
     ...init,
@@ -60,8 +140,15 @@ async function apiRequest<T>(
       ...init.headers,
     },
   });
+  if (response.status === 401 && accessToken && allowParentRefresh) {
+    const refreshedToken = await refreshExpiredParentToken(accessToken);
+    if (refreshedToken) {
+      return apiRequest<T>(path, init, refreshedToken, false);
+    }
+  }
   if (!response.ok) {
     const detail = (await response.json().catch(() => null)) as unknown;
+    void reportClientApiError(path, init.method, response.status);
     throw new Error(
       typeof detail === "object" && detail
         ? JSON.stringify(detail)
