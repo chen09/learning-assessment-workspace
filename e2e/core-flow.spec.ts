@@ -1,14 +1,38 @@
 import { expect, test } from "@playwright/test";
 
-test("parent language choice translates onboarding and family setup", async ({
+test("authenticated parent legacy link is cleaned and remains responsive in all languages", async ({
   page,
-}) => {
-  await page.goto("/parent/");
-  await page.getByLabel("Language").selectOption("zh");
+}, testInfo) => {
+  await page.goto("/parent/?code=legacy-code-fixture");
+  await expect(page).toHaveURL(/\/parent\/$/);
+  await expect(
+    page.getByRole("heading", { name: "Set up your family workspace" }),
+  ).toBeVisible();
 
+  const sideRail = page.locator(".side-rail");
+  const bottomNavigation = page.locator(".bottom-nav");
+  if (testInfo.project.name === "mobile") {
+    await expect(sideRail).toBeHidden();
+    await expect(bottomNavigation).toBeVisible();
+  } else {
+    await expect(sideRail).toBeVisible();
+    await expect(bottomNavigation).toBeHidden();
+  }
+
+  await page.getByLabel("Language").selectOption("zh");
   await expect(
     page.getByRole("heading", { name: "设置家庭学习空间" }),
   ).toBeVisible();
+  await page.getByLabel("语言").selectOption("ja");
+  await expect(
+    page.getByRole("heading", { name: "家族の学習スペースを設定" }),
+  ).toBeVisible();
+  await page.getByLabel("言語").selectOption("en");
+  await expect(
+    page.getByRole("heading", { name: "Set up your family workspace" }),
+  ).toBeVisible();
+  await page.getByLabel("Language").selectOption("zh");
+
   await page.getByRole("link", { name: "进入家庭设置" }).click();
   await expect(page.getByText("家庭学习空间", { exact: true })).toBeVisible();
   await expect(

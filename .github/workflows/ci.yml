@@ -28,6 +28,7 @@ jobs:
       - run: npm run build:web
       - run: npx playwright install --with-deps chromium
       - run: npm run e2e
+      - run: npm run e2e:auth
 
   api:
     runs-on: ubuntu-latest

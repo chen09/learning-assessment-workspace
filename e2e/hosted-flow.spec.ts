@@ -28,6 +28,14 @@ test("temporary parent completes the hosted family learning flow", async ({
   const uploadedResponsePaths: string[] = [];
 
   try {
+    await page.goto("/parent/?code=legacy-code-fixture");
+    await expect(page).toHaveURL(/\/login\/$/);
+    await expect(
+      page.getByRole("heading", {
+        name: "Welcome to your family workspace",
+      }),
+    ).toBeVisible();
+
     const healthResponse = await request.get(`${apiBaseUrl}/healthz`);
     expect(healthResponse.ok()).toBeTruthy();
 
@@ -57,6 +65,14 @@ test("temporary parent completes the hosted family learning flow", async ({
     await page.getByLabel("Password").fill(password);
     await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page).toHaveURL(/\/parent\/family\/$/);
+
+    await page.goto("/parent/?code=legacy-code-fixture");
+    await expect(page).toHaveURL(/\/parent\/$/);
+    await expect(
+      page.getByRole("heading", {
+        name: "Set up your family workspace",
+      }),
+    ).toBeVisible();
 
     await page.goto("/parent/family/");
     const familyResponse = page.waitForResponse(

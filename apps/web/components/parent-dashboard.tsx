@@ -2,12 +2,62 @@
 
 import Link from "next/link";
 import { ArrowRight, ShieldCheck, UsersRound } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { useLanguage } from "@/components/language-provider";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { getParentAccessToken } from "@/lib/api-client";
+
+function removeLegacyAuthCode() {
+  const currentUrl = new URL(window.location.href);
+  if (!currentUrl.searchParams.has("code")) {
+    return;
+  }
+
+  currentUrl.searchParams.delete("code");
+  window.history.replaceState(
+    window.history.state,
+    "",
+    `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`,
+  );
+}
 
 export function ParentDashboard() {
+  const router = useRouter();
+  const [authenticated, setAuthenticated] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    removeLegacyAuthCode();
+
+    void getParentAccessToken()
+      .then((accessToken) => {
+        if (!active) {
+          return;
+        }
+        if (!accessToken) {
+          router.replace("/login/");
+          return;
+        }
+        setAuthenticated(true);
+      })
+      .catch(() => {
+        if (active) {
+          router.replace("/login/");
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [router]);
+
+  if (!authenticated) {
+    return null;
+  }
+
   return (
     <AppShell currentPath="/parent/" role="parent">
       <ParentDashboardContent />
