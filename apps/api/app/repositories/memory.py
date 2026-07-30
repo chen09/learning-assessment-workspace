@@ -1,5 +1,6 @@
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from uuid import UUID
 
 from argon2 import PasswordHasher
 
@@ -60,6 +61,11 @@ from app.fixtures.english_lesson_one import (
     lesson_one_source_summary,
     matches_lesson_one_import,
 )
+from app.tools.import_question_set import (
+    ImportDocument,
+    ImportResult,
+    document_checksum,
+)
 
 
 class MemoryRepository:
@@ -81,6 +87,7 @@ class MemoryRepository:
         self.child_pin_locked_until: dict[str, datetime] = {}
         self.imports: dict[str, QuestionSetImport] = {}
         self.import_idempotency: dict[tuple[str, str], str] = {}
+        self.structured_imports: dict[tuple[str, str], str] = {}
         self.confirm_idempotency: dict[tuple[str, str], str] = {}
         self.assignment_idempotency: dict[tuple[str, str], str] = {}
         self.upload_intents: dict[tuple[str, str], UploadIntent] = {}
@@ -997,6 +1004,115 @@ class MemoryRepository:
         self.imports[str(imported.id)] = imported
         self.import_idempotency[record_key] = str(imported.id)
         return imported
+
+    async def import_structured_question_set(
+        self,
+        document: ImportDocument,
+        *,
+        family_id: UUID,
+        child_id: UUID,
+        source_name: str,
+        parent_id: str,
+    ) -> ImportResult:
+        family_key = str(family_id)
+        child_key = str(child_id)
+        child = self.children.get(child_key)
+        if (
+            family_key not in self.families
+            or parent_id not in self.family_parents.get(family_key, set())
+            or child is None
+            or child.family_id != family_id
+        ):
+            raise NotFoundError
+
+        checksum = document_checksum(document)
+        record_key = (family_key, checksum)
+        existing_set_id = self.structured_imports.get(record_key)
+        if existing_set_id is not None:
+            question_set = self.question_sets[existing_set_id]
+            assignment = next(
+                (
+                    candidate
+                    for candidate in self.assignments.values()
+                    if str(candidate.question_set_id) == existing_set_id
+                    and candidate.child_id == child_id
+                ),
+                None,
+            )
+            if assignment is None:
+                assignment = Assignment(
+                    family_id=family_id,
+                    question_set_id=question_set.id,
+                    child_id=child_id,
+                )
+                self.assignments[str(assignment.id)] = assignment
+            return ImportResult(
+                question_set_id=question_set.id,
+                assignment_id=assignment.id,
+                family_id=family_id,
+                family_name=self.families[family_key].name,
+                child_id=child_id,
+                child_nickname=child.nickname,
+                question_count=sum(
+                    question.question_set_id == question_set.id
+                    for question in self.questions.values()
+                ),
+                total_points=document.total_points,
+                status="confirmed",
+                reused_existing=True,
+                checksum=checksum,
+            )
+
+        question_set = QuestionSet(
+            family_id=family_id,
+            title=document.question_set.title,
+            subject=document.question_set.subject,
+            status=QuestionSetStatus.CONFIRMED,
+            source_summary={
+                **document.question_set.source_summary,
+                "schema_version": document.schema_version,
+                "import_checksum": checksum,
+                "imported_via": "parent_json_upload",
+                "original_json_filename": source_name,
+                "question_count": document.question_count,
+                "total_points": float(document.total_points),
+                "estimated_minutes": document.question_set.estimated_minutes,
+                "answer_keys_present": True,
+            },
+        )
+        self.question_sets[str(question_set.id)] = question_set
+        for item in document.questions:
+            question = Question(
+                family_id=family_id,
+                question_set_id=question_set.id,
+                position=item.position,
+                type=item.type,
+                prompt=item.prompt,
+                options=item.options or None,
+                answer_key=item.answer_key,
+                points=float(item.points),
+            )
+            self.questions[str(question.id)] = question
+        assignment = Assignment(
+            family_id=family_id,
+            question_set_id=question_set.id,
+            child_id=child_id,
+        )
+        self.assignments[str(assignment.id)] = assignment
+        self.structured_imports[record_key] = str(question_set.id)
+        return ImportResult(
+            question_set_id=question_set.id,
+            assignment_id=assignment.id,
+            family_id=family_id,
+            family_name=self.families[family_key].name,
+            child_id=child_id,
+            child_nickname=child.nickname,
+            question_count=document.question_count,
+            total_points=document.total_points,
+            status="confirmed",
+            reused_existing=False,
+            checksum=checksum,
+        )
 
     async def get_question_set_draft(
         self,

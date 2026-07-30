@@ -1052,6 +1052,43 @@
         "title": "HistoryItem",
         "type": "object"
       },
+      "ImportDocument": {
+        "additionalProperties": false,
+        "properties": {
+          "knowledge_tags": {
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeTagInput"
+            },
+            "minItems": 1,
+            "title": "Knowledge Tags",
+            "type": "array"
+          },
+          "question_set": {
+            "$ref": "#/components/schemas/QuestionSetInput"
+          },
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/QuestionInput-Input"
+            },
+            "minItems": 1,
+            "title": "Questions",
+            "type": "array"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "question_set",
+          "knowledge_tags",
+          "questions"
+        ],
+        "title": "ImportDocument",
+        "type": "object"
+      },
       "ImportPurpose": {
         "enum": [
           "use_as_questions",
@@ -1059,6 +1096,86 @@
         ],
         "title": "ImportPurpose",
         "type": "string"
+      },
+      "ImportResult": {
+        "additionalProperties": false,
+        "properties": {
+          "assignment_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignment Id"
+          },
+          "checksum": {
+            "title": "Checksum",
+            "type": "string"
+          },
+          "child_id": {
+            "format": "uuid",
+            "title": "Child Id",
+            "type": "string"
+          },
+          "child_nickname": {
+            "title": "Child Nickname",
+            "type": "string"
+          },
+          "family_id": {
+            "format": "uuid",
+            "title": "Family Id",
+            "type": "string"
+          },
+          "family_name": {
+            "title": "Family Name",
+            "type": "string"
+          },
+          "question_count": {
+            "title": "Question Count",
+            "type": "integer"
+          },
+          "question_set_id": {
+            "format": "uuid",
+            "title": "Question Set Id",
+            "type": "string"
+          },
+          "reused_existing": {
+            "title": "Reused Existing",
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "needs_review",
+              "confirmed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "total_points": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Points",
+            "type": "string"
+          }
+        },
+        "required": [
+          "question_set_id",
+          "assignment_id",
+          "family_id",
+          "family_name",
+          "child_id",
+          "child_nickname",
+          "question_count",
+          "total_points",
+          "status",
+          "reused_existing",
+          "checksum"
+        ],
+        "title": "ImportResult",
+        "type": "object"
       },
       "Job": {
         "properties": {
@@ -1125,6 +1242,27 @@
         ],
         "title": "JobStatus",
         "type": "string"
+      },
+      "KnowledgeTagInput": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "minLength": 1,
+            "title": "Code",
+            "type": "string"
+          },
+          "label": {
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "label"
+        ],
+        "title": "KnowledgeTagInput",
+        "type": "object"
       },
       "LibrarySubmission": {
         "properties": {
@@ -1539,6 +1677,124 @@
         "title": "Question",
         "type": "object"
       },
+      "QuestionInput-Input": {
+        "additionalProperties": false,
+        "properties": {
+          "answer_key": {
+            "additionalProperties": true,
+            "title": "Answer Key",
+            "type": "object"
+          },
+          "knowledge_code": {
+            "minLength": 1,
+            "title": "Knowledge Code",
+            "type": "string"
+          },
+          "options": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "points": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Points"
+          },
+          "position": {
+            "exclusiveMinimum": 0.0,
+            "title": "Position",
+            "type": "integer"
+          },
+          "prompt": {
+            "minLength": 1,
+            "title": "Prompt",
+            "type": "string"
+          },
+          "rubric": {
+            "additionalProperties": true,
+            "title": "Rubric",
+            "type": "object"
+          },
+          "type": {
+            "$ref": "#/components/schemas/QuestionType"
+          }
+        },
+        "required": [
+          "position",
+          "type",
+          "prompt",
+          "answer_key",
+          "points",
+          "knowledge_code"
+        ],
+        "title": "QuestionInput",
+        "type": "object"
+      },
+      "QuestionInput-Output": {
+        "additionalProperties": false,
+        "properties": {
+          "answer_key": {
+            "additionalProperties": true,
+            "title": "Answer Key",
+            "type": "object"
+          },
+          "knowledge_code": {
+            "minLength": 1,
+            "title": "Knowledge Code",
+            "type": "string"
+          },
+          "options": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "points": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Points",
+            "type": "string"
+          },
+          "position": {
+            "exclusiveMinimum": 0.0,
+            "title": "Position",
+            "type": "integer"
+          },
+          "prompt": {
+            "minLength": 1,
+            "title": "Prompt",
+            "type": "string"
+          },
+          "rubric": {
+            "additionalProperties": true,
+            "title": "Rubric",
+            "type": "object"
+          },
+          "type": {
+            "$ref": "#/components/schemas/QuestionType"
+          }
+        },
+        "required": [
+          "position",
+          "type",
+          "prompt",
+          "answer_key",
+          "points",
+          "knowledge_code"
+        ],
+        "title": "QuestionInput",
+        "type": "object"
+      },
       "QuestionResult": {
         "properties": {
           "attempt_id": {
@@ -1739,6 +1995,82 @@
           "purpose"
         ],
         "title": "QuestionSetImport",
+        "type": "object"
+      },
+      "QuestionSetInput": {
+        "additionalProperties": false,
+        "properties": {
+          "difficulty": {
+            "enum": [
+              "reinforcement",
+              "standard",
+              "challenge",
+              "adaptive"
+            ],
+            "title": "Difficulty",
+            "type": "string"
+          },
+          "estimated_minutes": {
+            "exclusiveMinimum": 0.0,
+            "title": "Estimated Minutes",
+            "type": "integer"
+          },
+          "instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructions"
+          },
+          "locale": {
+            "enum": [
+              "zh",
+              "ja",
+              "en"
+            ],
+            "title": "Locale",
+            "type": "string"
+          },
+          "source_mode": {
+            "enum": [
+              "manual",
+              "generate",
+              "convert",
+              "similar"
+            ],
+            "title": "Source Mode",
+            "type": "string"
+          },
+          "source_summary": {
+            "additionalProperties": true,
+            "title": "Source Summary",
+            "type": "object"
+          },
+          "subject": {
+            "minLength": 1,
+            "title": "Subject",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "subject",
+          "locale",
+          "difficulty",
+          "source_mode",
+          "estimated_minutes"
+        ],
+        "title": "QuestionSetInput",
         "type": "object"
       },
       "QuestionSetStatus": {
@@ -1977,6 +2309,104 @@
           "answer"
         ],
         "title": "SavedResponse",
+        "type": "object"
+      },
+      "StructuredImportPreview": {
+        "properties": {
+          "answer_keys_present": {
+            "title": "Answer Keys Present",
+            "type": "boolean"
+          },
+          "checksum": {
+            "title": "Checksum",
+            "type": "string"
+          },
+          "estimated_minutes": {
+            "title": "Estimated Minutes",
+            "type": "integer"
+          },
+          "knowledge_tag_count": {
+            "title": "Knowledge Tag Count",
+            "type": "integer"
+          },
+          "locale": {
+            "title": "Locale",
+            "type": "string"
+          },
+          "question_count": {
+            "title": "Question Count",
+            "type": "integer"
+          },
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/QuestionInput-Output"
+            },
+            "title": "Questions",
+            "type": "array"
+          },
+          "source_summary": {
+            "additionalProperties": true,
+            "title": "Source Summary",
+            "type": "object"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "total_points": {
+            "title": "Total Points",
+            "type": "number"
+          }
+        },
+        "required": [
+          "title",
+          "subject",
+          "locale",
+          "question_count",
+          "total_points",
+          "estimated_minutes",
+          "knowledge_tag_count",
+          "answer_keys_present",
+          "checksum",
+          "source_summary",
+          "questions"
+        ],
+        "title": "StructuredImportPreview",
+        "type": "object"
+      },
+      "StructuredImportRequest": {
+        "properties": {
+          "child_id": {
+            "format": "uuid",
+            "title": "Child Id",
+            "type": "string"
+          },
+          "document": {
+            "$ref": "#/components/schemas/ImportDocument"
+          },
+          "family_id": {
+            "format": "uuid",
+            "title": "Family Id",
+            "type": "string"
+          },
+          "source_name": {
+            "maxLength": 180,
+            "minLength": 1,
+            "title": "Source Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "family_id",
+          "child_id",
+          "source_name",
+          "document"
+        ],
+        "title": "StructuredImportRequest",
         "type": "object"
       },
       "SubmissionReceipt": {
@@ -4343,6 +4773,135 @@
           }
         },
         "summary": "Create Import",
+        "tags": [
+          "question-sets"
+        ]
+      }
+    },
+    "/v1/question-sets/imports/structured": {
+      "post": {
+        "operationId": "import_structured_question_set_v1_question_sets_imports_structured_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 120,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StructuredImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Import Structured Question Set",
+        "tags": [
+          "question-sets"
+        ]
+      }
+    },
+    "/v1/question-sets/imports/structured/preview": {
+      "post": {
+        "operationId": "preview_structured_import_v1_question_sets_imports_structured_preview_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportDocument"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StructuredImportPreview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Structured Import",
         "tags": [
           "question-sets"
         ]

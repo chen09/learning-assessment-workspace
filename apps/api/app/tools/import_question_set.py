@@ -185,6 +185,7 @@ async def import_question_set(
     source_name: str,
     confirm: bool,
     assign: bool,
+    parent_id: UUID | None = None,
 ) -> ImportResult:
     if assign and not confirm:
         raise ValueError("A question set must be confirmed before it can be assigned.")
@@ -210,6 +211,10 @@ async def import_question_set(
                         from public.family_members fm
                         where fm.family_id = f.id
                           and fm.status = 'active'
+                          and (
+                            cast(:parent_id as uuid) is null
+                            or fm.user_id = cast(:parent_id as uuid)
+                          )
                         order by (fm.user_id = f.created_by) desc, fm.joined_at
                         limit 1
                       ) as parent_id
@@ -220,10 +225,24 @@ async def import_question_set(
                     where f.id = :family_id
                       and f.deleted_at is null
                       and c.id = :child_id
+                      and (
+                        cast(:parent_id as uuid) is null
+                        or exists (
+                          select 1
+                          from public.family_members authorized_parent
+                          where authorized_parent.family_id = f.id
+                            and authorized_parent.user_id = cast(:parent_id as uuid)
+                            and authorized_parent.status = 'active'
+                        )
+                      )
                     for share of f, c
                     """
                 ),
-                {"family_id": family_id, "child_id": child_id},
+                {
+                    "family_id": family_id,
+                    "child_id": child_id,
+                    "parent_id": parent_id,
+                },
             )
             target = target_result.mappings().one_or_none()
             if target is None:
@@ -355,7 +374,11 @@ async def import_question_set(
                 {
                     "schema_version": document.schema_version,
                     "import_checksum": checksum,
-                    "imported_via": "ai_json_cli",
+                    "imported_via": (
+                        "parent_json_upload"
+                        if parent_id is not None
+                        else "ai_json_cli"
+                    ),
                     "original_json_filename": source_name,
                     "question_count": document.question_count,
                     "total_points": float(document.total_points),

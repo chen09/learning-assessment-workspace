@@ -68,6 +68,109 @@ test("parent imports material, reviews it, and reaches the printable set", async
   ).toBeVisible();
 });
 
+test("parent previews an AI JSON file before assigning its structured questions", async ({
+  page,
+  request,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "The shared fixture API import runs once; responsive UI is covered separately.",
+  );
+  const apiBaseUrl = "http://127.0.0.1:8017";
+  const parentHeaders = {
+    Authorization: "Bearer parent-fixture",
+    "Idempotency-Key": "e2e-structured-family",
+  };
+  const family = (await (
+    await request.post(`${apiBaseUrl}/v1/families`, {
+      headers: parentHeaders,
+      data: { name: "Structured JSON family" },
+    })
+  ).json()) as { id: string };
+  const child = (await (
+    await request.post(`${apiBaseUrl}/v1/families/${family.id}/children`, {
+      headers: {
+        Authorization: "Bearer parent-fixture",
+        "Idempotency-Key": "e2e-structured-child",
+      },
+      data: {
+        nickname: "JSON child",
+        grade_stage: "Junior high 1",
+        ui_language: "en",
+        pin: "123456",
+      },
+    })
+  ).json()) as { id: string };
+  const document = {
+    schema_version: "1.0",
+    question_set: {
+      title: "Uploaded JSON practice",
+      subject: "Mathematics",
+      locale: "en",
+      difficulty: "standard",
+      source_mode: "convert",
+      estimated_minutes: 5,
+      source_summary: { fixture: true },
+    },
+    knowledge_tags: [{ code: "addition", label: "Addition" }],
+    questions: [
+      {
+        position: 1,
+        type: "typed_text",
+        prompt: "What is 2 + 2?",
+        options: [],
+        answer_key: { text: "4" },
+        rubric: { grading_mode: "exact" },
+        points: 1,
+        knowledge_code: "addition",
+      },
+    ],
+  };
+
+  await page.goto(
+    `/parent/create/?familyId=${encodeURIComponent(family.id)}&childId=${encodeURIComponent(child.id)}`,
+  );
+  await page
+    .getByRole("button", { name: "Import AI question JSON" })
+    .click();
+  await page.getByLabel("AI question JSON").setInputFiles({
+    name: "structured-fixture.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(document)),
+  });
+  await page.getByRole("button", { name: "Preview questions" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Review before assigning" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "What is 2 + 2?" }),
+  ).toBeVisible();
+
+  const importResponse = page.waitForResponse(
+    (response) =>
+      response.url() ===
+        `${apiBaseUrl}/v1/question-sets/imports/structured` &&
+      response.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "Confirm and assign" }).click();
+  const assignmentId = (
+    (await (await importResponse).json()) as { assignment_id: string }
+  ).assignment_id;
+  await expect(page.getByText("Confirmed and assigned")).toBeVisible();
+
+  await page.goto(
+    `/child/login/?childId=${encodeURIComponent(child.id)}&assignmentId=${encodeURIComponent(assignmentId)}`,
+  );
+  for (const digit of ["1", "2", "3", "4", "5", "6"]) {
+    await page.getByRole("button", { name: digit, exact: true }).click();
+  }
+  await page.getByRole("button", { name: "Open my work" }).click();
+  await expect(page.getByText("0/1", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "What is 2 + 2?" }),
+  ).toBeVisible();
+});
+
 test("child completes a mixed worksheet and opens corrections", async ({
   page,
 }) => {

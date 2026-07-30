@@ -5,6 +5,112 @@ from app.main import create_app
 PARENT_HEADERS = {"Authorization": "Bearer parent-fixture"}
 
 
+def _structured_question_set() -> dict[str, object]:
+    return {
+        "schema_version": "1.0",
+        "question_set": {
+            "title": "Lesson 2 interactive practice",
+            "subject": "English",
+            "locale": "ja",
+            "difficulty": "standard",
+            "source_mode": "convert",
+            "instructions": "Answer every question.",
+            "estimated_minutes": 20,
+            "source_summary": {"unit": "Lesson 2"},
+        },
+        "knowledge_tags": [
+            {"code": "if-condition", "label": "if condition"},
+        ],
+        "questions": [
+            {
+                "position": 1,
+                "type": "single_choice",
+                "prompt": "___ it rains, stay home.",
+                "options": ["If", "Because"],
+                "answer_key": {"choice": 0},
+                "rubric": {"grading_mode": "exact"},
+                "points": 1,
+                "knowledge_code": "if-condition",
+            },
+        ],
+    }
+
+
+def test_parent_can_preview_structured_json_without_creating_a_question_set() -> None:
+    client = TestClient(create_app())
+    fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+    before = client.get(
+        f"/v1/library/families/{fixture['family']['id']}/question-sets",
+        headers=PARENT_HEADERS,
+    ).json()
+
+    preview = client.post(
+        "/v1/question-sets/imports/structured/preview",
+        headers=PARENT_HEADERS,
+        json=_structured_question_set(),
+    )
+    after = client.get(
+        f"/v1/library/families/{fixture['family']['id']}/question-sets",
+        headers=PARENT_HEADERS,
+    ).json()
+
+    assert preview.status_code == 200
+    assert preview.json()["title"] == "Lesson 2 interactive practice"
+    assert preview.json()["question_count"] == 1
+    assert preview.json()["answer_keys_present"] is True
+    assert preview.json()["questions"][0]["answer_key"] == {"choice": 0}
+    assert [item["id"] for item in after] == [item["id"] for item in before]
+
+
+def test_parent_can_confirm_structured_json_and_assign_it_without_exposing_answers() -> None:
+    client = TestClient(create_app())
+    fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+    request = {
+        "family_id": fixture["family"]["id"],
+        "child_id": fixture["child"]["id"],
+        "source_name": "lesson-2.json",
+        "document": _structured_question_set(),
+    }
+    headers = {
+        **PARENT_HEADERS,
+        "Idempotency-Key": "structured-lesson-two-import",
+    }
+
+    imported = client.post(
+        "/v1/question-sets/imports/structured",
+        headers=headers,
+        json=request,
+    )
+    repeated = client.post(
+        "/v1/question-sets/imports/structured",
+        headers=headers,
+        json=request,
+    )
+
+    assert imported.status_code == 201
+    assert imported.json()["status"] == "confirmed"
+    assert imported.json()["assignment_id"] is not None
+    assert repeated.json()["question_set_id"] == imported.json()["question_set_id"]
+    assert repeated.json()["assignment_id"] == imported.json()["assignment_id"]
+    assert repeated.json()["reused_existing"] is True
+
+    child_session = client.post(
+        f"/v1/children/{fixture['child']['id']}/sessions",
+        json={"pin": "123456"},
+    ).json()
+    work = client.post(
+        f"/v1/assignments/{imported.json()['assignment_id']}/start",
+        headers={
+            "Authorization": f"Bearer {child_session['access_token']}",
+        },
+    )
+
+    assert work.status_code == 200
+    assert work.json()["title"] == "Lesson 2 interactive practice"
+    assert work.json()["questions"][0]["prompt"] == "___ it rains, stay home."
+    assert "answer_key" not in work.json()["questions"][0]
+
+
 def test_import_stays_in_review_then_can_be_confirmed_and_assigned() -> None:
     client = TestClient(create_app())
     fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()

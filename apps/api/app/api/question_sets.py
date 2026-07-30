@@ -1,7 +1,8 @@
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
+from pydantic import BaseModel, Field
 
 from app.api.dependencies import Repository, get_repository, require_parent
 from app.domain.errors import NotFoundError
@@ -13,12 +14,81 @@ from app.domain.models import (
     QuestionSetDraft,
     QuestionSetImport,
 )
+from app.tools.import_question_set import (
+    ImportDocument,
+    ImportResult,
+    QuestionInput,
+    document_summary,
+)
 
 router = APIRouter(prefix="/v1/question-sets", tags=["question-sets"])
 IdempotencyKey = Annotated[
     str,
     Header(alias="Idempotency-Key", min_length=8, max_length=120),
 ]
+
+
+class StructuredImportPreview(BaseModel):
+    title: str
+    subject: str
+    locale: str
+    question_count: int
+    total_points: float
+    estimated_minutes: int
+    knowledge_tag_count: int
+    answer_keys_present: bool
+    checksum: str
+    source_summary: dict[str, Any]
+    questions: list[QuestionInput]
+
+
+class StructuredImportRequest(BaseModel):
+    family_id: UUID
+    child_id: UUID
+    source_name: str = Field(min_length=1, max_length=180)
+    document: ImportDocument
+
+
+@router.post(
+    "/imports/structured/preview",
+    response_model=StructuredImportPreview,
+)
+async def preview_structured_import(
+    document: ImportDocument,
+    _parent_id: Annotated[str, Depends(require_parent)],
+) -> StructuredImportPreview:
+    summary = document_summary(document, source_name="browser-upload.json")
+    return StructuredImportPreview(
+        **summary,
+        source_summary=document.question_set.source_summary,
+        questions=document.questions,
+    )
+
+
+@router.post(
+    "/imports/structured",
+    response_model=ImportResult,
+    status_code=status.HTTP_201_CREATED,
+)
+async def import_structured_question_set(
+    request: StructuredImportRequest,
+    _idempotency_key: IdempotencyKey,
+    repository: Annotated[Repository, Depends(get_repository)],
+    parent_id: Annotated[str, Depends(require_parent)],
+) -> ImportResult:
+    try:
+        return await repository.import_structured_question_set(
+            request.document,
+            family_id=request.family_id,
+            child_id=request.child_id,
+            source_name=request.source_name,
+            parent_id=parent_id,
+        )
+    except NotFoundError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The active family or child is not available.",
+        ) from error
 
 
 @router.post(
