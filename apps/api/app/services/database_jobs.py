@@ -37,11 +37,25 @@ def _localized_text(value: Any) -> str:
     return ""
 
 
+def _visual_adapter_for_family(
+    visual_adapter: VisualGradingAdapter | None,
+    *,
+    family_id: str,
+    allowed_family_ids: frozenset[str] | None,
+) -> VisualGradingAdapter | None:
+    if visual_adapter is None:
+        return None
+    if allowed_family_ids is None or family_id in allowed_family_ids:
+        return visual_adapter
+    return None
+
+
 async def fixture_job_handler(
     connection: asyncpg.Connection,
     job: dict[str, Any],
     *,
     visual_adapter: VisualGradingAdapter | None = None,
+    allowed_visual_family_ids: frozenset[str] | None = None,
     minimum_confidence: float = 0.75,
 ) -> dict[str, Any]:
     if job["type"] == "purge_deleted_data":
@@ -297,6 +311,11 @@ async def fixture_job_handler(
         job_data = dict(job)
         job_data["payload"] = payload
         job_model = Job(**job_data)
+        job_visual_adapter = _visual_adapter_for_family(
+            visual_adapter,
+            family_id=str(job_model.family_id),
+            allowed_family_ids=allowed_visual_family_ids,
+        )
         outcomes: dict[str, int] = {}
         grader_versions: set[str] = set()
         for row in question_rows:
@@ -321,7 +340,7 @@ async def fixture_job_handler(
                 job_model,
                 question,
                 responses.get(str(question.id)),
-                visual_adapter=visual_adapter,
+                visual_adapter=job_visual_adapter,
                 grading_guide=grading_guide,
                 minimum_confidence=minimum_confidence,
             )

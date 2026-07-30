@@ -15,6 +15,7 @@ from app.ai.contracts import (
 )
 from app.ai.fixture import FixtureAIAdapter
 from app.ai.handwriting import render_strokes_png
+from app.config import Settings
 from app.domain.models import (
     GradingOutcome,
     Job,
@@ -23,6 +24,7 @@ from app.domain.models import (
     ResponseKind,
     SavedResponse,
 )
+from app.services.database_jobs import _visual_adapter_for_family
 from app.services.grading import FixtureGrader, grade_response_with_ai
 
 
@@ -246,6 +248,37 @@ def test_low_confidence_visual_grade_is_routed_to_human_review() -> None:
     assert result.feedback["evidence"] == [
         "The final words are hard to distinguish."
     ]
+
+
+def test_visual_grading_adapter_is_limited_to_allowed_families() -> None:
+    adapter = FixtureAIAdapter()
+
+    assert (
+        _visual_adapter_for_family(
+            adapter,
+            family_id="family-a",
+            allowed_family_ids=frozenset({"family-a"}),
+        )
+        is adapter
+    )
+    assert (
+        _visual_adapter_for_family(
+            adapter,
+            family_id="family-b",
+            allowed_family_ids=frozenset({"family-a"}),
+        )
+        is None
+    )
+
+
+def test_codex_family_allowlist_is_loaded_from_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CODEX_FAMILY_IDS", '["family-a", "family-b"]')
+
+    settings = Settings(_env_file=None)
+
+    assert settings.codex_family_ids == ("family-a", "family-b")
 
 
 @pytest.mark.parametrize(
