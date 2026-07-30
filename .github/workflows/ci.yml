@@ -87,3 +87,4 @@ jobs:
       - uses: actions/checkout@v7
       - run: docker compose config --quiet
       - run: docker compose build
+      - run: docker compose run --rm worker codex --version
