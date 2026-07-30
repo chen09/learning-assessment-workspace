@@ -18,36 +18,6 @@ import {
   getChildAccessToken,
 } from "@/lib/api-client";
 
-const demoResults: AttemptResult[] = [
-  {
-    id: "demo-correct",
-    question_id: "algebra-choice",
-    outcome: "correct",
-    awarded_points: 1,
-    confidence: 0.99,
-    feedback: { summary: "Correct." },
-  },
-  {
-    id: "demo-incorrect",
-    question_id: "english-fill",
-    outcome: "incorrect",
-    awarded_points: 0,
-    confidence: 0.98,
-    feedback: {
-      summary: "Try once more.",
-      action: "Check the subject and the verb ending.",
-    },
-  },
-  {
-    id: "demo-uncertain",
-    question_id: "algebra-proof",
-    outcome: "uncertain",
-    awarded_points: null,
-    confidence: 0.35,
-    feedback: { summary: "Waiting for a parent." },
-  },
-];
-
 const subscribeToHydration = () => () => undefined;
 const getRequestedAttemptId = () =>
   new URLSearchParams(window.location.search).get("attemptId");
@@ -73,13 +43,15 @@ function ChildResultsContent() {
     getRequestedAttemptId,
     getServerAttemptId,
   );
-  const [results, setResults] = useState<AttemptResult[]>(demoResults);
+  const [results, setResults] = useState<AttemptResult[]>([]);
   const [attemptId, setAttemptId] = useState<string | null>(null);
-  const [complete, setComplete] = useState(true);
+  const [loadState, setLoadState] = useState<
+    "loading" | "ready" | "missing"
+  >("loading");
   const [correctionStatus, setCorrectionStatus] = useState<
     "idle" | "working" | "error"
   >("idle");
-  const [childName, setChildName] = useState("Alex");
+  const [childName, setChildName] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -99,7 +71,12 @@ function ChildResultsContent() {
   useEffect(() => {
     const id = requestedAttemptId;
     const token = getChildAccessToken();
-    if (!id || !token) {
+    if (!id) {
+      queueMicrotask(() => setLoadState("missing"));
+      return;
+    }
+    if (!token) {
+      queueMicrotask(() => setLoadState("missing"));
       return;
     }
     let cancelled = false;
@@ -111,9 +88,9 @@ function ChildResultsContent() {
           return;
         }
         setAttemptId(id);
-        setComplete(payload.complete);
         if (payload.complete) {
           setResults(payload.results);
+          setLoadState("ready");
           return;
         }
         timer = window.setTimeout(() => void poll(), 2000);
@@ -143,12 +120,9 @@ function ChildResultsContent() {
   const correctionCount = results.filter(
     (result) => result.outcome !== "correct",
   ).length;
-  const waitingForHostedResults = Boolean(
-    requestedAttemptId && !attemptId,
-  );
-  const visibleComplete = complete && !waitingForHostedResults;
+  const visibleComplete = loadState === "ready";
   const correctionActionReady =
-    hydrated && (!requestedAttemptId || Boolean(attemptId));
+    hydrated && loadState === "ready" && Boolean(attemptId);
   const correctionButtonLabel =
     !correctionActionReady || correctionStatus === "working"
       ? t("results.preparingCorrections")
@@ -157,7 +131,6 @@ function ChildResultsContent() {
   const beginCorrection = async () => {
     const token = getChildAccessToken();
     if (!attemptId || !token) {
-      window.location.assign("/child/work/?correction=demo");
       return;
     }
     setCorrectionStatus("working");
@@ -180,28 +153,40 @@ function ChildResultsContent() {
       <header className="result-header">
         <div>
           <p className="eyebrow">
-            {visibleComplete ? t("results.ready") : t("results.checking")}
+            {loadState === "missing"
+              ? t("results.unavailable")
+              : visibleComplete
+                ? t("results.ready")
+                : t("results.checking")}
           </p>
           <h1>
-            {visibleComplete
-              ? t("results.goodWork", { name: childName })
-              : t("results.almostReady")}
+            {loadState === "missing"
+              ? t("results.unavailableTitle")
+              : visibleComplete
+                ? t("results.goodWork", {
+                    name: childName ?? t("role.child"),
+                  })
+                : t("results.almostReady")}
           </h1>
           <p>
-            {visibleComplete
-              ? t(
-                  correctionCount === 1
-                    ? "results.correctionOne"
-                    : "results.correctionMany",
-                  { count: correctionCount },
-                )
-              : t("results.fullResult")}
+            {loadState === "missing"
+              ? t("results.unavailableBody")
+              : visibleComplete
+                ? t(
+                    correctionCount === 1
+                      ? "results.correctionOne"
+                      : "results.correctionMany",
+                    { count: correctionCount },
+                  )
+                : t("results.fullResult")}
           </p>
         </div>
-        <div className="score-badge">
-          <strong>{visibleComplete ? score : "—"}</strong>
-          <span>{t("results.points")}</span>
-        </div>
+        {loadState !== "missing" ? (
+          <div className="score-badge">
+            <strong>{visibleComplete ? score : "—"}</strong>
+            <span>{t("results.points")}</span>
+          </div>
+        ) : null}
       </header>
       <section className="result-list" aria-live="polite">
         {visibleComplete
@@ -242,9 +227,7 @@ function ChildResultsContent() {
                     </h2>
                     {result.feedback.action ? (
                       <p className="result-hint">
-                        {result.id === "demo-incorrect"
-                          ? t("results.demoAction")
-                          : result.feedback.action}
+                        {result.feedback.action}
                       </p>
                     ) : null}
                   </div>

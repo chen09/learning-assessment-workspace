@@ -40,7 +40,7 @@ test("authenticated parent legacy link is cleaned and remains responsive in all 
   ).toBeVisible();
 });
 
-test("parent imports material, reviews it, and reaches the printable set", async ({
+test("parent imports material and reviews the draft", async ({
   page,
 }) => {
   await page.goto("/");
@@ -62,10 +62,6 @@ test("parent imports material, reviews it, and reaches the printable set", async
     page.getByRole("heading", { name: "Review before assigning" }),
   ).toBeVisible();
   await expect(page.getByText("Draft · not visible to children")).toBeVisible();
-  await page.getByRole("link", { name: "Print A4 instead" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Algebra & English warm-up" }),
-  ).toBeVisible();
 });
 
 test("parent previews an AI JSON file before assigning its structured questions", async ({
@@ -178,6 +174,82 @@ test("parent previews an AI JSON file before assigning its structured questions"
   await expect(
     page.getByRole("heading", { name: "What is 2 + 2?" }),
   ).toBeVisible();
+});
+
+test("an expired child session returns to PIN login and resumes the requested page", async ({
+  page,
+  request,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "Session expiry behavior is viewport-independent.",
+  );
+  const apiBaseUrl = "http://127.0.0.1:8017";
+  const family = (await (
+    await request.post(`${apiBaseUrl}/v1/families`, {
+      headers: {
+        Authorization: "Bearer parent-fixture",
+        "Idempotency-Key": "e2e-expired-child-family",
+      },
+      data: { name: "Expired child session family" },
+    })
+  ).json()) as { id: string };
+  const child = (await (
+    await request.post(`${apiBaseUrl}/v1/families/${family.id}/children`, {
+      headers: {
+        Authorization: "Bearer parent-fixture",
+        "Idempotency-Key": "e2e-expired-child-profile",
+      },
+      data: {
+        nickname: "Expiry child",
+        grade_stage: "Junior high 1",
+        ui_language: "en",
+        pin: "123456",
+      },
+    })
+  ).json()) as { id: string };
+
+  await page.goto(
+    `/child/login/?childId=${encodeURIComponent(child.id)}`,
+  );
+  for (const digit of ["1", "2", "3", "4", "5", "6"]) {
+    await page.getByRole("button", { name: digit, exact: true }).click();
+  }
+  const initialAssignments = page.waitForResponse(
+    (response) =>
+      response.url() === `${apiBaseUrl}/v1/assignments` &&
+      response.status() === 200,
+  );
+  await page.getByRole("button", { name: "Open my work" }).click();
+  await expect(page).toHaveURL(/\/child\/$/);
+  await initialAssignments;
+
+  await page.evaluate(() => {
+    window.localStorage.setItem("luma-child-session", "expired-child-token");
+  });
+  const relogin = page.waitForURL(/\/child\/login\//);
+  await page.goto("/child/work/").catch((error: unknown) => {
+    if (!(error instanceof Error) || !error.message.includes("ERR_ABORTED")) {
+      throw error;
+    }
+  });
+  await relogin;
+
+  const loginUrl = new URL(page.url());
+  expect(loginUrl.searchParams.get("childId")).toBe(child.id);
+  expect(loginUrl.searchParams.get("expired")).toBe("1");
+  expect(loginUrl.searchParams.get("returnTo")).toBe("/child/work/");
+  await expect(
+    page.getByText(
+      "Your child session expired. Enter the PIN again to continue.",
+    ),
+  ).toBeVisible();
+
+  for (const digit of ["1", "2", "3", "4", "5", "6"]) {
+    await page.getByRole("button", { name: digit, exact: true }).click();
+  }
+  await page.getByRole("button", { name: "Open my work" }).click();
+  await expect(page).toHaveURL(/\/child\/work\/$/);
 });
 
 test("child screens stay responsive across Chinese, Japanese, and English", async ({
@@ -350,10 +422,41 @@ test("child screens stay responsive across Chinese, Japanese, and English", asyn
     page.getByRole("button", { name: "今日はスキップ" }),
   ).toBeVisible();
 
+  let releaseHistory: (() => void) | undefined;
+  const historyGate = new Promise<void>((resolve) => {
+    releaseHistory = resolve;
+  });
+  await page.route(
+    `${apiBaseUrl}/v1/history/child`,
+    async (route) => {
+      await historyGate;
+      await route.continue();
+    },
+  );
   await page.goto("/child/history/");
   await expect(
     page.getByRole("heading", { name: "学習履歴" }),
   ).toBeVisible();
+  await expect(page.getByText("学習履歴を読み込んでいます…")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Algebra & English warm-up" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Past tense practice" }),
+  ).toHaveCount(0);
+  releaseHistory?.();
+  await expect(
+    page.getByRole("heading", { name: "Responsive assigned practice" }),
+  ).toBeVisible();
+  await page.unroute(`${apiBaseUrl}/v1/history/child`);
+
+  await page.goto("/child/results/");
+  await expect(
+    page.getByRole("heading", { name: "表示できる結果がありません" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "もう一度" }),
+  ).toHaveCount(0);
 
   await page.goto("/child/exit/");
   await expect(
@@ -464,7 +567,11 @@ test("parent creation reaches child grading and correction through the API", asy
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Next question" }).click();
 
-  const canvas = page.getByLabel("Handwriting answer area");
+  let canvas = page.getByLabel("Handwriting answer area");
+  await page.getByRole("button", { name: "Add space to the right" }).click();
+  await page.getByRole("button", { name: "Add space below" }).click();
+  await expect(canvas).toHaveAttribute("width", "1200");
+  await expect(canvas).toHaveAttribute("height", "700");
   const canvasBox = await canvas.boundingBox();
   expect(canvasBox).not.toBeNull();
   await page.mouse.move(canvasBox!.x + 50, canvasBox!.y + 60);
@@ -474,6 +581,13 @@ test("parent creation reaches child grading and correction through the API", asy
   });
   await page.mouse.up();
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+
+  await page.reload();
+  await page.getByRole("button", { name: "Go to question 3" }).click();
+  canvas = page.getByLabel("Handwriting answer area");
+  await expect(canvas).toHaveAttribute("width", "1200");
+  await expect(canvas).toHaveAttribute("height", "700");
+
   await page.getByRole("button", { name: "Submit all answers" }).click();
   await expect(
     page.getByRole("heading", { name: "Your work is being checked" }),

@@ -60,6 +60,7 @@ describe("ParentResultsPage", () => {
           question_points: 2,
           response_kind: "strokes",
           response_answer: {
+            canvas_size: { width: 1200, height: 700 },
             strokes: [
               {
                 points: [
@@ -100,9 +101,13 @@ describe("ParentResultsPage", () => {
     expect(
       screen.getByText("请写出平方差公式的推导过程。"),
     ).toBeInTheDocument();
-    expect(
-      screen.getByLabelText("孩子的手写答案"),
-    ).toBeInTheDocument();
+    const handwritingPreview =
+      screen.getByLabelText("孩子的手写答案");
+    expect(handwritingPreview).toBeInTheDocument();
+    expect(handwritingPreview.querySelector("svg")).toHaveAttribute(
+      "viewBox",
+      "0 0 1200 700",
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "判为正确" }));
 

@@ -79,6 +79,10 @@ const assignmentWork = {
 
 describe("WorksheetWorkbench", () => {
   beforeEach(() => {
+    vi.spyOn(
+      HTMLCanvasElement.prototype,
+      "getContext",
+    ).mockReturnValue(null);
     window.history.replaceState({}, "", "/child/work/?assignmentId=assignment-1");
     window.localStorage.clear();
     window.localStorage.setItem("luma-language:demo-child", "en");
@@ -162,6 +166,62 @@ describe("WorksheetWorkbench", () => {
     expect(uploadedImages).toHaveTextContent(
       "1. answer-page.jpg2. draft-page.jpg",
     );
+  });
+
+  it("restores and resaves an expanded handwriting canvas", async () => {
+    mocks.startAssignment.mockResolvedValue({
+      ...assignmentWork,
+      responses: [
+        {
+          id: "response-1",
+          question_id: "algebra-proof",
+          kind: "strokes",
+          answer: {
+            strokes: [
+              {
+                points: [
+                  { x: 20, y: 30, pressure: 0.5 },
+                  { x: 80, y: 90, pressure: 0.5 },
+                ],
+                width: 2.5,
+                eraser: false,
+              },
+            ],
+            canvas_size: { width: 1200, height: 700 },
+          },
+          version: 3,
+        },
+      ],
+    });
+
+    render(<WorksheetWorkbench />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Go to question 3" }),
+    );
+    const canvas = screen.getByLabelText("Handwriting answer area");
+    expect(canvas).toHaveAttribute("width", "1200");
+    expect(canvas).toHaveAttribute("height", "700");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Add space below" }),
+    );
+
+    await waitFor(() => {
+      expect(mocks.saveAttemptResponse).toHaveBeenCalledWith(
+        "attempt-1",
+        "algebra-proof",
+        {
+          kind: "strokes",
+          answer: {
+            strokes: expect.any(Array),
+            canvas_size: { width: 1200, height: 980 },
+          },
+          expected_version: 3,
+        },
+        "child-token",
+      );
+    });
   });
 
   it("localizes worksheet controls without translating question content", () => {

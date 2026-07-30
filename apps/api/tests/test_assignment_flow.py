@@ -133,6 +133,49 @@ def test_autosave_rejects_a_stale_response_version() -> None:
     }
 
 
+def test_attempt_work_restores_saved_handwriting_and_canvas_size() -> None:
+    client = TestClient(create_app())
+    _fixture, child_headers, work = start_fixture_assignment(client)
+    attempt_id = work["attempt"]["id"]
+    question_id = work["questions"][2]["id"]
+    answer = {
+        "strokes": [
+            {
+                "points": [
+                    {"x": 20, "y": 30, "pressure": 0.5},
+                    {"x": 80, "y": 90, "pressure": 0.5},
+                ],
+                "width": 2.5,
+                "eraser": False,
+            }
+        ],
+        "canvas_size": {"width": 1200, "height": 700},
+    }
+
+    saved = client.put(
+        f"/v1/attempts/{attempt_id}/responses/{question_id}",
+        headers=child_headers,
+        json={
+            "kind": "strokes",
+            "answer": answer,
+            "expected_version": 0,
+        },
+    )
+    reopened = client.get(
+        f"/v1/attempts/{attempt_id}/work",
+        headers=child_headers,
+    )
+
+    assert saved.status_code == 200
+    assert reopened.status_code == 200
+    assert reopened.json()["responses"] == [
+        {
+            **saved.json(),
+            "answer": answer,
+        }
+    ]
+
+
 def test_submission_is_immutable_and_fixture_grading_releases_full_results() -> None:
     client = TestClient(create_app())
     _fixture, child_headers, work = start_fixture_assignment(client)

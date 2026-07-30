@@ -82,6 +82,13 @@
             "title": "Questions",
             "type": "array"
           },
+          "responses": {
+            "items": {
+              "$ref": "#/components/schemas/SavedResponse"
+            },
+            "title": "Responses",
+            "type": "array"
+          },
           "title": {
             "title": "Title",
             "type": "string"

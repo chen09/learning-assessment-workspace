@@ -83,9 +83,12 @@ function ChildReviewContent() {
           <Sparkles />
         </span>
         <p className="eyebrow">{t("review.today")}</p>
-        <h1>{t(countKey, { count: reviews.length })}</h1>
+        <h1>
+          {loading
+            ? t("review.loading")
+            : t(countKey, { count: reviews.length })}
+        </h1>
         <p>{t("review.description")}</p>
-        {loading ? <p>{t("review.loading")}</p> : null}
         {!loading && reviews.length === 0 ? (
           <>
             <p>{t("review.none")}</p>

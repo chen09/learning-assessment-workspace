@@ -35,4 +35,19 @@ describe("ChildLoginPage", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText("Enter your six-digit PIN")).not.toBeInTheDocument();
   });
+
+  it("explains in the child's language when the saved session expired", async () => {
+    window.localStorage.setItem("luma-language:demo-child", "ja");
+    window.history.replaceState(
+      {},
+      "",
+      "/child/login/?childId=child-1&expired=1&returnTo=%2Fchild%2Fwork%2F",
+    );
+
+    render(<ChildLoginPage />);
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "子どもセッションの有効期限が切れました。PIN をもう一度入力してください。",
+    );
+  });
 });

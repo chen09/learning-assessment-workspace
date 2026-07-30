@@ -50,9 +50,56 @@ describe("CreateWorkspace", () => {
     expect(screen.getByText("Fixture child")).toBeInTheDocument();
   });
 
-  it("keeps question material and its private answer key separate", () => {
+  it("keeps draft creation disabled until a real family and child are loaded", async () => {
+    let releaseFamilies:
+      | ((families: Array<{ id: string; name: string }>) => void)
+      | undefined;
+    mocks.getFamilies.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseFamilies = resolve;
+        }),
+    );
+
     render(<CreateWorkspace />);
 
+    expect(
+      screen.getByRole("button", { name: "Create review draft" }),
+    ).toBeDisabled();
+
+    await waitFor(() => {
+      expect(mocks.getFamilies).toHaveBeenCalled();
+    });
+    releaseFamilies?.([{ id: "family-1", name: "Fixture family" }]);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Create review draft" }),
+      ).toBeEnabled();
+    });
+  });
+
+  it("keeps question material and its private answer key separate", async () => {
+    mocks.createUploadIntent.mockResolvedValue({
+      bucket: "sources",
+      path: "family-1/import-1/english-lesson.pdf",
+      token: "upload-token",
+      signed_url: "https://storage.example/upload",
+    });
+    mocks.uploadToSignedUrl.mockResolvedValue(undefined);
+    mocks.createQuestionSetImport.mockResolvedValue({
+      question_set_id: "question-set-1",
+      job_id: "job-1",
+      status: "needs_review",
+    });
+    mocks.getQuestionSetDraft.mockResolvedValue({
+      question_set: { status: "needs_review" },
+      questions: [],
+    });
+
+    render(<CreateWorkspace />);
+
+    await screen.findByRole("combobox", { name: "Child" });
     fireEvent.click(screen.getByRole("button", { name: "Import material" }));
     expect(
       screen.getByRole("radio", {
@@ -103,7 +150,7 @@ describe("CreateWorkspace", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create review draft" }));
 
     expect(
-      screen.getByRole("heading", { name: "Review before assigning" }),
+      await screen.findByRole("heading", { name: "Review before assigning" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Draft · not visible to children")).toBeInTheDocument();
   });

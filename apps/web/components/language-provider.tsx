@@ -90,6 +90,8 @@ const messages = {
     "childLogin.opening": "Opening…",
     "childLogin.openWork": "Open my work",
     "childLogin.error": "That PIN did not work. Please try again.",
+    "childLogin.expired":
+      "Your child session expired. Enter the PIN again to continue.",
     "childLogin.returnParent": "Return to parent mode",
     "childHome.today": "Today",
     "childHome.title": "Ready for a small win?",
@@ -98,6 +100,7 @@ const messages = {
     "childHome.reviewOne": "{count} review question",
     "childHome.reviewMany": "{count} review questions",
     "childHome.summary": "{assignments} and {reviews}.",
+    "childHome.loadingSummary": "Loading today’s learning plan…",
     "childHome.start": "Start",
     "childHome.status.inProgress": "In progress",
     "childHome.status.submitted": "Submitted",
@@ -174,8 +177,11 @@ const messages = {
     "handwriting.redo": "Redo",
     "handwriting.clear": "Clear handwriting",
     "handwriting.clearConfirm": "Clear all handwriting?",
+    "handwriting.expandRight": "Add space to the right",
+    "handwriting.expandDown": "Add space below",
     "handwriting.area": "Handwriting answer area",
-    "handwriting.help": "Use a finger or stylus. Your work saves as you write.",
+    "handwriting.help":
+      "Use a finger or stylus. Add space to the right or below when needed. Your work saves as you write.",
     "submitted.eyebrow": "All handed in",
     "submitted.title": "Your work is being checked",
     "submitted.description":
@@ -189,6 +195,10 @@ const messages = {
     "results.checking": "Checking your work",
     "results.goodWork": "Good work, {name}",
     "results.almostReady": "Almost ready",
+    "results.unavailable": "Results unavailable",
+    "results.unavailableTitle": "No results to show",
+    "results.unavailableBody":
+      "Open a submitted assignment from History to see its results.",
     "results.correctionOne":
       "{count} answer is ready for one more try or a parent check.",
     "results.correctionMany":
@@ -257,6 +267,9 @@ const messages = {
     "history.eyebrow": "Your work",
     "history.title": "History",
     "history.description": "Finished sets, scores, and corrections.",
+    "history.loading": "Loading learning history…",
+    "history.empty": "No learning history yet.",
+    "history.error": "History could not be loaded. Please sign in again.",
     "history.assigned": "Assigned",
     "history.correctionOne": "{count} correction",
     "history.correctionMany": "{count} corrections",
@@ -372,6 +385,8 @@ const messages = {
     "childLogin.opening": "開いています…",
     "childLogin.openWork": "学習を開く",
     "childLogin.error": "PIN が正しくありません。もう一度お試しください。",
+    "childLogin.expired":
+      "子どもセッションの有効期限が切れました。PIN をもう一度入力してください。",
     "childLogin.returnParent": "保護者モードに戻る",
     "childHome.today": "今日",
     "childHome.title": "小さな一歩を始めよう",
@@ -380,6 +395,7 @@ const messages = {
     "childHome.reviewOne": "復習問題 {count} 問",
     "childHome.reviewMany": "復習問題 {count} 問",
     "childHome.summary": "{assignments}、{reviews}。",
+    "childHome.loadingSummary": "今日の学習予定を読み込んでいます…",
     "childHome.start": "開始",
     "childHome.status.inProgress": "学習中",
     "childHome.status.submitted": "提出済み",
@@ -456,9 +472,11 @@ const messages = {
     "handwriting.redo": "やり直す",
     "handwriting.clear": "手書きをすべて消す",
     "handwriting.clearConfirm": "手書きをすべて消しますか？",
+    "handwriting.expandRight": "右に解答欄を追加",
+    "handwriting.expandDown": "下に解答欄を追加",
     "handwriting.area": "手書き解答欄",
     "handwriting.help":
-      "指またはスタイラスで書いてください。書くたびに保存されます。",
+      "指またはスタイラスで書いてください。必要に応じて右や下に解答欄を追加できます。書くたびに保存されます。",
     "submitted.eyebrow": "提出完了",
     "submitted.title": "答えを採点しています",
     "submitted.description":
@@ -472,6 +490,10 @@ const messages = {
     "results.checking": "採点中",
     "results.goodWork": "よくできました、{name}",
     "results.almostReady": "もう少しです",
+    "results.unavailable": "結果を表示できません",
+    "results.unavailableTitle": "表示できる結果がありません",
+    "results.unavailableBody":
+      "学習履歴から提出済みの練習を開いてください。",
     "results.correctionOne":
       "{count} 問をもう一度解くか、保護者に確認してもらいます。",
     "results.correctionMany":
@@ -536,6 +558,10 @@ const messages = {
     "history.eyebrow": "あなたの学習",
     "history.title": "学習履歴",
     "history.description": "完了した練習、得点、やり直しの記録です。",
+    "history.loading": "学習履歴を読み込んでいます…",
+    "history.empty": "学習履歴はまだありません。",
+    "history.error":
+      "学習履歴を読み込めませんでした。もう一度ログインしてください。",
     "history.assigned": "割り当て済み",
     "history.correctionOne": "やり直し {count} 問",
     "history.correctionMany": "やり直し {count} 問",
@@ -650,6 +676,7 @@ const messages = {
     "childLogin.opening": "正在打开…",
     "childLogin.openWork": "打开我的练习",
     "childLogin.error": "PIN 不正确，请重试。",
+    "childLogin.expired": "孩子会话已过期，请重新输入 PIN 后继续。",
     "childLogin.returnParent": "返回家长模式",
     "childHome.today": "今天",
     "childHome.title": "准备好取得一个小进步了吗？",
@@ -658,6 +685,7 @@ const messages = {
     "childHome.reviewOne": "{count} 道复习题",
     "childHome.reviewMany": "{count} 道复习题",
     "childHome.summary": "{assignments}，{reviews}。",
+    "childHome.loadingSummary": "正在读取今天的学习安排…",
     "childHome.start": "开始",
     "childHome.status.inProgress": "进行中",
     "childHome.status.submitted": "已提交",
@@ -732,8 +760,11 @@ const messages = {
     "handwriting.redo": "重做",
     "handwriting.clear": "清除手写内容",
     "handwriting.clearConfirm": "确定清除全部手写内容吗？",
+    "handwriting.expandRight": "向右增加书写空间",
+    "handwriting.expandDown": "向下增加书写空间",
     "handwriting.area": "手写作答区域",
-    "handwriting.help": "请用手指或触控笔书写，书写内容会持续保存。",
+    "handwriting.help":
+      "请用手指或触控笔书写，需要时可向右或向下增加空间，内容会持续保存。",
     "submitted.eyebrow": "已全部提交",
     "submitted.title": "系统正在批改你的答案",
     "submitted.description":
@@ -747,6 +778,9 @@ const messages = {
     "results.checking": "正在批改",
     "results.goodWork": "做得好，{name}",
     "results.almostReady": "马上就好",
+    "results.unavailable": "暂时无法显示结果",
+    "results.unavailableTitle": "没有可显示的结果",
+    "results.unavailableBody": "请从学习记录中打开已提交练习的结果。",
     "results.correctionOne": "有 {count} 道题需要再试一次或等待家长确认。",
     "results.correctionMany": "有 {count} 道题需要再试一次或等待家长确认。",
     "results.fullResult": "所有题目批改完成后才会显示完整结果。",
@@ -804,6 +838,9 @@ const messages = {
     "history.eyebrow": "你的练习",
     "history.title": "学习记录",
     "history.description": "已完成的练习、分数和订正记录。",
+    "history.loading": "正在加载学习记录…",
+    "history.empty": "目前还没有学习记录。",
+    "history.error": "无法加载学习记录，请重新登录。",
     "history.assigned": "已安排",
     "history.correctionOne": "{count} 道待订正",
     "history.correctionMany": "{count} 道待订正",

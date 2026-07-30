@@ -73,5 +73,7 @@ describe("ChildHomePage", () => {
     expect(
       screen.queryByRole("heading", { name: "Algebra & English warm-up" }),
     ).not.toBeInTheDocument();
+    expect(screen.queryByText("0 份练习，0 道复习题。")).not.toBeInTheDocument();
+    expect(screen.getByText("正在读取今天的学习安排…")).toBeInTheDocument();
   });
 });

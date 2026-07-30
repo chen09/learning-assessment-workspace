@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  ArrowDown,
+  ArrowRight,
   Eraser,
   RotateCcw,
   RotateCw,
@@ -28,18 +30,50 @@ export type Stroke = {
   eraser: boolean;
 };
 
-type HandwritingCanvasProps = {
-  onChange: (strokes: Stroke[]) => void;
+export type CanvasSize = {
+  width: number;
+  height: number;
 };
 
-export function HandwritingCanvas({ onChange }: HandwritingCanvasProps) {
+type HandwritingCanvasProps = {
+  initialSize?: CanvasSize;
+  initialStrokes?: Stroke[];
+  onChange: (strokes: Stroke[], size: CanvasSize) => void;
+};
+
+const BASE_CANVAS_SIZE: CanvasSize = { width: 900, height: 420 };
+const CANVAS_WIDTH_STEP = 300;
+const CANVAS_HEIGHT_STEP = 280;
+const MAX_CANVAS_SIZE: CanvasSize = { width: 1800, height: 1260 };
+
+function normalizeCanvasSize(size: CanvasSize): CanvasSize {
+  return {
+    width: Math.min(
+      Math.max(size.width, BASE_CANVAS_SIZE.width),
+      MAX_CANVAS_SIZE.width,
+    ),
+    height: Math.min(
+      Math.max(size.height, BASE_CANVAS_SIZE.height),
+      MAX_CANVAS_SIZE.height,
+    ),
+  };
+}
+
+export function HandwritingCanvas({
+  initialSize = BASE_CANVAS_SIZE,
+  initialStrokes = [],
+  onChange,
+}: HandwritingCanvasProps) {
   const { t } = useLanguage();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawingRef = useRef<Stroke | null>(null);
-  const [strokes, setStrokes] = useState<Stroke[]>([]);
+  const [strokes, setStrokes] = useState<Stroke[]>(initialStrokes);
   const [redoStack, setRedoStack] = useState<Stroke[]>([]);
   const [width, setWidth] = useState(2.5);
   const [eraser, setEraser] = useState(false);
+  const [canvasSize, setCanvasSize] = useState<CanvasSize>(() =>
+    normalizeCanvasSize(initialSize),
+  );
 
   const draw = useCallback((allStrokes: Stroke[]) => {
     const canvas = canvasRef.current;
@@ -76,7 +110,7 @@ export function HandwritingCanvas({ onChange }: HandwritingCanvasProps) {
 
   useEffect(() => {
     draw(strokes);
-  }, [draw, strokes]);
+  }, [canvasSize, draw, strokes]);
 
   const pointFromEvent = (
     event: ReactPointerEvent<HTMLCanvasElement>,
@@ -119,7 +153,7 @@ export function HandwritingCanvas({ onChange }: HandwritingCanvasProps) {
     const next = [...strokes, stroke];
     setStrokes(next);
     setRedoStack([]);
-    onChange(next);
+    onChange(next, canvasSize);
   };
 
   const undo = () => {
@@ -130,7 +164,7 @@ export function HandwritingCanvas({ onChange }: HandwritingCanvasProps) {
     const next = strokes.slice(0, -1);
     setStrokes(next);
     setRedoStack((current) => [...current, last]);
-    onChange(next);
+    onChange(next, canvasSize);
   };
 
   const redo = () => {
@@ -141,7 +175,7 @@ export function HandwritingCanvas({ onChange }: HandwritingCanvasProps) {
     const next = [...strokes, nextStroke];
     setStrokes(next);
     setRedoStack((current) => current.slice(0, -1));
-    onChange(next);
+    onChange(next, canvasSize);
   };
 
   const clear = () => {
@@ -153,7 +187,12 @@ export function HandwritingCanvas({ onChange }: HandwritingCanvasProps) {
     }
     setStrokes([]);
     setRedoStack([]);
-    onChange([]);
+    onChange([], canvasSize);
+  };
+
+  const resizeCanvas = (nextSize: CanvasSize) => {
+    setCanvasSize(nextSize);
+    onChange(strokes, nextSize);
   };
 
   return (
@@ -196,6 +235,38 @@ export function HandwritingCanvas({ onChange }: HandwritingCanvasProps) {
         </div>
         <div>
           <button
+            aria-label={t("handwriting.expandRight")}
+            disabled={canvasSize.width >= MAX_CANVAS_SIZE.width}
+            onClick={() =>
+              resizeCanvas({
+                ...canvasSize,
+                width: Math.min(
+                  canvasSize.width + CANVAS_WIDTH_STEP,
+                  MAX_CANVAS_SIZE.width,
+                ),
+              })
+            }
+            type="button"
+          >
+            <ArrowRight size={17} />
+          </button>
+          <button
+            aria-label={t("handwriting.expandDown")}
+            disabled={canvasSize.height >= MAX_CANVAS_SIZE.height}
+            onClick={() =>
+              resizeCanvas({
+                ...canvasSize,
+                height: Math.min(
+                  canvasSize.height + CANVAS_HEIGHT_STEP,
+                  MAX_CANVAS_SIZE.height,
+                ),
+              })
+            }
+            type="button"
+          >
+            <ArrowDown size={17} />
+          </button>
+          <button
             aria-label={t("handwriting.undo")}
             disabled={!strokes.length}
             onClick={undo}
@@ -220,16 +291,22 @@ export function HandwritingCanvas({ onChange }: HandwritingCanvasProps) {
           </button>
         </div>
       </div>
-      <canvas
-        aria-label={t("handwriting.area")}
-        height={420}
-        onPointerCancel={finishStroke}
-        onPointerDown={startStroke}
-        onPointerMove={continueStroke}
-        onPointerUp={finishStroke}
-        ref={canvasRef}
-        width={900}
-      />
+      <div className="canvas-scroll">
+        <canvas
+          aria-label={t("handwriting.area")}
+          height={canvasSize.height}
+          onPointerCancel={finishStroke}
+          onPointerDown={startStroke}
+          onPointerMove={continueStroke}
+          onPointerUp={finishStroke}
+          ref={canvasRef}
+          style={{
+            height: `${canvasSize.height}px`,
+            width: `${(canvasSize.width / BASE_CANVAS_SIZE.width) * 100}%`,
+          }}
+          width={canvasSize.width}
+        />
+      </div>
       <p>{t("handwriting.help")}</p>
     </div>
   );

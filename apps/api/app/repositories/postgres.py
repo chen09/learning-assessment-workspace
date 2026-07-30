@@ -837,6 +837,20 @@ class PostgresRepository:
                 {"question_set_id": assignment_row["question_set_id"]},
             )
             question_rows = question_result.mappings().all()
+            response_rows = (
+                await connection.execute(
+                    text(
+                        """
+                        select id, family_id, attempt_id, question_id, kind,
+                               answer, version, saved_at
+                        from public.responses
+                        where attempt_id = :attempt_id
+                        order by saved_at
+                        """
+                    ),
+                    {"attempt_id": attempt_row["id"]},
+                )
+            ).mappings().all()
 
         assignment_data = dict(assignment_row)
         assignment_data["status"] = AssignmentStatus.IN_PROGRESS
@@ -848,6 +862,7 @@ class PostgresRepository:
             questions=[
                 QuestionView.model_validate(question.model_dump()) for question in questions
             ],
+            responses=[SavedResponse(**dict(row)) for row in response_rows],
         )
 
     async def save_response(
@@ -1488,6 +1503,20 @@ class PostgresRepository:
                     {"correction_attempt_id": correction_row["id"]},
                 )
             ).mappings().all()
+            response_rows = (
+                await connection.execute(
+                    text(
+                        """
+                        select id, family_id, attempt_id, question_id, kind,
+                               answer, version, saved_at
+                        from public.responses
+                        where attempt_id = :attempt_id
+                        order by saved_at
+                        """
+                    ),
+                    {"attempt_id": correction_row["id"]},
+                )
+            ).mappings().all()
         questions = [_question(row) for row in question_rows]
         return AssignmentWork(
             title=str(assignment_row["title"]),
@@ -1497,6 +1526,7 @@ class PostgresRepository:
                 QuestionView.model_validate(question.model_dump())
                 for question in questions
             ],
+            responses=[SavedResponse(**dict(row)) for row in response_rows],
         )
 
     async def get_attempt_work(
@@ -1564,6 +1594,20 @@ class PostgresRepository:
                     },
                 )
             ).mappings().all()
+            response_rows = (
+                await connection.execute(
+                    text(
+                        """
+                        select id, family_id, attempt_id, question_id, kind,
+                               answer, version, saved_at
+                        from public.responses
+                        where attempt_id = :attempt_id
+                        order by saved_at
+                        """
+                    ),
+                    {"attempt_id": _uuid(attempt_id)},
+                )
+            ).mappings().all()
         questions = [_question(row) for row in question_rows]
         return AssignmentWork(
             title=str(assignment_row["title"]),
@@ -1573,6 +1617,7 @@ class PostgresRepository:
                 QuestionView.model_validate(question.model_dump())
                 for question in questions
             ],
+            responses=[SavedResponse(**dict(row)) for row in response_rows],
         )
 
     async def list_child_assignments(

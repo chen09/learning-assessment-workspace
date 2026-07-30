@@ -57,6 +57,16 @@ function HandwritingPreview({
   const strokes = Array.isArray(rawStrokes)
     ? (rawStrokes as Stroke[])
     : [];
+  const rawCanvasSize = item.response_answer.canvas_size;
+  const canvasSize =
+    rawCanvasSize &&
+    typeof rawCanvasSize === "object" &&
+    "width" in rawCanvasSize &&
+    "height" in rawCanvasSize &&
+    typeof rawCanvasSize.width === "number" &&
+    typeof rawCanvasSize.height === "number"
+      ? rawCanvasSize
+      : { width: 900, height: 420 };
 
   return (
     <div
@@ -67,7 +77,7 @@ function HandwritingPreview({
         <svg
           preserveAspectRatio="xMidYMid meet"
           role="img"
-          viewBox="0 0 900 420"
+          viewBox={`0 0 ${canvasSize.width} ${canvasSize.height}`}
         >
           {strokes.map((stroke, index) => {
             const points = (stroke.points ?? [])
