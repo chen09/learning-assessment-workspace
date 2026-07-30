@@ -40,28 +40,71 @@ test("authenticated parent legacy link is cleaned and remains responsive in all 
   ).toBeVisible();
 });
 
-test("parent imports material and reviews the draft", async ({
+test("parent separates imported material and its private answer key", async ({
   page,
-}) => {
-  await page.goto("/");
-  await page.getByRole("link", { name: "Open demo" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Set up your family workspace" }),
-  ).toBeVisible();
+  request,
+}, testInfo) => {
+  const apiBaseUrl = "http://127.0.0.1:8017";
+  const fixtureKey = `e2e-material-${testInfo.project.name}-${testInfo.workerIndex}`;
+  const familyResponse = await request.post(`${apiBaseUrl}/v1/families`, {
+    headers: {
+      Authorization: "Bearer parent-fixture",
+      "Idempotency-Key": `${fixtureKey}-family`,
+    },
+    data: { name: "Material import family" },
+  });
+  expect(familyResponse.ok()).toBeTruthy();
+  const family = (await familyResponse.json()) as { id: string };
+  const childResponse = await request.post(
+    `${apiBaseUrl}/v1/families/${family.id}/children`,
+    {
+      headers: {
+        Authorization: "Bearer parent-fixture",
+        "Idempotency-Key": `${fixtureKey}-child`,
+      },
+      data: {
+        nickname: "Material child",
+        grade_stage: "Junior high 1",
+        ui_language: "en",
+        pin: "123456",
+      },
+    },
+  );
+  expect(childResponse.ok()).toBeTruthy();
+  const child = (await childResponse.json()) as { id: string };
 
-  await page.goto("/parent/create/");
+  await page.goto(
+    `/parent/create/?familyId=${encodeURIComponent(family.id)}&childId=${encodeURIComponent(child.id)}`,
+  );
+  await expect(page.getByRole("combobox", { name: "Family" })).toHaveValue(
+    family.id,
+  );
+  await expect(page.getByRole("combobox", { name: "Child" })).toHaveValue(
+    child.id,
+  );
   await page.getByRole("button", { name: "Import material" }).click();
-  await page.getByLabel("Learning material and exercises").setInputFiles({
+  await page
+    .getByRole("radio", {
+      name: "Convert an existing worksheet into questions",
+    })
+    .click();
+  await page.getByLabel("Question material").setInputFiles({
     name: "english-lesson.pdf",
     mimeType: "application/pdf",
     buffer: Buffer.from("fixture"),
   });
-  await page.getByRole("button", { name: "Create review draft" }).click();
+  await page.getByLabel("Answer key (private)").setInputFiles({
+    name: "english-lesson-answers.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("answers"),
+  });
 
+  await expect(page.getByText("english-lesson.pdf")).toBeVisible();
+  await expect(page.getByText("english-lesson-answers.pdf")).toBeVisible();
+  await expect(page.getByText("Children never receive this file.")).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Review before assigning" }),
-  ).toBeVisible();
-  await expect(page.getByText("Draft · not visible to children")).toBeVisible();
+    page.getByRole("button", { name: "Create review draft" }),
+  ).toBeEnabled();
 });
 
 test("parent previews an AI JSON file before assigning its structured questions", async ({
