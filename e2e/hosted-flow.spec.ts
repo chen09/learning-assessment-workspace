@@ -309,6 +309,16 @@ test("temporary parent completes the hosted family learning flow", async ({
               points: 2,
               knowledge_code: "difference-squares",
             },
+            {
+              position: 5,
+              type: "typed_text",
+              prompt: "Complete: They ___ English after school.",
+              options: [],
+              answer_key: { text: "study" },
+              rubric: { grading_mode: "exact" },
+              points: 1,
+              knowledge_code: "present-simple",
+            },
           ],
         }),
       ),
@@ -345,7 +355,7 @@ test("temporary parent completes the hosted family learning flow", async ({
     );
     await page.getByRole("button", { name: "Open my work" }).click();
     expect((await startAssignmentResponse).ok()).toBeTruthy();
-    await expect(page.getByText("0/4", { exact: true })).toBeVisible({
+    await expect(page.getByText("0/5", { exact: true })).toBeVisible({
       timeout: 10_000,
     });
     await expect(page.getByText("今日练习")).toBeVisible();
@@ -491,7 +501,7 @@ test("temporary parent completes the hosted family learning flow", async ({
     await page.getByRole("button", { name: "View results" }).click();
     await completedResults;
     await expect(page).toHaveURL(/\/child\/results\/\?attemptId=/);
-    await expect(page.getByText("Try once more")).toBeVisible({
+    await expect(page.getByText("Try once more")).toHaveCount(2, {
       timeout: 45_000,
     });
     await expect(page.getByText("Waiting for a parent")).toHaveCount(2);
@@ -535,7 +545,7 @@ test("temporary parent completes the hosted family learning flow", async ({
     );
     await page.getByRole("button", { name: "Correct these answers" }).click();
     await expect(page).toHaveURL(/\/child\/work\/\?attemptId=/);
-    await expect(page.getByText("0/1", { exact: true })).toBeVisible();
+    await expect(page.getByText("0/2", { exact: true })).toBeVisible();
   } finally {
     testInfo.setTimeout(testInfo.timeout + 30_000);
     if (hostedCleanupState) {
