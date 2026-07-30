@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import {
+  type CanvasSize,
   HandwritingCanvas,
   type Stroke,
 } from "@/components/handwriting-canvas";
@@ -28,6 +29,8 @@ import {
   syncPendingDrafts,
 } from "@/lib/draft-queue";
 import {
+  type ApiQuestion,
+  type AssignmentWork,
   createChildUploadIntent,
   getAttemptWork,
   getChildAccessToken,
@@ -62,9 +65,73 @@ type Answer = {
   tokens?: string[];
   text?: string;
   strokes?: Stroke[];
+  canvasSize?: CanvasSize;
   photoNames?: string[];
   photoPaths?: string[];
 };
+
+function canvasSizeFromAnswer(
+  answer: Record<string, unknown>,
+): CanvasSize | undefined {
+  const rawSize = answer.canvas_size;
+  if (
+    !rawSize ||
+    typeof rawSize !== "object" ||
+    !("width" in rawSize) ||
+    !("height" in rawSize) ||
+    typeof rawSize.width !== "number" ||
+    typeof rawSize.height !== "number"
+  ) {
+    return undefined;
+  }
+  return { width: rawSize.width, height: rawSize.height };
+}
+
+function restoreAnswer(
+  response: AssignmentWork["responses"][number],
+  questionType: ApiQuestion["type"] | undefined,
+): Answer {
+  const answer = response.answer;
+  if (response.kind === "choice") {
+    const choices = Array.isArray(answer.choices)
+      ? answer.choices.filter(
+          (choice): choice is number => typeof choice === "number",
+        )
+      : [];
+    return questionType === "single_choice"
+      ? { choice: choices[0] }
+      : { choices };
+  }
+  if (response.kind === "tokens") {
+    return {
+      tokens: Array.isArray(answer.tokens)
+        ? answer.tokens.filter(
+            (token): token is string => typeof token === "string",
+          )
+        : [],
+    };
+  }
+  if (response.kind === "text") {
+    return { text: typeof answer.text === "string" ? answer.text : "" };
+  }
+  if (response.kind === "photo") {
+    const paths = Array.isArray(answer.paths)
+      ? answer.paths.filter(
+          (path): path is string => typeof path === "string",
+        )
+      : [];
+    return {
+      photoNames: paths.map((path) => path.split("/").at(-1) ?? path),
+      photoPaths: paths,
+    };
+  }
+  return {
+    strokes: Array.isArray(answer.strokes)
+      ? (answer.strokes as Stroke[])
+      : [],
+    canvasSize: canvasSizeFromAnswer(answer),
+  };
+}
 
 export function WorksheetWorkbench() {
   return (
@@ -154,6 +221,29 @@ function WorksheetWorkbenchContent() {
         if (work.assignment.time_limit_seconds) {
           setSecondsRemaining(work.assignment.time_limit_seconds);
         }
+        const questionTypes = new Map(
+          work.questions.map((question) => [question.id, question.type]),
+        );
+        const savedResponses = work.responses ?? [];
+        setAnswers(
+          Object.fromEntries(
+            savedResponses.map((response) => [
+              response.question_id,
+              restoreAnswer(
+                response,
+                questionTypes.get(response.question_id),
+              ),
+            ]),
+          ),
+        );
+        setResponseVersions(
+          Object.fromEntries(
+            savedResponses.map((response) => [
+              response.question_id,
+              response.version,
+            ]),
+          ),
+        );
         setQuestions(
           work.questions.map((question) => ({
             id: question.id,
@@ -226,7 +316,10 @@ function WorksheetWorkbenchContent() {
             }
           : kind === "text"
             ? { text: answer.text ?? "" }
-            : { strokes: answer?.strokes ?? [] };
+            : {
+                strokes: answer?.strokes ?? [],
+                canvas_size: answer?.canvasSize,
+              };
       const syncRequest: DraftSyncRequest | undefined =
         attemptId && childToken
           ? {
@@ -617,7 +710,12 @@ function WorksheetWorkbenchContent() {
     }
     return (
       <HandwritingCanvas
-        onChange={(strokes) => updateAnswer(question.id, { strokes })}
+        initialSize={answer.canvasSize}
+        initialStrokes={answer.strokes}
+        key={question.id}
+        onChange={(strokes, canvasSize) =>
+          updateAnswer(question.id, { strokes, canvasSize })
+        }
       />
     );
   };

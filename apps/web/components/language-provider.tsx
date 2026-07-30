@@ -177,8 +177,11 @@ const messages = {
     "handwriting.redo": "Redo",
     "handwriting.clear": "Clear handwriting",
     "handwriting.clearConfirm": "Clear all handwriting?",
+    "handwriting.expandRight": "Add space to the right",
+    "handwriting.expandDown": "Add space below",
     "handwriting.area": "Handwriting answer area",
-    "handwriting.help": "Use a finger or stylus. Your work saves as you write.",
+    "handwriting.help":
+      "Use a finger or stylus. Add space to the right or below when needed. Your work saves as you write.",
     "submitted.eyebrow": "All handed in",
     "submitted.title": "Your work is being checked",
     "submitted.description":
@@ -469,9 +472,11 @@ const messages = {
     "handwriting.redo": "やり直す",
     "handwriting.clear": "手書きをすべて消す",
     "handwriting.clearConfirm": "手書きをすべて消しますか？",
+    "handwriting.expandRight": "右に解答欄を追加",
+    "handwriting.expandDown": "下に解答欄を追加",
     "handwriting.area": "手書き解答欄",
     "handwriting.help":
-      "指またはスタイラスで書いてください。書くたびに保存されます。",
+      "指またはスタイラスで書いてください。必要に応じて右や下に解答欄を追加できます。書くたびに保存されます。",
     "submitted.eyebrow": "提出完了",
     "submitted.title": "答えを採点しています",
     "submitted.description":
@@ -755,8 +760,11 @@ const messages = {
     "handwriting.redo": "重做",
     "handwriting.clear": "清除手写内容",
     "handwriting.clearConfirm": "确定清除全部手写内容吗？",
+    "handwriting.expandRight": "向右增加书写空间",
+    "handwriting.expandDown": "向下增加书写空间",
     "handwriting.area": "手写作答区域",
-    "handwriting.help": "请用手指或触控笔书写，书写内容会持续保存。",
+    "handwriting.help":
+      "请用手指或触控笔书写，需要时可向右或向下增加空间，内容会持续保存。",
     "submitted.eyebrow": "已全部提交",
     "submitted.title": "系统正在批改你的答案",
     "submitted.description":

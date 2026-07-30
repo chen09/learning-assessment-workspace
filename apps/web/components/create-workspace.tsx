@@ -141,14 +141,16 @@ export function CreateWorkspace() {
     };
   }, []);
 
+  const hasAssignmentTarget = Boolean(
+    selectedFamilyId && selectedChildId,
+  );
   const canCreate =
-    mode === "import"
+    hasAssignmentTarget &&
+    (mode === "import"
       ? Boolean(fileName)
       : mode === "structured"
-        ? structuredFile !== null &&
-          Boolean(selectedFamilyId) &&
-          Boolean(selectedChildId)
-        : true;
+        ? structuredFile !== null
+        : true);
   const isLessonOneImport = files.some(
     (file) => file.name === "english_lesson1_similar_practice.pdf",
   );

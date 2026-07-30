@@ -70,6 +70,13 @@ export type AssignmentWork = {
     id: string;
   };
   questions: ApiQuestion[];
+  responses: Array<{
+    id: string;
+    question_id: string;
+    kind: "choice" | "text" | "tokens" | "strokes" | "photo";
+    answer: Record<string, unknown>;
+    version: number;
+  }>;
 };
 
 export type UploadIntent = {

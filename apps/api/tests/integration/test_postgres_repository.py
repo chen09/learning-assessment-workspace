@@ -284,6 +284,18 @@ async def test_postgres_vertical_flow_and_family_isolation() -> None:
             ),
         )
         assert saved.version == 1
+        reopened_work = await repository.get_attempt_work(
+            str(work.attempt.id),
+            str(child_a),
+        )
+        assert len(reopened_work.responses) >= 1
+        restored_response = next(
+            response
+            for response in reopened_work.responses
+            if response.question_id == first_question.id
+        )
+        assert restored_response.answer == {"choices": [0]}
+        assert restored_response.version == 1
         with pytest.raises(ResponseVersionConflict):
             await repository.save_response(
                 str(work.attempt.id),

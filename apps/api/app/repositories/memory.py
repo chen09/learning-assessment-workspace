@@ -350,6 +350,7 @@ class MemoryRepository:
             questions=[
                 QuestionView.model_validate(question.model_dump()) for question in questions
             ],
+            responses=list(self.responses_for_attempt(str(attempt.id)).values()),
         )
 
     async def list_child_assignments(
@@ -876,6 +877,9 @@ class MemoryRepository:
                 QuestionView.model_validate(question.model_dump())
                 for question in questions
             ],
+            responses=list(
+                self.responses_for_attempt(str(correction.id)).values()
+            ),
         )
 
     async def get_attempt_work(
@@ -907,6 +911,7 @@ class MemoryRepository:
                 QuestionView.model_validate(question.model_dump())
                 for question in questions
             ],
+            responses=list(self.responses_for_attempt(attempt_id).values()),
         )
 
     async def create_import(

@@ -222,20 +222,6 @@ class Attempt(BaseModel):
     submitted_at: datetime | None = None
 
 
-class AssignmentWork(BaseModel):
-    title: str
-    assignment: Assignment
-    attempt: Attempt
-    questions: list[QuestionView]
-
-
-class PrintableAssignment(BaseModel):
-    assignment: Assignment
-    title: str
-    questions: list[QuestionView]
-    template_version: Literal["a4-v1"] = "a4-v1"
-
-
 class SaveResponseRequest(BaseModel):
     kind: ResponseKind
     answer: dict[str, Any]
@@ -251,6 +237,21 @@ class SavedResponse(BaseModel):
     answer: dict[str, Any]
     version: int = 1
     saved_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class AssignmentWork(BaseModel):
+    title: str
+    assignment: Assignment
+    attempt: Attempt
+    questions: list[QuestionView]
+    responses: list[SavedResponse] = Field(default_factory=list)
+
+
+class PrintableAssignment(BaseModel):
+    assignment: Assignment
+    title: str
+    questions: list[QuestionView]
+    template_version: Literal["a4-v1"] = "a4-v1"
 
 
 class Job(BaseModel):

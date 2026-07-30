@@ -567,7 +567,11 @@ test("parent creation reaches child grading and correction through the API", asy
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Next question" }).click();
 
-  const canvas = page.getByLabel("Handwriting answer area");
+  let canvas = page.getByLabel("Handwriting answer area");
+  await page.getByRole("button", { name: "Add space to the right" }).click();
+  await page.getByRole("button", { name: "Add space below" }).click();
+  await expect(canvas).toHaveAttribute("width", "1200");
+  await expect(canvas).toHaveAttribute("height", "700");
   const canvasBox = await canvas.boundingBox();
   expect(canvasBox).not.toBeNull();
   await page.mouse.move(canvasBox!.x + 50, canvasBox!.y + 60);
@@ -577,6 +581,13 @@ test("parent creation reaches child grading and correction through the API", asy
   });
   await page.mouse.up();
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+
+  await page.reload();
+  await page.getByRole("button", { name: "Go to question 3" }).click();
+  canvas = page.getByLabel("Handwriting answer area");
+  await expect(canvas).toHaveAttribute("width", "1200");
+  await expect(canvas).toHaveAttribute("height", "700");
+
   await page.getByRole("button", { name: "Submit all answers" }).click();
   await expect(
     page.getByRole("heading", { name: "Your work is being checked" }),
