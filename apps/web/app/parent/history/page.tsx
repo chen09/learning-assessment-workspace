@@ -12,49 +12,53 @@ import {
   getParentAccessToken,
 } from "@/lib/api-client";
 
-const demoHistory: HistoryItem[] = [
-  {
-    assignment_id: "demo-alex",
-    attempt_id: null,
-    child_id: "alex",
-    child_nickname: "Alex",
-    title: "Algebra & English warm-up",
-    status: "results_ready",
-    submitted_at: new Date().toISOString(),
-    awarded_points: 6,
-    available_points: 8,
-    correction_count: 2,
-  },
-  {
-    assignment_id: "demo-emi",
-    attempt_id: null,
-    child_id: "emi",
-    child_nickname: "Emi",
-    title: "Present simple from textbook pages",
-    status: "grading",
-    submitted_at: new Date().toISOString(),
-    awarded_points: 0,
-    available_points: 8,
-    correction_count: 0,
-  },
-];
+type LoadState = "loading" | "ready" | "missing" | "error";
 
 export default function ParentHistoryPage() {
-  const [items, setItems] = useState(demoHistory);
+  const [items, setItems] = useState<HistoryItem[]>([]);
   const [childFilter, setChildFilter] = useState("all");
+  const [loadState, setLoadState] = useState<LoadState>("loading");
 
   useEffect(() => {
+    let active = true;
     const familyId = new URLSearchParams(window.location.search).get(
       "familyId",
     );
     if (!familyId) {
-      return;
+      queueMicrotask(() => {
+        if (active) {
+          setLoadState("missing");
+        }
+      });
+      return () => {
+        active = false;
+      };
     }
-    void getParentAccessToken().then(async (token) => {
-      if (token) {
-        setItems(await getFamilyHistory(familyId, token));
+
+    void (async () => {
+      try {
+        const token = await getParentAccessToken();
+        if (!token) {
+          if (active) {
+            setLoadState("error");
+          }
+          return;
+        }
+        const historyItems = await getFamilyHistory(familyId, token);
+        if (active) {
+          setItems(historyItems);
+          setLoadState("ready");
+        }
+      } catch {
+        if (active) {
+          setLoadState("error");
+        }
       }
-    });
+    })();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const children = Array.from(
@@ -98,48 +102,64 @@ export default function ParentHistoryPage() {
         ))}
       </section>
       <section className="record-table">
-        {visibleItems.map((item) => (
-          <article key={item.assignment_id}>
-            <span className="record-icon">
-              {item.status === "grading" ? <Clock3 /> : <FileCheck2 />}
-            </span>
-            <div>
-              <p>
-                {item.child_nickname} ·{" "}
-                {item.submitted_at
-                  ? new Intl.DateTimeFormat(undefined, {
-                      month: "short",
-                      day: "numeric",
-                    }).format(new Date(item.submitted_at))
-                  : "Assigned"}
-              </p>
-              <h2>{item.title}</h2>
-              <span>
-                {item.awarded_points} / {item.available_points} points ·{" "}
-                {item.correction_count} corrections
-              </span>
-            </div>
-            <span
-              className={
-                item.correction_count > 0
-                  ? "status-pill warm"
-                  : "status-pill"
-              }
-            >
-              {item.status.replaceAll("_", " ")}
-            </span>
-            {item.attempt_id ? (
-              <Link
-                aria-label={`Open ${item.title}`}
-                href={`/parent/results/?attemptId=${encodeURIComponent(
-                  item.attempt_id,
-                )}`}
-              >
-                <ArrowRight />
-              </Link>
-            ) : null}
-          </article>
-        ))}
+        {loadState === "loading" ? <p>Loading family history…</p> : null}
+        {loadState === "missing" ? (
+          <p>Select a family to view its history.</p>
+        ) : null}
+        {loadState === "error" ? (
+          <p>Family history could not be loaded.</p>
+        ) : null}
+        {loadState === "ready" && visibleItems.length === 0 ? (
+          <p>No family history yet.</p>
+        ) : null}
+        {loadState === "ready"
+          ? visibleItems.map((item) => (
+              <article key={item.assignment_id}>
+                <span className="record-icon">
+                  {item.status === "grading" ? <Clock3 /> : <FileCheck2 />}
+                </span>
+                <div>
+                  <p>
+                    {item.child_nickname} ·{" "}
+                    {item.submitted_at
+                      ? new Intl.DateTimeFormat(undefined, {
+                          month: "short",
+                          day: "numeric",
+                        }).format(new Date(item.submitted_at))
+                      : "Assigned"}
+                  </p>
+                  <h2>{item.title}</h2>
+                  <span>
+                    {["results_ready", "correcting", "completed"].includes(
+                      item.status,
+                    )
+                      ? `${item.awarded_points} / ${item.available_points} points · `
+                      : ""}
+                    {item.correction_count} corrections
+                  </span>
+                </div>
+                <span
+                  className={
+                    item.correction_count > 0
+                      ? "status-pill warm"
+                      : "status-pill"
+                  }
+                >
+                  {item.status.replaceAll("_", " ")}
+                </span>
+                {item.attempt_id ? (
+                  <Link
+                    aria-label={`Open ${item.title}`}
+                    href={`/parent/results/?attemptId=${encodeURIComponent(
+                      item.attempt_id,
+                    )}`}
+                  >
+                    <ArrowRight />
+                  </Link>
+                ) : null}
+              </article>
+            ))
+          : null}
       </section>
     </AppShell>
   );

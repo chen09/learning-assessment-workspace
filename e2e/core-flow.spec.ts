@@ -40,7 +40,7 @@ test("authenticated parent legacy link is cleaned and remains responsive in all 
   ).toBeVisible();
 });
 
-test("parent imports material, reviews it, and reaches the printable set", async ({
+test("parent imports material and reviews the draft", async ({
   page,
 }) => {
   await page.goto("/");
@@ -62,10 +62,6 @@ test("parent imports material, reviews it, and reaches the printable set", async
     page.getByRole("heading", { name: "Review before assigning" }),
   ).toBeVisible();
   await expect(page.getByText("Draft · not visible to children")).toBeVisible();
-  await page.getByRole("link", { name: "Print A4 instead" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Algebra & English warm-up" }),
-  ).toBeVisible();
 });
 
 test("parent previews an AI JSON file before assigning its structured questions", async ({
@@ -426,10 +422,41 @@ test("child screens stay responsive across Chinese, Japanese, and English", asyn
     page.getByRole("button", { name: "今日はスキップ" }),
   ).toBeVisible();
 
+  let releaseHistory: (() => void) | undefined;
+  const historyGate = new Promise<void>((resolve) => {
+    releaseHistory = resolve;
+  });
+  await page.route(
+    `${apiBaseUrl}/v1/history/child`,
+    async (route) => {
+      await historyGate;
+      await route.continue();
+    },
+  );
   await page.goto("/child/history/");
   await expect(
     page.getByRole("heading", { name: "学習履歴" }),
   ).toBeVisible();
+  await expect(page.getByText("学習履歴を読み込んでいます…")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Algebra & English warm-up" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Past tense practice" }),
+  ).toHaveCount(0);
+  releaseHistory?.();
+  await expect(
+    page.getByRole("heading", { name: "Responsive assigned practice" }),
+  ).toBeVisible();
+  await page.unroute(`${apiBaseUrl}/v1/history/child`);
+
+  await page.goto("/child/results/");
+  await expect(
+    page.getByRole("heading", { name: "表示できる結果がありません" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "もう一度" }),
+  ).toHaveCount(0);
 
   await page.goto("/child/exit/");
   await expect(

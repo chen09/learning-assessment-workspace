@@ -11,33 +11,6 @@ import {
   type HistoryItem,
 } from "@/lib/api-client";
 
-const demoHistory: HistoryItem[] = [
-  {
-    assignment_id: "demo-today",
-    attempt_id: null,
-    child_id: "demo-child",
-    child_nickname: "Alex",
-    title: "Algebra & English warm-up",
-    status: "results_ready",
-    submitted_at: new Date().toISOString(),
-    awarded_points: 6,
-    available_points: 8,
-    correction_count: 2,
-  },
-  {
-    assignment_id: "demo-past",
-    attempt_id: null,
-    child_id: "demo-child",
-    child_nickname: "Alex",
-    title: "Past tense practice",
-    status: "completed",
-    submitted_at: "2026-07-26T09:00:00Z",
-    awarded_points: 9,
-    available_points: 10,
-    correction_count: 0,
-  },
-];
-
 export default function ChildHistoryPage() {
   return (
     <AppShell currentPath="/child/history/" role="child">
@@ -60,14 +33,39 @@ const historyStatusKeys = {
 
 function ChildHistoryContent() {
   const { language, t } = useLanguage();
-  const [items, setItems] = useState(demoHistory);
+  const [items, setItems] = useState<HistoryItem[]>([]);
+  const [loadState, setLoadState] = useState<
+    "loading" | "ready" | "signed-out" | "error"
+  >("loading");
 
   useEffect(() => {
+    let active = true;
     const token = getChildAccessToken();
     if (!token) {
-      return;
+      queueMicrotask(() => {
+        if (active) {
+          setLoadState("signed-out");
+        }
+      });
+      return () => {
+        active = false;
+      };
     }
-    void getChildHistory(token).then(setItems).catch(() => undefined);
+    void getChildHistory(token)
+      .then((nextItems) => {
+        if (active) {
+          setItems(nextItems);
+          setLoadState("ready");
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setLoadState("error");
+        }
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   const dateLocale = { en: "en-US", ja: "ja-JP", zh: "zh-CN" }[language];
@@ -81,51 +79,66 @@ function ChildHistoryContent() {
           <p className="lede">{t("history.description")}</p>
         </div>
       </header>
-      <section className="history-list">
-        {items.map((item) => (
-          <article key={item.assignment_id}>
-            <span>
-              {item.submitted_at
-                ? new Intl.DateTimeFormat(dateLocale, {
-                    month: "short",
-                    day: "numeric",
-                  }).format(new Date(item.submitted_at))
-                : t("history.assigned")}
-            </span>
-            <div>
-              <h2>{item.title}</h2>
-              <p>
-                {item.correction_count > 0
-                  ? t(
-                      item.correction_count === 1
-                        ? "history.correctionOne"
-                        : "history.correctionMany",
-                      { count: item.correction_count },
-                    )
-                  : t(
-                      historyStatusKeys[
-                        item.status as keyof typeof historyStatusKeys
-                      ] ?? "history.status.other",
-                    )}
-              </p>
-            </div>
-            <strong>
-              {item.awarded_points} / {item.available_points}
-            </strong>
-            {item.attempt_id ? (
-              <Link
-                aria-label={t("history.openResults", {
-                  title: item.title,
-                })}
-                href={`/child/results/?attemptId=${encodeURIComponent(
-                  item.attempt_id,
-                )}`}
-              >
-                {t("history.results")}
-              </Link>
-            ) : null}
-          </article>
-        ))}
+      <section aria-live="polite" className="history-list">
+        {loadState === "loading" ? (
+          <p className="form-notice">{t("history.loading")}</p>
+        ) : null}
+        {loadState === "ready" && items.length === 0 ? (
+          <p className="form-notice">{t("history.empty")}</p>
+        ) : null}
+        {loadState === "signed-out" || loadState === "error" ? (
+          <p className="form-error">{t("history.error")}</p>
+        ) : null}
+        {loadState === "ready"
+          ? items.map((item) => (
+              <article key={item.assignment_id}>
+                <span>
+                  {item.submitted_at
+                    ? new Intl.DateTimeFormat(dateLocale, {
+                        month: "short",
+                        day: "numeric",
+                      }).format(new Date(item.submitted_at))
+                    : t("history.assigned")}
+                </span>
+                <div>
+                  <h2>{item.title}</h2>
+                  <p>
+                    {item.correction_count > 0
+                      ? t(
+                          item.correction_count === 1
+                            ? "history.correctionOne"
+                            : "history.correctionMany",
+                          { count: item.correction_count },
+                        )
+                      : t(
+                          historyStatusKeys[
+                            item.status as keyof typeof historyStatusKeys
+                          ] ?? "history.status.other",
+                        )}
+                  </p>
+                </div>
+                {["results_ready", "correcting", "completed"].includes(
+                  item.status,
+                ) ? (
+                  <strong>
+                    {item.awarded_points} / {item.available_points}
+                  </strong>
+                ) : null}
+                {item.attempt_id ? (
+                  <Link
+                    aria-label={t("history.openResults", {
+                      title: item.title,
+                    })}
+                    href={`/child/results/?attemptId=${encodeURIComponent(
+                      item.attempt_id,
+                    )}`}
+                  >
+                    {t("history.results")}
+                  </Link>
+                ) : null}
+              </article>
+            ))
+          : null}
       </section>
     </>
   );

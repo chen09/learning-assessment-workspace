@@ -63,4 +63,17 @@ describe("AppShell child language", () => {
       );
     });
   });
+
+  it("does not identify an unknown child as Alex before the profile is ready", () => {
+    mocks.getActiveChildProfile.mockReturnValue(null);
+
+    render(
+      <AppShell currentPath="/child/" role="child">
+        <h1>Loading child data</h1>
+      </AppShell>,
+    );
+
+    expect(screen.queryByText("Alex")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Child mode")).not.toHaveLength(0);
+  });
 });

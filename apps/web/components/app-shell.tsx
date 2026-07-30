@@ -57,7 +57,7 @@ export function AppShell({ children, role, currentPath }: AppShellProps) {
 
 function AppShellContent({ children, role, currentPath }: AppShellProps) {
   const { t } = useLanguage();
-  const [childName, setChildName] = useState("Alex");
+  const [childName, setChildName] = useState<string | null>(null);
   const navigation = role === "parent" ? parentNavigation : childNavigation;
   const roleLabel = t(role === "parent" ? "role.parent" : "role.child");
 
@@ -109,11 +109,13 @@ function AppShellContent({ children, role, currentPath }: AppShellProps) {
           <span className="avatar">
             {role === "parent"
               ? "P"
-              : childName.slice(0, 1).toUpperCase()}
+              : childName?.slice(0, 1).toUpperCase() ?? "•"}
           </span>
           <span>
             <strong>
-              {role === "parent" ? t("identity.parent") : childName}
+              {role === "parent"
+                ? t("identity.parent")
+                : childName ?? roleLabel}
             </strong>
             <small>{roleLabel}</small>
           </span>

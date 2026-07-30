@@ -3,12 +3,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import ChildHistoryPage from "./page";
 
+const mocks = vi.hoisted(() => ({
+  getChildHistory: vi.fn(),
+}));
+
 vi.mock("@/lib/api-client", async (importOriginal) => {
   const original =
     await importOriginal<typeof import("@/lib/api-client")>();
   return {
     ...original,
-    getChildAccessToken: vi.fn(() => null),
+    getChildAccessToken: vi.fn(() => "child-token"),
+    getChildHistory: mocks.getChildHistory,
   };
 });
 
@@ -16,6 +21,21 @@ describe("ChildHistoryPage", () => {
   beforeEach(() => {
     window.localStorage.clear();
     window.localStorage.setItem("luma-language:demo-child", "zh");
+    mocks.getChildHistory.mockReset();
+    mocks.getChildHistory.mockResolvedValue([
+      {
+        assignment_id: "assignment-1",
+        attempt_id: "attempt-1",
+        child_id: "child-1",
+        child_nickname: "肉肉",
+        title: "Lesson 2 同レベル変形練習（インタラクティブ版）",
+        status: "completed",
+        submitted_at: "2026-07-30T05:00:00Z",
+        awarded_points: 82,
+        available_points: 100,
+        correction_count: 2,
+      },
+    ]);
   });
 
   it("localizes history metadata while preserving worksheet titles", async () => {
@@ -29,11 +49,27 @@ describe("ChildHistoryPage", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole("heading", {
-        name: "Algebra & English warm-up",
+        name: "Lesson 2 同レベル変形練習（インタラクティブ版）",
       }),
     ).toBeInTheDocument();
     expect(screen.getByText("2 道待订正")).toBeInTheDocument();
-    expect(screen.getByText("已完成")).toBeInTheDocument();
+    expect(screen.getByText("82 / 100")).toBeInTheDocument();
     expect(screen.queryByText("Your work")).not.toBeInTheDocument();
+  });
+
+  it("does not render example records while history is loading", () => {
+    mocks.getChildHistory.mockReturnValue(new Promise(() => undefined));
+
+    render(<ChildHistoryPage />);
+
+    expect(screen.getByText("正在加载学习记录…")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", {
+        name: "Algebra & English warm-up",
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Past tense practice" }),
+    ).not.toBeInTheDocument();
   });
 });

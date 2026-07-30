@@ -104,13 +104,19 @@ function ChildHomeContent() {
         <div>
           <p className="eyebrow">{t("childHome.today")}</p>
           <h1>{t("childHome.title")}</h1>
-          <p>{t("childHome.summary", {
-            assignments: assignmentSummary,
-            reviews: reviewSummary,
-          })}</p>
+          <p>
+            {loadState === "ready"
+              ? t("childHome.summary", {
+                  assignments: assignmentSummary,
+                  reviews: reviewSummary,
+                })
+              : loadState === "loading"
+                ? t("childHome.loadingSummary")
+                : t("worksheet.unavailable")}
+          </p>
         </div>
         <span className="child-mascot" aria-hidden="true">
-          A
+          <Sparkles size={32} />
         </span>
       </header>
 
