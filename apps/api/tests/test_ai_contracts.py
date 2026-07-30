@@ -1,13 +1,18 @@
 import pytest
+from PIL import Image
 from pydantic import ValidationError
 
+from app.ai.codex_cli import CodexCLIGradingAdapter
 from app.ai.contracts import (
     ExtractSourceInput,
+    GeneratedQuestion,
     GenerateQuestionsInput,
     GradeResponseInput,
+    GradeResponseOutput,
     SourcePageInput,
 )
 from app.ai.fixture import FixtureAIAdapter
+from app.ai.handwriting import render_strokes_png
 from app.domain.models import (
     GradingOutcome,
     Job,
@@ -16,7 +21,7 @@ from app.domain.models import (
     ResponseKind,
     SavedResponse,
 )
-from app.services.grading import FixtureGrader
+from app.services.grading import FixtureGrader, grade_response_with_ai
 
 
 def test_ai_contracts_forbid_unversioned_extra_fields() -> None:
@@ -79,6 +84,160 @@ def test_fixture_adapter_is_deterministic_and_reports_confidence() -> None:
     assert 0 <= extracted.confidence <= 1
     assert grade.outcome == "correct"
     assert grade.confidence >= 0.95
+
+
+def test_handwriting_strokes_render_to_a_clean_png(tmp_path) -> None:
+    image_path = render_strokes_png(
+        {
+            "canvas_size": {"width": 1200, "height": 700},
+            "strokes": [
+                {
+                    "points": [
+                        {"x": 100, "y": 150, "pressure": 0.5},
+                        {"x": 420, "y": 360, "pressure": 0.7},
+                    ],
+                    "width": 4,
+                    "eraser": False,
+                }
+            ],
+        },
+        tmp_path / "answer.png",
+    )
+
+    with Image.open(image_path) as rendered:
+        assert rendered.format == "PNG"
+        assert rendered.size == (1200, 700)
+        assert rendered.getbbox() == (0, 0, 1200, 700)
+        assert rendered.getpixel((260, 255)) != (255, 255, 255)
+
+
+def test_codex_cli_grades_anonymous_handwriting_with_a_locked_down_command() -> None:
+    observed: dict[str, object] = {}
+
+    def fake_runner(command: list[str], timeout_seconds: int) -> None:
+        observed["command"] = command
+        observed["timeout_seconds"] = timeout_seconds
+        image_path = command[command.index("--image") + 1]
+        with Image.open(image_path) as rendered:
+            observed["image_format"] = rendered.format
+        output_path = command[command.index("--output-last-message") + 1]
+        with open(output_path, "w", encoding="utf-8") as output:
+            output.write(
+                """
+                {
+                  "schema_version": "1.0",
+                  "outcome": "correct",
+                  "awarded_points": 2,
+                  "confidence": 0.94,
+                  "evidence": ["The handwritten sentence joins both clauses with that."],
+                  "feedback": "The sentence is grammatically complete."
+                }
+                """
+            )
+
+    adapter = CodexCLIGradingAdapter(
+        runner=fake_runner,
+        timeout_seconds=60,
+    )
+    grade = adapter.grade_response(
+        GradeResponseInput(
+            question=GeneratedQuestion(
+                client_id="question-32",
+                type="handwriting",
+                prompt=(
+                    "Combine the sentences with that: "
+                    "I think. This plan is useful."
+                ),
+                answer_key={
+                    "reference": "I think that this plan is useful."
+                },
+                grading_guide=(
+                    "Accept an equivalent complete sentence using that."
+                ),
+                difficulty="standard",
+                knowledge_points=["that-clause"],
+                points=2,
+            ),
+            response={
+                "kind": "strokes",
+                "canvas_size": {"width": 1200, "height": 700},
+                "strokes": [
+                    {
+                        "points": [[100, 150], [420, 360]],
+                        "width": 4,
+                    }
+                ],
+            },
+        )
+    )
+
+    command = observed["command"]
+    assert isinstance(command, list)
+    assert command[:2] == ["codex", "exec"]
+    assert "--ephemeral" in command
+    assert command[command.index("--sandbox") + 1] == "read-only"
+    assert "--ignore-user-config" in command
+    assert "--ignore-rules" in command
+    assert observed["image_format"] == "PNG"
+    assert observed["timeout_seconds"] == 60
+    assert grade.outcome == "correct"
+    assert grade.awarded_points == 2
+    assert grade.confidence == 0.94
+
+
+def test_low_confidence_visual_grade_is_routed_to_human_review() -> None:
+    class LowConfidenceVisualAdapter:
+        version = "codex-cli-v1"
+
+        def grade_response(
+            self,
+            _request: GradeResponseInput,
+        ) -> GradeResponseOutput:
+            return GradeResponseOutput(
+                outcome="correct",
+                awarded_points=2,
+                confidence=0.62,
+                evidence=["The final words are hard to distinguish."],
+                feedback="The answer may be correct, but the image is unclear.",
+            )
+
+    job = Job(
+        family_id="00000000-0000-0000-0000-000000000001",
+        subject_id="00000000-0000-0000-0000-000000000002",
+    )
+    question = Question(
+        family_id=job.family_id,
+        question_set_id="00000000-0000-0000-0000-000000000003",
+        position=1,
+        type=QuestionType.HANDWRITING,
+        prompt="Combine the sentences with that.",
+        answer_key={"reference": "I think that this plan is useful."},
+        points=2,
+    )
+    response = SavedResponse(
+        family_id=job.family_id,
+        attempt_id=job.subject_id,
+        question_id=question.id,
+        kind=ResponseKind.STROKES,
+        answer={"strokes": [{"points": [[10, 10], [20, 20]]}]},
+    )
+
+    result = grade_response_with_ai(
+        job,
+        question,
+        response,
+        visual_adapter=LowConfidenceVisualAdapter(),
+        grading_guide="Accept an equivalent complete sentence.",
+        minimum_confidence=0.75,
+    )
+
+    assert result.outcome == "uncertain"
+    assert result.awarded_points is None
+    assert result.confidence == 0.62
+    assert result.grader_version == "codex-cli-v1"
+    assert result.feedback["evidence"] == [
+        "The final words are hard to distinguish."
+    ]
 
 
 @pytest.mark.parametrize(

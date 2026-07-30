@@ -7,8 +7,10 @@ from argon2 import PasswordHasher
 from app.domain.errors import (
     FamilyParentLimitReached,
     NotFoundError,
+    QuestionAnswerRequired,
     ResponseVersionConflict,
     SubmittedAttemptImmutable,
+    SubmittedQuestionImmutable,
 )
 from app.domain.models import (
     Assignment,
@@ -47,6 +49,7 @@ from app.domain.models import (
     QuestionSetDraft,
     QuestionSetImport,
     QuestionSetStatus,
+    QuestionSubmissionReceipt,
     QuestionType,
     QuestionView,
     ReviewCompletion,
@@ -82,6 +85,7 @@ class MemoryRepository:
         self.jobs: dict[str, Job] = {}
         self.question_results: dict[str, list[QuestionResult]] = {}
         self.submission_idempotency: dict[tuple[str, str], str] = {}
+        self.question_submissions: dict[tuple[str, str], str] = {}
         self.child_pin_hashes: dict[str, str] = {}
         self.child_pin_failures: dict[str, int] = {}
         self.child_pin_locked_until: dict[str, datetime] = {}
@@ -351,6 +355,11 @@ class MemoryRepository:
                 QuestionView.model_validate(question.model_dump()) for question in questions
             ],
             responses=list(self.responses_for_attempt(str(attempt.id)).values()),
+            submitted_question_ids=[
+                UUID(question_id)
+                for saved_attempt_id, question_id in self.question_submissions
+                if saved_attempt_id == str(attempt.id)
+            ],
         )
 
     async def list_child_assignments(
@@ -444,6 +453,8 @@ class MemoryRepository:
             raise NotFoundError
         if attempt.submitted_at is not None:
             raise SubmittedAttemptImmutable
+        if (attempt_id, question_id) in self.question_submissions:
+            raise SubmittedQuestionImmutable
 
         key = (attempt_id, question_id)
         existing = self.responses.get(key)
@@ -464,6 +475,50 @@ class MemoryRepository:
         response = SavedResponse(**response_data)
         self.responses[key] = response
         return response
+
+    async def submit_question(
+        self,
+        attempt_id: str,
+        question_id: str,
+        child_id: str,
+        idempotency_key: str,
+    ) -> QuestionSubmissionReceipt:
+        attempt = self.attempts.get(attempt_id)
+        question = self.questions.get(question_id)
+        if (
+            attempt is None
+            or question is None
+            or str(attempt.child_id) != child_id
+            or question.family_id != attempt.family_id
+        ):
+            raise NotFoundError
+        if attempt.submitted_at is not None:
+            raise SubmittedAttemptImmutable
+        existing_job_id = self.question_submissions.get((attempt_id, question_id))
+        if existing_job_id is not None:
+            return QuestionSubmissionReceipt(
+                attempt_id=attempt.id,
+                question_id=question.id,
+                job=self.jobs[existing_job_id],
+            )
+        if (attempt_id, question_id) not in self.responses:
+            raise QuestionAnswerRequired
+        job = Job(
+            family_id=attempt.family_id,
+            subject_id=attempt.id,
+            payload={
+                "scope": "question",
+                "question_id": question_id,
+                "idempotency_key": idempotency_key,
+            },
+        )
+        self.jobs[str(job.id)] = job
+        self.question_submissions[(attempt_id, question_id)] = str(job.id)
+        return QuestionSubmissionReceipt(
+            attempt_id=attempt.id,
+            question_id=question.id,
+            job=job,
+        )
 
     async def submit_attempt(
         self,
@@ -548,11 +603,18 @@ class MemoryRepository:
         job: Job,
         results: list[QuestionResult],
     ) -> Job:
-        self.question_results[str(job.subject_id)] = results
+        existing_results = self.question_results.get(str(job.subject_id), [])
+        graded_question_ids = {str(result.question_id) for result in results}
+        self.question_results[str(job.subject_id)] = [
+            result
+            for result in existing_results
+            if str(result.question_id) not in graded_question_ids
+        ] + results
         self.jobs[str(job.id)] = job
         attempt = self.attempts[str(job.subject_id)]
         assignment = self.assignments[str(attempt.assignment_id)]
-        assignment.status = AssignmentStatus.RESULTS_READY
+        if attempt.submitted_at is not None:
+            assignment.status = AssignmentStatus.RESULTS_READY
         self.assignments[str(assignment.id)] = assignment
         for result in results:
             if result.outcome.value != "incorrect":
@@ -912,6 +974,11 @@ class MemoryRepository:
                 for question in questions
             ],
             responses=list(self.responses_for_attempt(attempt_id).values()),
+            submitted_question_ids=[
+                UUID(question_id)
+                for saved_attempt_id, question_id in self.question_submissions
+                if saved_attempt_id == attempt_id
+            ],
         )
 
     async def create_import(

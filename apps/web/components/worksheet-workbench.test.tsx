@@ -5,21 +5,27 @@ import { WorksheetWorkbench } from "@/components/worksheet-workbench";
 
 const mocks = vi.hoisted(() => ({
   createChildUploadIntent: vi.fn(),
+  getAttemptResults: vi.fn(),
   getAttemptWork: vi.fn(),
   getChildAssignments: vi.fn(),
   saveAttemptResponse: vi.fn(),
   startAssignment: vi.fn(),
+  submitAttempt: vi.fn(),
+  submitQuestion: vi.fn(),
   uploadToSignedUrl: vi.fn(),
 }));
 
 vi.mock("@/lib/api-client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api-client")>()),
   createChildUploadIntent: mocks.createChildUploadIntent,
+  getAttemptResults: mocks.getAttemptResults,
   getAttemptWork: mocks.getAttemptWork,
   getChildAccessToken: () => "child-token",
   getChildAssignments: mocks.getChildAssignments,
   saveAttemptResponse: mocks.saveAttemptResponse,
   startAssignment: mocks.startAssignment,
+  submitAttempt: mocks.submitAttempt,
+  submitQuestion: mocks.submitQuestion,
   uploadToSignedUrl: mocks.uploadToSignedUrl,
 }));
 
@@ -75,6 +81,8 @@ const assignmentWork = {
       points: 1,
     },
   ],
+  responses: [],
+  submitted_question_ids: [],
 };
 
 describe("WorksheetWorkbench", () => {
@@ -111,6 +119,30 @@ describe("WorksheetWorkbench", () => {
     mocks.saveAttemptResponse.mockResolvedValue({ version: 1 });
     mocks.startAssignment.mockReset();
     mocks.startAssignment.mockResolvedValue(assignmentWork);
+    mocks.submitQuestion.mockReset();
+    mocks.submitQuestion.mockResolvedValue({
+      question_id: "algebra-choice",
+      job: { id: "job-1", status: "queued" },
+    });
+    mocks.submitAttempt.mockReset();
+    mocks.submitAttempt.mockResolvedValue({
+      job: { id: "job-all", status: "queued" },
+    });
+    mocks.getAttemptResults.mockReset();
+    mocks.getAttemptResults.mockResolvedValue({
+      attempt_id: "attempt-1",
+      complete: false,
+      results: [
+        {
+          id: "result-1",
+          question_id: "algebra-choice",
+          outcome: "correct",
+          awarded_points: 1,
+          confidence: 0.99,
+          feedback: { summary: "Correct." },
+        },
+      ],
+    });
     mocks.uploadToSignedUrl.mockReset();
     mocks.uploadToSignedUrl.mockResolvedValue(undefined);
   });
@@ -137,6 +169,77 @@ describe("WorksheetWorkbench", () => {
         name: "Complete: She ___ to school every day.",
       }),
     ).toBeInTheDocument();
+  });
+
+  it("submits only the current answer and keeps the rest of the attempt open", async () => {
+    render(<WorksheetWorkbench />);
+
+    fireEvent.click(
+      await screen.findByRole("radio", { name: "a² − b²" }),
+    );
+    await screen.findByText("Saved");
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Submit this answer for grading",
+      }),
+    );
+    expect(
+      screen.getByText(
+        "Only question 1 will be submitted. You can continue the other questions, but this answer cannot be changed.",
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Confirm single-answer submission",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mocks.submitQuestion).toHaveBeenCalledWith(
+        "attempt-1",
+        "algebra-choice",
+        "child-token",
+        "submit-attempt-1-algebra-choice",
+      );
+    });
+    expect(await screen.findByText("Correct.")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "This answer has been submitted",
+      }),
+    ).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Next question" }));
+    expect(
+      screen.getByRole("heading", {
+        name: "Complete: She ___ to school every day.",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("warns that unanswered questions become incorrect before full submission", async () => {
+    render(<WorksheetWorkbench />);
+
+    await screen.findByRole("heading", {
+      name: "Choose the correct expansion of (a + b)(a − b).",
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Submit all answers" }),
+    );
+    expect(
+      screen.getByText(
+        "5 unanswered questions will be marked incorrect. No answer can be changed after the entire practice is submitted.",
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirm full submission" }),
+    );
+    await waitFor(() => {
+      expect(mocks.submitAttempt).toHaveBeenCalledWith(
+        "attempt-1",
+        "child-token",
+        "submit-attempt-1-completed",
+      );
+    });
   });
 
   it("keeps multiple response photos in the selected shooting order", async () => {

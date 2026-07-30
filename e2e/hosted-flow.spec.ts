@@ -445,6 +445,9 @@ test("temporary parent completes the hosted family learning flow", async ({
     expect(anonymousPhotoResponse.ok()).toBeFalsy();
 
     await page.getByRole("button", { name: "Submit all answers" }).click();
+    await page
+      .getByRole("button", { name: "Confirm full submission" })
+      .click();
     await expect(
       page.getByRole("heading", { name: "Your work is being checked" }),
     ).toBeVisible();

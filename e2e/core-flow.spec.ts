@@ -632,6 +632,9 @@ test("parent creation reaches child grading and correction through the API", asy
   await expect(canvas).toHaveAttribute("height", "700");
 
   await page.getByRole("button", { name: "Submit all answers" }).click();
+  await page
+    .getByRole("button", { name: "Confirm full submission" })
+    .click();
   await expect(
     page.getByRole("heading", { name: "Your work is being checked" }),
   ).toBeVisible();

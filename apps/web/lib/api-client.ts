@@ -77,6 +77,7 @@ export type AssignmentWork = {
     answer: Record<string, unknown>;
     version: number;
   }>;
+  submitted_question_ids: string[];
 };
 
 export type UploadIntent = {
@@ -627,6 +628,26 @@ export async function submitAttempt(
 ) {
   return apiRequest<{ job: { id: string; status: string } }>(
     `/v1/attempts/${encodeURIComponent(attemptId)}/submit`,
+    {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+    },
+    childToken,
+  );
+}
+
+export async function submitQuestion(
+  attemptId: string,
+  questionId: string,
+  childToken: string,
+  idempotencyKey: string,
+) {
+  return apiRequest<{
+    attempt_id: string;
+    question_id: string;
+    job: { id: string; status: string };
+  }>(
+    `/v1/attempts/${encodeURIComponent(attemptId)}/questions/${encodeURIComponent(questionId)}/submit`,
     {
       method: "POST",
       headers: { "Idempotency-Key": idempotencyKey },

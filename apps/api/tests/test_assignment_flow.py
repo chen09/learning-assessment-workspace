@@ -176,6 +176,128 @@ def test_attempt_work_restores_saved_handwriting_and_canvas_size() -> None:
     ]
 
 
+def test_child_can_submit_one_answer_without_closing_the_attempt() -> None:
+    client = TestClient(create_app())
+    _fixture, child_headers, work = start_fixture_assignment(client)
+    attempt_id = work["attempt"]["id"]
+    first_question, second_question = work["questions"][:2]
+
+    saved = client.put(
+        f"/v1/attempts/{attempt_id}/responses/{first_question['id']}",
+        headers=child_headers,
+        json={
+            "kind": "choice",
+            "answer": {"choices": [0]},
+            "expected_version": 0,
+        },
+    )
+    submitted = client.post(
+        f"/v1/attempts/{attempt_id}/questions/{first_question['id']}/submit",
+        headers={
+            **child_headers,
+            "Idempotency-Key": "submit-one-answer",
+        },
+    )
+    locked_save = client.put(
+        f"/v1/attempts/{attempt_id}/responses/{first_question['id']}",
+        headers=child_headers,
+        json={
+            "kind": "choice",
+            "answer": {"choices": [1]},
+            "expected_version": 1,
+        },
+    )
+    other_save = client.put(
+        f"/v1/attempts/{attempt_id}/responses/{second_question['id']}",
+        headers=child_headers,
+        json={
+            "kind": "text",
+            "answer": {"text": "go"},
+            "expected_version": 0,
+        },
+    )
+    processed = client.post(
+        "/v1/demo/jobs/process-next",
+        headers=PARENT_HEADERS,
+    )
+    results = client.get(
+        f"/v1/attempts/{attempt_id}/results",
+        headers=child_headers,
+    )
+    reopened = client.get(
+        f"/v1/attempts/{attempt_id}/work",
+        headers=child_headers,
+    )
+
+    assert saved.status_code == 200
+    assert submitted.status_code == 202
+    assert submitted.json()["question_id"] == first_question["id"]
+    assert submitted.json()["job"]["status"] == "queued"
+    assert locked_save.status_code == 409
+    assert locked_save.json()["detail"] == {
+        "code": "submitted_question_is_immutable"
+    }
+    assert other_save.status_code == 200
+    assert processed.status_code == 200
+    assert results.status_code == 200
+    assert results.json()["complete"] is False
+    assert [
+        (result["question_id"], result["outcome"])
+        for result in results.json()["results"]
+    ] == [(first_question["id"], "correct")]
+    assert reopened.status_code == 200
+    assert reopened.json()["attempt"]["submitted_at"] is None
+    assert reopened.json()["submitted_question_ids"] == [first_question["id"]]
+
+
+def test_submitting_the_whole_attempt_marks_unanswered_questions_incorrect() -> None:
+    client = TestClient(create_app())
+    _fixture, child_headers, work = start_fixture_assignment(client)
+    attempt_id = work["attempt"]["id"]
+    questions = work["questions"]
+
+    saved = client.put(
+        f"/v1/attempts/{attempt_id}/responses/{questions[0]['id']}",
+        headers=child_headers,
+        json={
+            "kind": "choice",
+            "answer": {"choices": [0]},
+            "expected_version": 0,
+        },
+    )
+    submitted = client.post(
+        f"/v1/attempts/{attempt_id}/submit",
+        headers={
+            **child_headers,
+            "Idempotency-Key": "submit-with-unanswered",
+        },
+    )
+    processed = client.post(
+        "/v1/demo/jobs/process-next",
+        headers=PARENT_HEADERS,
+    )
+    results = client.get(
+        f"/v1/attempts/{attempt_id}/results",
+        headers=child_headers,
+    )
+
+    assert saved.status_code == 200
+    assert submitted.status_code == 202
+    assert processed.status_code == 200
+    assert results.status_code == 200
+    assert results.json()["complete"] is True
+    assert [result["outcome"] for result in results.json()["results"]] == [
+        "correct",
+        "incorrect",
+        "incorrect",
+    ]
+    assert results.json()["results"][1]["awarded_points"] == 0
+    assert results.json()["results"][1]["feedback"] == {
+        "summary": "No answer was submitted.",
+        "action": "Review this question and try it again.",
+    }
+
+
 def test_submission_is_immutable_and_fixture_grading_releases_full_results() -> None:
     client = TestClient(create_app())
     _fixture, child_headers, work = start_fixture_assignment(client)

@@ -17,8 +17,10 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_en
 from app.domain.errors import (
     FamilyParentLimitReached,
     NotFoundError,
+    QuestionAnswerRequired,
     ResponseVersionConflict,
     SubmittedAttemptImmutable,
+    SubmittedQuestionImmutable,
 )
 from app.domain.models import (
     Assignment,
@@ -55,6 +57,7 @@ from app.domain.models import (
     QuestionSet,
     QuestionSetDraft,
     QuestionSetImport,
+    QuestionSubmissionReceipt,
     QuestionView,
     ReviewCompletion,
     ReviewItemView,
@@ -851,6 +854,21 @@ class PostgresRepository:
                     {"attempt_id": attempt_row["id"]},
                 )
             ).mappings().all()
+            submitted_question_ids = list(
+                (
+                    await connection.execute(
+                        text(
+                            """
+                            select question_id
+                            from public.question_submissions
+                            where attempt_id = :attempt_id
+                            order by submitted_at
+                            """
+                        ),
+                        {"attempt_id": attempt_row["id"]},
+                    )
+                ).scalars()
+            )
 
         assignment_data = dict(assignment_row)
         assignment_data["status"] = AssignmentStatus.IN_PROGRESS
@@ -863,6 +881,7 @@ class PostgresRepository:
                 QuestionView.model_validate(question.model_dump()) for question in questions
             ],
             responses=[SavedResponse(**dict(row)) for row in response_rows],
+            submitted_question_ids=submitted_question_ids,
         )
 
     async def save_response(
@@ -890,6 +909,22 @@ class PostgresRepository:
                 raise NotFoundError
             if attempt_row["submitted_at"] is not None:
                 raise SubmittedAttemptImmutable
+            submitted_question_result = await connection.execute(
+                text(
+                    """
+                    select 1
+                    from public.question_submissions
+                    where attempt_id = :attempt_id
+                      and question_id = :question_id
+                    """
+                ),
+                {
+                    "attempt_id": _uuid(attempt_id),
+                    "question_id": _uuid(question_id),
+                },
+            )
+            if submitted_question_result.scalar_one_or_none() is not None:
+                raise SubmittedQuestionImmutable
             question_result = await connection.execute(
                 text(
                     """
@@ -965,6 +1000,125 @@ class PostgresRepository:
                 )
             row = response_result.mappings().one()
         return SavedResponse(**dict(row))
+
+    async def submit_question(
+        self,
+        attempt_id: str,
+        question_id: str,
+        child_id: str,
+        idempotency_key: str,
+    ) -> QuestionSubmissionReceipt:
+        async with self._engine.begin() as connection:
+            attempt_result = await connection.execute(
+                text(
+                    """
+                    select at.id, at.family_id, at.assignment_id, at.child_id,
+                           at.submitted_at, a.question_set_id
+                    from public.attempts at
+                    join public.assignments a on a.id = at.assignment_id
+                    where at.id = :attempt_id and at.child_id = :child_id
+                    for update of at
+                    """
+                ),
+                {
+                    "attempt_id": _uuid(attempt_id),
+                    "child_id": _uuid(child_id),
+                },
+            )
+            attempt_row = attempt_result.mappings().one_or_none()
+            if attempt_row is None:
+                raise NotFoundError
+            existing_result = await connection.execute(
+                text(
+                    """
+                    select j.id, j.family_id, j.subject_id, j.type, j.status,
+                           j.attempt_count, j.created_at, j.completed_at
+                    from public.question_submissions qs
+                    join public.jobs j on j.id = qs.job_id
+                    where qs.attempt_id = :attempt_id
+                      and qs.question_id = :question_id
+                    """
+                ),
+                {
+                    "attempt_id": _uuid(attempt_id),
+                    "question_id": _uuid(question_id),
+                },
+            )
+            existing_job = existing_result.mappings().one_or_none()
+            if existing_job is not None:
+                return QuestionSubmissionReceipt(
+                    attempt_id=_uuid(attempt_id),
+                    question_id=_uuid(question_id),
+                    job=_job(existing_job),
+                )
+            if attempt_row["submitted_at"] is not None:
+                raise SubmittedAttemptImmutable
+            response_result = await connection.execute(
+                text(
+                    """
+                    select r.id
+                    from public.responses r
+                    join public.questions q on q.id = r.question_id
+                    where r.attempt_id = :attempt_id
+                      and r.question_id = :question_id
+                      and q.question_set_id = :question_set_id
+                    """
+                ),
+                {
+                    "attempt_id": _uuid(attempt_id),
+                    "question_id": _uuid(question_id),
+                    "question_set_id": attempt_row["question_set_id"],
+                },
+            )
+            if response_result.scalar_one_or_none() is None:
+                raise QuestionAnswerRequired
+            job_result = await connection.execute(
+                text(
+                    """
+                    insert into public.jobs (
+                      family_id, type, subject_id, payload
+                    ) values (
+                      :family_id, 'grade_submission', :attempt_id,
+                      jsonb_build_object(
+                        'scope', 'question',
+                        'question_id', cast(:question_id as text),
+                        'idempotency_key', cast(:idempotency_key as text)
+                      )
+                    )
+                    returning id, family_id, subject_id, type, status,
+                              attempt_count, created_at, completed_at
+                    """
+                ),
+                {
+                    "family_id": attempt_row["family_id"],
+                    "attempt_id": _uuid(attempt_id),
+                    "question_id": question_id,
+                    "idempotency_key": idempotency_key,
+                },
+            )
+            job_row = job_result.mappings().one()
+            await connection.execute(
+                text(
+                    """
+                    insert into public.question_submissions (
+                      family_id, attempt_id, question_id, job_id
+                    ) values (
+                      :family_id, :attempt_id, :question_id, :job_id
+                    )
+                    """
+                ),
+                {
+                    "family_id": attempt_row["family_id"],
+                    "attempt_id": _uuid(attempt_id),
+                    "question_id": _uuid(question_id),
+                    "job_id": job_row["id"],
+                },
+            )
+        return QuestionSubmissionReceipt(
+            attempt_id=_uuid(attempt_id),
+            question_id=_uuid(question_id),
+            job=_job(job_row),
+        )
 
     async def submit_attempt(
         self,
@@ -1608,6 +1762,21 @@ class PostgresRepository:
                     {"attempt_id": _uuid(attempt_id)},
                 )
             ).mappings().all()
+            submitted_question_ids = list(
+                (
+                    await connection.execute(
+                        text(
+                            """
+                            select question_id
+                            from public.question_submissions
+                            where attempt_id = :attempt_id
+                            order by submitted_at
+                            """
+                        ),
+                        {"attempt_id": _uuid(attempt_id)},
+                    )
+                ).scalars()
+            )
         questions = [_question(row) for row in question_rows]
         return AssignmentWork(
             title=str(assignment_row["title"]),
@@ -1618,6 +1787,7 @@ class PostgresRepository:
                 for question in questions
             ],
             responses=[SavedResponse(**dict(row)) for row in response_rows],
+            submitted_question_ids=submitted_question_ids,
         )
 
     async def list_child_assignments(

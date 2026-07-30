@@ -1,6 +1,12 @@
 import unicodedata
 from datetime import UTC, datetime
+from typing import Any, Protocol
 
+from app.ai.contracts import (
+    GeneratedQuestion,
+    GradeResponseInput,
+    GradeResponseOutput,
+)
 from app.domain.models import (
     GradingOutcome,
     Job,
@@ -10,6 +16,15 @@ from app.domain.models import (
     ResponseKind,
     SavedResponse,
 )
+
+
+class VisualGradingAdapter(Protocol):
+    version: str
+
+    def grade_response(
+        self,
+        request: GradeResponseInput,
+    ) -> GradeResponseOutput: ...
 
 
 def normalize_exact_text(value: object) -> str:
@@ -28,13 +43,17 @@ class FixtureGrader:
         question: Question,
         response: SavedResponse | None,
     ) -> QuestionResult:
+        outcome: GradingOutcome
+        awarded_points: float | None
+        confidence: float
+        feedback: dict[str, Any]
         if response is None:
-            outcome = GradingOutcome.UNCERTAIN
-            awarded_points = None
-            confidence = 0.35
+            outcome = GradingOutcome.INCORRECT
+            awarded_points = 0
+            confidence = 1
             feedback = {
-                "summary": "No answer was available to grade.",
-                "action": "Ask the child to answer this question.",
+                "summary": "No answer was submitted.",
+                "action": "Review this question and try it again.",
             }
         elif response.kind in {
             ResponseKind.STROKES,
@@ -134,3 +153,66 @@ class FixtureGrader:
         job.status = JobStatus.SUCCEEDED
         job.completed_at = datetime.now(UTC)
         return job
+
+
+def grade_response_with_ai(
+    job: Job,
+    question: Question,
+    response: SavedResponse | None,
+    *,
+    visual_adapter: VisualGradingAdapter | None,
+    grading_guide: str = "",
+    minimum_confidence: float = 0.75,
+) -> QuestionResult:
+    if (
+        visual_adapter is None
+        or response is None
+        or response.kind != ResponseKind.STROKES
+    ):
+        return FixtureGrader().grade(job, question, response)
+    grade = visual_adapter.grade_response(
+        GradeResponseInput(
+            question=GeneratedQuestion(
+                client_id=str(question.id),
+                type=question.type,
+                prompt=question.prompt,
+                options=question.options,
+                answer_key=question.answer_key,
+                grading_guide=grading_guide,
+                difficulty="standard",
+                knowledge_points=[],
+                points=question.points,
+            ),
+            response={
+                "kind": response.kind.value,
+                **response.answer,
+            },
+        )
+    )
+    outcome = grade.outcome
+    awarded_points = grade.awarded_points
+    if grade.confidence < minimum_confidence:
+        outcome = GradingOutcome.UNCERTAIN
+        awarded_points = None
+    return QuestionResult(
+        family_id=job.family_id,
+        attempt_id=job.subject_id,
+        question_id=question.id,
+        outcome=outcome,
+        awarded_points=awarded_points,
+        confidence=grade.confidence,
+        feedback={
+            "summary": grade.feedback,
+            "action": (
+                "Continue to the next question."
+                if outcome == GradingOutcome.CORRECT
+                else (
+                    "Review the feedback and try this question again."
+                    if outcome == GradingOutcome.INCORRECT
+                    else "Ask a parent to confirm this answer."
+                )
+            ),
+            "evidence": grade.evidence,
+        },
+        grader_version=visual_adapter.version,
+    )

@@ -9,6 +9,7 @@ from app.domain.errors import (
     NotFoundError,
     ResponseVersionConflict,
     SubmittedAttemptImmutable,
+    SubmittedQuestionImmutable,
 )
 from app.domain.models import (
     CompleteReviewRequest,
@@ -308,6 +309,45 @@ async def test_postgres_vertical_flow_and_family_isolation() -> None:
                 ),
             )
 
+        question_receipt = await repository.submit_question(
+            str(work.attempt.id),
+            str(first_question.id),
+            str(child_a),
+            "integration-submit-question",
+        )
+        repeated_question_receipt = await repository.submit_question(
+            str(work.attempt.id),
+            str(first_question.id),
+            str(child_a),
+            "integration-submit-question",
+        )
+        assert repeated_question_receipt.job.id == question_receipt.job.id
+        with pytest.raises(SubmittedQuestionImmutable):
+            await repository.save_response(
+                str(work.attempt.id),
+                str(first_question.id),
+                str(child_a),
+                SaveResponseRequest(
+                    kind=ResponseKind.CHOICE,
+                    answer={"choices": [1]},
+                    expected_version=1,
+                ),
+            )
+        assert await worker.run_once() is True
+        partial_results = await repository.get_attempt_results(
+            str(work.attempt.id),
+            str(child_a),
+        )
+        assert partial_results.complete is False
+        assert [result.question_id for result in partial_results.results] == [
+            first_question.id
+        ]
+        partially_reopened = await repository.get_attempt_work(
+            str(work.attempt.id),
+            str(child_a),
+        )
+        assert partially_reopened.submitted_question_ids == [first_question.id]
+
         receipt = await repository.submit_attempt(
             str(work.attempt.id),
             str(child_a),
@@ -326,9 +366,9 @@ async def test_postgres_vertical_flow_and_family_isolation() -> None:
         )
         assert results.complete is True
         assert [result.outcome.value for result in results.results] == (
-            ["incorrect", "uncertain", "needs_parent_review"]
+            ["incorrect", "incorrect", "needs_parent_review"]
             if uploaded_path
-            else ["incorrect", "uncertain", "uncertain"]
+            else ["incorrect", "incorrect", "incorrect"]
         )
         if uploaded_path:
             photo_review = await repository.get_parent_attempt_review(
@@ -357,7 +397,10 @@ async def test_postgres_vertical_flow_and_family_isolation() -> None:
         finally:
             await review_connection.close()
         reviews = await repository.list_due_reviews(str(child_a))
-        assert len(reviews) == 1
+        # A visual answer that still needs a parent decision must not enter
+        # spaced review yet. When local Storage is unavailable, the fallback
+        # path has three deterministic incorrect results instead.
+        assert len(reviews) == (2 if uploaded_path else 3)
         completion = await repository.complete_review(
             str(reviews[0].id),
             str(child_a),

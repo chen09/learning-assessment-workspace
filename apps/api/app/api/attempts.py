@@ -6,13 +6,16 @@ from fastapi import APIRouter, Depends, Header, HTTPException, status
 from app.api.dependencies import Repository, get_repository, require_child
 from app.domain.errors import (
     NotFoundError,
+    QuestionAnswerRequired,
     ResponseVersionConflict,
     SubmittedAttemptImmutable,
+    SubmittedQuestionImmutable,
 )
 from app.domain.models import (
     AssignmentWork,
     AttemptResults,
     ChildSessionClaims,
+    QuestionSubmissionReceipt,
     SavedResponse,
     SaveResponseRequest,
     SubmissionReceipt,
@@ -92,6 +95,50 @@ async def save_response(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={"code": "submitted_attempt_is_immutable"},
+        ) from error
+    except SubmittedQuestionImmutable as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "submitted_question_is_immutable"},
+        ) from error
+    except NotFoundError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The attempt or question is not available.",
+        ) from error
+
+
+@router.post(
+    "/{attempt_id}/questions/{question_id}/submit",
+    response_model=QuestionSubmissionReceipt,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def submit_question(
+    attempt_id: UUID,
+    question_id: UUID,
+    repository: Annotated[Repository, Depends(get_repository)],
+    child: Annotated[ChildSessionClaims, Depends(require_child)],
+    idempotency_key: Annotated[
+        str,
+        Header(alias="Idempotency-Key", min_length=8, max_length=120),
+    ],
+) -> QuestionSubmissionReceipt:
+    try:
+        return await repository.submit_question(
+            str(attempt_id),
+            str(question_id),
+            str(child.child_id),
+            idempotency_key,
+        )
+    except QuestionAnswerRequired as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"code": "question_answer_required"},
+        ) from error
+    except (SubmittedAttemptImmutable, SubmittedQuestionImmutable) as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "submitted_question_is_immutable"},
         ) from error
     except NotFoundError as error:
         raise HTTPException(

@@ -30,14 +30,17 @@ import {
 } from "@/lib/draft-queue";
 import {
   type ApiQuestion,
+  type AttemptResult,
   type AssignmentWork,
   createChildUploadIntent,
+  getAttemptResults,
   getAttemptWork,
   getChildAccessToken,
   getChildAssignments,
   saveAttemptResponse,
   startAssignment,
   submitAttempt,
+  submitQuestion,
   uploadToSignedUrl,
 } from "@/lib/api-client";
 import { getAvailableWordOrderTokens } from "@/lib/word-order";
@@ -69,6 +72,18 @@ type Answer = {
   photoNames?: string[];
   photoPaths?: string[];
 };
+
+function hasMeaningfulAnswer(answer: Answer | undefined) {
+  return Boolean(
+    answer &&
+      (answer.choice !== undefined ||
+        answer.choices?.length ||
+        answer.tokens?.length ||
+        answer.text?.trim() ||
+        answer.strokes?.length ||
+        answer.photoNames?.length),
+  );
+}
 
 function canvasSizeFromAnswer(
   answer: Record<string, unknown>,
@@ -164,6 +179,16 @@ function WorksheetWorkbenchContent() {
   const [responseVersions, setResponseVersions] = useState<
     Record<string, number>
   >({});
+  const [submittedQuestionIds, setSubmittedQuestionIds] = useState<string[]>(
+    [],
+  );
+  const [questionResults, setQuestionResults] = useState<
+    Record<string, AttemptResult>
+  >({});
+  const [gradingQuestionIds, setGradingQuestionIds] = useState<string[]>([]);
+  const [submissionConfirmation, setSubmissionConfirmation] = useState<
+    "question" | "all" | null
+  >(null);
   const currentQuestion = questions[currentIndex];
 
   useEffect(() => {
@@ -244,6 +269,8 @@ function WorksheetWorkbenchContent() {
             ]),
           ),
         );
+        const submittedIds = work.submitted_question_ids ?? [];
+        setSubmittedQuestionIds(submittedIds);
         setQuestions(
           work.questions.map((question) => ({
             id: question.id,
@@ -265,6 +292,23 @@ function WorksheetWorkbenchContent() {
           })),
         );
         setLoadState("ready");
+        if (submittedIds.length > 0) {
+          void getAttemptResults(work.attempt.id, token)
+            .then((resultSet) => {
+              if (!active) {
+                return;
+              }
+              setQuestionResults(
+                Object.fromEntries(
+                  resultSet.results.map((result) => [
+                    result.question_id,
+                    result,
+                  ]),
+                ),
+              );
+            })
+            .catch(() => undefined);
+        }
         window.history.replaceState(
           {},
           "",
@@ -440,24 +484,69 @@ function WorksheetWorkbenchContent() {
     );
   }
 
+  async function waitForQuestionResult(questionId: string) {
+    if (!attemptId || !childToken) {
+      return;
+    }
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const resultSet = await getAttemptResults(attemptId, childToken);
+      const result = resultSet.results.find(
+        (candidate) => candidate.question_id === questionId,
+      );
+      if (result) {
+        setQuestionResults((current) => ({
+          ...current,
+          [questionId]: result,
+        }));
+        setGradingQuestionIds((current) =>
+          current.filter((id) => id !== questionId),
+        );
+        return;
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 1500));
+    }
+    setGradingQuestionIds((current) =>
+      current.filter((id) => id !== questionId),
+    );
+  }
+
+  async function submitCurrentQuestion() {
+    if (!attemptId || !childToken || !currentQuestion) {
+      return;
+    }
+    const questionId = currentQuestion.id;
+    try {
+      await submitQuestion(
+        attemptId,
+        questionId,
+        childToken,
+        `submit-${attemptId}-${questionId}`,
+      );
+      setSubmittedQuestionIds((current) =>
+        current.includes(questionId) ? current : [...current, questionId],
+      );
+      setGradingQuestionIds((current) =>
+        current.includes(questionId) ? current : [...current, questionId],
+      );
+      setSubmissionConfirmation(null);
+      void waitForQuestionResult(questionId);
+    } catch {
+      setSaveStatus("offline");
+    }
+  }
+
   const answeredCount = useMemo(
     () =>
-      questions.filter((question) => {
-        const answer = answers[question.id];
-        return Boolean(
-          answer &&
-            (answer.choice !== undefined ||
-              answer.choices?.length ||
-              answer.tokens?.length ||
-              answer.text?.trim() ||
-              answer.strokes?.length ||
-              answer.photoNames?.length),
-        );
-      }).length,
+      questions.filter((question) =>
+        hasMeaningfulAnswer(answers[question.id]),
+      ).length,
     [answers, questions],
   );
 
   const updateAnswer = (questionId: string, answer: Answer) => {
+    if (submittedQuestionIds.includes(questionId)) {
+      return;
+    }
     setAnswers((current) => ({ ...current, [questionId]: answer }));
     setDirtyQuestionId(questionId);
     setSaveStatus("saving");
@@ -720,7 +809,27 @@ function WorksheetWorkbenchContent() {
     );
   };
 
-  const questionCard = (question: Question) => (
+  const resultLabel = (outcome: AttemptResult["outcome"] | undefined) => {
+    if (outcome === "correct") {
+      return t("worksheet.result.correct");
+    }
+    if (outcome === "incorrect") {
+      return t("worksheet.result.incorrect");
+    }
+    if (outcome === "uncertain") {
+      return t("worksheet.result.uncertain");
+    }
+    if (outcome === "needs_parent_review") {
+      return t("worksheet.result.needsParentReview");
+    }
+    return t("worksheet.result.pending");
+  };
+
+  const questionCard = (question: Question) => {
+    const submitted = submittedQuestionIds.includes(question.id);
+    const grading = gradingQuestionIds.includes(question.id);
+    const result = questionResults[question.id];
+    return (
     <article className="question-card" key={question.id}>
       <header>
         <div>
@@ -741,9 +850,26 @@ function WorksheetWorkbenchContent() {
         </div>
       </header>
       <h1>{question.prompt}</h1>
-      {renderResponse(question)}
+      <div
+        aria-disabled={submitted}
+        className={submitted ? "response-locked" : undefined}
+      >
+        {renderResponse(question)}
+      </div>
+      {submitted ? (
+        <div className={`question-grade-status ${result?.outcome ?? "grading"}`}>
+          <strong>
+            {grading
+              ? t("worksheet.grading")
+              : result?.feedback.summary ??
+                resultLabel(result?.outcome)}
+          </strong>
+          {result?.feedback.action ? <p>{result.feedback.action}</p> : null}
+        </div>
+      ) : null}
     </article>
-  );
+    );
+  };
 
   if (loadState !== "ready") {
     const isEmpty = loadState === "empty";
@@ -877,6 +1003,81 @@ function WorksheetWorkbenchContent() {
             ? questions.map((question) => questionCard(question))
             : questionCard(currentQuestion)}
 
+          {submissionConfirmation ? (
+            <section
+              aria-live="polite"
+              className="submission-confirmation"
+            >
+              <div>
+                <strong>
+                  {submissionConfirmation === "question"
+                    ? t("worksheet.confirmQuestionTitle")
+                    : t("worksheet.confirmAllTitle")}
+                </strong>
+                <p>
+                  {submissionConfirmation === "question"
+                    ? t("worksheet.confirmQuestionBody", {
+                        number: currentQuestion.number,
+                      })
+                    : t("worksheet.confirmAllBody", {
+                        count: questions.length - answeredCount,
+                      })}
+                </p>
+              </div>
+              <div>
+                <button
+                  className="button ghost"
+                  onClick={() => setSubmissionConfirmation(null)}
+                  type="button"
+                >
+                  {t("worksheet.cancel")}
+                </button>
+                <button
+                  className="button primary"
+                  onClick={() => {
+                    if (submissionConfirmation === "question") {
+                      void submitCurrentQuestion();
+                    } else {
+                      void submitAll();
+                    }
+                  }}
+                  type="button"
+                >
+                  {submissionConfirmation === "question"
+                    ? t("worksheet.confirmQuestionAction")
+                    : t("worksheet.confirmAllAction")}
+                </button>
+              </div>
+            </section>
+          ) : null}
+
+          <div className="grading-actions">
+            <button
+              className="button ghost"
+              disabled={
+                submittedQuestionIds.includes(currentQuestion.id) ||
+                !hasMeaningfulAnswer(answers[currentQuestion.id]) ||
+                saveStatus === "saving"
+              }
+              onClick={() => setSubmissionConfirmation("question")}
+              type="button"
+            >
+              <Check size={16} aria-hidden="true" />
+              {submittedQuestionIds.includes(currentQuestion.id)
+                ? t("worksheet.questionSubmitted")
+                : t("worksheet.submitQuestion")}
+            </button>
+            <button
+              className="button primary"
+              disabled={saveStatus === "saving"}
+              onClick={() => setSubmissionConfirmation("all")}
+              type="button"
+            >
+              {t("worksheet.submit")}
+              <Send size={16} aria-hidden="true" />
+            </button>
+          </div>
+
           <footer className="work-actions">
             <button
               className="button ghost"
@@ -900,18 +1101,7 @@ function WorksheetWorkbenchContent() {
                 {t("worksheet.next")}
                 <ArrowRight size={17} aria-hidden="true" />
               </button>
-            ) : (
-              <button
-                className="button primary"
-                onClick={() => {
-                  void submitAll();
-                }}
-                type="button"
-              >
-                {t("worksheet.submit")}
-                <Send size={16} aria-hidden="true" />
-              </button>
-            )}
+            ) : null}
           </footer>
         </section>
       </div>

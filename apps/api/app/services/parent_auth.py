@@ -35,14 +35,17 @@ class SupabaseParentAuthService:
             )
         if not self._publishable_key:
             raise ParentAuthenticationError
-        async with httpx.AsyncClient(timeout=5) as client:
-            response = await client.get(
-                f"{self._supabase_url}/auth/v1/user",
-                headers={
-                    "Authorization": f"Bearer {token}",
-                    "apikey": self._publishable_key,
-                },
-            )
+        try:
+            async with httpx.AsyncClient(timeout=5) as client:
+                response = await client.get(
+                    f"{self._supabase_url}/auth/v1/user",
+                    headers={
+                        "Authorization": f"Bearer {token}",
+                        "apikey": self._publishable_key,
+                    },
+                )
+        except httpx.HTTPError as error:
+            raise ParentAuthenticationError from error
         if response.status_code != 200:
             raise ParentAuthenticationError
         payload = response.json()
