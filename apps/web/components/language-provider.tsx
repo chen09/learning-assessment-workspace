@@ -90,6 +90,8 @@ const messages = {
     "childLogin.opening": "Opening…",
     "childLogin.openWork": "Open my work",
     "childLogin.error": "That PIN did not work. Please try again.",
+    "childLogin.expired":
+      "Your child session expired. Enter the PIN again to continue.",
     "childLogin.returnParent": "Return to parent mode",
     "childHome.today": "Today",
     "childHome.title": "Ready for a small win?",
@@ -372,6 +374,8 @@ const messages = {
     "childLogin.opening": "開いています…",
     "childLogin.openWork": "学習を開く",
     "childLogin.error": "PIN が正しくありません。もう一度お試しください。",
+    "childLogin.expired":
+      "子どもセッションの有効期限が切れました。PIN をもう一度入力してください。",
     "childLogin.returnParent": "保護者モードに戻る",
     "childHome.today": "今日",
     "childHome.title": "小さな一歩を始めよう",
@@ -650,6 +654,7 @@ const messages = {
     "childLogin.opening": "正在打开…",
     "childLogin.openWork": "打开我的练习",
     "childLogin.error": "PIN 不正确，请重试。",
+    "childLogin.expired": "孩子会话已过期，请重新输入 PIN 后继续。",
     "childLogin.returnParent": "返回家长模式",
     "childHome.today": "今天",
     "childHome.title": "准备好取得一个小进步了吗？",

@@ -168,6 +168,23 @@ async function reportClientApiError(
   }
 }
 
+function redirectExpiredChildSession(accessToken: string) {
+  if (
+    typeof window === "undefined" ||
+    getChildAccessToken() !== accessToken
+  ) {
+    return;
+  }
+  const profile = getActiveChildProfile();
+  const returnTo = `${window.location.pathname}${window.location.search}`;
+  clearChildAccessToken();
+  const params = new URLSearchParams({ expired: "1", returnTo });
+  if (profile?.child_id) {
+    params.set("childId", profile.child_id);
+  }
+  window.location.replace(`/child/login/?${params.toString()}`);
+}
+
 async function apiRequest<T>(
   path: string,
   init: RequestInit,
@@ -182,6 +199,16 @@ async function apiRequest<T>(
       ...init.headers,
     },
   });
+  if (
+    response.status === 401 &&
+    accessToken &&
+    typeof window !== "undefined" &&
+    getChildAccessToken() === accessToken
+  ) {
+    await reportClientApiError(path, init.method, response.status);
+    redirectExpiredChildSession(accessToken);
+    throw new Error("The child session has expired.");
+  }
   if (response.status === 401 && accessToken && allowParentRefresh) {
     const refreshedToken = await refreshExpiredParentToken(accessToken);
     if (refreshedToken) {

@@ -180,6 +180,82 @@ test("parent previews an AI JSON file before assigning its structured questions"
   ).toBeVisible();
 });
 
+test("an expired child session returns to PIN login and resumes the requested page", async ({
+  page,
+  request,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "Session expiry behavior is viewport-independent.",
+  );
+  const apiBaseUrl = "http://127.0.0.1:8017";
+  const family = (await (
+    await request.post(`${apiBaseUrl}/v1/families`, {
+      headers: {
+        Authorization: "Bearer parent-fixture",
+        "Idempotency-Key": "e2e-expired-child-family",
+      },
+      data: { name: "Expired child session family" },
+    })
+  ).json()) as { id: string };
+  const child = (await (
+    await request.post(`${apiBaseUrl}/v1/families/${family.id}/children`, {
+      headers: {
+        Authorization: "Bearer parent-fixture",
+        "Idempotency-Key": "e2e-expired-child-profile",
+      },
+      data: {
+        nickname: "Expiry child",
+        grade_stage: "Junior high 1",
+        ui_language: "en",
+        pin: "123456",
+      },
+    })
+  ).json()) as { id: string };
+
+  await page.goto(
+    `/child/login/?childId=${encodeURIComponent(child.id)}`,
+  );
+  for (const digit of ["1", "2", "3", "4", "5", "6"]) {
+    await page.getByRole("button", { name: digit, exact: true }).click();
+  }
+  const initialAssignments = page.waitForResponse(
+    (response) =>
+      response.url() === `${apiBaseUrl}/v1/assignments` &&
+      response.status() === 200,
+  );
+  await page.getByRole("button", { name: "Open my work" }).click();
+  await expect(page).toHaveURL(/\/child\/$/);
+  await initialAssignments;
+
+  await page.evaluate(() => {
+    window.localStorage.setItem("luma-child-session", "expired-child-token");
+  });
+  const relogin = page.waitForURL(/\/child\/login\//);
+  await page.goto("/child/work/").catch((error: unknown) => {
+    if (!(error instanceof Error) || !error.message.includes("ERR_ABORTED")) {
+      throw error;
+    }
+  });
+  await relogin;
+
+  const loginUrl = new URL(page.url());
+  expect(loginUrl.searchParams.get("childId")).toBe(child.id);
+  expect(loginUrl.searchParams.get("expired")).toBe("1");
+  expect(loginUrl.searchParams.get("returnTo")).toBe("/child/work/");
+  await expect(
+    page.getByText(
+      "Your child session expired. Enter the PIN again to continue.",
+    ),
+  ).toBeVisible();
+
+  for (const digit of ["1", "2", "3", "4", "5", "6"]) {
+    await page.getByRole("button", { name: digit, exact: true }).click();
+  }
+  await page.getByRole("button", { name: "Open my work" }).click();
+  await expect(page).toHaveURL(/\/child\/work\/$/);
+});
+
 test("child screens stay responsive across Chinese, Japanese, and English", async ({
   page,
   request,
