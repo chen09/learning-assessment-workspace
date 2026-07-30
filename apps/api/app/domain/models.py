@@ -245,6 +245,7 @@ class AssignmentWork(BaseModel):
     attempt: Attempt
     questions: list[QuestionView]
     responses: list[SavedResponse] = Field(default_factory=list)
+    submitted_question_ids: list[UUID] = Field(default_factory=list)
 
 
 class PrintableAssignment(BaseModel):
@@ -260,6 +261,7 @@ class Job(BaseModel):
     subject_id: UUID
     type: str = "grade_submission"
     status: JobStatus = JobStatus.QUEUED
+    payload: dict[str, Any] = Field(default_factory=dict)
     attempt_count: int = 0
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime | None = None
@@ -268,6 +270,12 @@ class Job(BaseModel):
 class SubmissionReceipt(BaseModel):
     assignment: Assignment
     attempt: Attempt
+    job: Job
+
+
+class QuestionSubmissionReceipt(BaseModel):
+    attempt_id: UUID
+    question_id: UUID
     job: Job
 
 

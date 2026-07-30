@@ -24,6 +24,7 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+      target: runtime
     environment: &api-environment
       APP_ENV: local
       REPOSITORY_BACKEND: ${REPOSITORY_BACKEND:-memory}
@@ -32,7 +33,11 @@ services:
       SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:-}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
       CHILD_SESSION_SECRET: ${CHILD_SESSION_SECRET:-local-development-only-change-me}
-      AI_PROVIDER: fixture
+      AI_PROVIDER: ${AI_PROVIDER:-fixture}
+      CODEX_EXECUTABLE: ${CODEX_EXECUTABLE:-codex}
+      CODEX_MODEL: ${CODEX_MODEL:-}
+      CODEX_TIMEOUT_SECONDS: ${CODEX_TIMEOUT_SECONDS:-180}
+      AI_MINIMUM_CONFIDENCE: ${AI_MINIMUM_CONFIDENCE:-0.75}
     ports:
       - "127.0.0.1:8000:8000"
     extra_hosts:
@@ -56,6 +61,7 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+      target: worker
     command: ["uv", "run", "--no-sync", "python", "-m", "app.worker"]
     environment: *api-environment
     extra_hosts:

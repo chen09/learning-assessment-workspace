@@ -24,7 +24,11 @@ class Settings(BaseSettings):
     supabase_publishable_key: str = ""
     supabase_service_role_key: SecretStr = SecretStr("")
     child_session_secret: SecretStr = SecretStr("local-development-only-change-me")
-    ai_provider: Literal["fixture"] = "fixture"
+    ai_provider: Literal["fixture", "codex_cli"] = "fixture"
+    codex_executable: str = "codex"
+    codex_model: str | None = None
+    codex_timeout_seconds: int = 180
+    ai_minimum_confidence: float = 0.75
     repository_backend: Literal["memory", "postgres"] = "memory"
     client_log_path: str = "/tmp/learning-assessment/client-errors.jsonl"
     client_log_max_bytes: int = 5_000_000

@@ -7,8 +7,9 @@ photographed work, AI-assisted feedback, correction cycles, and spaced review.
 
 Parents create or import a structured question set, review it, and assign it to
 a child. Children answer with choices, text, on-screen handwriting, photos, or
-printed paper. A provider-neutral background job grades the full submission and
-returns per-question feedback for correction and later review.
+printed paper. A provider-neutral background job can grade one locked answer
+while the child continues, or grade the entire submission and return
+per-question feedback for correction and later review.
 
 The canonical MVP requirements are in [docs/mvp-spec.md](docs/mvp-spec.md).
 
@@ -20,8 +21,10 @@ The canonical MVP requirements are in [docs/mvp-spec.md](docs/mvp-spec.md).
 - `compose.yaml`: local API, worker, and web containers.
 
 Production delivery uses `study.hypnochunk.com` for the static frontend and
-`api.study.hypnochunk.com` for the Docker API. The production AI provider is
-intentionally undecided; integrations must implement the contracts in the API.
+`api.study.hypnochunk.com` for the Docker API. CI uses the deterministic fixture
+adapter. A controlled private worker may instead use the Codex CLI adapter to
+grade an isolated, identity-free rendering of a handwriting response; other AI
+providers still integrate through the same typed API contracts.
 
 ## Local development
 
@@ -78,18 +81,20 @@ does not duplicate the native Pages deployment.
 
 The production API template is in `deploy/compose.production.yaml` and binds
 FastAPI only to `127.0.0.1:8010`; the matching host Nginx template is under
-`deploy/nginx`. The API and single-concurrency fixture worker run in Docker on
-the shared 8G VPS, behind the HTTPS-only `api.study.hypnochunk.com` virtual host.
+`deploy/nginx`. The API and single-concurrency worker run in Docker on the
+shared 8G VPS, behind the HTTPS-only `api.study.hypnochunk.com` virtual host.
+The worker image includes the pinned Codex CLI, but the adapter is enabled only
+after a private server-side device login and `AI_PROVIDER=codex_cli`.
 The host has persistent Swap and container memory limits. Field-limited browser
 API errors are stored under `/opt/learning-assessment/logs` with bounded file
 rotation; request bodies, credentials, PINs, and URL query strings are excluded.
-Hosted Supabase owns Auth, PostgreSQL, and private Storage; all ten repository
+Hosted Supabase owns Auth, PostgreSQL, and private Storage; all twelve repository
 migrations are applied.
 
 This deployment is still a controlled pilot. Google/LINE provider setup, a real
-AI provider, generated listening audio, whole-page paper extraction, and
-public-library publication remain feature-gated until their integration or
-evaluation thresholds are approved.
+provider for photo/essay grading, generated listening audio, whole-page paper
+extraction, and public-library publication remain feature-gated until their
+integration or evaluation thresholds are approved.
 
 ## Data and privacy
 

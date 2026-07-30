@@ -126,10 +126,14 @@ recognition fails, the UI asks for page correction or per-question upload.
 
 ## 7. Submission and grading
 
-- A child submits a full assignment.
-- The submitted attempt and responses are immutable.
+- A child may submit the current answered question for asynchronous grading and
+  continue the remaining questions. That response becomes immutable and its
+  result appears inline when ready.
+- A child may submit the full assignment at any time. Unanswered questions are
+  recorded as incorrect, and all responses become immutable.
 - Corrections and retries are new attempts linked to the original.
-- Grading is asynchronous and results appear only after the complete job ends.
+- The complete result page appears only after the full-assignment grading job
+  ends; a single-question submission does not complete the attempt.
 - AI receives opaque identifiers, the relevant question/rubric, answer, and
   media only. It never receives family or child identity.
 - A failed job retries a limited number of times, then allows a parent retry.
@@ -213,8 +217,9 @@ browser push notifications.
 - Source files, responses, audio, and derived media use separate private buckets.
 - Service-role, database, LINE, SMTP, and AI credentials are server-only.
 - AI behavior is exposed through typed provider-neutral contracts. CI uses a
-  deterministic fixture adapter; production provider selection is a separate
-  approval.
+  deterministic fixture adapter. The first controlled visual adapter may use a
+  private runner's Codex CLI session and receives only an identity-free rendered
+  answer image plus the relevant question and rubric.
 - The frontend is a static Next.js export on Cloudflare Pages.
 - FastAPI and a single-concurrency worker run in Docker behind
   `api.study.hypnochunk.com`.

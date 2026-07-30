@@ -11,7 +11,10 @@ from app.fixtures.english_lesson_one import (
     lesson_one_source_summary,
     matches_lesson_one_import,
 )
-from app.services.grading import FixtureGrader
+from app.services.grading import (
+    VisualGradingAdapter,
+    grade_response_with_ai,
+)
 
 JobHandler = Callable[
     [asyncpg.Connection, dict[str, Any]],
@@ -23,9 +26,23 @@ def _json_value(value: Any) -> Any:
     return json.loads(value) if isinstance(value, str) else value
 
 
+def _localized_text(value: Any) -> str:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        for locale in ("en", "ja", "zh"):
+            candidate = value.get(locale)
+            if isinstance(candidate, str):
+                return candidate
+    return ""
+
+
 async def fixture_job_handler(
     connection: asyncpg.Connection,
     job: dict[str, Any],
+    *,
+    visual_adapter: VisualGradingAdapter | None = None,
+    minimum_confidence: float = 0.75,
 ) -> dict[str, Any]:
     if job["type"] == "purge_deleted_data":
         deletion = await connection.fetchrow(
@@ -231,15 +248,22 @@ async def fixture_job_handler(
             "status": "needs_review",
         }
     if job["type"] == "grade_submission":
+        payload = _json_value(job.get("payload") or {})
+        submitted_question_id = (
+            payload.get("question_id")
+            if isinstance(payload, dict)
+            else None
+        )
         question_rows = await connection.fetch(
             """
             select q.id, q.family_id, q.question_set_id, q.position, q.type,
-                   q.prompt, q.options, q.answer_key, q.points,
+                   q.prompt, q.options, q.answer_key, q.rubric, q.points,
                    q.primary_knowledge_tag_id, at.child_id
             from public.questions q
             join public.assignments a on a.question_set_id = q.question_set_id
             join public.attempts at on at.assignment_id = a.id
             where at.id = $1
+              and ($2::uuid is null or q.id = $2::uuid)
               and (
                 at.kind <> 'correction'
                 or exists (
@@ -254,6 +278,7 @@ async def fixture_job_handler(
             order by q.position
             """,
             job["subject_id"],
+            submitted_question_id,
         )
         response_rows = await connection.fetch(
             """
@@ -269,32 +294,38 @@ async def fixture_job_handler(
             response_data = dict(row)
             response_data["answer"] = _json_value(response_data["answer"])
             responses[str(row["question_id"])] = SavedResponse(**response_data)
-        grader = FixtureGrader()
-        job_model = Job(**dict(job))
+        job_data = dict(job)
+        job_data["payload"] = payload
+        job_model = Job(**job_data)
         outcomes: dict[str, int] = {}
+        grader_versions: set[str] = set()
         for row in question_rows:
-            prompt_value = _json_value(row["prompt"])
-            prompt = (
-                prompt_value.get("en", "")
-                if isinstance(prompt_value, dict)
-                else str(prompt_value)
-            )
             question = Question(
                 id=row["id"],
                 family_id=row["family_id"],
                 question_set_id=row["question_set_id"],
                 position=row["position"],
                 type=row["type"],
-                prompt=prompt,
+                prompt=_localized_text(_json_value(row["prompt"])),
                 options=_json_value(row["options"]),
                 answer_key=_json_value(row["answer_key"]),
                 points=float(row["points"]),
             )
-            result = grader.grade(
+            rubric = _json_value(row["rubric"])
+            grading_guide = (
+                str(rubric.get("grading_guide") or rubric.get("criteria") or "")
+                if isinstance(rubric, dict)
+                else str(rubric)
+            )
+            result = grade_response_with_ai(
                 job_model,
                 question,
                 responses.get(str(question.id)),
+                visual_adapter=visual_adapter,
+                grading_guide=grading_guide,
+                minimum_confidence=minimum_confidence,
             )
+            grader_versions.add(result.grader_version)
             await connection.execute(
                 """
                 insert into public.question_results (
@@ -342,17 +373,18 @@ async def fixture_job_handler(
                     result.question_id,
                 )
             outcomes[result.outcome.value] = outcomes.get(result.outcome.value, 0) + 1
-        await connection.execute(
-            """
-            update public.assignments a
-            set status = 'results_ready', updated_at = now()
-            from public.attempts at
-            where at.id = $1 and a.id = at.assignment_id
-            """,
-            job["subject_id"],
-        )
+        if submitted_question_id is None:
+            await connection.execute(
+                """
+                update public.assignments a
+                set status = 'results_ready', updated_at = now()
+                from public.attempts at
+                where at.id = $1 and a.id = at.assignment_id
+                """,
+                job["subject_id"],
+            )
         return {
-            "adapter": grader.version,
+            "adapter": ",".join(sorted(grader_versions)) or "fixture-v1",
             "job_type": job["type"],
             "schema_version": "1.0",
             "question_count": len(question_rows),

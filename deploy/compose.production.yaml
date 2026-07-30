@@ -5,11 +5,11 @@ services:
     build:
       context: ..
       dockerfile: apps/api/Dockerfile
+      target: runtime
     env_file:
       - /opt/learning-assessment/.env
     environment:
       APP_ENV: production
-      AI_PROVIDER: fixture
       CLIENT_LOG_PATH: /var/log/learning-assessment/client-errors.jsonl
       REPOSITORY_BACKEND: postgres
     ports:
@@ -38,13 +38,16 @@ services:
     build:
       context: ..
       dockerfile: apps/api/Dockerfile
+      target: worker
     command: ["uv", "run", "--no-sync", "python", "-m", "app.worker"]
     env_file:
       - /opt/learning-assessment/.env
     environment:
       APP_ENV: production
-      AI_PROVIDER: fixture
+      CODEX_HOME: /var/lib/learning-assessment-codex
       REPOSITORY_BACKEND: postgres
+    volumes:
+      - /opt/learning-assessment/codex:/var/lib/learning-assessment-codex
     restart: unless-stopped
     mem_limit: 2g
     cpus: 1.5

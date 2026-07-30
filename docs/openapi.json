@@ -89,6 +89,14 @@
             "title": "Responses",
             "type": "array"
           },
+          "submitted_question_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Submitted Question Ids",
+            "type": "array"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -1218,6 +1226,11 @@
             "title": "Id",
             "type": "string"
           },
+          "payload": {
+            "additionalProperties": true,
+            "title": "Payload",
+            "type": "object"
+          },
           "status": {
             "$ref": "#/components/schemas/JobStatus",
             "default": "queued"
@@ -2090,6 +2103,30 @@
         "title": "QuestionSetStatus",
         "type": "string"
       },
+      "QuestionSubmissionReceipt": {
+        "properties": {
+          "attempt_id": {
+            "format": "uuid",
+            "title": "Attempt Id",
+            "type": "string"
+          },
+          "job": {
+            "$ref": "#/components/schemas/Job"
+          },
+          "question_id": {
+            "format": "uuid",
+            "title": "Question Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "attempt_id",
+          "question_id",
+          "job"
+        ],
+        "title": "QuestionSubmissionReceipt",
+        "type": "object"
+      },
       "QuestionType": {
         "enum": [
           "single_choice",
@@ -2807,6 +2844,86 @@
           }
         },
         "summary": "Create Correction",
+        "tags": [
+          "attempts"
+        ]
+      }
+    },
+    "/v1/attempts/{attempt_id}/questions/{question_id}/submit": {
+      "post": {
+        "operationId": "submit_question_v1_attempts__attempt_id__questions__question_id__submit_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attempt_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Attempt Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "question_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Question Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 120,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionSubmissionReceipt"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit Question",
         "tags": [
           "attempts"
         ]

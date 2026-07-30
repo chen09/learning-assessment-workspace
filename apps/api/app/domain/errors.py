@@ -16,5 +16,13 @@ class SubmittedAttemptImmutable(DomainError):
     pass
 
 
+class SubmittedQuestionImmutable(DomainError):
+    pass
+
+
+class QuestionAnswerRequired(DomainError):
+    pass
+
+
 class FamilyParentLimitReached(DomainError):
     pass

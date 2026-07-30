@@ -18,6 +18,13 @@ class FixtureJobProcessor:
             return None
         job.attempt_count += 1
         questions = self._repository.questions_for_attempt(str(job.subject_id))
+        submitted_question_id = job.payload.get("question_id")
+        if isinstance(submitted_question_id, str):
+            questions = [
+                question
+                for question in questions
+                if str(question.id) == submitted_question_id
+            ]
         responses = self._repository.responses_for_attempt(str(job.subject_id))
         results = [
             self._grader.grade(job, question, responses.get(str(question.id)))

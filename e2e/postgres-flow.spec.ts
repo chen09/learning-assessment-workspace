@@ -186,6 +186,28 @@ test("verified parent completes the family assignment flow on PostgreSQL", async
       })
       .click();
     await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+    const singleQuestionSubmission = page.waitForResponse(
+      (response) =>
+        /\/v1\/attempts\/[^/]+\/questions\/[^/]+\/submit$/.test(
+          response.url(),
+        ) &&
+        response.request().method() === "POST",
+    );
+    await page
+      .getByRole("button", { name: "Submit this answer for grading" })
+      .click();
+    await page
+      .getByRole("button", { name: "Confirm single-answer submission" })
+      .click();
+    expect((await singleQuestionSubmission).status()).toBe(202);
+    await expect(
+      page.getByRole("button", {
+        name: "This answer has been submitted",
+      }),
+    ).toBeDisabled();
+    await expect(page.getByText("Correct.", { exact: true })).toBeVisible({
+      timeout: 30_000,
+    });
     await page.getByRole("button", { name: "Next question" }).click();
     await page.getByLabel("Your answer").fill("play");
     await expect(page.getByText("Saved", { exact: true })).toBeVisible();
@@ -202,6 +224,9 @@ test("verified parent completes the family assignment flow on PostgreSQL", async
     await page.mouse.up();
     await expect(page.getByText("Saved", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Submit all answers" }).click();
+    await page
+      .getByRole("button", { name: "Confirm full submission" })
+      .click();
     await expect(
       page.getByRole("heading", { name: "Your work is being checked" }),
     ).toBeVisible();

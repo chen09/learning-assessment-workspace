@@ -1176,6 +1176,65 @@ button {
   min-height: 25rem;
 }
 
+.response-locked {
+  pointer-events: none;
+  opacity: 0.66;
+}
+
+.question-grade-status {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  background: rgb(255 255 255 / 72%);
+  padding: 0.85rem 1rem;
+}
+
+.question-grade-status.correct {
+  border-color: rgb(38 137 112 / 28%);
+  background: #edf8f4;
+  color: #176c58;
+}
+
+.question-grade-status.incorrect,
+.question-grade-status.uncertain,
+.question-grade-status.needs_parent_review {
+  border-color: rgb(202 143 54 / 30%);
+  background: #fff8e9;
+}
+
+.question-grade-status p,
+.submission-confirmation p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.grading-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.submission-confirmation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1rem;
+  border: 1px solid rgb(67 91 211 / 22%);
+  border-radius: 1rem;
+  background: var(--blue-soft);
+  padding: 1rem;
+}
+
+.submission-confirmation > div:last-child {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.55rem;
+}
+
 .work-actions {
   display: flex;
   justify-content: space-between;
@@ -1897,6 +1956,18 @@ button {
     background: rgb(247 245 239 / 90%);
     padding: 0.5rem;
     backdrop-filter: blur(15px);
+  }
+
+  .grading-actions,
+  .submission-confirmation,
+  .submission-confirmation > div:last-child {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .grading-actions .button,
+  .submission-confirmation .button {
+    width: 100%;
   }
 
   .continue-card {
