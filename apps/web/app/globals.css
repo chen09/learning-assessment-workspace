@@ -2228,6 +2228,42 @@ button {
   gap: 1rem;
 }
 
+.assignment-target-card {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding-block: 1.15rem;
+}
+
+.assignment-target-card h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.assignment-target-fields {
+  display: grid;
+  grid-template-columns: minmax(10rem, 1fr) minmax(10rem, 1fr);
+  gap: 0.7rem;
+}
+
+.assignment-target-fields label {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 750;
+}
+
+.assignment-target-fields select {
+  min-height: 2.7rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  padding: 0 0.8rem;
+}
+
 .creation-tabs {
   display: grid;
   align-content: start;
@@ -3043,8 +3079,18 @@ button {
   }
 
   .create-layout,
+  .assignment-target-card,
   .review-result-grid,
   .settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .assignment-target-card {
+    display: grid;
+    align-items: stretch;
+  }
+
+  .assignment-target-fields {
     grid-template-columns: 1fr;
   }
 

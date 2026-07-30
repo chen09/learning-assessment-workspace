@@ -7,27 +7,35 @@ import {
   Camera,
   Check,
   FileText,
+  FileJson2,
   Headphones,
   ImagePlus,
   Printer,
   Sparkles,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import {
   type ApiQuestion,
+  type ChildProfile,
+  type Family,
+  type StructuredQuestionSetDocument,
   assignQuestionSet,
   confirmQuestionSet,
   createQuestionSetImport,
   createUploadIntent,
+  getChildren,
+  getFamilies,
   getParentAccessToken,
   getQuestionSetDraft,
+  importStructuredQuestionSet,
+  previewStructuredQuestionSet,
   uploadToSignedUrl,
 } from "@/lib/api-client";
 
-type CreateMode = "generate" | "import" | "manual";
+type CreateMode = "generate" | "import" | "structured" | "manual";
 type ImportPurpose = "generate_similar" | "use_as_questions";
 type Stage = "compose" | "review";
 
@@ -49,7 +57,26 @@ const sampleQuestions = [
   },
 ];
 
+function readTextFile(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () =>
+      typeof reader.result === "string"
+        ? resolve(reader.result)
+        : reject(new Error("The selected file is not text.")),
+    );
+    reader.addEventListener("error", () =>
+      reject(reader.error ?? new Error("The selected file could not be read.")),
+    );
+    reader.readAsText(file);
+  });
+}
+
 export function CreateWorkspace() {
+  const [families, setFamilies] = useState<Family[]>([]);
+  const [children, setChildren] = useState<ChildProfile[]>([]);
+  const [selectedFamilyId, setSelectedFamilyId] = useState("");
+  const [selectedChildId, setSelectedChildId] = useState("");
   const [mode, setMode] = useState<CreateMode>("generate");
   const [importPurpose, setImportPurpose] =
     useState<ImportPurpose>("generate_similar");
@@ -60,6 +87,10 @@ export function CreateWorkspace() {
   const [answerFiles, setAnswerFiles] = useState<File[]>([]);
   const [referenceFileName, setReferenceFileName] = useState("");
   const [referenceFiles, setReferenceFiles] = useState<File[]>([]);
+  const [structuredFile, setStructuredFile] = useState<File | null>(null);
+  const [structuredDocument, setStructuredDocument] =
+    useState<StructuredQuestionSetDocument | null>(null);
+  const [structuredChecksum, setStructuredChecksum] = useState("");
   const [prompt, setPrompt] = useState(
     "Make a short mixed practice from this week’s algebra and English work.",
   );
@@ -73,20 +104,121 @@ export function CreateWorkspace() {
     "idle" | "working" | "error"
   >("idle");
 
-  const canCreate = mode !== "import" || Boolean(fileName);
+  useEffect(() => {
+    let active = true;
+    void getParentAccessToken().then(async (parentToken) => {
+      if (!parentToken) {
+        return;
+      }
+      try {
+        const loadedFamilies = await getFamilies(parentToken);
+        const params = new URLSearchParams(window.location.search);
+        const requestedFamilyId = params.get("familyId");
+        const selectedFamily =
+          loadedFamilies.find((family) => family.id === requestedFamilyId) ??
+          loadedFamilies[0];
+        const loadedChildren = selectedFamily
+          ? await getChildren(selectedFamily.id, parentToken)
+          : [];
+        const requestedChildId = params.get("childId");
+        const selectedChild =
+          loadedChildren.find((child) => child.id === requestedChildId) ??
+          loadedChildren[0];
+        if (active) {
+          setFamilies(loadedFamilies);
+          setSelectedFamilyId(selectedFamily?.id ?? "");
+          setChildren(loadedChildren);
+          setSelectedChildId(selectedChild?.id ?? "");
+        }
+      } catch {
+        if (active) {
+          setRequestStatus("error");
+        }
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const canCreate =
+    mode === "import"
+      ? Boolean(fileName)
+      : mode === "structured"
+        ? structuredFile !== null &&
+          Boolean(selectedFamilyId) &&
+          Boolean(selectedChildId)
+        : true;
   const isLessonOneImport = files.some(
     (file) => file.name === "english_lesson1_similar_practice.pdf",
   );
 
   const getRouteIds = () => {
-    const params = new URLSearchParams(window.location.search);
     return {
-      familyId: params.get("familyId"),
-      childId: params.get("childId"),
+      familyId: selectedFamilyId || null,
+      childId: selectedChildId || null,
     };
   };
 
+  const selectFamily = async (familyId: string) => {
+    setSelectedFamilyId(familyId);
+    setSelectedChildId("");
+    const parentToken = await getParentAccessToken();
+    if (!parentToken) {
+      setChildren([]);
+      return;
+    }
+    try {
+      const loadedChildren = await getChildren(familyId, parentToken);
+      setChildren(loadedChildren);
+      setSelectedChildId(loadedChildren[0]?.id ?? "");
+    } catch {
+      setChildren([]);
+      setRequestStatus("error");
+    }
+  };
+
   const createDraft = async () => {
+    if (mode === "structured") {
+      if (!structuredFile) {
+        setRequestStatus("error");
+        return;
+      }
+      const parentToken = await getParentAccessToken();
+      if (!parentToken) {
+        setRequestStatus("error");
+        return;
+      }
+      setRequestStatus("working");
+      try {
+        const document = JSON.parse(
+          await readTextFile(structuredFile),
+        ) as StructuredQuestionSetDocument;
+        const preview = await previewStructuredQuestionSet(
+          document,
+          parentToken,
+        );
+        setStructuredDocument(document);
+        setStructuredChecksum(preview.checksum);
+        setDraftQuestions(
+          preview.questions.map((question) => ({
+            id: `preview-${question.position}`,
+            position: question.position,
+            type: question.type,
+            prompt: question.prompt,
+            options: question.options.length > 0 ? question.options : null,
+            points: question.points,
+            answer_key: question.answer_key,
+          })),
+        );
+        setStage("review");
+        setRequestStatus("idle");
+      } catch {
+        setRequestStatus("error");
+      }
+      return;
+    }
+
     const { familyId } = getRouteIds();
     if (!familyId) {
       setStage("review");
@@ -188,7 +320,45 @@ export function CreateWorkspace() {
   };
 
   const confirmAndAssign = async () => {
-    const { childId } = getRouteIds();
+    const { familyId, childId } = getRouteIds();
+    if (mode === "structured") {
+      if (
+        !familyId ||
+        !childId ||
+        !structuredFile ||
+        !structuredDocument ||
+        !structuredChecksum
+      ) {
+        setRequestStatus("error");
+        return;
+      }
+      const parentToken = await getParentAccessToken();
+      if (!parentToken) {
+        setRequestStatus("error");
+        return;
+      }
+      setRequestStatus("working");
+      try {
+        const imported = await importStructuredQuestionSet(
+          {
+            family_id: familyId,
+            child_id: childId,
+            source_name: structuredFile.name,
+            document: structuredDocument,
+          },
+          parentToken,
+          `structured-${structuredChecksum}-${childId}`,
+        );
+        setQuestionSetId(imported.question_set_id);
+        setAssignmentId(imported.assignment_id);
+        setConfirmed(true);
+        setRequestStatus("idle");
+      } catch {
+        setRequestStatus("error");
+      }
+      return;
+    }
+
     if (!questionSetId || !childId) {
       setConfirmed(true);
       return;
@@ -249,7 +419,9 @@ export function CreateWorkspace() {
           </span>
           <span>
             {draftQuestions.length || sampleQuestions.length} questions ·{" "}
-            {isLessonOneImport
+            {mode === "structured"
+              ? "validated JSON · answers stay private"
+              : isLessonOneImport
               ? "45-minute test"
               : "about 8 minutes · standard difficulty"}
           </span>
@@ -284,7 +456,10 @@ export function CreateWorkspace() {
           <div>
             <p className="eyebrow">Assign</p>
             <h2>
-              Alex · {isLessonOneImport ? "45-minute test" : "practice mode"}
+              {children.find((child) => child.id === selectedChildId)
+                ?.nickname ?? "Selected child"}{" "}
+              ·{" "}
+              {isLessonOneImport ? "45-minute test" : "practice mode"}
             </h2>
             <p>
               {isLessonOneImport ? "Timer: 45 minutes. " : "No timer. "}
@@ -305,6 +480,12 @@ export function CreateWorkspace() {
               Confirm and assign
             </button>
           )}
+          {requestStatus === "error" ? (
+            <p className="form-error" role="alert">
+              The JSON could not be imported. Check that the family and child
+              are still available, then try again.
+            </p>
+          ) : null}
           <Link
             className="button ghost"
             href={
@@ -334,6 +515,54 @@ export function CreateWorkspace() {
         <LanguageSwitcher />
       </header>
 
+      <section className="creation-card assignment-target-card">
+        <div>
+          <p className="eyebrow">Assign to</p>
+          <h2>Choose the child who will receive this set</h2>
+        </div>
+        {families.length > 0 ? (
+          <div className="assignment-target-fields">
+            <label>
+              Family
+              <select
+                aria-label="Family"
+                onChange={(event) => void selectFamily(event.target.value)}
+                value={selectedFamilyId}
+              >
+                {families.map((family) => (
+                  <option key={family.id} value={family.id}>
+                    {family.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Child
+              <select
+                aria-label="Child"
+                disabled={children.length === 0}
+                onChange={(event) => setSelectedChildId(event.target.value)}
+                value={selectedChildId}
+              >
+                {children.length > 0 ? (
+                  children.map((child) => (
+                    <option key={child.id} value={child.id}>
+                      {child.nickname}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">Add a child first</option>
+                )}
+              </select>
+            </label>
+          </div>
+        ) : (
+          <Link className="button ghost" href="/parent/family/">
+            Add a family and child first
+          </Link>
+        )}
+      </section>
+
       <div className="create-layout">
         <nav className="creation-tabs" aria-label="Question set source">
           <button
@@ -349,6 +578,13 @@ export function CreateWorkspace() {
             type="button"
           >
             <Camera /> Import material
+          </button>
+          <button
+            className={mode === "structured" ? "active" : ""}
+            onClick={() => setMode("structured")}
+            type="button"
+          >
+            <FileJson2 /> Import AI question JSON
           </button>
           <button
             className={mode === "manual" ? "active" : ""}
@@ -512,6 +748,45 @@ export function CreateWorkspace() {
             </>
           ) : null}
 
+          {mode === "structured" ? (
+            <>
+              <div className="creation-heading">
+                <span>
+                  <FileJson2 />
+                </span>
+                <div>
+                  <h2>Import an AI-structured question set</h2>
+                  <p>
+                    Select a schema 1.0 JSON file. It is validated and previewed
+                    here; it is never added to the application code or a pull
+                    request.
+                  </p>
+                </div>
+              </div>
+              <label className="drop-zone">
+                <input
+                  accept=".json,application/json"
+                  aria-label="AI question JSON"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null;
+                    setStructuredFile(file);
+                    setStructuredDocument(null);
+                    setStructuredChecksum("");
+                  }}
+                  type="file"
+                />
+                <FileJson2 />
+                <strong>
+                  {structuredFile?.name || "Choose AI question JSON"}
+                </strong>
+                <span>
+                  Preview does not write to the database. Questions are created
+                  and assigned only after your confirmation.
+                </span>
+              </label>
+            </>
+          ) : null}
+
           {mode === "manual" ? (
             <>
               <div className="creation-heading">
@@ -535,38 +810,42 @@ export function CreateWorkspace() {
             </>
           ) : null}
 
-          <div className="creation-options">
-            <label>
-              Subject
-              <select defaultValue="mixed">
-                <option value="mixed">English + mathematics</option>
-                <option value="english">English</option>
-                <option value="math">Mathematics</option>
-              </select>
+          {mode !== "structured" ? (
+            <div className="creation-options">
+              <label>
+                Subject
+                <select defaultValue="mixed">
+                  <option value="mixed">English + mathematics</option>
+                  <option value="english">English</option>
+                  <option value="math">Mathematics</option>
+                </select>
+              </label>
+              <label>
+                Difficulty
+                <select defaultValue="adaptive">
+                  <option value="adaptive">Match Alex</option>
+                  <option value="foundation">Foundation</option>
+                  <option value="standard">Standard</option>
+                  <option value="challenge">Challenge</option>
+                </select>
+              </label>
+              <label>
+                Questions
+                <select defaultValue="8">
+                  <option>5</option>
+                  <option>8</option>
+                  <option>10</option>
+                </select>
+              </label>
+            </div>
+          ) : null}
+          {mode !== "structured" ? (
+            <label className="toggle-row">
+              <input type="checkbox" />
+              <Headphones size={18} />
+              Include listening when the source calls for it
             </label>
-            <label>
-              Difficulty
-              <select defaultValue="adaptive">
-                <option value="adaptive">Match Alex</option>
-                <option value="foundation">Foundation</option>
-                <option value="standard">Standard</option>
-                <option value="challenge">Challenge</option>
-              </select>
-            </label>
-            <label>
-              Questions
-              <select defaultValue="8">
-                <option>5</option>
-                <option>8</option>
-                <option>10</option>
-              </select>
-            </label>
-          </div>
-          <label className="toggle-row">
-            <input type="checkbox" />
-            <Headphones size={18} />
-            Include listening when the source calls for it
-          </label>
+          ) : null}
           <button
             className="button primary large create-submit"
             disabled={!canCreate || requestStatus === "working"}
@@ -575,7 +854,9 @@ export function CreateWorkspace() {
           >
             {requestStatus === "working"
               ? "Preparing draft…"
-              : "Create review draft"}
+              : mode === "structured"
+                ? "Preview questions"
+                : "Create review draft"}
           </button>
           {requestStatus === "error" ? (
             <p className="form-error" role="alert">

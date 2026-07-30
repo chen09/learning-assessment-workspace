@@ -16,6 +16,47 @@ export type ApiQuestion = {
   points: number;
 };
 
+export type StructuredQuestion = {
+  position: number;
+  type: ApiQuestion["type"];
+  prompt: string;
+  options: string[];
+  answer_key: Record<string, unknown>;
+  rubric: Record<string, unknown>;
+  points: number;
+  knowledge_code: string;
+};
+
+export type StructuredQuestionSetDocument = {
+  schema_version: "1.0";
+  question_set: {
+    title: string;
+    subject: string;
+    locale: "zh" | "ja" | "en";
+    difficulty: "reinforcement" | "standard" | "challenge" | "adaptive";
+    source_mode: "manual" | "generate" | "convert" | "similar";
+    instructions?: string | null;
+    estimated_minutes: number;
+    source_summary?: Record<string, unknown>;
+  };
+  knowledge_tags: Array<{ code: string; label: string }>;
+  questions: StructuredQuestion[];
+};
+
+export type StructuredImportPreview = {
+  title: string;
+  subject: string;
+  locale: string;
+  question_count: number;
+  total_points: number;
+  estimated_minutes: number;
+  knowledge_tag_count: number;
+  answer_keys_present: boolean;
+  checksum: string;
+  source_summary: Record<string, unknown>;
+  questions: StructuredQuestion[];
+};
+
 export type AssignmentWork = {
   title: string;
   assignment: {
@@ -831,6 +872,9 @@ export async function uploadToSignedUrl(
   intent: UploadIntent,
   file: File,
 ) {
+  if (intent.upload_url.startsWith("fixture://")) {
+    return;
+  }
   const uploadFile = await stripImageMetadata(file);
   const response = await fetch(intent.upload_url, {
     method: "PUT",
@@ -864,6 +908,47 @@ export async function createQuestionSetImport(
     status: string;
   }>(
     "/v1/question-sets/imports",
+    {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify(payload),
+    },
+    parentToken,
+  );
+}
+
+export async function previewStructuredQuestionSet(
+  document: StructuredQuestionSetDocument,
+  parentToken: string,
+) {
+  return apiRequest<StructuredImportPreview>(
+    "/v1/question-sets/imports/structured/preview",
+    {
+      method: "POST",
+      body: JSON.stringify(document),
+    },
+    parentToken,
+  );
+}
+
+export async function importStructuredQuestionSet(
+  payload: {
+    family_id: string;
+    child_id: string;
+    source_name: string;
+    document: StructuredQuestionSetDocument;
+  },
+  parentToken: string,
+  idempotencyKey: string,
+) {
+  return apiRequest<{
+    question_set_id: string;
+    assignment_id: string;
+    status: "confirmed";
+    reused_existing: boolean;
+    checksum: string;
+  }>(
+    "/v1/question-sets/imports/structured",
     {
       method: "POST",
       headers: { "Idempotency-Key": idempotencyKey },

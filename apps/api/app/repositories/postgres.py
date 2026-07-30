@@ -63,6 +63,11 @@ from app.domain.models import (
     SubmissionReceipt,
     UploadIntent,
 )
+from app.tools.import_question_set import (
+    ImportDocument,
+    ImportResult,
+    import_question_set,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -188,6 +193,7 @@ class PostgresRepository:
         supabase_url: str,
         service_role_key: str,
     ) -> None:
+        self._database_url = database_url
         self._engine: AsyncEngine = create_async_engine(
             database_url,
             pool_pre_ping=True,
@@ -197,6 +203,26 @@ class PostgresRepository:
         )
         self._supabase_url = supabase_url.rstrip("/")
         self._service_role_key = service_role_key
+
+    async def import_structured_question_set(
+        self,
+        document: ImportDocument,
+        *,
+        family_id: UUID,
+        child_id: UUID,
+        source_name: str,
+        parent_id: str,
+    ) -> ImportResult:
+        return await import_question_set(
+            document,
+            database_url=self._database_url,
+            family_id=family_id,
+            child_id=child_id,
+            source_name=source_name,
+            confirm=True,
+            assign=True,
+            parent_id=_uuid(parent_id),
+        )
 
     async def close(self) -> None:
         await self._engine.dispose()

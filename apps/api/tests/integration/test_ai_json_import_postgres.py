@@ -5,8 +5,9 @@ from uuid import uuid4
 import asyncpg
 import pytest
 
+from app.repositories.postgres import PostgresRepository
 from app.services.child_sessions import ChildSessionService
-from app.tools.import_question_set import import_question_set, parse_import_document
+from app.tools.import_question_set import parse_import_document
 
 DATABASE_URL = os.getenv("TEST_DATABASE_URL")
 
@@ -92,24 +93,26 @@ async def test_ai_json_import_is_atomic_assignable_and_idempotent() -> None:
                 }
             )
         )
-        imported = await import_question_set(
+        repository = PostgresRepository(
+            DATABASE_URL,
+            supabase_url="http://127.0.0.1:54321",
+            service_role_key="",
+        )
+        imported = await repository.import_structured_question_set(
             document,
-            database_url=DATABASE_URL,
             family_id=family_id,
             child_id=child_id,
             source_name="lesson-2.json",
-            confirm=True,
-            assign=True,
+            parent_id=str(parent_id),
         )
-        repeated = await import_question_set(
+        repeated = await repository.import_structured_question_set(
             document,
-            database_url=DATABASE_URL,
             family_id=family_id,
             child_id=child_id,
             source_name="lesson-2.json",
-            confirm=True,
-            assign=True,
+            parent_id=str(parent_id),
         )
+        await repository.close()
 
         assert imported.reused_existing is False
         assert imported.status == "confirmed"
