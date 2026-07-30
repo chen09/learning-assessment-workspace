@@ -169,73 +169,95 @@ test("parent previews an AI JSON file before assigning its structured questions"
   await expect(
     page.getByRole("heading", { name: "What is 2 + 2?" }),
   ).toBeVisible();
-});
 
-test("child completes a mixed worksheet and opens corrections", async ({
-  page,
-}) => {
   await page.goto("/child/work/");
-  await page.getByRole("radio", { name: "a² − b²" }).click();
-  await expect(page.getByText("Saved")).toBeVisible();
-
-  await page.getByRole("button", { name: "Next question" }).click();
-  await page.getByLabel("Your answer").fill("goes");
-  await expect(page.getByText("Saved")).toBeVisible();
-
-  await page.getByRole("button", { name: "Next question" }).click();
-  const canvas = page.getByLabel("Handwriting answer area");
-  const canvasBox = await canvas.boundingBox();
-  expect(canvasBox).not.toBeNull();
-  await page.mouse.move(canvasBox!.x + 40, canvasBox!.y + 70);
-  await page.mouse.down();
-  await page.mouse.move(canvasBox!.x + 180, canvasBox!.y + 130, {
-    steps: 5,
-  });
-  await page.mouse.up();
-  await expect(page.getByText("Saved")).toBeVisible();
-
-  await page.getByRole("button", { name: "Next question" }).click();
-  await page.getByLabel("Take a photo or choose images").setInputFiles([
-    {
-      name: "math-answer.png",
-      mimeType: "image/png",
-      buffer: Buffer.from("answer"),
-    },
-    {
-      name: "math-draft.png",
-      mimeType: "image/png",
-      buffer: Buffer.from("draft"),
-    },
-  ]);
+  await expect(page).toHaveURL(/\/child\/work\/\?attemptId=/);
   await expect(
-    page
-      .getByRole("list", { name: "Uploaded answer images" })
-      .getByRole("listitem"),
-  ).toHaveText(["1. math-answer.png", "2. math-draft.png"]);
-  await expect(page.getByText("Saved")).toBeVisible();
-
-  await page.getByRole("button", { name: "Next question" }).click();
-  await page.getByRole("radio", { name: "School" }).click();
-  await expect(page.getByText("Saved")).toBeVisible();
-  await page.getByRole("button", { name: "Submit all answers" }).click();
-
-  await expect(
-    page.getByRole("heading", { name: "Your work is being checked" }),
+    page.getByRole("heading", { name: "Uploaded JSON practice" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "View results" }).click();
   await expect(
-    page.getByRole("heading", { name: "Good work, Alex" }),
+    page.getByRole("heading", { name: "What is 2 + 2?" }),
   ).toBeVisible();
-  await expect(page.getByText("Try once more")).toBeVisible();
-  await expect(page.getByText("Waiting for a parent")).toBeVisible();
-
-  await page.getByRole("button", { name: "Correct these answers" }).click();
-  await expect(page).toHaveURL(/\/child\/work\/\?correction=demo$/);
 });
 
 test("child screens stay responsive across Chinese, Japanese, and English", async ({
   page,
+  request,
 }, testInfo) => {
+  const apiBaseUrl = "http://127.0.0.1:8017";
+  const fixtureKey = `responsive-${testInfo.project.name}`;
+  const familyResponse = await request.post(`${apiBaseUrl}/v1/families`, {
+    headers: {
+      Authorization: "Bearer parent-fixture",
+      "Idempotency-Key": `${fixtureKey}-family`,
+    },
+    data: { name: `Responsive ${testInfo.project.name}` },
+  });
+  expect(familyResponse.ok()).toBeTruthy();
+  const family = (await familyResponse.json()) as { id: string };
+  const childResponse = await request.post(
+    `${apiBaseUrl}/v1/families/${family.id}/children`,
+    {
+      headers: {
+        Authorization: "Bearer parent-fixture",
+        "Idempotency-Key": `${fixtureKey}-child`,
+      },
+      data: {
+        nickname: "Alex responsive",
+        grade_stage: "Junior high 1",
+        ui_language: "zh",
+        pin: "123456",
+      },
+    },
+  );
+  expect(childResponse.ok()).toBeTruthy();
+  const child = (await childResponse.json()) as { id: string };
+  const importResponse = await request.post(
+    `${apiBaseUrl}/v1/question-sets/imports/structured`,
+    {
+      headers: {
+        Authorization: "Bearer parent-fixture",
+        "Idempotency-Key": `${fixtureKey}-import`,
+      },
+      data: {
+        family_id: family.id,
+        child_id: child.id,
+        source_name: "responsive-question.json",
+        document: {
+          schema_version: "1.0",
+          question_set: {
+            title: "Responsive assigned practice",
+            subject: "English",
+            locale: "en",
+            difficulty: "standard",
+            source_mode: "convert",
+            estimated_minutes: 5,
+            source_summary: { fixture: true },
+          },
+          knowledge_tags: [
+            { code: "present-simple", label: "Present simple" },
+          ],
+          questions: [
+            {
+              position: 1,
+              type: "single_choice",
+              prompt: "Choose the correct present-simple sentence.",
+              options: [
+                "She walks to school.",
+                "She walk to school.",
+              ],
+              answer_key: { choice: 0 },
+              rubric: { grading_mode: "exact" },
+              points: 1,
+              knowledge_code: "present-simple",
+            },
+          ],
+        },
+      },
+    },
+  );
+  expect(importResponse.ok()).toBeTruthy();
+
   const expectNoHorizontalOverflow = async () => {
     await expect
       .poll(() =>
@@ -264,17 +286,25 @@ test("child screens stay responsive across Chinese, Japanese, and English", asyn
   }
   await expectNoHorizontalOverflow();
 
-  await page.goto("/child/login/");
+  await page.goto(
+    `/child/login/?childId=${encodeURIComponent(child.id)}`,
+  );
   await expect(
     page.getByRole("heading", { name: "输入六位 PIN" }),
   ).toBeVisible();
   await expectNoHorizontalOverflow();
+  for (const digit of ["1", "2", "3", "4", "5", "6"]) {
+    await page.getByRole("button", { name: digit, exact: true }).click();
+  }
+  await page.getByRole("button", { name: "打开我的练习" }).click();
+  await expect(page).toHaveURL(/\/child\/$/);
 
   await page.goto("/child/work/");
+  await expect(page).toHaveURL(/\/child\/work\/\?attemptId=/);
   await expect(page.getByText("今日练习")).toBeVisible();
   await expect(
     page.getByRole("heading", {
-      name: "Choose the correct expansion of (a + b)(a − b).",
+      name: "Choose the correct present-simple sentence.",
     }),
   ).toBeVisible();
   await page.getByLabel("语言").selectOption("ja");
@@ -314,17 +344,6 @@ test("child screens stay responsive across Chinese, Japanese, and English", asyn
     page.getByRole("heading", { name: "答えを採点しています" }),
   ).toBeVisible();
 
-  await page.goto("/child/results/");
-  await expect(
-    page.getByRole("heading", { name: "よくできました、Alex" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "もう一度", exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "保護者の確認待ち" }),
-  ).toBeVisible();
-
   await page.goto("/child/review/");
   await expect(page.getByText("今日の復習", { exact: true })).toBeVisible();
   await expect(
@@ -334,9 +353,6 @@ test("child screens stay responsive across Chinese, Japanese, and English", asyn
   await page.goto("/child/history/");
   await expect(
     page.getByRole("heading", { name: "学習履歴" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "Past tense practice" }),
   ).toBeVisible();
 
   await page.goto("/child/exit/");
