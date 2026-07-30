@@ -372,7 +372,11 @@ test("temporary parent completes the hosted family learning flow", async ({
     await expect(page.getByText("Saved", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Next question" }).click();
 
-    const canvas = page.getByLabel("Handwriting answer area");
+    let canvas = page.getByLabel("Handwriting answer area");
+    await page.getByRole("button", { name: "Add space to the right" }).click();
+    await page.getByRole("button", { name: "Add space below" }).click();
+    await expect(canvas).toHaveAttribute("width", "1200");
+    await expect(canvas).toHaveAttribute("height", "700");
     const canvasBox = await canvas.boundingBox();
     expect(canvasBox).not.toBeNull();
     await page.mouse.move(canvasBox!.x + 50, canvasBox!.y + 60);
@@ -382,6 +386,12 @@ test("temporary parent completes the hosted family learning flow", async ({
     });
     await page.mouse.up();
     await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+
+    await page.reload();
+    await page.getByRole("button", { name: "Go to question 3" }).click();
+    canvas = page.getByLabel("Handwriting answer area");
+    await expect(canvas).toHaveAttribute("width", "1200");
+    await expect(canvas).toHaveAttribute("height", "700");
     await page.getByRole("button", { name: "Next question" }).click();
 
     const uploadIntentResponse = page.waitForResponse(
@@ -469,9 +479,12 @@ test("temporary parent completes the hosted family learning flow", async ({
     await expect(
       page.getByRole("heading", { name: "Review answers" }),
     ).toBeVisible();
-    await expect(
-      page.getByLabel("Child's handwritten answer"),
-    ).toBeVisible();
+    const handwritingPreview = page.getByLabel("Child's handwritten answer");
+    await expect(handwritingPreview).toBeVisible();
+    await expect(handwritingPreview.getByRole("img")).toHaveAttribute(
+      "viewBox",
+      "0 0 1200 700",
+    );
     const photoPreview = page.getByRole("img", {
       name: "Uploaded answer photos 1",
     });
