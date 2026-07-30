@@ -24,7 +24,7 @@ CMD ["uv", "run", "--no-sync", "uvicorn", "app.main:app", "--host", "0.0.0.0", "
 FROM runtime AS worker
 
 COPY --from=codex /usr/local/bin/node /usr/local/bin/node
-COPY --from=codex /usr/local/bin/codex /usr/local/bin/codex
 COPY --from=codex /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -s /usr/local/lib/node_modules/@openai/codex/bin/codex.js /usr/local/bin/codex
 
 CMD ["uv", "run", "--no-sync", "python", "-m", "app.worker"]
