@@ -825,6 +825,16 @@ function WorksheetWorkbenchContent() {
     return t("worksheet.result.pending");
   };
 
+  const resultAction = (outcome: AttemptResult["outcome"]) => {
+    if (outcome === "correct") {
+      return t("worksheet.result.action.correct");
+    }
+    if (outcome === "incorrect") {
+      return t("worksheet.result.action.incorrect");
+    }
+    return t("worksheet.result.action.review");
+  };
+
   const questionCard = (question: Question) => {
     const submitted = submittedQuestionIds.includes(question.id);
     const grading = gradingQuestionIds.includes(question.id);
@@ -864,7 +874,7 @@ function WorksheetWorkbenchContent() {
               : result?.feedback.summary ??
                 resultLabel(result?.outcome)}
           </strong>
-          {result?.feedback.action ? <p>{result.feedback.action}</p> : null}
+          {!grading && result ? <p>{resultAction(result.outcome)}</p> : null}
         </div>
       ) : null}
     </article>

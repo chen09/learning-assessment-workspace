@@ -179,6 +179,10 @@ const messages = {
     "worksheet.result.uncertain": "The grader is not certain.",
     "worksheet.result.needsParentReview": "Waiting for parent review.",
     "worksheet.result.pending": "Waiting for a result.",
+    "worksheet.result.action.correct": "Continue to the next question.",
+    "worksheet.result.action.incorrect":
+      "Review the feedback and try this question again.",
+    "worksheet.result.action.review": "Ask a parent to confirm this answer.",
     "worksheet.loading": "Loading",
     "worksheet.loadingTitle": "Opening your assigned practice…",
     "worksheet.loadingBody": "This should only take a moment.",
@@ -491,6 +495,11 @@ const messages = {
     "worksheet.result.uncertain": "自動採点では判断できませんでした。",
     "worksheet.result.needsParentReview": "保護者の確認待ちです。",
     "worksheet.result.pending": "結果を待っています。",
+    "worksheet.result.action.correct": "次の問題へ進んでください。",
+    "worksheet.result.action.incorrect":
+      "フィードバックを確認して、もう一度この問題に取り組んでください。",
+    "worksheet.result.action.review":
+      "保護者にこの答えを確認してもらってください。",
     "worksheet.loading": "読み込み中",
     "worksheet.loadingTitle": "割り当てられた練習を開いています…",
     "worksheet.loadingBody": "まもなく表示されます。",
@@ -796,6 +805,9 @@ const messages = {
     "worksheet.result.uncertain": "自动批改暂时无法确定。",
     "worksheet.result.needsParentReview": "等待家长确认。",
     "worksheet.result.pending": "正在等待结果。",
+    "worksheet.result.action.correct": "可以继续下一题。",
+    "worksheet.result.action.incorrect": "请查看反馈并重新完成这一题。",
+    "worksheet.result.action.review": "请让家长确认这份答案。",
     "worksheet.loading": "正在加载",
     "worksheet.loadingTitle": "正在打开已安排的练习…",
     "worksheet.loadingBody": "练习马上就会显示。",

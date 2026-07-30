@@ -216,6 +216,51 @@ describe("WorksheetWorkbench", () => {
     ).toBeInTheDocument();
   });
 
+  it("localizes the post-grading action instead of showing the API fallback language", async () => {
+    window.localStorage.setItem("luma-language:demo-child", "ja");
+    mocks.getAttemptResults.mockResolvedValue({
+      attempt_id: "attempt-1",
+      complete: false,
+      results: [
+        {
+          id: "result-1",
+          question_id: "algebra-choice",
+          outcome: "correct",
+          awarded_points: 1,
+          confidence: 0.99,
+          feedback: {
+            summary: "正解です。",
+            action: "Continue to the next question.",
+          },
+        },
+      ],
+    });
+
+    render(<WorksheetWorkbench />);
+
+    fireEvent.click(
+      await screen.findByRole("radio", { name: "a² − b²" }),
+    );
+    await screen.findByText("保存済み");
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "この答えだけ採点に出す",
+      }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "1問だけ提出する",
+      }),
+    );
+
+    expect(
+      await screen.findByText("次の問題へ進んでください。"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Continue to the next question."),
+    ).not.toBeInTheDocument();
+  });
+
   it("warns that unanswered questions become incorrect before full submission", async () => {
     render(<WorksheetWorkbench />);
 
