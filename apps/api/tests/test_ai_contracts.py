@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from PIL import Image
 from pydantic import ValidationError
@@ -120,6 +122,9 @@ def test_codex_cli_grades_anonymous_handwriting_with_a_locked_down_command() -> 
         image_path = command[command.index("--image") + 1]
         with Image.open(image_path) as rendered:
             observed["image_format"] = rendered.format
+        schema_path = command[command.index("--output-schema") + 1]
+        with open(schema_path, encoding="utf-8") as schema_file:
+            observed["output_schema"] = json.load(schema_file)
         output_path = command[command.index("--output-last-message") + 1]
         with open(output_path, "w", encoding="utf-8") as output:
             output.write(
@@ -180,6 +185,9 @@ def test_codex_cli_grades_anonymous_handwriting_with_a_locked_down_command() -> 
     assert "--ignore-rules" in command
     assert observed["image_format"] == "PNG"
     assert observed["timeout_seconds"] == 60
+    output_schema = observed["output_schema"]
+    assert isinstance(output_schema, dict)
+    assert set(output_schema["required"]) == set(output_schema["properties"])
     assert grade.outcome == "correct"
     assert grade.awarded_points == 2
     assert grade.confidence == 0.94

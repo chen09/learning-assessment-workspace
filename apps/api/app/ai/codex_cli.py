@@ -51,8 +51,10 @@ class CodexCLIGradingAdapter:
                 workspace / "answer.png",
             )
             schema_path = workspace / "grade-schema.json"
+            output_schema = GradeResponseOutput.model_json_schema()
+            output_schema["required"] = list(output_schema["properties"])
             schema_path.write_text(
-                json.dumps(GradeResponseOutput.model_json_schema()),
+                json.dumps(output_schema),
                 encoding="utf-8",
             )
             output_path = workspace / "grade.json"
