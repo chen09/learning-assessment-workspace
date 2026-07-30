@@ -75,20 +75,88 @@ test("verified parent completes the family assignment flow on PostgreSQL", async
     await page.goto(
       `/parent/create/?familyId=${encodeURIComponent(familyId)}&childId=${encodeURIComponent(childId)}`,
     );
-    await page.getByRole("button", { name: "Create review draft" }).click();
+    await page
+      .getByRole("button", { name: "Import AI question JSON" })
+      .click();
+    await page.getByLabel("AI question JSON").setInputFiles({
+      name: "postgres-structured-questions.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(
+        JSON.stringify({
+          schema_version: "1.0",
+          question_set: {
+            title: "PostgreSQL mixed practice",
+            subject: "English & Mathematics",
+            locale: "en",
+            difficulty: "standard",
+            source_mode: "convert",
+            estimated_minutes: 8,
+            source_summary: { fixture: true },
+          },
+          knowledge_tags: [
+            { code: "present-simple", label: "Present simple" },
+            { code: "difference-squares", label: "Difference of squares" },
+          ],
+          questions: [
+            {
+              position: 1,
+              type: "single_choice",
+              prompt:
+                "Choose the sentence that uses the present simple correctly.",
+              options: [
+                "She walk to school every day.",
+                "She walks to school every day.",
+                "She walking to school every day.",
+              ],
+              answer_key: { choice: 1 },
+              rubric: { grading_mode: "exact" },
+              points: 1,
+              knowledge_code: "present-simple",
+            },
+            {
+              position: 2,
+              type: "typed_text",
+              prompt: "Complete: My brother ___ tennis on Sundays.",
+              options: [],
+              answer_key: { text: "plays" },
+              rubric: { grading_mode: "exact" },
+              points: 1,
+              knowledge_code: "present-simple",
+            },
+            {
+              position: 3,
+              type: "handwriting",
+              prompt: "Explain why (a + b)(a − b) = a² − b².",
+              options: [],
+              answer_key: {
+                reference: "Expand and combine the middle terms.",
+              },
+              rubric: {
+                grading_mode: "parent_review",
+                criteria: ["Shows the expansion and cancels the middle terms."],
+              },
+              points: 1,
+              knowledge_code: "difference-squares",
+            },
+          ],
+        }),
+      ),
+    });
+    await page.getByRole("button", { name: "Preview questions" }).click();
     await expect(
       page.getByRole("heading", { name: "Review before assigning" }),
     ).toBeVisible({ timeout: 30_000 });
 
-    const assignmentResponse = page.waitForResponse(
+    const importResponse = page.waitForResponse(
       (response) =>
-        response.url().endsWith("/assignments") &&
+        response.url() ===
+          "http://127.0.0.1:8018/v1/question-sets/imports/structured" &&
         response.request().method() === "POST",
     );
     await page.getByRole("button", { name: "Confirm and assign" }).click();
     const assignmentId = (
-      (await (await assignmentResponse).json()) as { id: string }
-    ).id;
+      (await (await importResponse).json()) as { assignment_id: string }
+    ).assignment_id;
     await expect(page.getByText("Confirmed and assigned")).toBeVisible();
 
     await page.goto(
