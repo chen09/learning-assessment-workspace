@@ -38,6 +38,8 @@ import {
   getAttemptWork,
   getChildAccessToken,
   getChildAssignments,
+  getQuestionGradingJob,
+  regradeQuestion,
   saveAttemptResponse,
   startAssignment,
   submitAttempt,
@@ -213,6 +215,9 @@ function WorksheetWorkbenchContent() {
   >(null);
   const [isRetryAttempt, setIsRetryAttempt] = useState(false);
   const [retryingQuestionId, setRetryingQuestionId] = useState<string | null>(
+    null,
+  );
+  const [regradingQuestionId, setRegradingQuestionId] = useState<string | null>(
     null,
   );
   const currentQuestion = questions[currentIndex];
@@ -547,7 +552,12 @@ function WorksheetWorkbenchContent() {
   }
 
   async function redoQuestion(question: Question) {
-    if (!attemptId || !childToken || retryingQuestionId) {
+    if (
+      !attemptId ||
+      !childToken ||
+      retryingQuestionId ||
+      regradingQuestionId
+    ) {
       return;
     }
     setRetryingQuestionId(question.id);
@@ -583,6 +593,80 @@ function WorksheetWorkbenchContent() {
       setSaveStatus("offline");
     } finally {
       setRetryingQuestionId(null);
+    }
+  }
+
+  async function waitForRegradedResult(
+    questionId: string,
+    jobId: string,
+  ) {
+    if (!attemptId || !childToken) {
+      return;
+    }
+    try {
+      for (let poll = 0; poll < 120; poll += 1) {
+        const job = await getQuestionGradingJob(
+          attemptId,
+          questionId,
+          jobId,
+          childToken,
+        );
+        if (job.status === "failed") {
+          throw new Error("question_regrade_failed");
+        }
+        if (job.status === "succeeded") {
+          const resultSet = await getAttemptResults(attemptId, childToken);
+          const result = resultSet.results.find(
+            (candidate) => candidate.question_id === questionId,
+          );
+          if (result) {
+            setQuestionResults((current) => ({
+              ...current,
+              [questionId]: result,
+            }));
+            return;
+          }
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 2000));
+      }
+      throw new Error("question_regrade_timed_out");
+    } catch {
+      setSaveStatus("offline");
+    } finally {
+      setGradingQuestionIds((current) =>
+        current.filter((id) => id !== questionId),
+      );
+      setRegradingQuestionId(null);
+    }
+  }
+
+  async function regradeExistingAnswer(question: Question) {
+    if (
+      !attemptId ||
+      !childToken ||
+      retryingQuestionId ||
+      regradingQuestionId
+    ) {
+      return;
+    }
+    setRegradingQuestionId(question.id);
+    setGradingQuestionIds((current) =>
+      current.includes(question.id) ? current : [...current, question.id],
+    );
+    try {
+      const receipt = await regradeQuestion(
+        attemptId,
+        question.id,
+        childToken,
+        `regrade-${attemptId}-${question.id}-${window.crypto.randomUUID()}`,
+      );
+      void waitForRegradedResult(question.id, receipt.job.id);
+    } catch {
+      setGradingQuestionIds((current) =>
+        current.filter((id) => id !== question.id),
+      );
+      setRegradingQuestionId(null);
+      setSaveStatus("offline");
     }
   }
 
@@ -932,16 +1016,34 @@ function WorksheetWorkbenchContent() {
           {!grading && result ? (
             <>
               <p>{resultAction(result.outcome)}</p>
-              <button
-                className="button ghost"
-                disabled={retryingQuestionId !== null}
-                onClick={() => void redoQuestion(question)}
-                type="button"
-              >
-                {retryingQuestionId === question.id
-                  ? t("worksheet.preparingRedo")
-                  : t("worksheet.redoQuestion")}
-              </button>
+              <div className="question-grade-actions">
+                <button
+                  className="button ghost"
+                  disabled={
+                    retryingQuestionId !== null ||
+                    regradingQuestionId !== null
+                  }
+                  onClick={() => void regradeExistingAnswer(question)}
+                  type="button"
+                >
+                  {regradingQuestionId === question.id
+                    ? t("worksheet.regradingAnswer")
+                    : t("worksheet.regradeAnswer")}
+                </button>
+                <button
+                  className="button ghost"
+                  disabled={
+                    retryingQuestionId !== null ||
+                    regradingQuestionId !== null
+                  }
+                  onClick={() => void redoQuestion(question)}
+                  type="button"
+                >
+                  {retryingQuestionId === question.id
+                    ? t("worksheet.preparingRedo")
+                    : t("worksheet.redoQuestion")}
+                </button>
+              </div>
             </>
           ) : null}
         </div>

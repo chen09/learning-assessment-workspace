@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   getAttemptResults: vi.fn(),
   getAttemptWork: vi.fn(),
   getChildAssignments: vi.fn(),
+  getQuestionGradingJob: vi.fn(),
+  regradeQuestion: vi.fn(),
   saveAttemptResponse: vi.fn(),
   startAssignment: vi.fn(),
   submitAttempt: vi.fn(),
@@ -24,6 +26,8 @@ vi.mock("@/lib/api-client", async (importOriginal) => ({
   getAttemptWork: mocks.getAttemptWork,
   getChildAccessToken: () => "child-token",
   getChildAssignments: mocks.getChildAssignments,
+  getQuestionGradingJob: mocks.getQuestionGradingJob,
+  regradeQuestion: mocks.regradeQuestion,
   saveAttemptResponse: mocks.saveAttemptResponse,
   startAssignment: mocks.startAssignment,
   submitAttempt: mocks.submitAttempt,
@@ -125,6 +129,17 @@ describe("WorksheetWorkbench", () => {
         latest_attempt_id: null,
       },
     ]);
+    mocks.getQuestionGradingJob.mockReset();
+    mocks.getQuestionGradingJob.mockResolvedValue({
+      id: "regrade-job-1",
+      status: "succeeded",
+    });
+    mocks.regradeQuestion.mockReset();
+    mocks.regradeQuestion.mockResolvedValue({
+      attempt_id: "attempt-1",
+      question_id: "algebra-proof",
+      job: { id: "regrade-job-1", status: "queued" },
+    });
     mocks.saveAttemptResponse.mockReset();
     mocks.saveAttemptResponse.mockResolvedValue({ version: 1 });
     mocks.startAssignment.mockReset();
@@ -444,6 +459,110 @@ describe("WorksheetWorkbench", () => {
     expect(await screen.findByText("Check this term.")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Clear handwriting" }),
+    ).toBeDisabled();
+  });
+
+  it("regrades the same locked answer and replaces stale feedback", async () => {
+    window.localStorage.setItem("luma-language:demo-child", "zh");
+    mocks.startAssignment.mockResolvedValue({
+      ...assignmentWork,
+      submitted_question_ids: ["algebra-proof"],
+      responses: [
+        {
+          id: "response-1",
+          question_id: "algebra-proof",
+          kind: "strokes",
+          answer: {
+            strokes: [
+              {
+                points: [
+                  { x: 20, y: 30, pressure: 0.5 },
+                  { x: 80, y: 90, pressure: 0.5 },
+                ],
+                width: 2.5,
+                eraser: false,
+              },
+            ],
+            canvas_size: { width: 900, height: 420 },
+          },
+          version: 3,
+        },
+      ],
+    });
+    mocks.getAttemptResults
+      .mockResolvedValueOnce({
+        attempt_id: "attempt-1",
+        complete: false,
+        results: [
+          {
+            id: "result-proof",
+            question_id: "algebra-proof",
+            outcome: "needs_parent_review",
+            awarded_points: null,
+            confidence: 0.72,
+            feedback: {
+              summary: "A parent review is needed.",
+              annotations: [],
+            },
+          },
+        ],
+      })
+      .mockResolvedValue({
+        attempt_id: "attempt-1",
+        complete: false,
+        results: [
+          {
+            id: "result-proof",
+            question_id: "algebra-proof",
+            outcome: "incorrect",
+            awarded_points: 0,
+            confidence: 0.94,
+            feedback: {
+              summary: "句子中缺少必要的目的地。",
+              annotations: [],
+            },
+          },
+        ],
+      });
+
+    render(<WorksheetWorkbench />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "前往第 3 题" }),
+    );
+    expect(
+      await screen.findByText("A parent review is needed."),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "保留答案并重新评判",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mocks.regradeQuestion).toHaveBeenCalledWith(
+        "attempt-1",
+        "algebra-proof",
+        "child-token",
+        expect.stringMatching(/^regrade-attempt-1-algebra-proof-/),
+      );
+    });
+    expect(mocks.getQuestionGradingJob).toHaveBeenCalledWith(
+      "attempt-1",
+      "algebra-proof",
+      "regrade-job-1",
+      "child-token",
+    );
+    expect(
+      await screen.findByText("句子中缺少必要的目的地。"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("A parent review is needed."),
+    ).not.toBeInTheDocument();
+    expect(mocks.createQuestionRetry).not.toHaveBeenCalled();
+    expect(window.location.search).toContain("attemptId=attempt-1");
+    expect(
+      screen.getByRole("button", { name: "清除手写内容" }),
     ).toBeDisabled();
   });
 

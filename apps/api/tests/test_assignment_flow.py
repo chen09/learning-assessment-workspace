@@ -250,6 +250,88 @@ def test_child_can_submit_one_answer_without_closing_the_attempt() -> None:
     assert reopened.json()["submitted_question_ids"] == [first_question["id"]]
 
 
+def test_child_can_regrade_the_same_answer_without_creating_a_duplicate() -> None:
+    app = create_app()
+    client = TestClient(app)
+    _fixture, child_headers, work = start_fixture_assignment(client)
+    attempt_id = work["attempt"]["id"]
+    question_id = work["questions"][0]["id"]
+
+    saved = client.put(
+        f"/v1/attempts/{attempt_id}/responses/{question_id}",
+        headers=child_headers,
+        json={
+            "kind": "choice",
+            "answer": {"choices": [0]},
+            "expected_version": 0,
+        },
+    )
+    first_submission = client.post(
+        f"/v1/attempts/{attempt_id}/questions/{question_id}/submit",
+        headers={
+            **child_headers,
+            "Idempotency-Key": "submit-before-regrade",
+        },
+    )
+    client.post("/v1/demo/jobs/process-next", headers=PARENT_HEADERS)
+    first_results = client.get(
+        f"/v1/attempts/{attempt_id}/results",
+        headers=child_headers,
+    )
+
+    regrade = client.post(
+        f"/v1/attempts/{attempt_id}/questions/{question_id}/regrade",
+        headers={
+            **child_headers,
+            "Idempotency-Key": "regrade-same-answer",
+        },
+    )
+    repeated_request = client.post(
+        f"/v1/attempts/{attempt_id}/questions/{question_id}/regrade",
+        headers={
+            **child_headers,
+            "Idempotency-Key": "regrade-same-answer",
+        },
+    )
+    regrade_job_id = regrade.json()["job"]["id"]
+    job_url = (
+        f"/v1/attempts/{attempt_id}/questions/{question_id}"
+        f"/grading-jobs/{regrade_job_id}"
+    )
+    queued_status = client.get(job_url, headers=child_headers)
+    client.post("/v1/demo/jobs/process-next", headers=PARENT_HEADERS)
+    completed_status = client.get(job_url, headers=child_headers)
+    reopened = client.get(
+        f"/v1/attempts/{attempt_id}/work",
+        headers=child_headers,
+    )
+    final_results = client.get(
+        f"/v1/attempts/{attempt_id}/results",
+        headers=child_headers,
+    )
+
+    assert saved.status_code == 200
+    assert first_submission.status_code == 202
+    assert regrade.status_code == 202
+    assert regrade.json()["job"]["id"] != first_submission.json()["job"]["id"]
+    assert repeated_request.status_code == 202
+    assert repeated_request.json()["job"]["id"] == regrade_job_id
+    assert queued_status.status_code == 200
+    assert queued_status.json()["status"] == "queued"
+    assert completed_status.status_code == 200
+    assert completed_status.json()["status"] == "succeeded"
+    assert reopened.json()["attempt"]["id"] == attempt_id
+    assert reopened.json()["responses"] == [
+        {
+            **saved.json(),
+            "answer": {"choices": [0]},
+        }
+    ]
+    assert reopened.json()["submitted_question_ids"] == [question_id]
+    assert len(first_results.json()["results"]) == 1
+    assert len(final_results.json()["results"]) == 1
+
+
 def test_child_redoes_one_graded_answer_in_a_new_immutable_attempt() -> None:
     client = TestClient(create_app())
     _fixture, child_headers, work = start_fixture_assignment(client)

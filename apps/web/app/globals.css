@@ -1265,6 +1265,13 @@ button {
   color: var(--muted);
 }
 
+.question-grade-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 0.65rem;
+}
+
 .grading-actions {
   display: flex;
   justify-content: flex-end;

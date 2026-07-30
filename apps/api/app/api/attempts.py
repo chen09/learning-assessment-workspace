@@ -15,6 +15,7 @@ from app.domain.models import (
     AssignmentWork,
     AttemptResults,
     ChildSessionClaims,
+    Job,
     QuestionSubmissionReceipt,
     SavedResponse,
     SaveResponseRequest,
@@ -172,6 +173,60 @@ async def submit_question(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="The attempt or question is not available.",
+        ) from error
+
+
+@router.post(
+    "/{attempt_id}/questions/{question_id}/regrade",
+    response_model=QuestionSubmissionReceipt,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def regrade_question(
+    attempt_id: UUID,
+    question_id: UUID,
+    repository: Annotated[Repository, Depends(get_repository)],
+    child: Annotated[ChildSessionClaims, Depends(require_child)],
+    idempotency_key: Annotated[
+        str,
+        Header(alias="Idempotency-Key", min_length=8, max_length=120),
+    ],
+) -> QuestionSubmissionReceipt:
+    try:
+        return await repository.regrade_question(
+            str(attempt_id),
+            str(question_id),
+            str(child.child_id),
+            idempotency_key,
+        )
+    except NotFoundError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="A graded answer is required before requesting another review.",
+        ) from error
+
+
+@router.get(
+    "/{attempt_id}/questions/{question_id}/grading-jobs/{job_id}",
+    response_model=Job,
+)
+async def get_question_grading_job(
+    attempt_id: UUID,
+    question_id: UUID,
+    job_id: UUID,
+    repository: Annotated[Repository, Depends(get_repository)],
+    child: Annotated[ChildSessionClaims, Depends(require_child)],
+) -> Job:
+    try:
+        return await repository.get_question_grading_job(
+            str(attempt_id),
+            str(question_id),
+            str(job_id),
+            str(child.child_id),
+        )
+    except NotFoundError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The grading job is not available.",
         ) from error
 
 

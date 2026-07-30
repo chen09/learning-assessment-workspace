@@ -342,11 +342,52 @@ async def test_postgres_vertical_flow_and_family_isolation() -> None:
         assert [result.question_id for result in partial_results.results] == [
             first_question.id
         ]
+        original_result_id = partial_results.results[0].id
+        regrade_receipt = await repository.regrade_question(
+            str(work.attempt.id),
+            str(first_question.id),
+            str(child_a),
+            "integration-regrade-same-answer",
+        )
+        repeated_regrade_receipt = await repository.regrade_question(
+            str(work.attempt.id),
+            str(first_question.id),
+            str(child_a),
+            "integration-regrade-same-answer",
+        )
+        assert regrade_receipt.job.id != question_receipt.job.id
+        assert repeated_regrade_receipt.job.id == regrade_receipt.job.id
+        queued_regrade = await repository.get_question_grading_job(
+            str(work.attempt.id),
+            str(first_question.id),
+            str(regrade_receipt.job.id),
+            str(child_a),
+        )
+        assert queued_regrade.status.value == "queued"
+        assert await worker.run_once() is True
+        finished_regrade = await repository.get_question_grading_job(
+            str(work.attempt.id),
+            str(first_question.id),
+            str(regrade_receipt.job.id),
+            str(child_a),
+        )
+        assert finished_regrade.status.value == "succeeded"
+        regraded_results = await repository.get_attempt_results(
+            str(work.attempt.id),
+            str(child_a),
+        )
+        assert len(regraded_results.results) == 1
+        assert regraded_results.results[0].id == original_result_id
         partially_reopened = await repository.get_attempt_work(
             str(work.attempt.id),
             str(child_a),
         )
         assert partially_reopened.submitted_question_ids == [first_question.id]
+        assert next(
+            response
+            for response in partially_reopened.responses
+            if response.question_id == first_question.id
+        ).id == saved.id
 
         receipt = await repository.submit_attempt(
             str(work.attempt.id),

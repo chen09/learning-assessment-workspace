@@ -1120,6 +1120,179 @@ class PostgresRepository:
             job=_job(job_row),
         )
 
+    async def regrade_question(
+        self,
+        attempt_id: str,
+        question_id: str,
+        child_id: str,
+        idempotency_key: str,
+    ) -> QuestionSubmissionReceipt:
+        async with self._engine.begin() as connection:
+            answer_result = await connection.execute(
+                text(
+                    """
+                    select at.id, at.family_id
+                    from public.attempts at
+                    join public.assignments a on a.id = at.assignment_id
+                    join public.questions q
+                      on q.question_set_id = a.question_set_id
+                    join public.responses r
+                      on r.attempt_id = at.id and r.question_id = q.id
+                    join public.question_results qr
+                      on qr.attempt_id = at.id and qr.question_id = q.id
+                    where at.id = :attempt_id
+                      and at.child_id = :child_id
+                      and q.id = :question_id
+                    for update of at
+                    """
+                ),
+                {
+                    "attempt_id": _uuid(attempt_id),
+                    "child_id": _uuid(child_id),
+                    "question_id": _uuid(question_id),
+                },
+            )
+            answer_row = answer_result.mappings().one_or_none()
+            if answer_row is None:
+                raise NotFoundError
+            idempotent_result = await connection.execute(
+                text(
+                    """
+                    select id, family_id, subject_id, type, status,
+                           attempt_count, created_at, completed_at
+                    from public.jobs
+                    where type = 'grade_submission'
+                      and subject_id = :attempt_id
+                      and payload ->> 'question_id' = :question_id
+                      and payload ->> 'idempotency_key' = :idempotency_key
+                      and payload ->> 'regrade' = 'true'
+                    order by created_at desc
+                    limit 1
+                    """
+                ),
+                {
+                    "attempt_id": _uuid(attempt_id),
+                    "question_id": question_id,
+                    "idempotency_key": idempotency_key,
+                },
+            )
+            idempotent_job = idempotent_result.mappings().one_or_none()
+            if idempotent_job is not None:
+                return QuestionSubmissionReceipt(
+                    attempt_id=_uuid(attempt_id),
+                    question_id=_uuid(question_id),
+                    job=_job(idempotent_job),
+                )
+            active_result = await connection.execute(
+                text(
+                    """
+                    select j.id, j.family_id, j.subject_id, j.type, j.status,
+                           j.attempt_count, j.created_at, j.completed_at
+                    from public.question_submissions qs
+                    join public.jobs j on j.id = qs.job_id
+                    where qs.attempt_id = :attempt_id
+                      and qs.question_id = :question_id
+                      and j.status in ('queued', 'running')
+                    """
+                ),
+                {
+                    "attempt_id": _uuid(attempt_id),
+                    "question_id": _uuid(question_id),
+                },
+            )
+            active_job = active_result.mappings().one_or_none()
+            if active_job is not None:
+                return QuestionSubmissionReceipt(
+                    attempt_id=_uuid(attempt_id),
+                    question_id=_uuid(question_id),
+                    job=_job(active_job),
+                )
+            job_result = await connection.execute(
+                text(
+                    """
+                    insert into public.jobs (
+                      family_id, type, subject_id, payload
+                    ) values (
+                      :family_id, 'grade_submission', :attempt_id,
+                      jsonb_build_object(
+                        'scope', 'question',
+                        'question_id', cast(:question_id as text),
+                        'idempotency_key', cast(:idempotency_key as text),
+                        'regrade', true
+                      )
+                    )
+                    returning id, family_id, subject_id, type, status,
+                              attempt_count, created_at, completed_at
+                    """
+                ),
+                {
+                    "family_id": answer_row["family_id"],
+                    "attempt_id": _uuid(attempt_id),
+                    "question_id": question_id,
+                    "idempotency_key": idempotency_key,
+                },
+            )
+            job_row = job_result.mappings().one()
+            await connection.execute(
+                text(
+                    """
+                    insert into public.question_submissions (
+                      family_id, attempt_id, question_id, job_id
+                    ) values (
+                      :family_id, :attempt_id, :question_id, :job_id
+                    )
+                    on conflict (attempt_id, question_id) do update
+                    set job_id = excluded.job_id,
+                        submitted_at = now()
+                    """
+                ),
+                {
+                    "family_id": answer_row["family_id"],
+                    "attempt_id": _uuid(attempt_id),
+                    "question_id": _uuid(question_id),
+                    "job_id": job_row["id"],
+                },
+            )
+        return QuestionSubmissionReceipt(
+            attempt_id=_uuid(attempt_id),
+            question_id=_uuid(question_id),
+            job=_job(job_row),
+        )
+
+    async def get_question_grading_job(
+        self,
+        attempt_id: str,
+        question_id: str,
+        job_id: str,
+        child_id: str,
+    ) -> Job:
+        async with self._engine.connect() as connection:
+            result = await connection.execute(
+                text(
+                    """
+                    select j.id, j.family_id, j.subject_id, j.type, j.status,
+                           j.attempt_count, j.created_at, j.completed_at
+                    from public.jobs j
+                    join public.attempts at on at.id = j.subject_id
+                    where j.id = :job_id
+                      and j.subject_id = :attempt_id
+                      and at.child_id = :child_id
+                      and j.type = 'grade_submission'
+                      and j.payload ->> 'question_id' = :question_id
+                    """
+                ),
+                {
+                    "job_id": _uuid(job_id),
+                    "attempt_id": _uuid(attempt_id),
+                    "child_id": _uuid(child_id),
+                    "question_id": question_id,
+                },
+            )
+            row = result.mappings().one_or_none()
+        if row is None:
+            raise NotFoundError
+        return _job(row)
+
     async def submit_attempt(
         self,
         attempt_id: str,

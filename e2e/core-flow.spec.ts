@@ -708,6 +708,35 @@ test("parent creation reaches child grading and correction through the API", asy
     page.getByRole("button", { name: "清除手写内容" }),
   ).toBeDisabled();
 
+  const originalWorkUrl = page.url();
+  const regradeResponse = page.waitForResponse(
+    (response) =>
+      response
+        .url()
+        .startsWith(
+          `${apiBaseUrl}/v1/attempts/${originalAttemptId}/questions/`,
+        ) &&
+      response.url().endsWith("/regrade") &&
+      response.request().method() === "POST",
+  );
+  await page
+    .getByRole("button", { name: "保留答案并重新评判" })
+    .click();
+  expect((await regradeResponse).status()).toBe(202);
+  await expect(page.getByText("正在批改这一题…")).toBeVisible();
+  const regradeProcessedResponse = await request.post(
+    `${apiBaseUrl}/v1/demo/jobs/process-next`,
+    { headers: parentHeaders },
+  );
+  expect(regradeProcessedResponse.ok()).toBeTruthy();
+  await expect(page.getByText("请补充完整的句子。")).toBeVisible({
+    timeout: 30_000,
+  });
+  expect(page.url()).toBe(originalWorkUrl);
+  await expect(
+    page.getByRole("button", { name: "清除手写内容" }),
+  ).toBeDisabled();
+
   await page
     .getByRole("button", { name: "清空并重做这一题" })
     .click();

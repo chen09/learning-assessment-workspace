@@ -656,6 +656,42 @@ export async function submitQuestion(
   );
 }
 
+export async function regradeQuestion(
+  attemptId: string,
+  questionId: string,
+  childToken: string,
+  idempotencyKey: string,
+) {
+  return apiRequest<{
+    attempt_id: string;
+    question_id: string;
+    job: { id: string; status: string };
+  }>(
+    `/v1/attempts/${encodeURIComponent(attemptId)}/questions/${encodeURIComponent(questionId)}/regrade`,
+    {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+    },
+    childToken,
+  );
+}
+
+export async function getQuestionGradingJob(
+  attemptId: string,
+  questionId: string,
+  jobId: string,
+  childToken: string,
+) {
+  return apiRequest<{
+    id: string;
+    status: "queued" | "running" | "succeeded" | "failed";
+  }>(
+    `/v1/attempts/${encodeURIComponent(attemptId)}/questions/${encodeURIComponent(questionId)}/grading-jobs/${encodeURIComponent(jobId)}`,
+    { method: "GET" },
+    childToken,
+  );
+}
+
 export type GradingAnnotation = {
   kind: "box" | "underline" | "cross";
   x: number;

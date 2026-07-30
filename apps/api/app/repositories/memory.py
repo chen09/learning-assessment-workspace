@@ -520,6 +520,91 @@ class MemoryRepository:
             job=job,
         )
 
+    async def regrade_question(
+        self,
+        attempt_id: str,
+        question_id: str,
+        child_id: str,
+        idempotency_key: str,
+    ) -> QuestionSubmissionReceipt:
+        attempt = self.attempts.get(attempt_id)
+        question = self.questions.get(question_id)
+        existing_results = self.question_results.get(attempt_id, [])
+        has_result = any(
+            str(result.question_id) == question_id for result in existing_results
+        )
+        if (
+            attempt is None
+            or question is None
+            or str(attempt.child_id) != child_id
+            or question.family_id != attempt.family_id
+            or (attempt_id, question_id) not in self.responses
+            or not has_result
+        ):
+            raise NotFoundError
+        for job in self.jobs.values():
+            if (
+                str(job.subject_id) == attempt_id
+                and job.payload.get("question_id") == question_id
+                and job.payload.get("idempotency_key") == idempotency_key
+            ):
+                return QuestionSubmissionReceipt(
+                    attempt_id=attempt.id,
+                    question_id=question.id,
+                    job=job,
+                )
+        current_job_id = self.question_submissions.get((attempt_id, question_id))
+        current_job = (
+            self.jobs.get(current_job_id) if current_job_id is not None else None
+        )
+        if current_job is not None and current_job.status in {
+            JobStatus.QUEUED,
+            JobStatus.RUNNING,
+        }:
+            return QuestionSubmissionReceipt(
+                attempt_id=attempt.id,
+                question_id=question.id,
+                job=current_job,
+            )
+        job = Job(
+            family_id=attempt.family_id,
+            subject_id=attempt.id,
+            payload={
+                "scope": "question",
+                "question_id": question_id,
+                "idempotency_key": idempotency_key,
+                "regrade": True,
+            },
+        )
+        self.jobs[str(job.id)] = job
+        self.question_submissions[(attempt_id, question_id)] = str(job.id)
+        return QuestionSubmissionReceipt(
+            attempt_id=attempt.id,
+            question_id=question.id,
+            job=job,
+        )
+
+    async def get_question_grading_job(
+        self,
+        attempt_id: str,
+        question_id: str,
+        job_id: str,
+        child_id: str,
+    ) -> Job:
+        attempt = self.attempts.get(attempt_id)
+        question = self.questions.get(question_id)
+        job = self.jobs.get(job_id)
+        if (
+            attempt is None
+            or question is None
+            or job is None
+            or str(attempt.child_id) != child_id
+            or str(job.subject_id) != attempt_id
+            or job.payload.get("question_id") != question_id
+        ):
+            raise NotFoundError
+        return job
+
     async def submit_attempt(
         self,
         attempt_id: str,
@@ -604,19 +689,32 @@ class MemoryRepository:
         results: list[QuestionResult],
     ) -> Job:
         existing_results = self.question_results.get(str(job.subject_id), [])
-        graded_question_ids = {str(result.question_id) for result in results}
+        existing_by_question = {
+            str(result.question_id): result for result in existing_results
+        }
+        stable_results = [
+            result.model_copy(
+                update={"id": existing_by_question[str(result.question_id)].id}
+            )
+            if str(result.question_id) in existing_by_question
+            else result
+            for result in results
+        ]
+        graded_question_ids = {
+            str(result.question_id) for result in stable_results
+        }
         self.question_results[str(job.subject_id)] = [
             result
             for result in existing_results
             if str(result.question_id) not in graded_question_ids
-        ] + results
+        ] + stable_results
         self.jobs[str(job.id)] = job
         attempt = self.attempts[str(job.subject_id)]
         assignment = self.assignments[str(attempt.assignment_id)]
         if attempt.submitted_at is not None:
             assignment.status = AssignmentStatus.RESULTS_READY
         self.assignments[str(assignment.id)] = assignment
-        for result in results:
+        for result in stable_results:
             if result.outcome.value != "incorrect":
                 continue
             question = self.questions[str(result.question_id)]
