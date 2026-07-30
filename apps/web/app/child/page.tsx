@@ -13,16 +13,6 @@ import {
   getTodayReviews,
 } from "@/lib/api-client";
 
-const demoAssignment: ChildAssignmentSummary = {
-  id: "demo",
-  title: "Algebra & English warm-up",
-  status: "in_progress",
-  mode: "practice",
-  time_limit_seconds: null,
-  question_count: 3,
-  latest_attempt_id: null,
-};
-
 function assignmentHref(assignment: ChildAssignmentSummary) {
   if (
     assignment.latest_attempt_id &&
@@ -48,29 +38,40 @@ export default function ChildHomePage() {
 
 function ChildHomeContent() {
   const { t } = useLanguage();
-  const [assignments, setAssignments] = useState<ChildAssignmentSummary[]>([
-    demoAssignment,
-  ]);
-  const [reviewCount, setReviewCount] = useState(3);
-  const [connected, setConnected] = useState(false);
+  const [assignments, setAssignments] = useState<ChildAssignmentSummary[]>([]);
+  const [reviewCount, setReviewCount] = useState(0);
+  const [loadState, setLoadState] = useState<
+    "loading" | "ready" | "signed-out" | "error"
+  >("loading");
 
   useEffect(() => {
-    const childToken = getChildAccessToken();
-    if (!childToken) {
-      return;
-    }
-    void Promise.all([
-      getChildAssignments(childToken),
-      getTodayReviews(childToken),
-    ])
-      .then(([loadedAssignments, reviews]) => {
+    let active = true;
+    void (async () => {
+      const childToken = getChildAccessToken();
+      if (!childToken) {
+        setLoadState("signed-out");
+        return;
+      }
+      try {
+        const [loadedAssignments, reviews] = await Promise.all([
+          getChildAssignments(childToken),
+          getTodayReviews(childToken),
+        ]);
+        if (!active) {
+          return;
+        }
         setAssignments(loadedAssignments);
         setReviewCount(reviews.length);
-        setConnected(true);
-      })
-      .catch(() => {
-        setConnected(false);
-      });
+        setLoadState("ready");
+      } catch {
+        if (active) {
+          setLoadState("error");
+        }
+      }
+    })();
+    return () => {
+      active = false;
+    };
   }, []);
 
   const current = assignments[0];
@@ -113,7 +114,15 @@ function ChildHomeContent() {
         </span>
       </header>
 
-      {current ? (
+      {loadState === "loading" ? (
+        <section className="continue-card">
+          <div className="continue-copy">
+            <span className="status-pill">{t("worksheet.loading")}</span>
+            <h2>{t("worksheet.loadingTitle")}</h2>
+            <p>{t("worksheet.loadingBody")}</p>
+          </div>
+        </section>
+      ) : current ? (
         <section className="continue-card">
           <div className="continue-copy">
             <span className="status-pill warm">
@@ -159,9 +168,23 @@ function ChildHomeContent() {
       ) : (
         <section className="continue-card">
           <div className="continue-copy">
-            <span className="status-pill">{t("childHome.allClear")}</span>
-            <h2>{t("childHome.noAssigned")}</h2>
-            <p>{t("childHome.parentCanAssign")}</p>
+            <span className="status-pill">
+              {loadState === "ready"
+                ? t("childHome.allClear")
+                : t("worksheet.unavailable")}
+            </span>
+            <h2>
+              {loadState === "ready"
+                ? t("childHome.noAssigned")
+                : loadState === "signed-out"
+                  ? t("worksheet.signInRequired")
+                  : t("worksheet.loadError")}
+            </h2>
+            <p>
+              {loadState === "ready"
+                ? t("childHome.parentCanAssign")
+                : t("worksheet.tryAgain")}
+            </p>
           </div>
         </section>
       )}
@@ -181,11 +204,6 @@ function ChildHomeContent() {
             : t("childHome.viewReview")}
         </Link>
       </section>
-      {!connected ? (
-        <p className="settings-note">
-          {t("childHome.localDemo")}
-        </p>
-      ) : null}
     </>
   );
 }

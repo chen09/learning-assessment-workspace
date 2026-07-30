@@ -63,4 +63,15 @@ describe("ChildHomePage", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText("Ready for a small win?")).not.toBeInTheDocument();
   });
+
+  it("does not show a synthetic assignment while real data is loading", () => {
+    mocks.getChildAssignments.mockReturnValue(new Promise(() => {}));
+    mocks.getTodayReviews.mockReturnValue(new Promise(() => {}));
+
+    render(<ChildHomePage />);
+
+    expect(
+      screen.queryByRole("heading", { name: "Algebra & English warm-up" }),
+    ).not.toBeInTheDocument();
+  });
 });

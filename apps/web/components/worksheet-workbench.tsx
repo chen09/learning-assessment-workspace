@@ -31,6 +31,7 @@ import {
   createChildUploadIntent,
   getAttemptWork,
   getChildAccessToken,
+  getChildAssignments,
   saveAttemptResponse,
   startAssignment,
   submitAttempt,
@@ -65,51 +66,6 @@ type Answer = {
   photoPaths?: string[];
 };
 
-const demoQuestions: Question[] = [
-  {
-    id: "algebra-choice",
-    number: 1,
-    type: "choice",
-    subject: "Algebra · Foundation",
-    prompt: "Choose the correct expansion of (a + b)(a − b).",
-    options: ["a² − b²", "a² + b²", "a² − 2ab + b²"],
-    points: 1,
-  },
-  {
-    id: "english-fill",
-    number: 2,
-    type: "text",
-    subject: "English · Present simple",
-    prompt: "Complete: She ___ to school every day.",
-    points: 1,
-  },
-  {
-    id: "algebra-proof",
-    number: 3,
-    type: "handwriting",
-    subject: "Algebra · Show your work",
-    prompt: "Show why (a + b)(a − b) = a² − b².",
-    points: 2,
-  },
-  {
-    id: "math-photo",
-    number: 4,
-    type: "photo",
-    subject: "Mathematics · Paper response",
-    prompt: "Solve 3(x − 2) = 12 on paper, then photograph your work.",
-    points: 2,
-  },
-  {
-    id: "english-listening",
-    number: 5,
-    type: "listening",
-    subject: "English · Listening",
-    prompt: "Listen and choose where the speaker goes every morning.",
-    options: ["The library", "School", "The station"],
-    points: 1,
-  },
-];
-
 export function WorksheetWorkbench() {
   return (
     <AppShell currentPath="/child/work/" role="child">
@@ -120,8 +76,11 @@ export function WorksheetWorkbench() {
 
 function WorksheetWorkbenchContent() {
   const { t } = useLanguage();
-  const [title, setTitle] = useState("Algebra & English warm-up");
-  const [questions, setQuestions] = useState<Question[]>(demoQuestions);
+  const [title, setTitle] = useState("");
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [loadState, setLoadState] = useState<
+    "loading" | "ready" | "empty" | "signed-out" | "error"
+  >("loading");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [mode, setMode] = useState<"focus" | "sheet">("focus");
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
@@ -145,14 +104,48 @@ function WorksheetWorkbenchContent() {
     const assignmentId = params.get("assignmentId");
     const existingAttemptId = params.get("attemptId");
     const token = getChildAccessToken();
-    if ((!assignmentId && !existingAttemptId) || !token) {
-      return;
-    }
-    const loadWork = existingAttemptId
-      ? getAttemptWork(existingAttemptId, token)
-      : startAssignment(assignmentId!, token);
-    void loadWork
-      .then((work) => {
+    let active = true;
+
+    void (async () => {
+      if (!token) {
+        setLoadState("signed-out");
+        return;
+      }
+      try {
+        let work;
+        if (existingAttemptId) {
+          work = await getAttemptWork(existingAttemptId, token);
+        } else if (assignmentId) {
+          work = await startAssignment(assignmentId, token);
+        } else {
+          const assignments = await getChildAssignments(token);
+          const current = assignments[0];
+          if (!current) {
+            if (active) {
+              setLoadState("empty");
+            }
+            return;
+          }
+          if (
+            current.latest_attempt_id &&
+            ["grading", "results_ready", "submitted", "completed"].includes(
+              current.status,
+            )
+          ) {
+            window.location.assign(
+              `/child/results/?attemptId=${encodeURIComponent(
+                current.latest_attempt_id,
+              )}`,
+            );
+            return;
+          }
+          work = current.latest_attempt_id
+            ? await getAttemptWork(current.latest_attempt_id, token)
+            : await startAssignment(current.id, token);
+        }
+        if (!active) {
+          return;
+        }
         setTitle(work.title);
         setChildToken(token);
         setAttemptId(work.attempt.id);
@@ -181,9 +174,24 @@ function WorksheetWorkbenchContent() {
             points: question.points,
           })),
         );
-        return syncPendingDrafts(token);
-      })
-      .catch(() => setSaveStatus("offline"));
+        setLoadState("ready");
+        window.history.replaceState(
+          {},
+          "",
+          `/child/work/?attemptId=${encodeURIComponent(work.attempt.id)}`,
+        );
+        void syncPendingDrafts(token).catch(() => setSaveStatus("offline"));
+      } catch {
+        if (active) {
+          setLoadState("error");
+          setSaveStatus("offline");
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -638,6 +646,40 @@ function WorksheetWorkbenchContent() {
       {renderResponse(question)}
     </article>
   );
+
+  if (loadState !== "ready") {
+    const isEmpty = loadState === "empty";
+    const isLoading = loadState === "loading";
+    return (
+      <section className="continue-card">
+        <div className="continue-copy">
+          <span className="status-pill">
+            {isLoading
+              ? t("worksheet.loading")
+              : isEmpty
+                ? t("childHome.allClear")
+                : t("worksheet.unavailable")}
+          </span>
+          <h1>
+            {isLoading
+              ? t("worksheet.loadingTitle")
+              : isEmpty
+                ? t("childHome.noAssigned")
+                : loadState === "signed-out"
+                  ? t("worksheet.signInRequired")
+                  : t("worksheet.loadError")}
+          </h1>
+          <p>
+            {isLoading
+              ? t("worksheet.loadingBody")
+              : isEmpty
+                ? t("childHome.parentCanAssign")
+                : t("worksheet.tryAgain")}
+          </p>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <>
