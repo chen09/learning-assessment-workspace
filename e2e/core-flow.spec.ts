@@ -177,6 +177,33 @@ test("child screens stay responsive across Chinese, Japanese, and English", asyn
   await page.getByLabel("语言").selectOption("ja");
   await expect(page.getByText("今日の練習")).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "ja");
+  const worksheetReadability = await page
+    .locator(".question-card")
+    .evaluate((card) => {
+      const cardStyle = window.getComputedStyle(card);
+      const eyebrow = card.querySelector<HTMLElement>(".eyebrow");
+      const meta = card.querySelector<HTMLElement>("header span");
+
+      return {
+        backgroundImage: cardStyle.backgroundImage,
+        backgroundSize: cardStyle.backgroundSize,
+        eyebrowFontSize: Number.parseFloat(
+          window.getComputedStyle(eyebrow!).fontSize,
+        ),
+        metaFontSize: Number.parseFloat(
+          window.getComputedStyle(meta!).fontSize,
+        ),
+      };
+    });
+  expect(worksheetReadability.backgroundImage).toContain("0.08");
+  expect(worksheetReadability.backgroundSize).toContain("32px 32px");
+  expect(worksheetReadability.eyebrowFontSize).toBeGreaterThanOrEqual(13.5);
+  expect(worksheetReadability.metaFontSize).toBeGreaterThanOrEqual(14);
+  await expect(page.locator(".exam-toggle")).toHaveCSS(
+    "white-space",
+    "nowrap",
+  );
+  await expect(page.locator(".save-state")).toHaveCSS("white-space", "nowrap");
   await expectNoHorizontalOverflow();
 
   await page.goto("/child/submitted/");
