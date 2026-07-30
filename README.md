@@ -84,7 +84,9 @@ FastAPI only to `127.0.0.1:8010`; the matching host Nginx template is under
 `deploy/nginx`. The API and single-concurrency worker run in Docker on the
 shared 8G VPS, behind the HTTPS-only `api.study.hypnochunk.com` virtual host.
 The worker image includes the pinned Codex CLI, but the adapter is enabled only
-after a private server-side device login and `AI_PROVIDER=codex_cli`.
+after a private server-side device login, `AI_PROVIDER=codex_cli`, and an
+explicit family UUID allowlist in `CODEX_FAMILY_IDS`. An empty allowlist sends no
+learner response to Codex.
 The host has persistent Swap and container memory limits. Field-limited browser
 API errors are stored under `/opt/learning-assessment/logs` with bounded file
 rotation; request bodies, credentials, PINs, and URL query strings are excluded.

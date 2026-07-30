@@ -30,6 +30,7 @@ async def run() -> None:
         handler=partial(
             fixture_job_handler,
             visual_adapter=visual_adapter,
+            allowed_visual_family_ids=frozenset(settings.codex_family_ids),
             minimum_confidence=settings.ai_minimum_confidence,
         ),
     )
