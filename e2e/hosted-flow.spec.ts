@@ -367,6 +367,28 @@ test("temporary parent completes the hosted family learning flow", async ({
       })
       .click();
     await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+    const singleQuestionSubmission = page.waitForResponse(
+      (response) =>
+        /\/v1\/attempts\/[^/]+\/questions\/[^/]+\/submit$/.test(
+          response.url(),
+        ) &&
+        response.request().method() === "POST",
+    );
+    await page
+      .getByRole("button", { name: "Submit this answer for grading" })
+      .click();
+    await page
+      .getByRole("button", { name: "Confirm single-answer submission" })
+      .click();
+    expect((await singleQuestionSubmission).status()).toBe(202);
+    await expect(
+      page.getByRole("button", {
+        name: "This answer has been submitted",
+      }),
+    ).toBeDisabled();
+    await expect(page.getByText("Correct.", { exact: true })).toBeVisible({
+      timeout: 45_000,
+    });
     await page.getByRole("button", { name: "Next question" }).click();
     await page.getByLabel("Your answer").fill("play");
     await expect(page.getByText("Saved", { exact: true })).toBeVisible();
