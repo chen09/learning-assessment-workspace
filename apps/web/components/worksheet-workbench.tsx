@@ -36,6 +36,7 @@ import {
   submitAttempt,
   uploadToSignedUrl,
 } from "@/lib/api-client";
+import { getAvailableWordOrderTokens } from "@/lib/word-order";
 
 type Question = {
   id: string;
@@ -402,8 +403,9 @@ function WorksheetWorkbenchContent() {
     }
     if (question.type === "word_order") {
       const selectedTokens = answer.tokens ?? [];
-      const available = (question.options ?? []).filter(
-        (token) => !selectedTokens.includes(token),
+      const available = getAvailableWordOrderTokens(
+        question.options ?? [],
+        selectedTokens,
       );
       return (
         <div className="typed-answer">
@@ -412,10 +414,10 @@ function WorksheetWorkbenchContent() {
             {selectedTokens.join(" ") || t("worksheet.chooseWords")}
           </p>
           <div className="header-actions">
-            {available.map((token) => (
+            {available.map((token, index) => (
                 <button
                   className="button ghost"
-                  key={token}
+                  key={`${token}-${index}`}
                   onClick={() =>
                     updateAnswer(question.id, {
                       tokens: [...selectedTokens, token],
