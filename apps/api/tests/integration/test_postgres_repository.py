@@ -397,7 +397,10 @@ async def test_postgres_vertical_flow_and_family_isolation() -> None:
         finally:
             await review_connection.close()
         reviews = await repository.list_due_reviews(str(child_a))
-        assert len(reviews) == 3
+        # A visual answer that still needs a parent decision must not enter
+        # spaced review yet. When local Storage is unavailable, the fallback
+        # path has three deterministic incorrect results instead.
+        assert len(reviews) == (2 if uploaded_path else 3)
         completion = await repository.complete_review(
             str(reviews[0].id),
             str(child_a),
