@@ -656,6 +656,15 @@ export async function submitQuestion(
   );
 }
 
+export type GradingAnnotation = {
+  kind: "box" | "underline" | "cross";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  label: string;
+};
+
 export type AttemptResult = {
   id: string;
   question_id: string;
@@ -665,6 +674,8 @@ export type AttemptResult = {
   feedback: {
     summary?: string;
     action?: string;
+    evidence?: string[];
+    annotations?: GradingAnnotation[];
   };
 };
 
@@ -768,6 +779,22 @@ export async function createCorrectionAttempt(
 ) {
   return apiRequest<AssignmentWork>(
     `/v1/attempts/${encodeURIComponent(attemptId)}/correction`,
+    {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+    },
+    childToken,
+  );
+}
+
+export async function createQuestionRetry(
+  attemptId: string,
+  questionId: string,
+  childToken: string,
+  idempotencyKey: string,
+) {
+  return apiRequest<AssignmentWork>(
+    `/v1/attempts/${encodeURIComponent(attemptId)}/questions/${encodeURIComponent(questionId)}/retry`,
     {
       method: "POST",
       headers: { "Idempotency-Key": idempotencyKey },

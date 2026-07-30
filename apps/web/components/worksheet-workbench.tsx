@@ -33,6 +33,7 @@ import {
   type AttemptResult,
   type AssignmentWork,
   createChildUploadIntent,
+  createQuestionRetry,
   getAttemptResults,
   getAttemptWork,
   getChildAccessToken,
@@ -148,6 +149,27 @@ function restoreAnswer(
   };
 }
 
+function questionFromApi(question: ApiQuestion): Question {
+  return {
+    id: question.id,
+    number: question.position,
+    type:
+      question.type === "single_choice"
+        ? "choice"
+        : question.type === "multiple_choice"
+          ? "multiple_choice"
+          : question.type === "word_order"
+            ? "word_order"
+            : question.type === "typed_text"
+              ? "text"
+              : question.type,
+    subject: "",
+    prompt: question.prompt,
+    options: question.options ?? undefined,
+    points: question.points,
+  };
+}
+
 export function WorksheetWorkbench() {
   return (
     <AppShell currentPath="/child/work/" role="child">
@@ -189,12 +211,17 @@ function WorksheetWorkbenchContent() {
   const [submissionConfirmation, setSubmissionConfirmation] = useState<
     "question" | "all" | null
   >(null);
+  const [isRetryAttempt, setIsRetryAttempt] = useState(false);
+  const [retryingQuestionId, setRetryingQuestionId] = useState<string | null>(
+    null,
+  );
   const currentQuestion = questions[currentIndex];
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const assignmentId = params.get("assignmentId");
     const existingAttemptId = params.get("attemptId");
+    const retryAttempt = params.get("retry") === "1";
     const token = getChildAccessToken();
     let active = true;
 
@@ -271,26 +298,8 @@ function WorksheetWorkbenchContent() {
         );
         const submittedIds = work.submitted_question_ids ?? [];
         setSubmittedQuestionIds(submittedIds);
-        setQuestions(
-          work.questions.map((question) => ({
-            id: question.id,
-            number: question.position,
-            type:
-              question.type === "single_choice"
-                ? "choice"
-                : question.type === "multiple_choice"
-                  ? "multiple_choice"
-                  : question.type === "word_order"
-                    ? "word_order"
-                : question.type === "typed_text"
-                  ? "text"
-                  : question.type,
-            subject: "",
-            prompt: question.prompt,
-            options: question.options ?? undefined,
-            points: question.points,
-          })),
-        );
+        setQuestions(work.questions.map(questionFromApi));
+        setIsRetryAttempt(retryAttempt);
         setLoadState("ready");
         if (submittedIds.length > 0) {
           void getAttemptResults(work.attempt.id, token)
@@ -312,7 +321,9 @@ function WorksheetWorkbenchContent() {
         window.history.replaceState(
           {},
           "",
-          `/child/work/?attemptId=${encodeURIComponent(work.attempt.id)}`,
+          `/child/work/?attemptId=${encodeURIComponent(work.attempt.id)}${
+            retryAttempt ? "&retry=1" : ""
+          }`,
         );
         void syncPendingDrafts(token).catch(() => setSaveStatus("offline"));
       } catch {
@@ -532,6 +543,46 @@ function WorksheetWorkbenchContent() {
       void waitForQuestionResult(questionId);
     } catch {
       setSaveStatus("offline");
+    }
+  }
+
+  async function redoQuestion(question: Question) {
+    if (!attemptId || !childToken || retryingQuestionId) {
+      return;
+    }
+    setRetryingQuestionId(question.id);
+    try {
+      const work = await createQuestionRetry(
+        attemptId,
+        question.id,
+        childToken,
+        `retry-${attemptId}-${question.id}`,
+      );
+      setTitle(work.title);
+      setAttemptId(work.attempt.id);
+      setFamilyId(work.assignment.family_id);
+      setQuestions(work.questions.map(questionFromApi));
+      setAnswers({});
+      setResponseVersions({});
+      setSubmittedQuestionIds([]);
+      setQuestionResults({});
+      setGradingQuestionIds([]);
+      setSubmissionConfirmation(null);
+      setCurrentIndex(0);
+      setMode("focus");
+      setIsRetryAttempt(true);
+      setSaveStatus("idle");
+      window.history.replaceState(
+        {},
+        "",
+        `/child/work/?attemptId=${encodeURIComponent(
+          work.attempt.id,
+        )}&retry=1`,
+      );
+    } catch {
+      setSaveStatus("offline");
+    } finally {
+      setRetryingQuestionId(null);
     }
   }
 
@@ -799,12 +850,16 @@ function WorksheetWorkbenchContent() {
     }
     return (
       <HandwritingCanvas
+        annotations={
+          questionResults[question.id]?.feedback.annotations
+        }
         initialSize={answer.canvasSize}
         initialStrokes={answer.strokes}
-        key={question.id}
+        key={`${attemptId ?? "demo-attempt"}:${question.id}`}
         onChange={(strokes, canvasSize) =>
           updateAnswer(question.id, { strokes, canvasSize })
         }
+        readOnly={submittedQuestionIds.includes(question.id)}
       />
     );
   };
@@ -874,7 +929,21 @@ function WorksheetWorkbenchContent() {
               : result?.feedback.summary ??
                 resultLabel(result?.outcome)}
           </strong>
-          {!grading && result ? <p>{resultAction(result.outcome)}</p> : null}
+          {!grading && result ? (
+            <>
+              <p>{resultAction(result.outcome)}</p>
+              <button
+                className="button ghost"
+                disabled={retryingQuestionId !== null}
+                onClick={() => void redoQuestion(question)}
+                type="button"
+              >
+                {retryingQuestionId === question.id
+                  ? t("worksheet.preparingRedo")
+                  : t("worksheet.redoQuestion")}
+              </button>
+            </>
+          ) : null}
         </div>
       ) : null}
     </article>
@@ -1075,17 +1144,23 @@ function WorksheetWorkbenchContent() {
               <Check size={16} aria-hidden="true" />
               {submittedQuestionIds.includes(currentQuestion.id)
                 ? t("worksheet.questionSubmitted")
-                : t("worksheet.submitQuestion")}
+                : t(
+                    isRetryAttempt
+                      ? "worksheet.submitQuestionAgain"
+                      : "worksheet.submitQuestion",
+                  )}
             </button>
-            <button
-              className="button primary"
-              disabled={saveStatus === "saving"}
-              onClick={() => setSubmissionConfirmation("all")}
-              type="button"
-            >
-              {t("worksheet.submit")}
-              <Send size={16} aria-hidden="true" />
-            </button>
+            {!isRetryAttempt ? (
+              <button
+                className="button primary"
+                disabled={saveStatus === "saving"}
+                onClick={() => setSubmissionConfirmation("all")}
+                type="button"
+              >
+                {t("worksheet.submit")}
+                <Send size={16} aria-hidden="true" />
+              </button>
+            ) : null}
           </div>
 
           <footer className="work-actions">

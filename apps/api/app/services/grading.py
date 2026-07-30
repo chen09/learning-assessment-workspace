@@ -1,6 +1,6 @@
 import unicodedata
 from datetime import UTC, datetime
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 from app.ai.contracts import (
     GeneratedQuestion,
@@ -30,6 +30,32 @@ class VisualGradingAdapter(Protocol):
 def normalize_exact_text(value: object) -> str:
     normalized = unicodedata.normalize("NFKC", str(value))
     return " ".join(normalized.split()).casefold()
+
+
+def localized_feedback_action(
+    language: Literal["en", "ja", "zh"],
+    outcome: GradingOutcome,
+) -> str:
+    actions = {
+        "en": {
+            GradingOutcome.CORRECT: "Continue to the next question.",
+            GradingOutcome.INCORRECT: "Review the feedback and try this question again.",
+            "review": "Ask a parent to confirm this answer.",
+        },
+        "ja": {
+            GradingOutcome.CORRECT: "次の問題へ進んでください。",
+            GradingOutcome.INCORRECT: (
+                "フィードバックを確認して、この問題をもう一度解いてください。"
+            ),
+            "review": "保護者にこの答えを確認してもらってください。",
+        },
+        "zh": {
+            GradingOutcome.CORRECT: "继续做下一题。",
+            GradingOutcome.INCORRECT: "查看批语后，重新完成这道题。",
+            "review": "请家长确认这份答案。",
+        },
+    }
+    return actions[language].get(outcome, actions[language]["review"])
 
 
 class FixtureGrader:
@@ -163,6 +189,7 @@ def grade_response_with_ai(
     visual_adapter: VisualGradingAdapter | None,
     grading_guide: str = "",
     minimum_confidence: float = 0.75,
+    feedback_language: Literal["en", "ja", "zh"] = "en",
 ) -> QuestionResult:
     if (
         visual_adapter is None
@@ -172,6 +199,7 @@ def grade_response_with_ai(
         return FixtureGrader().grade(job, question, response)
     grade = visual_adapter.grade_response(
         GradeResponseInput(
+            language=feedback_language,
             question=GeneratedQuestion(
                 client_id=str(question.id),
                 type=question.type,
@@ -203,16 +231,11 @@ def grade_response_with_ai(
         confidence=grade.confidence,
         feedback={
             "summary": grade.feedback,
-            "action": (
-                "Continue to the next question."
-                if outcome == GradingOutcome.CORRECT
-                else (
-                    "Review the feedback and try this question again."
-                    if outcome == GradingOutcome.INCORRECT
-                    else "Ask a parent to confirm this answer."
-                )
-            ),
+            "action": localized_feedback_action(feedback_language, outcome),
             "evidence": grade.evidence,
+            "annotations": [
+                annotation.model_dump() for annotation in grade.annotations
+            ],
         },
         grader_version=visual_adapter.version,
     )

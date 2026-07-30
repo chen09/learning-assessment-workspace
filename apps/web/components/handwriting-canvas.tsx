@@ -17,6 +17,7 @@ import {
 } from "react";
 
 import { useLanguage } from "@/components/language-provider";
+import type { GradingAnnotation } from "@/lib/api-client";
 
 type Point = {
   x: number;
@@ -36,9 +37,11 @@ export type CanvasSize = {
 };
 
 type HandwritingCanvasProps = {
+  annotations?: GradingAnnotation[];
   initialSize?: CanvasSize;
   initialStrokes?: Stroke[];
   onChange: (strokes: Stroke[], size: CanvasSize) => void;
+  readOnly?: boolean;
 };
 
 const BASE_CANVAS_SIZE: CanvasSize = { width: 900, height: 420 };
@@ -60,9 +63,11 @@ function normalizeCanvasSize(size: CanvasSize): CanvasSize {
 }
 
 export function HandwritingCanvas({
+  annotations = [],
   initialSize = BASE_CANVAS_SIZE,
   initialStrokes = [],
   onChange,
+  readOnly = false,
 }: HandwritingCanvasProps) {
   const { t } = useLanguage();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -128,6 +133,9 @@ export function HandwritingCanvas({
   };
 
   const startStroke = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    if (readOnly) {
+      return;
+    }
     event.currentTarget.setPointerCapture(event.pointerId);
     drawingRef.current = {
       points: [pointFromEvent(event)],
@@ -137,6 +145,9 @@ export function HandwritingCanvas({
   };
 
   const continueStroke = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    if (readOnly) {
+      return;
+    }
     if (!drawingRef.current) {
       return;
     }
@@ -145,6 +156,10 @@ export function HandwritingCanvas({
   };
 
   const finishStroke = () => {
+    if (readOnly) {
+      drawingRef.current = null;
+      return;
+    }
     const stroke = drawingRef.current;
     if (!stroke) {
       return;
@@ -205,6 +220,7 @@ export function HandwritingCanvas({
           <button
             aria-label={t("handwriting.thinPen")}
             className={!eraser && width === 2.5 ? "active" : ""}
+            disabled={readOnly}
             onClick={() => {
               setEraser(false);
               setWidth(2.5);
@@ -216,6 +232,7 @@ export function HandwritingCanvas({
           <button
             aria-label={t("handwriting.thickPen")}
             className={!eraser && width === 5 ? "active" : ""}
+            disabled={readOnly}
             onClick={() => {
               setEraser(false);
               setWidth(5);
@@ -227,6 +244,7 @@ export function HandwritingCanvas({
           <button
             aria-label={t("handwriting.eraser")}
             className={eraser ? "active" : ""}
+            disabled={readOnly}
             onClick={() => setEraser(true)}
             type="button"
           >
@@ -236,7 +254,9 @@ export function HandwritingCanvas({
         <div>
           <button
             aria-label={t("handwriting.expandRight")}
-            disabled={canvasSize.width >= MAX_CANVAS_SIZE.width}
+            disabled={
+              readOnly || canvasSize.width >= MAX_CANVAS_SIZE.width
+            }
             onClick={() =>
               resizeCanvas({
                 ...canvasSize,
@@ -252,7 +272,9 @@ export function HandwritingCanvas({
           </button>
           <button
             aria-label={t("handwriting.expandDown")}
-            disabled={canvasSize.height >= MAX_CANVAS_SIZE.height}
+            disabled={
+              readOnly || canvasSize.height >= MAX_CANVAS_SIZE.height
+            }
             onClick={() =>
               resizeCanvas({
                 ...canvasSize,
@@ -268,7 +290,7 @@ export function HandwritingCanvas({
           </button>
           <button
             aria-label={t("handwriting.undo")}
-            disabled={!strokes.length}
+            disabled={readOnly || !strokes.length}
             onClick={undo}
             type="button"
           >
@@ -276,7 +298,7 @@ export function HandwritingCanvas({
           </button>
           <button
             aria-label={t("handwriting.redo")}
-            disabled={!redoStack.length}
+            disabled={readOnly || !redoStack.length}
             onClick={redo}
             type="button"
           >
@@ -284,6 +306,7 @@ export function HandwritingCanvas({
           </button>
           <button
             aria-label={t("handwriting.clear")}
+            disabled={readOnly}
             onClick={clear}
             type="button"
           >
@@ -292,21 +315,102 @@ export function HandwritingCanvas({
         </div>
       </div>
       <div className="canvas-scroll">
-        <canvas
-          aria-label={t("handwriting.area")}
-          height={canvasSize.height}
-          onPointerCancel={finishStroke}
-          onPointerDown={startStroke}
-          onPointerMove={continueStroke}
-          onPointerUp={finishStroke}
-          ref={canvasRef}
+        <div
+          className="canvas-stage"
           style={{
             height: `${canvasSize.height}px`,
             width: `${(canvasSize.width / BASE_CANVAS_SIZE.width) * 100}%`,
           }}
-          width={canvasSize.width}
-        />
+        >
+          <canvas
+            aria-label={t("handwriting.area")}
+            aria-readonly={readOnly}
+            height={canvasSize.height}
+            onPointerCancel={finishStroke}
+            onPointerDown={startStroke}
+            onPointerMove={continueStroke}
+            onPointerUp={finishStroke}
+            ref={canvasRef}
+            width={canvasSize.width}
+          />
+          {annotations.length > 0 ? (
+            <svg
+              aria-hidden="true"
+              className="grading-annotation-layer"
+              viewBox={`0 0 ${canvasSize.width} ${canvasSize.height}`}
+            >
+              {annotations.map((annotation, index) => {
+                const x = annotation.x * canvasSize.width;
+                const y = annotation.y * canvasSize.height;
+                const annotationWidth =
+                  annotation.width * canvasSize.width;
+                const annotationHeight =
+                  annotation.height * canvasSize.height;
+                const commonProps = {
+                  "data-grading-annotation": annotation.kind,
+                  vectorEffect: "non-scaling-stroke" as const,
+                };
+                if (annotation.kind === "underline") {
+                  return (
+                    <line
+                      {...commonProps}
+                      key={`${annotation.kind}-${index}`}
+                      x1={x}
+                      x2={x + annotationWidth}
+                      y1={y + annotationHeight}
+                      y2={y + annotationHeight}
+                    />
+                  );
+                }
+                if (annotation.kind === "cross") {
+                  return (
+                    <g
+                      data-grading-annotation={annotation.kind}
+                      key={`${annotation.kind}-${index}`}
+                    >
+                      <line
+                        vectorEffect="non-scaling-stroke"
+                        x1={x}
+                        x2={x + annotationWidth}
+                        y1={y}
+                        y2={y + annotationHeight}
+                      />
+                      <line
+                        vectorEffect="non-scaling-stroke"
+                        x1={x + annotationWidth}
+                        x2={x}
+                        y1={y}
+                        y2={y + annotationHeight}
+                      />
+                    </g>
+                  );
+                }
+                return (
+                  <rect
+                    {...commonProps}
+                    height={annotationHeight}
+                    key={`${annotation.kind}-${index}`}
+                    rx={8}
+                    width={annotationWidth}
+                    x={x}
+                    y={y}
+                  />
+                );
+              })}
+            </svg>
+          ) : null}
+        </div>
       </div>
+      {annotations.length > 0 ? (
+        <ol className="grading-annotation-list">
+          {annotations.map((annotation, index) => (
+            <li key={`${annotation.kind}-${index}-label`}>
+              <span>{index + 1}</span>
+              {annotation.label}
+            </li>
+          ))}
+        </ol>
+      ) : null}
       <p>{t("handwriting.help")}</p>
     </div>
   );

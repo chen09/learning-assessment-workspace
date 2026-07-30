@@ -90,8 +90,8 @@ learner response to Codex.
 The host has persistent Swap and container memory limits. Field-limited browser
 API errors are stored under `/opt/learning-assessment/logs` with bounded file
 rotation; request bodies, credentials, PINs, and URL query strings are excluded.
-Hosted Supabase owns Auth, PostgreSQL, and private Storage; all twelve repository
-migrations are applied.
+Hosted Supabase owns Auth, PostgreSQL, and private Storage; all repository
+migrations are applied before the matching API/Worker release.
 
 This deployment is still a controlled pilot. Google/LINE provider setup, a real
 provider for photo/essay grading, generated listening audio, whole-page paper

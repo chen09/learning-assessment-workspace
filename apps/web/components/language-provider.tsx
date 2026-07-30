@@ -163,7 +163,10 @@ const messages = {
     "worksheet.next": "Next question",
     "worksheet.submit": "Submit all answers",
     "worksheet.submitQuestion": "Submit this answer for grading",
+    "worksheet.submitQuestionAgain": "Submit again for review",
     "worksheet.questionSubmitted": "This answer has been submitted",
+    "worksheet.redoQuestion": "Clear and redo this question",
+    "worksheet.preparingRedo": "Preparing a blank answer…",
     "worksheet.confirmQuestionTitle": "Submit only this answer?",
     "worksheet.confirmQuestionBody":
       "Only question {number} will be submitted. You can continue the other questions, but this answer cannot be changed.",
@@ -479,7 +482,10 @@ const messages = {
     "worksheet.next": "次の問題",
     "worksheet.submit": "すべての答えを提出",
     "worksheet.submitQuestion": "この答えだけ採点に出す",
+    "worksheet.submitQuestionAgain": "もう一度採点に出す",
     "worksheet.questionSubmitted": "この答えは提出済みです",
+    "worksheet.redoQuestion": "この問題を消してやり直す",
+    "worksheet.preparingRedo": "空の解答を準備中…",
     "worksheet.confirmQuestionTitle": "この答えだけ提出しますか？",
     "worksheet.confirmQuestionBody":
       "問題 {number} だけを提出します。他の問題は続けられますが、この答えは変更できなくなります。",
@@ -789,7 +795,10 @@ const messages = {
     "worksheet.next": "下一题",
     "worksheet.submit": "提交全部答案",
     "worksheet.submitQuestion": "只提交这一题批改",
+    "worksheet.submitQuestionAgain": "重新提交审阅",
     "worksheet.questionSubmitted": "这一题已经提交",
+    "worksheet.redoQuestion": "清空并重做这一题",
+    "worksheet.preparingRedo": "正在准备空白答案…",
     "worksheet.confirmQuestionTitle": "只提交这一题吗？",
     "worksheet.confirmQuestionBody":
       "只提交第 {number} 题。其他题仍可继续作答，但这一题提交后不能再修改。",

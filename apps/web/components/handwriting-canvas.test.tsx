@@ -71,4 +71,40 @@ describe("HandwritingCanvas", () => {
     expect(canvas).toHaveAttribute("width", "1500");
     expect(canvas).toHaveAttribute("height", "980");
   });
+
+  it("shows AI annotations over an immutable handwritten answer", () => {
+    const onChange = vi.fn();
+
+    const { container } = render(
+      <HandwritingCanvas
+        annotations={[
+          {
+            kind: "underline",
+            x: 0.68,
+            y: 0.54,
+            width: 0.21,
+            height: 0.08,
+            label: "Check these words.",
+          },
+        ]}
+        initialStrokes={initialStrokes}
+        onChange={onChange}
+        readOnly
+      />,
+    );
+
+    expect(screen.getByText("Check these words.")).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-grading-annotation="underline"]'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Clear handwriting" }),
+    ).toBeDisabled();
+
+    fireEvent.pointerDown(
+      screen.getByLabelText("Handwriting answer area"),
+      { clientX: 10, clientY: 10, pointerId: 1 },
+    );
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });

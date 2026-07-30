@@ -1146,12 +1146,68 @@ button {
 
 .handwriting canvas {
   display: block;
+  width: 100%;
+  height: 100%;
   max-width: none;
   touch-action: none;
   background:
     linear-gradient(#e8ebf4 1px, transparent 1px),
     linear-gradient(90deg, #e8ebf4 1px, transparent 1px);
   background-size: 28px 28px;
+}
+
+.canvas-stage {
+  position: relative;
+}
+
+.grading-annotation-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.grading-annotation-layer line,
+.grading-annotation-layer rect {
+  fill: none;
+  stroke: #d73737;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 1px 0 rgb(255 255 255 / 90%));
+}
+
+.grading-annotation-list {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  border-top: 1px solid #f0c6c6;
+  background: #fff6f6;
+  padding: 0.75rem 1rem;
+  color: #a62222;
+  font-size: 0.82rem;
+  font-weight: 720;
+  list-style: none;
+}
+
+.grading-annotation-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+}
+
+.grading-annotation-list span {
+  display: grid;
+  flex: none;
+  width: 1.3rem;
+  height: 1.3rem;
+  place-items: center;
+  border-radius: 50%;
+  background: #d73737;
+  color: white;
+  font-size: 0.7rem;
 }
 
 .canvas-scroll {
@@ -1178,7 +1234,6 @@ button {
 
 .response-locked {
   pointer-events: none;
-  opacity: 0.66;
 }
 
 .question-grade-status {

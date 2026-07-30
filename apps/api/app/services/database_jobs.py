@@ -1,6 +1,6 @@
 import json
 from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import Any, Literal, cast
 
 import asyncpg
 import structlog
@@ -272,10 +272,11 @@ async def fixture_job_handler(
             """
             select q.id, q.family_id, q.question_set_id, q.position, q.type,
                    q.prompt, q.options, q.answer_key, q.rubric, q.points,
-                   q.primary_knowledge_tag_id, at.child_id
+                   q.primary_knowledge_tag_id, at.child_id, c.ui_language
             from public.questions q
             join public.assignments a on a.question_set_id = q.question_set_id
             join public.attempts at on at.assignment_id = a.id
+            join public.children c on c.id = at.child_id
             where at.id = $1
               and ($2::uuid is null or q.id = $2::uuid)
               and (
@@ -343,6 +344,10 @@ async def fixture_job_handler(
                 visual_adapter=job_visual_adapter,
                 grading_guide=grading_guide,
                 minimum_confidence=minimum_confidence,
+                feedback_language=cast(
+                    Literal["en", "ja", "zh"],
+                    str(row["ui_language"]),
+                ),
             )
             grader_versions.add(result.grader_version)
             await connection.execute(

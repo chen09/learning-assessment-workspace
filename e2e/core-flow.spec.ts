@@ -521,7 +521,7 @@ test("parent creation reaches child grading and correction through the API", asy
     testInfo.project.name !== "desktop",
     "The shared fixture API flow runs once; responsive UI is covered separately.",
   );
-  test.setTimeout(60_000);
+  test.setTimeout(120_000);
 
   const apiBaseUrl = "http://127.0.0.1:8017";
   const parentHeaders = { Authorization: "Bearer parent-fixture" };
@@ -625,6 +625,162 @@ test("parent creation reaches child grading and correction through the API", asy
   await page.mouse.up();
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();
 
+  const originalAttemptId = new URL(page.url()).searchParams.get("attemptId");
+  expect(originalAttemptId).toBeTruthy();
+  const addChineseHandwritingFeedback = async (targetAttemptId: string) => {
+    await page.route(
+      `${apiBaseUrl}/v1/attempts/${targetAttemptId}/results`,
+      async (route) => {
+        const response = await route.fetch();
+        const payload = (await response.json()) as {
+          complete: boolean;
+          results: Array<{
+            feedback: Record<string, unknown>;
+            [key: string]: unknown;
+          }>;
+        };
+        const annotatedIndex = payload.results.length - 1;
+        await route.fulfill({
+          response,
+          json: {
+            ...payload,
+            results: payload.results.map((result, index) =>
+              index === annotatedIndex
+                ? {
+                    ...result,
+                    feedback: {
+                      ...result.feedback,
+                      action: "查看批语后，重新完成这道题。",
+                      annotations: [
+                        {
+                          kind: "box",
+                          x: 0.22,
+                          y: 0.2,
+                          width: 0.5,
+                          height: 0.24,
+                          label: "这里需要补充完整的句子。",
+                        },
+                      ],
+                      evidence: ["句子内容不完整。"],
+                      summary: "请补充完整的句子。",
+                    },
+                  }
+                : result,
+            ),
+          },
+        });
+      },
+    );
+  };
+
+  await page.getByLabel("Language").selectOption("zh");
+  await addChineseHandwritingFeedback(originalAttemptId!);
+  const originalQuestionSubmission = page.waitForResponse(
+    (response) =>
+      response
+        .url()
+        .startsWith(
+          `${apiBaseUrl}/v1/attempts/${originalAttemptId}/questions/`,
+        ) &&
+      response.url().endsWith("/submit") &&
+      response.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "只提交这一题批改" }).click();
+  await page
+    .getByRole("button", { name: "确认只提交这一题" })
+    .click();
+  expect((await originalQuestionSubmission).status()).toBe(202);
+  const originalProcessedResponse = await request.post(
+    `${apiBaseUrl}/v1/demo/jobs/process-next`,
+    { headers: parentHeaders },
+  );
+  expect(originalProcessedResponse.ok()).toBeTruthy();
+  await expect(page.getByText("请补充完整的句子。")).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(
+    page.locator('[data-grading-annotation="box"]'),
+  ).toBeVisible();
+  await expect(
+    page.getByText("这里需要补充完整的句子。"),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "清除手写内容" }),
+  ).toBeDisabled();
+
+  await page
+    .getByRole("button", { name: "清空并重做这一题" })
+    .click();
+  await expect(page).toHaveURL(/\/child\/work\/\?attemptId=.*&retry=1$/);
+  const retryAttemptId = new URL(page.url()).searchParams.get("attemptId");
+  expect(retryAttemptId).toBeTruthy();
+  await expect(page.locator("[data-grading-annotation]")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "重新提交审阅" }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "清除手写内容" }),
+  ).toBeEnabled();
+
+  const retryCanvas = page.getByLabel("手写作答区域");
+  const retryCanvasBox = await retryCanvas.boundingBox();
+  expect(retryCanvasBox).not.toBeNull();
+  const retrySave = page.waitForResponse(
+    (response) =>
+      response
+        .url()
+        .startsWith(
+          `${apiBaseUrl}/v1/attempts/${retryAttemptId}/responses/`,
+        ) &&
+      response.request().method() === "PUT",
+  );
+  await page.mouse.move(
+    retryCanvasBox!.x + 80,
+    retryCanvasBox!.y + 90,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    retryCanvasBox!.x + 250,
+    retryCanvasBox!.y + 170,
+    { steps: 8 },
+  );
+  await page.mouse.up();
+  expect((await retrySave).ok()).toBeTruthy();
+  await expect(page.getByText("已保存", { exact: true })).toBeVisible();
+
+  await addChineseHandwritingFeedback(retryAttemptId!);
+  const retrySubmission = page.waitForResponse(
+    (response) =>
+      response
+        .url()
+        .startsWith(
+          `${apiBaseUrl}/v1/attempts/${retryAttemptId}/questions/`,
+        ) &&
+      response.url().endsWith("/submit") &&
+      response.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "重新提交审阅" }).click();
+  await page
+    .getByRole("button", { name: "确认只提交这一题" })
+    .click();
+  expect((await retrySubmission).status()).toBe(202);
+  const retryProcessedResponse = await request.post(
+    `${apiBaseUrl}/v1/demo/jobs/process-next`,
+    { headers: parentHeaders },
+  );
+  expect(retryProcessedResponse.ok()).toBeTruthy();
+  await expect(page.getByText("请补充完整的句子。")).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(
+    page.locator('[data-grading-annotation="box"]'),
+  ).toBeVisible();
+
+  await page.goto(
+    `/child/work/?attemptId=${encodeURIComponent(originalAttemptId!)}`,
+  );
+  await page.getByLabel("语言").selectOption("en");
+
   await page.reload();
   await page.getByRole("button", { name: "Go to question 3" }).click();
   canvas = page.getByLabel("Handwriting answer area");
@@ -655,6 +811,7 @@ test("parent creation reaches child grading and correction through the API", asy
 
   const attemptId = new URL(page.url()).searchParams.get("attemptId");
   expect(attemptId).toBeTruthy();
+
   await page.goto(
     `/parent/results/?attemptId=${encodeURIComponent(attemptId!)}`,
   );

@@ -65,6 +65,34 @@ async def create_correction(
         ) from error
 
 
+@router.post(
+    "/{attempt_id}/questions/{question_id}/retry",
+    response_model=AssignmentWork,
+)
+async def create_question_retry(
+    attempt_id: UUID,
+    question_id: UUID,
+    repository: Annotated[Repository, Depends(get_repository)],
+    child: Annotated[ChildSessionClaims, Depends(require_child)],
+    idempotency_key: Annotated[
+        str,
+        Header(alias="Idempotency-Key", min_length=8, max_length=120),
+    ],
+) -> AssignmentWork:
+    try:
+        return await repository.create_question_retry(
+            str(attempt_id),
+            str(question_id),
+            str(child.child_id),
+            idempotency_key,
+        )
+    except NotFoundError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No graded answer is available to retry.",
+        ) from error
+
+
 @router.put(
     "/{attempt_id}/responses/{question_id}",
     response_model=SavedResponse,

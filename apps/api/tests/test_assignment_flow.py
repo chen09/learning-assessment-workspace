@@ -250,6 +250,86 @@ def test_child_can_submit_one_answer_without_closing_the_attempt() -> None:
     assert reopened.json()["submitted_question_ids"] == [first_question["id"]]
 
 
+def test_child_redoes_one_graded_answer_in_a_new_immutable_attempt() -> None:
+    client = TestClient(create_app())
+    _fixture, child_headers, work = start_fixture_assignment(client)
+    attempt_id = work["attempt"]["id"]
+    question = work["questions"][0]
+
+    client.put(
+        f"/v1/attempts/{attempt_id}/responses/{question['id']}",
+        headers=child_headers,
+        json={
+            "kind": "choice",
+            "answer": {"choices": [0]},
+            "expected_version": 0,
+        },
+    )
+    client.post(
+        f"/v1/attempts/{attempt_id}/questions/{question['id']}/submit",
+        headers={
+            **child_headers,
+            "Idempotency-Key": "submit-before-single-retry",
+        },
+    )
+    client.post("/v1/demo/jobs/process-next", headers=PARENT_HEADERS)
+
+    retry = client.post(
+        f"/v1/attempts/{attempt_id}/questions/{question['id']}/retry",
+        headers={
+            **child_headers,
+            "Idempotency-Key": "single-question-retry",
+        },
+    )
+    repeated = client.post(
+        f"/v1/attempts/{attempt_id}/questions/{question['id']}/retry",
+        headers={
+            **child_headers,
+            "Idempotency-Key": "single-question-retry",
+        },
+    )
+
+    assert retry.status_code == 200
+    assert repeated.status_code == 200
+    assert repeated.json()["attempt"]["id"] == retry.json()["attempt"]["id"]
+    assert retry.json()["attempt"]["id"] != attempt_id
+    assert [item["id"] for item in retry.json()["questions"]] == [question["id"]]
+    assert retry.json()["responses"] == []
+    assert retry.json()["submitted_question_ids"] == []
+    retry_attempt_id = retry.json()["attempt"]["id"]
+    retry_save = client.put(
+        f"/v1/attempts/{retry_attempt_id}/responses/{question['id']}",
+        headers=child_headers,
+        json={
+            "kind": "choice",
+            "answer": {"choices": [1]},
+            "expected_version": 0,
+        },
+    )
+    retry_submit = client.post(
+        f"/v1/attempts/{retry_attempt_id}/questions/{question['id']}/submit",
+        headers={
+            **child_headers,
+            "Idempotency-Key": "submit-single-retry-answer",
+        },
+    )
+    client.post("/v1/demo/jobs/process-next", headers=PARENT_HEADERS)
+    retry_results = client.get(
+        f"/v1/attempts/{retry_attempt_id}/results",
+        headers=child_headers,
+    )
+    original_results = client.get(
+        f"/v1/attempts/{attempt_id}/results",
+        headers=child_headers,
+    )
+    assert retry_save.status_code == 200
+    assert retry_submit.status_code == 202
+    assert retry_results.status_code == 200
+    assert retry_results.json()["results"][0]["outcome"] == "incorrect"
+    assert original_results.status_code == 200
+    assert original_results.json()["results"][0]["outcome"] == "correct"
+
+
 def test_submitting_the_whole_attempt_marks_unanswered_questions_incorrect() -> None:
     client = TestClient(create_app())
     _fixture, child_headers, work = start_fixture_assignment(client)

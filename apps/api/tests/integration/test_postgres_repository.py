@@ -370,6 +370,24 @@ async def test_postgres_vertical_flow_and_family_isolation() -> None:
             if uploaded_path
             else ["incorrect", "incorrect", "incorrect"]
         )
+        single_retry = await repository.create_question_retry(
+            str(work.attempt.id),
+            str(work.questions[0].id),
+            str(child_a),
+            "integration-single-question-retry",
+        )
+        repeated_single_retry = await repository.create_question_retry(
+            str(work.attempt.id),
+            str(work.questions[0].id),
+            str(child_a),
+            "integration-single-question-retry",
+        )
+        assert single_retry.attempt.id == repeated_single_retry.attempt.id
+        assert single_retry.attempt.id != work.attempt.id
+        assert [question.id for question in single_retry.questions] == [
+            work.questions[0].id
+        ]
+        assert single_retry.responses == []
         if uploaded_path:
             photo_review = await repository.get_parent_attempt_review(
                 str(work.attempt.id),

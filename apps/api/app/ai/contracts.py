@@ -67,9 +67,19 @@ class GenerateQuestionsOutput(StrictContract):
 
 class GradeResponseInput(StrictContract):
     schema_version: Literal["1.0"] = "1.0"
+    language: Literal["en", "ja", "zh"] = "en"
     question: GeneratedQuestion
     response: dict[str, Any]
     attachment_paths: list[str] = []
+
+
+class GradeAnnotation(StrictContract):
+    kind: Literal["box", "underline", "cross"]
+    x: float = Field(ge=0, le=1)
+    y: float = Field(ge=0, le=1)
+    width: float = Field(gt=0, le=1)
+    height: float = Field(gt=0, le=1)
+    label: str = Field(min_length=1, max_length=120)
 
 
 class GradeResponseOutput(StrictContract):
@@ -79,6 +89,10 @@ class GradeResponseOutput(StrictContract):
     confidence: float = Field(ge=0, le=1)
     evidence: list[str]
     feedback: str
+    annotations: list[GradeAnnotation] = Field(
+        default_factory=list,
+        max_length=12,
+    )
 
 
 class ExplainCorrectionInput(StrictContract):

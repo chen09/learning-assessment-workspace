@@ -5,6 +5,7 @@ import { WorksheetWorkbench } from "@/components/worksheet-workbench";
 
 const mocks = vi.hoisted(() => ({
   createChildUploadIntent: vi.fn(),
+  createQuestionRetry: vi.fn(),
   getAttemptResults: vi.fn(),
   getAttemptWork: vi.fn(),
   getChildAssignments: vi.fn(),
@@ -18,6 +19,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/api-client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api-client")>()),
   createChildUploadIntent: mocks.createChildUploadIntent,
+  createQuestionRetry: mocks.createQuestionRetry,
   getAttemptResults: mocks.getAttemptResults,
   getAttemptWork: mocks.getAttemptWork,
   getChildAccessToken: () => "child-token",
@@ -100,6 +102,14 @@ describe("WorksheetWorkbench", () => {
       path: "family-1/attempt-1/answer.png",
       upload_url: "https://storage.example.test/upload",
       expires_in: 300,
+    });
+    mocks.createQuestionRetry.mockReset();
+    mocks.createQuestionRetry.mockResolvedValue({
+      ...assignmentWork,
+      attempt: { id: "retry-attempt-1" },
+      questions: [assignmentWork.questions[2]],
+      responses: [],
+      submitted_question_ids: [],
     });
     mocks.getAttemptWork.mockReset();
     mocks.getAttemptWork.mockResolvedValue(assignmentWork);
@@ -370,6 +380,149 @@ describe("WorksheetWorkbench", () => {
         "child-token",
       );
     });
+  });
+
+  it("renders the AI red markup over a submitted handwriting answer", async () => {
+    mocks.startAssignment.mockResolvedValue({
+      ...assignmentWork,
+      submitted_question_ids: ["algebra-proof"],
+      responses: [
+        {
+          id: "response-1",
+          question_id: "algebra-proof",
+          kind: "strokes",
+          answer: {
+            strokes: [
+              {
+                points: [
+                  { x: 20, y: 30, pressure: 0.5 },
+                  { x: 80, y: 90, pressure: 0.5 },
+                ],
+                width: 2.5,
+                eraser: false,
+              },
+            ],
+            canvas_size: { width: 900, height: 420 },
+          },
+          version: 3,
+        },
+      ],
+    });
+    mocks.getAttemptResults.mockResolvedValue({
+      attempt_id: "attempt-1",
+      complete: false,
+      results: [
+        {
+          id: "result-proof",
+          question_id: "algebra-proof",
+          outcome: "incorrect",
+          awarded_points: 0,
+          confidence: 0.96,
+          feedback: {
+            summary: "The last algebra term is incorrect.",
+            annotations: [
+              {
+                kind: "box",
+                x: 0.55,
+                y: 0.4,
+                width: 0.2,
+                height: 0.16,
+                label: "Check this term.",
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    render(<WorksheetWorkbench />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Go to question 3" }),
+    );
+
+    expect(await screen.findByText("Check this term.")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Clear handwriting" }),
+    ).toBeDisabled();
+  });
+
+  it("clears one graded answer into a new attempt and can request review again", async () => {
+    mocks.startAssignment.mockResolvedValue({
+      ...assignmentWork,
+      submitted_question_ids: ["algebra-proof"],
+      responses: [
+        {
+          id: "response-1",
+          question_id: "algebra-proof",
+          kind: "strokes",
+          answer: {
+            strokes: [
+              {
+                points: [
+                  { x: 20, y: 30, pressure: 0.5 },
+                  { x: 80, y: 90, pressure: 0.5 },
+                ],
+                width: 2.5,
+                eraser: false,
+              },
+            ],
+            canvas_size: { width: 900, height: 420 },
+          },
+          version: 3,
+        },
+      ],
+    });
+    mocks.getAttemptResults.mockResolvedValue({
+      attempt_id: "attempt-1",
+      complete: false,
+      results: [
+        {
+          id: "result-proof",
+          question_id: "algebra-proof",
+          outcome: "incorrect",
+          awarded_points: 0,
+          confidence: 0.96,
+          feedback: {
+            summary: "The last algebra term is incorrect.",
+            annotations: [],
+          },
+        },
+      ],
+    });
+
+    render(<WorksheetWorkbench />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Go to question 3" }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Clear and redo this question",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mocks.createQuestionRetry).toHaveBeenCalledWith(
+        "attempt-1",
+        "algebra-proof",
+        "child-token",
+        "retry-attempt-1-algebra-proof",
+      );
+    });
+    expect(
+      screen.getByRole("button", { name: "Clear handwriting" }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "Submit again for review" }),
+    ).toBeDisabled();
+    expect(
+      screen.queryByText("The last algebra term is incorrect."),
+    ).not.toBeInTheDocument();
+    expect(window.location.search).toContain(
+      "attemptId=retry-attempt-1",
+    );
+    expect(window.location.search).toContain("retry=1");
   });
 
   it("localizes worksheet controls without translating question content", () => {

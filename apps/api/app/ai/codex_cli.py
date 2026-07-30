@@ -97,6 +97,11 @@ class CodexCLIGradingAdapter:
     @staticmethod
     def _prompt(request: GradeResponseInput) -> str:
         question = request.question
+        language_names = {
+            "en": "English",
+            "ja": "Japanese",
+            "zh": "Chinese",
+        }
         return (
             "Grade one anonymous student's handwritten answer. "
             "Do not run shell commands, inspect files other than the attached image, "
@@ -105,7 +110,16 @@ class CodexCLIGradingAdapter:
             "Judge semantic correctness, required reasoning, and legibility. "
             "Use outcome=uncertain when the writing cannot be read reliably. "
             "Use outcome=needs_parent_review when the rubric permits multiple defensible "
-            "judgments. Return only JSON matching the supplied schema.\n"
+            "judgments. Return evidence and feedback in the requested response language. "
+            "For each visible mistake or uncertain region, return a concise annotation "
+            "using normalized image coordinates from 0 to 1. Use box for a region, "
+            "underline for words, or cross only for content that should be removed. "
+            "Annotation labels must use the requested response language. Return an empty "
+            "annotations array when no visible correction is needed. "
+            "Do not translate the student's answer or educational terms that must remain "
+            "in their source language. Return only JSON matching the supplied schema.\n"
+            f"Response language: {language_names[request.language]} "
+            f"({request.language}).\n"
             "<question_data>\n"
             f"Prompt: {question.prompt}\n"
             f"Reference answer: {json.dumps(question.answer_key, ensure_ascii=False)}\n"

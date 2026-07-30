@@ -195,6 +195,56 @@ def test_codex_cli_grades_anonymous_handwriting_with_a_locked_down_command() -> 
     assert grade.confidence == 0.94
 
 
+def test_codex_cli_requests_feedback_in_the_child_language() -> None:
+    observed: dict[str, str] = {}
+
+    def fake_runner(command: list[str], _timeout_seconds: int) -> None:
+        observed["prompt"] = command[-1]
+        output_path = command[command.index("--output-last-message") + 1]
+        with open(output_path, "w", encoding="utf-8") as output:
+            output.write(
+                """
+                {
+                  "schema_version": "1.0",
+                  "outcome": "incorrect",
+                  "awarded_points": 0,
+                  "confidence": 0.95,
+                  "evidence": ["目的地が書かれていません。"],
+                  "feedback": "Canada を含む完全な文に直しましょう。"
+                }
+                """
+            )
+
+    grade = CodexCLIGradingAdapter(runner=fake_runner).grade_response(
+        GradeResponseInput(
+            language="ja",
+            question=GeneratedQuestion(
+                client_id="question-33",
+                type="handwriting",
+                prompt="Write a sentence about a trip to Canada.",
+                answer_key={"reference": "Ms. Brown moved to Canada."},
+                grading_guide="The destination Canada is required.",
+                difficulty="standard",
+                knowledge_points=["past-tense"],
+                points=2,
+            ),
+            response={
+                "kind": "strokes",
+                "canvas_size": {"width": 900, "height": 420},
+                "strokes": [
+                    {
+                        "points": [[100, 150], [420, 360]],
+                        "width": 4,
+                    }
+                ],
+            },
+        )
+    )
+
+    assert "Response language: Japanese (ja)." in observed["prompt"]
+    assert grade.feedback == "Canada を含む完全な文に直しましょう。"
+
+
 def test_low_confidence_visual_grade_is_routed_to_human_review() -> None:
     class LowConfidenceVisualAdapter:
         version = "codex-cli-v1"
@@ -209,6 +259,16 @@ def test_low_confidence_visual_grade_is_routed_to_human_review() -> None:
                 confidence=0.62,
                 evidence=["The final words are hard to distinguish."],
                 feedback="The answer may be correct, but the image is unclear.",
+                annotations=[
+                    {
+                        "kind": "underline",
+                        "x": 0.68,
+                        "y": 0.54,
+                        "width": 0.21,
+                        "height": 0.08,
+                        "label": "Check these words.",
+                    }
+                ],
             )
 
     job = Job(
@@ -239,15 +299,25 @@ def test_low_confidence_visual_grade_is_routed_to_human_review() -> None:
         visual_adapter=LowConfidenceVisualAdapter(),
         grading_guide="Accept an equivalent complete sentence.",
         minimum_confidence=0.75,
+        feedback_language="zh",
     )
 
     assert result.outcome == "uncertain"
     assert result.awarded_points is None
     assert result.confidence == 0.62
     assert result.grader_version == "codex-cli-v1"
-    assert result.feedback["evidence"] == [
-        "The final words are hard to distinguish."
+    assert result.feedback["evidence"] == ["The final words are hard to distinguish."]
+    assert result.feedback["annotations"] == [
+        {
+            "kind": "underline",
+            "x": 0.68,
+            "y": 0.54,
+            "width": 0.21,
+            "height": 0.08,
+            "label": "Check these words.",
+        }
     ]
+    assert result.feedback["action"] == "请家长确认这份答案。"
 
 
 def test_visual_grading_adapter_is_limited_to_allowed_families() -> None:

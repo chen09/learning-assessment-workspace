@@ -944,6 +944,72 @@ class MemoryRepository:
             ),
         )
 
+    async def create_question_retry(
+        self,
+        attempt_id: str,
+        question_id: str,
+        child_id: str,
+        idempotency_key: str,
+    ) -> AssignmentWork:
+        original = self.attempts.get(attempt_id)
+        result = next(
+            (
+                item
+                for item in self.question_results.get(attempt_id, [])
+                if str(item.question_id) == question_id
+            ),
+            None,
+        )
+        if original is None or result is None or str(original.child_id) != child_id:
+            raise NotFoundError
+        record_key = (
+            f"question-retry:{attempt_id}:{question_id}",
+            idempotency_key,
+        )
+        existing_id = self.correction_idempotency.get(record_key)
+        if existing_id is not None:
+            retry = self.attempts[existing_id]
+        else:
+            sequence = (
+                max(
+                    (
+                        attempt.sequence
+                        for attempt in self.attempts.values()
+                        if attempt.assignment_id == original.assignment_id
+                    ),
+                    default=0,
+                )
+                + 1
+            )
+            retry = Attempt(
+                family_id=original.family_id,
+                assignment_id=original.assignment_id,
+                child_id=original.child_id,
+                sequence=sequence,
+            )
+            self.attempts[str(retry.id)] = retry
+            self.correction_idempotency[record_key] = str(retry.id)
+            self.correction_question_ids[str(retry.id)] = {question_id}
+        assignment = self.assignments[str(original.assignment_id)]
+        assignment.status = AssignmentStatus.CORRECTING
+        question = next(
+            (
+                item
+                for item in self.questions_for_attempt(attempt_id)
+                if str(item.id) == question_id
+            ),
+            None,
+        )
+        if question is None:
+            raise NotFoundError
+        return AssignmentWork(
+            title=self.question_sets[str(assignment.question_set_id)].title,
+            assignment=assignment,
+            attempt=retry,
+            questions=[QuestionView.model_validate(question.model_dump())],
+            responses=list(self.responses_for_attempt(str(retry.id)).values()),
+        )
+
     async def get_attempt_work(
         self,
         attempt_id: str,

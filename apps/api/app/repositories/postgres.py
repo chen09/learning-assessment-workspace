@@ -1683,6 +1683,158 @@ class PostgresRepository:
             responses=[SavedResponse(**dict(row)) for row in response_rows],
         )
 
+    async def create_question_retry(
+        self,
+        attempt_id: str,
+        question_id: str,
+        child_id: str,
+        idempotency_key: str,
+    ) -> AssignmentWork:
+        client_key = f"question-retry:{attempt_id}:{question_id}:{idempotency_key}"
+        async with self._engine.begin() as connection:
+            original_result = await connection.execute(
+                text(
+                    """
+                    select at.id, at.family_id, at.assignment_id, at.child_id,
+                           qr.id as result_id
+                    from public.attempts at
+                    join public.question_results qr
+                      on qr.attempt_id = at.id
+                     and qr.question_id = :question_id
+                    where at.id = :attempt_id
+                      and at.child_id = :child_id
+                    for update of at
+                    """
+                ),
+                {
+                    "attempt_id": _uuid(attempt_id),
+                    "question_id": _uuid(question_id),
+                    "child_id": _uuid(child_id),
+                },
+            )
+            original = original_result.mappings().one_or_none()
+            if original is None:
+                raise NotFoundError
+            existing_result = await connection.execute(
+                text(
+                    """
+                    select id, family_id, assignment_id, child_id, sequence,
+                           started_at, submitted_at
+                    from public.attempts
+                    where family_id = :family_id
+                      and client_idempotency_key = :client_key
+                    """
+                ),
+                {
+                    "family_id": original["family_id"],
+                    "client_key": client_key,
+                },
+            )
+            retry_row = existing_result.mappings().one_or_none()
+            if retry_row is None:
+                sequence_result = await connection.execute(
+                    text(
+                        """
+                        select coalesce(max(sequence), 0) + 1
+                        from public.attempts
+                        where assignment_id = :assignment_id
+                        """
+                    ),
+                    {"assignment_id": original["assignment_id"]},
+                )
+                retry_result = await connection.execute(
+                    text(
+                        """
+                        insert into public.attempts (
+                          family_id, assignment_id, child_id, kind, sequence,
+                          client_idempotency_key
+                        ) values (
+                          :family_id, :assignment_id, :child_id, 'correction',
+                          :sequence, :client_key
+                        )
+                        returning id, family_id, assignment_id, child_id,
+                                  sequence, started_at, submitted_at
+                        """
+                    ),
+                    {
+                        "family_id": original["family_id"],
+                        "assignment_id": original["assignment_id"],
+                        "child_id": _uuid(child_id),
+                        "sequence": int(sequence_result.scalar_one()),
+                        "client_key": client_key,
+                    },
+                )
+                retry_row = retry_result.mappings().one()
+                await connection.execute(
+                    text(
+                        """
+                        insert into public.correction_links (
+                          original_result_id, correction_attempt_id
+                        ) values (:result_id, :correction_attempt_id)
+                        on conflict do nothing
+                        """
+                    ),
+                    {
+                        "result_id": original["result_id"],
+                        "correction_attempt_id": retry_row["id"],
+                    },
+                )
+            assignment_result = await connection.execute(
+                text(
+                    """
+                    with updated as (
+                      update public.assignments
+                      set status = 'correcting', updated_at = now()
+                      where id = :assignment_id
+                      returning id, family_id, question_set_id, child_id,
+                                status, mode, time_limit_seconds
+                    )
+                    select updated.*, qs.title
+                    from updated
+                    join public.question_sets qs
+                      on qs.id = updated.question_set_id
+                    """
+                ),
+                {"assignment_id": original["assignment_id"]},
+            )
+            assignment_row = assignment_result.mappings().one()
+            question_result = await connection.execute(
+                text(
+                    """
+                    select q.id, q.family_id, q.question_set_id, q.position,
+                           q.type, q.prompt, q.options, q.answer_key, q.points
+                    from public.questions q
+                    where q.id = :question_id
+                    """
+                ),
+                {"question_id": _uuid(question_id)},
+            )
+            question_row = question_result.mappings().one_or_none()
+            if question_row is None:
+                raise NotFoundError
+            response_rows = (
+                await connection.execute(
+                    text(
+                        """
+                        select id, family_id, attempt_id, question_id, kind,
+                               answer, version, saved_at
+                        from public.responses
+                        where attempt_id = :attempt_id
+                        order by saved_at
+                        """
+                    ),
+                    {"attempt_id": retry_row["id"]},
+                )
+            ).mappings().all()
+        question = _question(question_row)
+        return AssignmentWork(
+            title=str(assignment_row["title"]),
+            assignment=_assignment(assignment_row),
+            attempt=_attempt(retry_row),
+            questions=[QuestionView.model_validate(question.model_dump())],
+            responses=[SavedResponse(**dict(row)) for row in response_rows],
+        )
+
     async def get_attempt_work(
         self,
         attempt_id: str,
