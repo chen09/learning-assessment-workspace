@@ -279,6 +279,9 @@ function CreateWorkspaceContent() {
   const [stage, setStage] = useState<Stage>("compose");
   const [fileName, setFileName] = useState("");
   const [files, setFiles] = useState<File[]>([]);
+  const [completedDocumentLanguage, setCompletedDocumentLanguage] = useState<
+    "zh" | "ja" | "en"
+  >("ja");
   const [answerFileName, setAnswerFileName] = useState("");
   const [answerFiles, setAnswerFiles] = useState<File[]>([]);
   const [referenceFileName, setReferenceFileName] = useState("");
@@ -575,7 +578,7 @@ function CreateWorkspaceContent() {
             child_id: childId,
             title: fileName.slice(0, 160),
             subject: "Mixed practice",
-            document_language: "ja",
+            document_language: completedDocumentLanguage,
             feedback_language: feedbackLanguage,
             filenames: files.map((file) => file.name),
             response_paths: responsePaths,
@@ -1907,6 +1910,23 @@ function CreateWorkspaceContent() {
                 <ImagePlus />
                 <strong>{fileName || t("completedPaper.choosePages")}</strong>
                 <span>{t("completedPaper.pagesHelp")}</span>
+              </label>
+              <label className="completed-paper-language">
+                {t("completedPaper.documentLanguage")}
+                <select
+                  aria-label={t("completedPaper.documentLanguage")}
+                  onChange={(event) =>
+                    setCompletedDocumentLanguage(
+                      event.target.value as "zh" | "ja" | "en",
+                    )
+                  }
+                  value={completedDocumentLanguage}
+                >
+                  <option value="ja">{t("language.option.ja")}</option>
+                  <option value="zh">{t("language.option.zh")}</option>
+                  <option value="en">{t("language.option.en")}</option>
+                </select>
+                <span>{t("completedPaper.documentLanguageHelp")}</span>
               </label>
             </>
           ) : null}

@@ -2711,6 +2711,31 @@ button {
   padding: 0.7rem;
 }
 
+.completed-paper-language {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.9rem;
+  max-width: 22rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.completed-paper-language select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  background: var(--paper);
+  color: var(--ink);
+  padding: 0.7rem;
+}
+
+.completed-paper-language span {
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
 .toggle-row {
   display: flex;
   align-items: center;

@@ -687,6 +687,9 @@ describe("CreateWorkspace", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Grade completed paper" }),
     );
+    fireEvent.change(screen.getByLabelText("Worksheet language"), {
+      target: { value: "en" },
+    });
     fireEvent.change(screen.getByLabelText("Completed worksheet scans"), {
       target: {
         files: [
@@ -705,6 +708,7 @@ describe("CreateWorkspace", () => {
       expect.objectContaining({
         family_id: "family-1",
         child_id: "child-1",
+        document_language: "en",
         feedback_language: "zh",
         response_paths: ["family-1/completed-paper/page-1.jpg"],
       }),

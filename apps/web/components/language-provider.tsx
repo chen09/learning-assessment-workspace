@@ -378,6 +378,9 @@ const messages = {
     "completedPaper.composeDescription":
       "Upload the original scan or photos. The handwriting stays private and is reviewed only after you confirm the draft.",
     "completedPaper.scans": "Completed worksheet scans",
+    "completedPaper.documentLanguage": "Worksheet language",
+    "completedPaper.documentLanguageHelp":
+      "This is the language printed on the paper, not the child's interface language.",
     "completedPaper.choosePages": "Choose completed worksheet pages",
     "completedPaper.pagesHelp":
       "Upload several pages in their photographed order. Nothing is assigned or graded until you confirm the review draft.",
@@ -766,6 +769,9 @@ const messages = {
     "completedPaper.composeDescription":
       "元のスキャンまたは写真をアップロードします。手書きは非公開のまま、下書きを確認した後だけレビューされます。",
     "completedPaper.scans": "解答済みプリントのスキャン",
+    "completedPaper.documentLanguage": "プリントの言語",
+    "completedPaper.documentLanguageHelp":
+      "子どもの画面言語ではなく、プリントに印刷された言語を選んでください。",
     "completedPaper.choosePages": "解答済みプリントのページを選択",
     "completedPaper.pagesHelp":
       "撮影した順番で複数ページをアップロードできます。確認用下書きを確定するまで、課題の割り当てや採点は行われません。",
@@ -1137,6 +1143,9 @@ const messages = {
     "completedPaper.composeDescription":
       "上传原始扫描件或照片。手写内容保持私密，只会在你确认草稿后审核。",
     "completedPaper.scans": "已完成试卷扫描件",
+    "completedPaper.documentLanguage": "试卷语言",
+    "completedPaper.documentLanguageHelp":
+      "请选择试卷印刷内容的语言，而不是孩子的界面语言。",
     "completedPaper.choosePages": "选择已完成试卷页面",
     "completedPaper.pagesHelp":
       "可按拍摄顺序上传多页。在确认审核草稿前，不会安排练习或开始批改。",
