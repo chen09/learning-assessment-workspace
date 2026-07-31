@@ -332,6 +332,9 @@ export function HandwritingCanvas({
             aria-label={t("handwriting.clear")}
             disabled={readOnly}
             onClick={requestClear}
+            onTouchEnd={(event) =>
+              handleTouchAction(event, requestClear)
+            }
             type="button"
           >
             <Trash2 size={17} />

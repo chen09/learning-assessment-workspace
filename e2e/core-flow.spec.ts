@@ -1175,6 +1175,13 @@ test("parent creation reaches child grading and correction through the API", asy
   const clearHandwriting = page.getByRole("button", {
     name: "Clear handwriting",
   });
+  const undoHandwriting = page.getByRole("button", { name: "Undo" });
+  await expect(undoHandwriting).toBeEnabled();
+  const clearedResponseSave = page.waitForResponse(
+    (response) =>
+      response.url().includes("/responses/") &&
+      response.request().method() === "PUT",
+  );
   if (testInfo.project.name === "ipad-chrome") {
     const clearButtonBox = await clearHandwriting.boundingBox();
     expect(clearButtonBox).not.toBeNull();
@@ -1192,21 +1199,54 @@ test("parent creation reaches child grading and correction through the API", asy
   await expect(
     clearDialog.getByRole("button", { name: "Clear now" }),
   ).toHaveCSS("min-height", "41.6px");
-  const keepHandwriting = clearDialog.getByRole("button", {
-    name: "Keep handwriting",
+  const clearNow = clearDialog.getByRole("button", {
+    name: "Clear now",
   });
   if (testInfo.project.name === "ipad-chrome") {
-    await keepHandwriting.scrollIntoViewIfNeeded();
-    const keepButtonBox = await keepHandwriting.boundingBox();
-    expect(keepButtonBox).not.toBeNull();
+    await clearNow.scrollIntoViewIfNeeded();
+    const clearNowBox = await clearNow.boundingBox();
+    expect(clearNowBox).not.toBeNull();
     await page.touchscreen.tap(
-      keepButtonBox!.x + keepButtonBox!.width / 2,
-      keepButtonBox!.y + keepButtonBox!.height / 2,
+      clearNowBox!.x + clearNowBox!.width / 2,
+      clearNowBox!.y + clearNowBox!.height / 2,
     );
   } else {
-    await keepHandwriting.click();
+    await clearNow.click();
   }
   await expect(clearDialog).toBeHidden();
+  await expect(undoHandwriting).toBeDisabled();
+  expect((await clearedResponseSave).ok()).toBeTruthy();
+
+  const clearedCanvasBox = await canvas.boundingBox();
+  expect(clearedCanvasBox).not.toBeNull();
+  const redrawnResponseSave = page.waitForResponse(
+    (response) =>
+      response.url().includes("/responses/") &&
+      response.request().method() === "PUT",
+  );
+  await canvas.dispatchEvent("pointerdown", {
+    clientX: clearedCanvasBox!.x + 50,
+    clientY: clearedCanvasBox!.y + 60,
+    pointerId: 42,
+    pointerType: "touch",
+    pressure: 0.5,
+  });
+  await canvas.dispatchEvent("pointermove", {
+    clientX: clearedCanvasBox!.x + 210,
+    clientY: clearedCanvasBox!.y + 140,
+    pointerId: 42,
+    pointerType: "touch",
+    pressure: 0.5,
+  });
+  await canvas.dispatchEvent("pointerup", {
+    clientX: clearedCanvasBox!.x + 210,
+    clientY: clearedCanvasBox!.y + 140,
+    pointerId: 42,
+    pointerType: "touch",
+    pressure: 0.5,
+  });
+  expect((await redrawnResponseSave).ok()).toBeTruthy();
+  await expect(undoHandwriting).toBeEnabled();
 
   const originalAttemptId = new URL(page.url()).searchParams.get("attemptId");
   expect(originalAttemptId).toBeTruthy();

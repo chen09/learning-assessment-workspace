@@ -100,6 +100,23 @@ describe("HandwritingCanvas", () => {
     });
   });
 
+  it("opens the clear confirmation from an iPad touch action", () => {
+    render(
+      <HandwritingCanvas
+        initialStrokes={initialStrokes}
+        onChange={vi.fn()}
+      />,
+    );
+
+    fireEvent.touchEnd(
+      screen.getByRole("button", { name: "Clear handwriting" }),
+    );
+
+    expect(screen.getByRole("alertdialog")).toHaveTextContent(
+      "Clear all handwriting?",
+    );
+  });
+
   it("closes the clear confirmation from a touch action", () => {
     const onChange = vi.fn();
 
