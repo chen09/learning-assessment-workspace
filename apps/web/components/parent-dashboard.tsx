@@ -1,14 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, ShieldCheck, UsersRound } from "lucide-react";
+import { ArrowRight, BookOpen, History, ShieldCheck, UsersRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { useLanguage } from "@/components/language-provider";
 import { LanguageSwitcher } from "@/components/language-switcher";
-import { getParentAccessToken } from "@/lib/api-client";
+import {
+  type ChildProfile,
+  type Family,
+  getChildren,
+  getFamilies,
+  getParentAccessToken,
+} from "@/lib/api-client";
 
 function removeLegacyAuthCode() {
   const currentUrl = new URL(window.location.href);
@@ -27,13 +33,19 @@ function removeLegacyAuthCode() {
 export function ParentDashboard() {
   const router = useRouter();
   const [authenticated, setAuthenticated] = useState(false);
+  const [families, setFamilies] = useState<Family[] | null>(null);
+  const [children, setChildren] = useState<ChildProfile[]>([]);
+  const [workspaceError, setWorkspaceError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let active = true;
+    let hasParentSession = false;
     removeLegacyAuthCode();
 
-    void getParentAccessToken()
-      .then((accessToken) => {
+    void (async () => {
+      try {
+        const accessToken = await getParentAccessToken();
         if (!active) {
           return;
         }
@@ -41,18 +53,39 @@ export function ParentDashboard() {
           router.replace("/login/");
           return;
         }
+        hasParentSession = true;
         setAuthenticated(true);
-      })
-      .catch(() => {
-        if (active) {
+        setWorkspaceError(false);
+        setFamilies(null);
+
+        const nextFamilies = await getFamilies(accessToken);
+        if (!active) {
+          return;
+        }
+        const firstFamily = nextFamilies[0];
+        const nextChildren = firstFamily
+          ? await getChildren(firstFamily.id, accessToken)
+          : [];
+        if (!active) {
+          return;
+        }
+        setFamilies(nextFamilies);
+        setChildren(nextChildren);
+      } catch {
+        if (active && !hasParentSession) {
           router.replace("/login/");
         }
-      });
+        if (active && hasParentSession) {
+          setWorkspaceError(true);
+          setFamilies([]);
+        }
+      }
+    })();
 
     return () => {
       active = false;
     };
-  }, [router]);
+  }, [reloadKey, router]);
 
   if (!authenticated) {
     return null;
@@ -60,13 +93,120 @@ export function ParentDashboard() {
 
   return (
     <AppShell currentPath="/parent/" role="parent">
-      <ParentDashboardContent />
+      <ParentDashboardContent
+        childProfiles={children}
+        families={families}
+        workspaceError={workspaceError}
+        onRetry={() => setReloadKey((value) => value + 1)}
+      />
     </AppShell>
   );
 }
 
-function ParentDashboardContent() {
+function ParentDashboardContent({
+  families,
+  childProfiles,
+  workspaceError,
+  onRetry,
+}: {
+  families: Family[] | null;
+  childProfiles: ChildProfile[];
+  workspaceError: boolean;
+  onRetry: () => void;
+}) {
   const { t } = useLanguage();
+
+  if (families === null) {
+    return null;
+  }
+
+  if (workspaceError) {
+    return (
+      <>
+        <header className="page-header">
+          <div>
+            <p className="eyebrow">{t("parentDashboard.eyebrow")}</p>
+            <h1>{t("parentDashboard.workspaceUnavailable")}</h1>
+          </div>
+          <LanguageSwitcher />
+        </header>
+        <section className="settings-card">
+          <p>{t("parentDashboard.workspaceUnavailableDetails")}</p>
+          <button className="button primary" type="button" onClick={onRetry}>
+            {t("parentDashboard.tryAgain")}
+          </button>
+        </section>
+      </>
+    );
+  }
+
+  const activeFamily = families[0];
+  if (activeFamily) {
+    return (
+      <>
+        <header className="page-header">
+          <div>
+            <p className="eyebrow">{t("family.eyebrow")}</p>
+            <h1>{activeFamily.name}</h1>
+            <p className="lede">
+              {t("parentDashboard.activeFamilyDescription", {
+                count: childProfiles.length,
+              })}
+            </p>
+          </div>
+          <LanguageSwitcher />
+        </header>
+
+        <section className="settings-card dashboard-family-card">
+          <div className="settings-heading">
+            <UsersRound aria-hidden="true" />
+            <div>
+              <p className="eyebrow">{t("family.children")}</p>
+              <h2>{t("parentDashboard.learningToday")}</h2>
+            </div>
+          </div>
+          {childProfiles.length > 0 ? (
+            <div className="dashboard-child-grid">
+              {childProfiles.map((child) => (
+                <article className="dashboard-child-card" key={child.id}>
+                  <strong>{child.nickname}</strong>
+                  <span>{child.grade_stage}</span>
+                  <Link
+                    className="button primary"
+                    href={`/parent/create?familyId=${encodeURIComponent(activeFamily.id)}&childId=${encodeURIComponent(child.id)}`}
+                  >
+                    {t("family.createPractice")}
+                  </Link>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="dashboard-empty-children">
+              <p>{t("parentDashboard.noChildren")}</p>
+              <Link className="button primary" href="/parent/family/">
+                {t("family.addChild")}
+              </Link>
+            </div>
+          )}
+        </section>
+
+        <section className="dashboard-action-grid" aria-label={t("parentDashboard.quickActions")}>
+          <Link className="settings-card dashboard-action-card" href={`/parent/family/?familyId=${encodeURIComponent(activeFamily.id)}`}>
+            <ShieldCheck aria-hidden="true" />
+            <span>{t("nav.family")}</span>
+          </Link>
+          <Link className="settings-card dashboard-action-card" href={`/parent/library/?familyId=${encodeURIComponent(activeFamily.id)}`}>
+            <BookOpen aria-hidden="true" />
+            <span>{t("nav.library")}</span>
+          </Link>
+          <Link className="settings-card dashboard-action-card" href={`/parent/history/?familyId=${encodeURIComponent(activeFamily.id)}`}>
+            <History aria-hidden="true" />
+            <span>{t("nav.history")}</span>
+          </Link>
+        </section>
+      </>
+    );
+  }
 
   return (
     <>

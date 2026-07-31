@@ -334,6 +334,73 @@ button {
   font-size: 0.82rem;
 }
 
+.dashboard-family-card {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.dashboard-child-grid,
+.dashboard-action-grid {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.dashboard-child-grid {
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+}
+
+.dashboard-child-card {
+  display: grid;
+  gap: 0.7rem;
+  border: 1px solid #dce4ff;
+  border-radius: 1rem;
+  background: var(--blue-soft);
+  padding: 1rem;
+}
+
+.dashboard-child-card strong {
+  font-size: 1.05rem;
+}
+
+.dashboard-child-card span {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.dashboard-child-card .button {
+  justify-content: center;
+}
+
+.dashboard-empty-children {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+}
+
+.dashboard-empty-children p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.dashboard-action-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dashboard-action-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  box-shadow: none;
+  color: var(--ink);
+  font-weight: 760;
+  text-decoration: none;
+}
+
+.dashboard-action-card svg {
+  color: var(--blue-dark);
+}
+
 .text-link,
 .quiet-link {
   display: inline-flex;
@@ -2004,6 +2071,10 @@ button {
 
   .page-header {
     display: grid;
+  }
+
+  .dashboard-action-grid {
+    grid-template-columns: 1fr;
   }
 
   .work-header {
