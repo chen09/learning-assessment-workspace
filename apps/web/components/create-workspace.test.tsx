@@ -280,6 +280,121 @@ describe("CreateWorkspace", () => {
     ).toBeInTheDocument();
   });
 
+  it("turns one parent-authored question into a reviewed and assigned set", async () => {
+    mocks.previewStructuredQuestionSet.mockResolvedValue({
+      title: "Weather check",
+      subject: "English",
+      locale: "en",
+      question_count: 1,
+      total_points: 2,
+      estimated_minutes: 5,
+      knowledge_tag_count: 1,
+      answer_keys_present: true,
+      checksum: "manual12345678",
+      source_summary: { source_kind: "manual" },
+      questions: [
+        {
+          position: 1,
+          type: "typed_text",
+          prompt: "Complete: If it ___ tomorrow, we will stay home.",
+          options: [],
+          answer_key: { text: "rains" },
+          rubric: { grading_mode: "exact" },
+          points: 2,
+          knowledge_code: "manual-practice",
+        },
+      ],
+    });
+    mocks.importStructuredQuestionSet.mockResolvedValue({
+      question_set_id: "manual-question-set-1",
+      assignment_id: "manual-assignment-1",
+      status: "confirmed",
+      reused_existing: false,
+    });
+
+    render(<CreateWorkspace />);
+
+    await screen.findByRole("combobox", { name: "Child" });
+    fireEvent.click(screen.getByRole("button", { name: "Start simple" }));
+    fireEvent.change(screen.getByLabelText("Practice title"), {
+      target: { value: "Weather check" },
+    });
+    fireEvent.change(screen.getByLabelText("Question"), {
+      target: { value: "Complete: If it ___ tomorrow, we will stay home." },
+    });
+    fireEvent.change(screen.getByLabelText("Answer or grading guide"), {
+      target: { value: "rains" },
+    });
+    fireEvent.change(screen.getByLabelText("Points"), {
+      target: { value: "2" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create review draft" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Review before assigning" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", {
+        name: "Complete: If it ___ tomorrow, we will stay home.",
+      }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Confirm and assign" }));
+    await waitFor(() => {
+      expect(mocks.importStructuredQuestionSet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          family_id: "family-1",
+          child_id: "child-1",
+          source_name: "Manual question",
+          document: expect.objectContaining({
+            question_set: expect.objectContaining({
+              title: "Weather check",
+              source_mode: "manual",
+            }),
+            questions: [
+              expect.objectContaining({
+                type: "typed_text",
+                answer_key: { text: "rains" },
+                points: 2,
+              }),
+            ],
+          }),
+        }),
+        "parent-token",
+        expect.stringContaining("manual-"),
+      );
+    });
+  });
+
+  it("requires a parent-authored choice answer to match one listed option", async () => {
+    render(<CreateWorkspace />);
+
+    await screen.findByRole("combobox", { name: "Child" });
+    fireEvent.click(screen.getByRole("button", { name: "Start simple" }));
+    fireEvent.change(screen.getByLabelText("Response type"), {
+      target: { value: "single_choice" },
+    });
+    fireEvent.change(screen.getByLabelText("Question"), {
+      target: { value: "Choose a greeting." },
+    });
+    fireEvent.change(screen.getByLabelText("Choices, one per line"), {
+      target: { value: "Hello\nGoodbye" },
+    });
+    fireEvent.change(screen.getByLabelText("Answer or grading guide"), {
+      target: { value: "Welcome" },
+    });
+    expect(
+      screen.getByRole("button", { name: "Create review draft" }),
+    ).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText("Answer or grading guide"), {
+      target: { value: "Hello" },
+    });
+    expect(
+      screen.getByRole("button", { name: "Create review draft" }),
+    ).toBeEnabled();
+  });
+
   it("keeps a completed paper private until the reviewed JSON creates its submitted attempt", async () => {
     const document = {
       schema_version: "1.0",
