@@ -10,6 +10,7 @@ from app.api.assignments import router as assignments_router
 from app.api.attempts import router as attempts_router
 from app.api.children import router as children_router
 from app.api.client_logs import router as client_logs_router
+from app.api.completed_worksheets import router as completed_worksheets_router
 from app.api.deletions import router as deletions_router
 from app.api.demo import router as demo_router
 from app.api.families import router as families_router
@@ -99,6 +100,7 @@ def create_app() -> FastAPI:
     )
     application.include_router(children_router)
     application.include_router(client_logs_router)
+    application.include_router(completed_worksheets_router)
     application.include_router(assignments_router)
     application.include_router(attempts_router)
     application.include_router(demo_router)

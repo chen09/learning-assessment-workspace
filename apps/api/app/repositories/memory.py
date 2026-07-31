@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from argon2 import PasswordHasher
 
@@ -20,9 +20,12 @@ from app.domain.models import (
     AttemptResults,
     Child,
     ChildAssignmentSummary,
+    CompletedWorksheetImport,
+    CompletedWorksheetStatus,
     CompleteReviewRequest,
     CreateAssignmentRequest,
     CreateChildRequest,
+    CreateCompletedWorksheetRequest,
     CreateDeletionRequest,
     CreateFamilyInvitationRequest,
     CreateFamilyRequest,
@@ -91,6 +94,8 @@ class MemoryRepository:
         self.child_pin_locked_until: dict[str, datetime] = {}
         self.imports: dict[str, QuestionSetImport] = {}
         self.import_idempotency: dict[tuple[str, str], str] = {}
+        self.completed_worksheet_imports: dict[str, CompletedWorksheetImport] = {}
+        self.completed_worksheet_idempotency: dict[tuple[str, str], str] = {}
         self.structured_imports: dict[tuple[str, str], str] = {}
         self.confirm_idempotency: dict[tuple[str, str], str] = {}
         self.assignment_idempotency: dict[tuple[str, str], str] = {}
@@ -1239,6 +1244,79 @@ class MemoryRepository:
         self.questions.update({str(question.id): question for question in questions})
         self.imports[str(imported.id)] = imported
         self.import_idempotency[record_key] = str(imported.id)
+        return imported
+
+    async def create_completed_worksheet_import(
+        self,
+        request: CreateCompletedWorksheetRequest,
+        idempotency_key: str,
+        parent_id: str,
+    ) -> CompletedWorksheetImport:
+        family_id = str(request.family_id)
+        child = self.children.get(str(request.child_id))
+        if (
+            family_id not in self.families
+            or parent_id not in self.family_parents.get(family_id, set())
+            or child is None
+            or child.family_id != request.family_id
+        ):
+            raise NotFoundError
+        record_key = (family_id, idempotency_key)
+        existing_id = self.completed_worksheet_idempotency.get(record_key)
+        if existing_id is not None:
+            return self.completed_worksheet_imports[existing_id]
+
+        worksheet_id = uuid4()
+        job = Job(
+            family_id=request.family_id,
+            subject_id=worksheet_id,
+            type="analyze_completed_worksheet",
+            payload={"schema_version": "1.0"},
+        )
+        imported = CompletedWorksheetImport(
+            id=worksheet_id,
+            family_id=request.family_id,
+            child_id=request.child_id,
+            title=request.title,
+            subject=request.subject,
+            document_language=request.document_language,
+            feedback_language=request.feedback_language,
+            filenames=request.filenames,
+            response_paths=request.response_paths,
+            answer_source_paths=request.answer_source_paths,
+            reference_source_paths=request.reference_source_paths,
+            job=job,
+        )
+        self.completed_worksheet_imports[str(imported.id)] = imported
+        self.completed_worksheet_idempotency[record_key] = str(imported.id)
+        self.jobs[str(job.id)] = job
+        return imported
+
+    def complete_completed_worksheet_analysis(self, job: Job) -> Job:
+        imported = self.completed_worksheet_imports.get(str(job.subject_id))
+        if imported is None:
+            raise NotFoundError
+        imported.status = CompletedWorksheetStatus.NEEDS_REVIEW
+        imported.job = job
+        self.completed_worksheet_imports[str(imported.id)] = imported
+        self.jobs[str(job.id)] = job
+        return job
+
+    async def get_completed_worksheet_import(
+        self,
+        worksheet_id: str,
+        parent_id: str,
+    ) -> CompletedWorksheetImport:
+        imported = self.completed_worksheet_imports.get(worksheet_id)
+        if (
+            imported is None
+            or parent_id not in self.family_parents.get(str(imported.family_id), set())
+        ):
+            raise NotFoundError
+        job = self.jobs.get(str(imported.job.id))
+        if job is None:
+            raise NotFoundError
+        imported.job = job
         return imported
 
     async def import_structured_question_set(
