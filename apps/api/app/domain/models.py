@@ -464,6 +464,24 @@ class CompletedWorksheetImport(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+class CompletedWorksheetResponseInput(BaseModel):
+    """One reviewed answer region from an already-completed paper."""
+
+    question_position: int = Field(gt=0)
+    kind: ResponseKind = ResponseKind.PHOTO
+    answer: dict[str, Any] = Field(default_factory=dict)
+
+
+class CompletedWorksheetConfirmation(BaseModel):
+    """The durable learning records created from a parent-confirmed scan."""
+
+    completed_worksheet: CompletedWorksheetImport
+    question_set_id: UUID
+    assignment: Assignment
+    attempt: Attempt
+    grading_job: Job
+
+
 class QuestionSetDraft(BaseModel):
     question_set: QuestionSet
     questions: list[Question]

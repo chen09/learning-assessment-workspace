@@ -87,6 +87,14 @@ export type UploadIntent = {
   expires_in: number;
 };
 
+export type CompletedWorksheetImport = {
+  id: string;
+  status: "processing" | "needs_review" | "grading" | "results_ready";
+  assignment_id: string | null;
+  attempt_id: string | null;
+  job: { id: string; status: string; type: string };
+};
+
 const CHILD_TOKEN_KEY = "luma-child-session";
 const CHILD_PROFILE_KEY = "luma-child-profile";
 
@@ -1026,6 +1034,74 @@ export async function createQuestionSetImport(
     status: string;
   }>(
     "/v1/question-sets/imports",
+    {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify(payload),
+    },
+    parentToken,
+  );
+}
+
+export async function createCompletedWorksheetImport(
+  payload: {
+    family_id: string;
+    child_id: string;
+    title: string;
+    subject: string;
+    document_language: "zh" | "ja" | "en";
+    feedback_language: "zh" | "ja" | "en";
+    filenames: string[];
+    response_paths: string[];
+    answer_source_paths?: string[];
+    reference_source_paths?: string[];
+  },
+  parentToken: string,
+  idempotencyKey: string,
+) {
+  return apiRequest<CompletedWorksheetImport>(
+    "/v1/completed-worksheets",
+    {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify(payload),
+    },
+    parentToken,
+  );
+}
+
+export async function getCompletedWorksheetImport(
+  worksheetId: string,
+  parentToken: string,
+) {
+  return apiRequest<CompletedWorksheetImport>(
+    `/v1/completed-worksheets/${encodeURIComponent(worksheetId)}`,
+    { method: "GET" },
+    parentToken,
+  );
+}
+
+export async function confirmCompletedWorksheetImport(
+  worksheetId: string,
+  payload: {
+    document: StructuredQuestionSetDocument;
+    responses: Array<{
+      question_position: number;
+      kind: "choice" | "text" | "tokens" | "strokes" | "photo";
+      answer: Record<string, unknown>;
+    }>;
+  },
+  parentToken: string,
+  idempotencyKey: string,
+) {
+  return apiRequest<{
+    completed_worksheet: CompletedWorksheetImport;
+    question_set_id: string;
+    assignment: { id: string; status: string };
+    attempt: { id: string; submitted_at: string | null };
+    grading_job: { id: string; status: string; type: string };
+  }>(
+    `/v1/completed-worksheets/${encodeURIComponent(worksheetId)}/confirm`,
     {
       method: "POST",
       headers: { "Idempotency-Key": idempotencyKey },

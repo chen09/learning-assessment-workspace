@@ -429,6 +429,216 @@
         "title": "CompleteReviewRequest",
         "type": "object"
       },
+      "CompletedWorksheetConfirmation": {
+        "description": "The durable learning records created from a parent-confirmed scan.",
+        "properties": {
+          "assignment": {
+            "$ref": "#/components/schemas/Assignment"
+          },
+          "attempt": {
+            "$ref": "#/components/schemas/Attempt"
+          },
+          "completed_worksheet": {
+            "$ref": "#/components/schemas/CompletedWorksheetImport"
+          },
+          "grading_job": {
+            "$ref": "#/components/schemas/Job"
+          },
+          "question_set_id": {
+            "format": "uuid",
+            "title": "Question Set Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "completed_worksheet",
+          "question_set_id",
+          "assignment",
+          "attempt",
+          "grading_job"
+        ],
+        "title": "CompletedWorksheetConfirmation",
+        "type": "object"
+      },
+      "CompletedWorksheetImport": {
+        "properties": {
+          "answer_source_paths": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Answer Source Paths",
+            "type": "array"
+          },
+          "assignment_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignment Id"
+          },
+          "attempt_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "child_id": {
+            "format": "uuid",
+            "title": "Child Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "document_language": {
+            "enum": [
+              "en",
+              "ja",
+              "zh"
+            ],
+            "title": "Document Language",
+            "type": "string"
+          },
+          "family_id": {
+            "format": "uuid",
+            "title": "Family Id",
+            "type": "string"
+          },
+          "feedback_language": {
+            "enum": [
+              "en",
+              "ja",
+              "zh"
+            ],
+            "title": "Feedback Language",
+            "type": "string"
+          },
+          "filenames": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Filenames",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "job": {
+            "$ref": "#/components/schemas/Job"
+          },
+          "reference_source_paths": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reference Source Paths",
+            "type": "array"
+          },
+          "response_paths": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Response Paths",
+            "type": "array"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CompletedWorksheetStatus",
+            "default": "processing"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "family_id",
+          "child_id",
+          "title",
+          "subject",
+          "document_language",
+          "feedback_language",
+          "filenames",
+          "response_paths",
+          "job"
+        ],
+        "title": "CompletedWorksheetImport",
+        "type": "object"
+      },
+      "CompletedWorksheetResponseInput": {
+        "description": "One reviewed answer region from an already-completed paper.",
+        "properties": {
+          "answer": {
+            "additionalProperties": true,
+            "title": "Answer",
+            "type": "object"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ResponseKind",
+            "default": "photo"
+          },
+          "question_position": {
+            "exclusiveMinimum": 0.0,
+            "title": "Question Position",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "question_position"
+        ],
+        "title": "CompletedWorksheetResponseInput",
+        "type": "object"
+      },
+      "CompletedWorksheetStatus": {
+        "enum": [
+          "processing",
+          "needs_review",
+          "confirmed",
+          "grading",
+          "results_ready",
+          "failed"
+        ],
+        "title": "CompletedWorksheetStatus",
+        "type": "string"
+      },
+      "ConfirmCompletedWorksheetRequest": {
+        "description": "The parent's reviewed extraction; answers stay attached to the scan.",
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/ImportDocument"
+          },
+          "responses": {
+            "items": {
+              "$ref": "#/components/schemas/CompletedWorksheetResponseInput"
+            },
+            "title": "Responses",
+            "type": "array"
+          }
+        },
+        "required": [
+          "document",
+          "responses"
+        ],
+        "title": "ConfirmCompletedWorksheetRequest",
+        "type": "object"
+      },
       "CreateAssignmentRequest": {
         "properties": {
           "child_id": {
@@ -501,6 +711,97 @@
           "pin"
         ],
         "title": "CreateChildRequest",
+        "type": "object"
+      },
+      "CreateCompletedWorksheetRequest": {
+        "description": "A parent-uploaded paper that already contains a child's answers.",
+        "properties": {
+          "answer_source_paths": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 30,
+            "title": "Answer Source Paths",
+            "type": "array"
+          },
+          "child_id": {
+            "format": "uuid",
+            "title": "Child Id",
+            "type": "string"
+          },
+          "document_language": {
+            "enum": [
+              "en",
+              "ja",
+              "zh"
+            ],
+            "title": "Document Language",
+            "type": "string"
+          },
+          "family_id": {
+            "format": "uuid",
+            "title": "Family Id",
+            "type": "string"
+          },
+          "feedback_language": {
+            "enum": [
+              "en",
+              "ja",
+              "zh"
+            ],
+            "title": "Feedback Language",
+            "type": "string"
+          },
+          "filenames": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Filenames",
+            "type": "array"
+          },
+          "reference_source_paths": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Reference Source Paths",
+            "type": "array"
+          },
+          "response_paths": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Response Paths",
+            "type": "array"
+          },
+          "subject": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Subject",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "family_id",
+          "child_id",
+          "title",
+          "subject",
+          "document_language",
+          "feedback_language",
+          "filenames",
+          "response_paths"
+        ],
+        "title": "CreateCompletedWorksheetRequest",
         "type": "object"
       },
       "CreateDeletionRequest": {
@@ -3737,6 +4038,217 @@
         "summary": "Create Client Log",
         "tags": [
           "client-logs"
+        ]
+      }
+    },
+    "/v1/completed-worksheets": {
+      "post": {
+        "description": "Start analysis without treating an unreviewed extraction as a task.",
+        "operationId": "create_completed_worksheet_import_v1_completed_worksheets_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 120,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCompletedWorksheetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompletedWorksheetImport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Completed Worksheet Import",
+        "tags": [
+          "completed-worksheets"
+        ]
+      }
+    },
+    "/v1/completed-worksheets/{worksheet_id}": {
+      "get": {
+        "operationId": "get_completed_worksheet_import_v1_completed_worksheets__worksheet_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "worksheet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Worksheet Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompletedWorksheetImport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Completed Worksheet Import",
+        "tags": [
+          "completed-worksheets"
+        ]
+      }
+    },
+    "/v1/completed-worksheets/{worksheet_id}/confirm": {
+      "post": {
+        "description": "Create the formal question set and submitted attempt after review.",
+        "operationId": "confirm_completed_worksheet_import_v1_completed_worksheets__worksheet_id__confirm_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "worksheet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Worksheet Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 120,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmCompletedWorksheetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompletedWorksheetConfirmation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm Completed Worksheet Import",
+        "tags": [
+          "completed-worksheets"
         ]
       }
     },

@@ -140,6 +140,86 @@ def test_parent_can_start_completed_worksheet_analysis_for_a_child() -> None:
     assert refreshed.json()["job"]["status"] == "succeeded"
 
 
+def test_parent_confirmation_turns_completed_worksheet_into_submitted_attempt() -> None:
+    """A reviewed paper becomes one immutable submitted attempt, exactly once."""
+    client = TestClient(create_app())
+    fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+    created = client.post(
+        "/v1/completed-worksheets",
+        headers={
+            **PARENT_HEADERS,
+            "Idempotency-Key": "completed-confirmation-source",
+        },
+        json={
+            "family_id": fixture["family"]["id"],
+            "child_id": fixture["child"]["id"],
+            "title": "Completed English check",
+            "subject": "English",
+            "document_language": "ja",
+            "feedback_language": "ja",
+            "filenames": ["completed-check.jpg"],
+            "response_paths": ["family/completed/completed-check.jpg"],
+        },
+    )
+    assert created.status_code == 202
+
+    # The analysis worker is the only component allowed to expose a reviewable
+    # draft; confirmation must not race an unfinished extraction.
+    client.post("/v1/demo/jobs/process-next", headers=PARENT_HEADERS)
+
+    body = {
+        "document": _structured_question_set(),
+        "responses": [
+            {
+                "question_position": 1,
+                "kind": "photo",
+                "answer": {
+                    "source_paths": ["family/completed/completed-check.jpg"],
+                    "page_numbers": [1],
+                },
+            },
+        ],
+    }
+    headers = {
+        **PARENT_HEADERS,
+        "Idempotency-Key": "confirm-completed-check",
+    }
+    confirmed = client.post(
+        f"/v1/completed-worksheets/{created.json()['id']}/confirm",
+        headers=headers,
+        json=body,
+    )
+    repeated = client.post(
+        f"/v1/completed-worksheets/{created.json()['id']}/confirm",
+        headers=headers,
+        json=body,
+    )
+
+    assert confirmed.status_code == 201
+    payload = confirmed.json()
+    assert payload["completed_worksheet"]["status"] == "grading"
+    assert payload["assignment"]["status"] == "grading"
+    assert payload["attempt"]["submitted_at"] is not None
+    assert payload["grading_job"]["type"] == "grade_submission"
+    assert repeated.json()["attempt"]["id"] == payload["attempt"]["id"]
+
+    session = client.post(
+        f"/v1/children/{fixture['child']['id']}/sessions",
+        json={"pin": "123456"},
+    ).json()
+    processed = client.post(
+        "/v1/demo/jobs/process-next",
+        headers=PARENT_HEADERS,
+    )
+    results = client.get(
+        f"/v1/attempts/{payload['attempt']['id']}/results",
+        headers={"Authorization": f"Bearer {session['access_token']}"},
+    )
+    assert processed.status_code == 200
+    assert results.status_code == 200
+    assert results.json()["results"][0]["outcome"] == "needs_parent_review"
+
+
 def test_parent_can_confirm_structured_json_and_assign_it_without_exposing_answers() -> None:
     client = TestClient(create_app())
     fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
