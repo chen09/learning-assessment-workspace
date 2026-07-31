@@ -41,6 +41,7 @@ import {
 type CreateMode = "generate" | "import" | "completed" | "structured" | "manual";
 type ImportPurpose = "generate_similar" | "use_as_questions";
 type Stage = "compose" | "review";
+type ManualQuestionType = "single_choice" | "typed_text" | "handwriting";
 
 type CompletedPaperAnswerRegion = {
   question_position: number;
@@ -272,6 +273,15 @@ export function CreateWorkspace() {
   const [structuredDocument, setStructuredDocument] =
     useState<StructuredQuestionSetDocument | null>(null);
   const [structuredChecksum, setStructuredChecksum] = useState("");
+  const [manualTitle, setManualTitle] = useState("New practice");
+  const [manualSubject, setManualSubject] = useState("Mixed practice");
+  const [manualLocale, setManualLocale] = useState<"zh" | "ja" | "en">("en");
+  const [manualQuestionType, setManualQuestionType] =
+    useState<ManualQuestionType>("typed_text");
+  const [manualQuestionPrompt, setManualQuestionPrompt] = useState("");
+  const [manualOptions, setManualOptions] = useState("");
+  const [manualAnswer, setManualAnswer] = useState("");
+  const [manualPoints, setManualPoints] = useState("1");
   const [prompt, setPrompt] = useState(
     "Make a short mixed practice from this week’s algebra and English work.",
   );
@@ -386,13 +396,28 @@ export function CreateWorkspace() {
   const hasAssignmentTarget = Boolean(
     selectedFamilyId && selectedChildId,
   );
+  const manualOptionList = manualOptions
+    .split("\n")
+    .map((option) => option.trim())
+    .filter(Boolean);
+  const manualPointsValue = Number(manualPoints);
+  const manualQuestionIsReady =
+    Boolean(
+      manualTitle.trim() && manualQuestionPrompt.trim() && manualAnswer.trim(),
+    ) &&
+    Number.isFinite(manualPointsValue) &&
+    manualPointsValue > 0 &&
+    (manualQuestionType !== "single_choice" ||
+      manualOptionList.some((option) => option === manualAnswer.trim()));
   const canCreate =
     hasAssignmentTarget &&
     (mode === "import" || mode === "completed"
       ? Boolean(fileName)
       : mode === "structured"
         ? structuredFile !== null
-        : true);
+        : mode === "manual"
+          ? manualQuestionIsReady
+          : true);
   const isLessonOneImport = files.some(
     (file) => file.name === "english_lesson1_similar_practice.pdf",
   );
@@ -521,6 +546,78 @@ export function CreateWorkspace() {
       return;
     }
 
+    if (mode === "manual") {
+      if (!manualQuestionIsReady) {
+        setRequestStatus("error");
+        return;
+      }
+      const parentToken = await getParentAccessToken();
+      if (!parentToken) {
+        setRequestStatus("error");
+        return;
+      }
+      const answer = manualAnswer.trim();
+      const document: StructuredQuestionSetDocument = {
+        schema_version: "1.0",
+        question_set: {
+          title: manualTitle.trim(),
+          subject: manualSubject.trim() || "Mixed practice",
+          locale: manualLocale,
+          difficulty: "adaptive",
+          source_mode: "manual",
+          instructions: "Answer the question.",
+          estimated_minutes: 5,
+          source_summary: { source_kind: "manual" },
+        },
+        knowledge_tags: [
+          { code: "manual-practice", label: "Parent-authored practice" },
+        ],
+        questions: [
+          {
+            position: 1,
+            type: manualQuestionType,
+            prompt: manualQuestionPrompt.trim(),
+            options:
+              manualQuestionType === "single_choice" ? manualOptionList : [],
+            answer_key:
+              manualQuestionType === "single_choice"
+                ? { choice: manualOptionList.indexOf(answer) }
+                : manualQuestionType === "handwriting"
+                  ? { reference: answer }
+                  : { text: answer },
+            rubric:
+              manualQuestionType === "handwriting"
+                ? { grading_mode: "parent_review" }
+                : { grading_mode: "exact" },
+            points: manualPointsValue,
+            knowledge_code: "manual-practice",
+          },
+        ],
+      };
+      setRequestStatus("working");
+      try {
+        const preview = await previewStructuredQuestionSet(document, parentToken);
+        setStructuredDocument(document);
+        setStructuredChecksum(preview.checksum);
+        setDraftQuestions(
+          preview.questions.map((question) => ({
+            id: `preview-${question.position}`,
+            position: question.position,
+            type: question.type,
+            prompt: question.prompt,
+            options: question.options.length > 0 ? question.options : null,
+            points: question.points,
+            answer_key: question.answer_key,
+          })),
+        );
+        setStage("review");
+        setRequestStatus("idle");
+      } catch {
+        setRequestStatus("error");
+      }
+      return;
+    }
+
     const { familyId } = getRouteIds();
     if (!familyId) {
       setStage("review");
@@ -623,11 +720,10 @@ export function CreateWorkspace() {
 
   const confirmAndAssign = async () => {
     const { familyId, childId } = getRouteIds();
-    if (mode === "structured") {
+    if (mode === "structured" || mode === "manual") {
       if (
         !familyId ||
         !childId ||
-        !structuredFile ||
         !structuredDocument ||
         !structuredChecksum
       ) {
@@ -645,11 +741,11 @@ export function CreateWorkspace() {
           {
             family_id: familyId,
             child_id: childId,
-            source_name: structuredFile.name,
+            source_name: structuredFile?.name ?? "Manual question",
             document: structuredDocument,
           },
           parentToken,
-          `structured-${structuredChecksum}-${childId}`,
+          `${mode}-${structuredChecksum}-${childId}`,
         );
         setQuestionSetId(imported.question_set_id);
         setAssignmentId(imported.assignment_id);
@@ -977,7 +1073,8 @@ export function CreateWorkspace() {
             <article key={question.prompt}>
               <div className="draft-question-number">{index + 1}</div>
               <div>
-                {mode === "structured" && editingQuestionId === question.id ? (
+                {(mode === "structured" || mode === "manual") &&
+                editingQuestionId === question.id ? (
                   <div className="draft-question-editor">
                     <label>
                       Question wording
@@ -1040,7 +1137,8 @@ export function CreateWorkspace() {
                   </>
                 )}
               </div>
-              {mode === "structured" && editingQuestionId !== question.id ? (
+              {(mode === "structured" || mode === "manual") &&
+              editingQuestionId !== question.id ? (
                 <button
                   className="quiet-link"
                   onClick={() => beginStructuredQuestionEdit(question)}
@@ -1435,19 +1533,108 @@ export function CreateWorkspace() {
                 <span><BookOpenText /></span>
                 <div>
                   <h2>Start with one structured question</h2>
-                  <p>You can add more questions on the review screen.</p>
+                  <p>
+                    Create one question, review it privately, then assign it to
+                    your child.
+                  </p>
                 </div>
+              </div>
+              <label className="field-label">
+                Practice title
+                <input
+                  aria-label="Practice title"
+                  onChange={(event) => setManualTitle(event.target.value)}
+                  value={manualTitle}
+                />
+              </label>
+              <div className="creation-options">
+                <label>
+                  Subject
+                  <input
+                    aria-label="Manual subject"
+                    onChange={(event) => setManualSubject(event.target.value)}
+                    value={manualSubject}
+                  />
+                </label>
+                <label>
+                  Language
+                  <select
+                    aria-label="Question language"
+                    onChange={(event) =>
+                      setManualLocale(event.target.value as "zh" | "ja" | "en")
+                    }
+                    value={manualLocale}
+                  >
+                    <option value="en">English</option>
+                    <option value="ja">日本語</option>
+                    <option value="zh">中文</option>
+                  </select>
+                </label>
+                <label>
+                  Response type
+                  <select
+                    aria-label="Response type"
+                    onChange={(event) =>
+                      setManualQuestionType(
+                        event.target.value as ManualQuestionType,
+                      )
+                    }
+                    value={manualQuestionType}
+                  >
+                    <option value="typed_text">Text answer</option>
+                    <option value="single_choice">Choose one answer</option>
+                    <option value="handwriting">Handwritten answer</option>
+                  </select>
+                </label>
               </div>
               <label className="field-label">
                 Question
                 <textarea
+                  aria-label="Question"
+                  onChange={(event) => setManualQuestionPrompt(event.target.value)}
                   placeholder="Write the question children will see…"
                   rows={4}
+                  value={manualQuestionPrompt}
                 />
               </label>
+              {manualQuestionType === "single_choice" ? (
+                <label className="field-label">
+                  Choices, one per line
+                  <textarea
+                    aria-label="Choices, one per line"
+                    onChange={(event) => setManualOptions(event.target.value)}
+                    placeholder={"Option A\nOption B\nOption C"}
+                    rows={4}
+                    value={manualOptions}
+                  />
+                </label>
+              ) : null}
               <label className="field-label">
                 Answer or grading guide
-                <textarea placeholder="The expected answer…" rows={3} />
+                <textarea
+                  aria-label="Answer or grading guide"
+                  onChange={(event) => setManualAnswer(event.target.value)}
+                  placeholder={
+                    manualQuestionType === "handwriting"
+                      ? "A private reference answer for parent review…"
+                      : manualQuestionType === "single_choice"
+                        ? "Paste one option exactly as written above…"
+                        : "The exact answer children should enter…"
+                  }
+                  rows={3}
+                  value={manualAnswer}
+                />
+              </label>
+              <label className="field-label manual-points-field">
+                Points
+                <input
+                  aria-label="Points"
+                  min="0.5"
+                  onChange={(event) => setManualPoints(event.target.value)}
+                  step="0.5"
+                  type="number"
+                  value={manualPoints}
+                />
               </label>
             </>
           ) : null}

@@ -240,6 +240,96 @@ test("parent previews an AI JSON file before assigning its structured questions"
   ).toBeVisible();
 });
 
+test("parent authors one question and assigns it through the reviewed draft", async ({
+  page,
+  request,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "The shared fixture API import runs once; responsive UI is covered separately.",
+  );
+  const apiBaseUrl = "http://127.0.0.1:8017";
+  const fixtureKey = `e2e-manual-question-${testInfo.workerIndex}`;
+  const family = (await (
+    await request.post(`${apiBaseUrl}/v1/families`, {
+      headers: {
+        Authorization: "Bearer parent-fixture",
+        "Idempotency-Key": `${fixtureKey}-family`,
+      },
+      data: { name: "Manual question family" },
+    })
+  ).json()) as { id: string };
+  const child = (await (
+    await request.post(`${apiBaseUrl}/v1/families/${family.id}/children`, {
+      headers: {
+        Authorization: "Bearer parent-fixture",
+        "Idempotency-Key": `${fixtureKey}-child`,
+      },
+      data: {
+        nickname: "Manual child",
+        grade_stage: "Junior high 1",
+        ui_language: "en",
+        pin: "123456",
+      },
+    })
+  ).json()) as { id: string };
+
+  await page.goto(
+    `/parent/create/?familyId=${encodeURIComponent(family.id)}&childId=${encodeURIComponent(child.id)}`,
+  );
+  await page.getByRole("button", { name: "Start simple" }).click();
+  await page.getByLabel("Practice title").fill("Weather check");
+  await page
+    .getByRole("textbox", { name: "Question", exact: true })
+    .fill("Complete: If it ___ tomorrow, we will stay home.");
+  await page.getByLabel("Answer or grading guide").fill("rains");
+  await page.getByLabel("Points").fill("2");
+  await page.getByRole("button", { name: "Create review draft" }).click();
+  await expect(
+    page.getByRole("heading", {
+      name: "Complete: If it ___ tomorrow, we will stay home.",
+    }),
+  ).toBeVisible();
+
+  const importResponse = page.waitForResponse(
+    (response) =>
+      response.url() ===
+        `${apiBaseUrl}/v1/question-sets/imports/structured` &&
+      response.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "Confirm and assign" }).click();
+  const importedRequest = await importResponse;
+  expect(importedRequest.request().postDataJSON()).toMatchObject({
+    source_name: "Manual question",
+    document: {
+      question_set: { source_mode: "manual", title: "Weather check" },
+      questions: [
+        {
+          type: "typed_text",
+          answer_key: { text: "rains" },
+          points: 2,
+        },
+      ],
+    },
+  });
+  const assignmentId = (await importedRequest.json() as {
+    assignment_id: string;
+  }).assignment_id;
+
+  await page.goto(
+    `/child/login/?childId=${encodeURIComponent(child.id)}&assignmentId=${encodeURIComponent(assignmentId)}`,
+  );
+  for (const digit of ["1", "2", "3", "4", "5", "6"]) {
+    await page.getByRole("button", { name: digit, exact: true }).click();
+  }
+  await page.getByRole("button", { name: "Open my work" }).click();
+  await expect(
+    page.getByRole("heading", {
+      name: "Complete: If it ___ tomorrow, we will stay home.",
+    }),
+  ).toBeVisible();
+});
+
 test("parent validates a local-AI completed-paper review before submitting it", async ({
   page,
   request,
