@@ -673,6 +673,22 @@ describe("CreateWorkspace", () => {
       assignment_id: null,
       attempt_id: null,
       response_paths: ["family-1/completed-paper/responses-completed-paper.jpg"],
+      extraction: {
+        schema_version: "1.0",
+        status: "needs_parent_confirmation",
+        document,
+        answer_regions: [
+          {
+            question_position: 1,
+            page_numbers: [1],
+            regions: [{ x: 0.12, y: 0.45, width: 0.7, height: 0.2 }],
+            transcription: "(x - 4)(x + 4)",
+            legibility: "clear",
+          },
+        ],
+        confidence: 0.9,
+        warnings: [],
+      },
       job: { id: "analysis-job-1", status: "completed", type: "analyze_completed_worksheet" },
     });
     mocks.confirmCompletedWorksheetImport.mockResolvedValue({
@@ -745,6 +761,15 @@ describe("CreateWorkspace", () => {
       expect.stringContaining("completed-worksheet-"),
     );
 
+    expect(
+      screen.getByText(
+        "A private AI draft is ready. Review every question and answer region before confirming.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Review ready · questions: 1 · answer regions: 1"),
+    ).toBeInTheDocument();
+
     const review = {
       document,
       answer_regions: [
@@ -757,9 +782,6 @@ describe("CreateWorkspace", () => {
         },
       ],
     };
-    expect(
-      screen.getByRole("button", { name: "Copy local AI prompt" }),
-    ).toBeInTheDocument();
     fireEvent.change(
       screen.getByLabelText("Reviewed completed worksheet JSON"),
       {

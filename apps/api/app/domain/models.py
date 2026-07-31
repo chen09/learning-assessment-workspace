@@ -459,6 +459,7 @@ class CompletedWorksheetImport(BaseModel):
     response_paths: list[str]
     answer_source_paths: list[str] = Field(default_factory=list)
     reference_source_paths: list[str] = Field(default_factory=list)
+    extraction: dict[str, Any] = Field(default_factory=dict)
     status: CompletedWorksheetStatus = CompletedWorksheetStatus.PROCESSING
     assignment_id: UUID | None = None
     attempt_id: UUID | None = None

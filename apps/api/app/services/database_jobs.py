@@ -1,10 +1,16 @@
 import json
 from collections.abc import Awaitable, Callable
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any, Literal, cast
+from urllib.parse import quote
 
 import asyncpg
+import httpx
 import structlog
 
+from app.ai.codex_cli import CodexCLIGradingAdapter
+from app.ai.contracts import CompletedWorksheetAnalysisInput
 from app.domain.models import Job, Question, SavedResponse
 from app.fixtures.english_lesson_one import (
     lesson_one_question_specs,
@@ -50,6 +56,51 @@ def _visual_adapter_for_family(
     return None
 
 
+async def _download_private_images(
+    *,
+    supabase_url: str,
+    service_role_key: str,
+    family_id: str,
+    bucket: str,
+    paths: list[str],
+    destination: Path,
+    prefix: str,
+) -> list[Path]:
+    """Download only same-family PNG/JPEG files into the worker's temp directory."""
+    if not supabase_url or not service_role_key:
+        return []
+    image_paths = [
+        path
+        for path in paths
+        if Path(path).suffix.lower() in {".jpg", ".jpeg", ".png"}
+    ]
+    expected_prefix = f"{family_id}/"
+    if any(not path.startswith(expected_prefix) for path in image_paths):
+        raise RuntimeError("Worksheet image path is outside its family boundary.")
+    downloaded: list[Path] = []
+    async with httpx.AsyncClient(timeout=30) as client:
+        for index, path in enumerate(image_paths, start=1):
+            endpoint = (
+                f"{supabase_url.rstrip('/')}/storage/v1/object/{bucket}/"
+                f"{quote(path, safe='/')}"
+            )
+            response = await client.get(
+                endpoint,
+                headers={
+                    "Authorization": f"Bearer {service_role_key}",
+                    "apikey": service_role_key,
+                },
+            )
+            response.raise_for_status()
+            if len(response.content) > 15_000_000:
+                raise RuntimeError("Worksheet image exceeds the 15 MB analysis limit.")
+            suffix = Path(path).suffix.lower()
+            image_path = destination / f"{prefix}-{index}{suffix}"
+            image_path.write_bytes(response.content)
+            downloaded.append(image_path)
+    return downloaded
+
+
 async def fixture_job_handler(
     connection: asyncpg.Connection,
     job: dict[str, Any],
@@ -57,6 +108,8 @@ async def fixture_job_handler(
     visual_adapter: VisualGradingAdapter | None = None,
     allowed_visual_family_ids: frozenset[str] | None = None,
     minimum_confidence: float = 0.75,
+    supabase_url: str = "",
+    supabase_service_role_key: str = "",
 ) -> dict[str, Any]:
     if job["type"] == "purge_deleted_data":
         deletion = await connection.fetchrow(
@@ -111,16 +164,87 @@ async def fixture_job_handler(
         )
         if worksheet is None:
             raise RuntimeError("The completed worksheet upload no longer exists.")
-        extraction = {
+        response_paths = list(_json_value(worksheet["response_paths"]))
+        answer_source_paths = list(_json_value(worksheet["answer_source_paths"]))
+        reference_source_paths = list(
+            _json_value(worksheet["reference_source_paths"])
+        )
+        extraction: dict[str, Any] = {
             "schema_version": "1.0",
             "status": "needs_parent_confirmation",
             "artifact_kind": "completed_worksheet_scan",
-            "source_page_count": len(list(_json_value(worksheet["response_paths"]))),
+            "source_page_count": len(response_paths),
             "question_units": [],
             "warnings": [
                 "No question boundaries are final until a parent confirms them."
             ],
         }
+        adapter_name = "fixture-v1"
+        worksheet_adapter = _visual_adapter_for_family(
+            visual_adapter,
+            family_id=str(worksheet["family_id"]),
+            allowed_family_ids=allowed_visual_family_ids,
+        )
+        if (
+            isinstance(worksheet_adapter, CodexCLIGradingAdapter)
+            and supabase_url
+            and supabase_service_role_key
+        ):
+            with TemporaryDirectory(prefix="luma-private-worksheet-") as directory:
+                workspace = Path(directory)
+                response_images = await _download_private_images(
+                    supabase_url=supabase_url,
+                    service_role_key=supabase_service_role_key,
+                    family_id=str(worksheet["family_id"]),
+                    bucket="responses",
+                    paths=response_paths,
+                    destination=workspace,
+                    prefix="response",
+                )
+                if response_images:
+                    answer_key_images = await _download_private_images(
+                        supabase_url=supabase_url,
+                        service_role_key=supabase_service_role_key,
+                        family_id=str(worksheet["family_id"]),
+                        bucket="sources",
+                        paths=answer_source_paths,
+                        destination=workspace,
+                        prefix="answer-key",
+                    )
+                    reference_images = await _download_private_images(
+                        supabase_url=supabase_url,
+                        service_role_key=supabase_service_role_key,
+                        family_id=str(worksheet["family_id"]),
+                        bucket="sources",
+                        paths=reference_source_paths,
+                        destination=workspace,
+                        prefix="reference",
+                    )
+                    drafted = worksheet_adapter.analyze_completed_worksheet(
+                        CompletedWorksheetAnalysisInput(
+                            document_language=cast(
+                                Literal["en", "ja", "zh"],
+                                str(worksheet["document_language"]),
+                            ),
+                            feedback_language=cast(
+                                Literal["en", "ja", "zh"],
+                                str(worksheet["feedback_language"]),
+                            ),
+                            source_page_count=len(response_paths),
+                            answer_key_page_count=len(answer_source_paths),
+                            reference_page_count=len(reference_source_paths),
+                        ),
+                        response_page_images=response_images,
+                        answer_key_images=answer_key_images,
+                        reference_images=reference_images,
+                    )
+                    extraction = drafted.model_dump(mode="json")
+                    adapter_name = worksheet_adapter.version
+                else:
+                    extraction["warnings"].append(
+                        "Automatic extraction currently needs at least one PNG or JPEG "
+                        "worksheet page."
+                    )
         await connection.execute(
             """
             update public.completed_worksheet_imports
@@ -131,7 +255,7 @@ async def fixture_job_handler(
             json.dumps(extraction),
         )
         return {
-            "adapter": "fixture-v1",
+            "adapter": adapter_name,
             "job_type": job["type"],
             "schema_version": "1.0",
             "status": "needs_review",

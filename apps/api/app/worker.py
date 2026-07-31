@@ -32,6 +32,8 @@ async def run() -> None:
             visual_adapter=visual_adapter,
             allowed_visual_family_ids=frozenset(settings.codex_family_ids),
             minimum_confidence=settings.ai_minimum_confidence,
+            supabase_url=settings.supabase_url,
+            supabase_service_role_key=settings.supabase_service_role_key.get_secret_value(),
         ),
     )
     stop = asyncio.Event()

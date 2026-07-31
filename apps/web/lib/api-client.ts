@@ -94,6 +94,9 @@ export type CompletedWorksheetImport = {
   assignment_id: string | null;
   attempt_id: string | null;
   response_paths: string[];
+  answer_source_paths?: string[];
+  reference_source_paths?: string[];
+  extraction?: Record<string, unknown>;
   job: { id: string; status: string; type: string };
 };
 

@@ -6,6 +6,7 @@ from pydantic import ValidationError
 
 from app.ai.codex_cli import CodexCLIGradingAdapter
 from app.ai.contracts import (
+    CompletedWorksheetAnalysisInput,
     ExtractSourceInput,
     GeneratedQuestion,
     GenerateQuestionsInput,
@@ -193,6 +194,86 @@ def test_codex_cli_grades_anonymous_handwriting_with_a_locked_down_command() -> 
     assert grade.outcome == "correct"
     assert grade.awarded_points == 2
     assert grade.confidence == 0.94
+
+
+def test_codex_cli_only_returns_a_parent_review_draft_for_completed_paper(
+    tmp_path,
+) -> None:
+    observed: dict[str, object] = {}
+    page_path = tmp_path / "worksheet.png"
+    Image.new("RGB", (20, 20), "white").save(page_path)
+
+    def fake_runner(command: list[str], timeout_seconds: int) -> None:
+        observed["command"] = command
+        observed["timeout_seconds"] = timeout_seconds
+        output_path = command[command.index("--output-last-message") + 1]
+        with open(output_path, "w", encoding="utf-8") as output:
+            output.write(
+                json.dumps(
+                    {
+                        "schema_version": "1.0",
+                        "status": "needs_parent_confirmation",
+                        "document": {
+                            "schema_version": "1.0",
+                            "question_set": {
+                                "title": "Factorisation review",
+                                "subject": "Mathematics",
+                                "locale": "ja",
+                                "difficulty": "standard",
+                                "source_mode": "convert",
+                                "instructions": "Answer every question.",
+                                "estimated_minutes": 10,
+                                "source_summary": {
+                                    "source_kind": "completed_worksheet"
+                                },
+                            },
+                            "knowledge_tags": [
+                                {"code": "factorisation", "label": "Factorisation"}
+                            ],
+                            "questions": [
+                                {
+                                    "position": 1,
+                                    "type": "handwriting",
+                                    "prompt": "因数分解しなさい。",
+                                    "options": [],
+                                    "answer_key": {"reference": "(x - 4)(x + 4)"},
+                                    "rubric": {"grading_mode": "parent_review"},
+                                    "points": 1,
+                                    "knowledge_code": "factorisation",
+                                }
+                            ],
+                        },
+                        "answer_regions": [
+                            {
+                                "question_position": 1,
+                                "page_numbers": [1],
+                                "legibility": "clear",
+                            }
+                        ],
+                        "confidence": 0.82,
+                        "warnings": ["Parent confirmation is required."],
+                    }
+                )
+            )
+
+    result = CodexCLIGradingAdapter(runner=fake_runner).analyze_completed_worksheet(
+        CompletedWorksheetAnalysisInput(
+            document_language="ja",
+            feedback_language="zh",
+            source_page_count=1,
+        ),
+        response_page_images=[page_path],
+    )
+
+    command = observed["command"]
+    assert isinstance(command, list)
+    assert command[:2] == ["codex", "exec"]
+    assert command[command.index("--sandbox") + 1] == "read-only"
+    assert command.count("--image") == 1
+    assert "needs_parent_confirmation" in command[-1]
+    assert observed["timeout_seconds"] == 180
+    assert result.status == "needs_parent_confirmation"
+    assert result.document.questions[0].type == QuestionType.HANDWRITING
 
 
 def test_codex_cli_requests_feedback_in_the_child_language() -> None:

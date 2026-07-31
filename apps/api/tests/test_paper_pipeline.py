@@ -1,6 +1,8 @@
 import cv2
 import numpy as np
+import pytest
 
+from app.services.database_jobs import fixture_job_handler
 from app.services.paper_pipeline import (
     A4_PIXEL_SIZE,
     AnswerRegion,
@@ -54,3 +56,43 @@ def test_paper_scan_is_rectified_to_a4_and_split_by_question_coordinates() -> No
     assert answers[0].question_id == "question-1"
     assert decoded_answer is not None
     assert decoded_answer.shape[0] > 400
+
+
+@pytest.mark.asyncio
+async def test_completed_paper_without_an_allowed_ai_adapter_stays_manual_review() -> None:
+    executed: list[tuple[str, object, object]] = []
+
+    class FakeConnection:
+        async def fetchrow(self, _query: str, _worksheet_id: object):
+            return {
+                "id": "worksheet-1",
+                "family_id": "family-1",
+                "child_id": "child-1",
+                "title": "Completed worksheet",
+                "subject": "English",
+                "document_language": "en",
+                "feedback_language": "zh",
+                "filenames": ["page-1.jpg"],
+                "response_paths": ["family-1/worksheet/page-1.jpg"],
+                "answer_source_paths": ["family-1/worksheet/answer-key.jpg"],
+                "reference_source_paths": [],
+            }
+
+        async def execute(self, query: str, worksheet_id: object, extraction: object):
+            executed.append((query, worksheet_id, extraction))
+
+    result = await fixture_job_handler(
+        FakeConnection(),  # type: ignore[arg-type]
+        {
+            "type": "analyze_completed_worksheet",
+            "subject_id": "worksheet-1",
+        },
+    )
+
+    assert result["adapter"] == "fixture-v1"
+    assert result["status"] == "needs_review"
+    assert len(executed) == 1
+    extraction = executed[0][2]
+    assert isinstance(extraction, str)
+    assert '"needs_parent_confirmation"' in extraction
+    assert '"question_units": []' in extraction

@@ -23,7 +23,8 @@ The canonical MVP requirements are in [docs/mvp-spec.md](docs/mvp-spec.md).
 Production delivery uses `study.hypnochunk.com` for the static frontend and
 `api.study.hypnochunk.com` for the Docker API. CI uses the deterministic fixture
 adapter. A controlled private worker may instead use the Codex CLI adapter to
-grade an isolated, identity-free rendering of a handwriting response; other AI
+grade an isolated, identity-free rendering of a handwriting response or create
+a parent-review draft from private PNG/JPEG completed-paper pages; other AI
 providers still integrate through the same typed API contracts.
 
 ## Local development
@@ -86,7 +87,11 @@ shared 8G VPS, behind the HTTPS-only `api.study.hypnochunk.com` virtual host.
 The worker image includes the pinned Codex CLI, but the adapter is enabled only
 after a private server-side device login, `AI_PROVIDER=codex_cli`, and an
 explicit family UUID allowlist in `CODEX_FAMILY_IDS`. An empty allowlist sends no
-learner response to Codex.
+learner response to Codex. For an allowed family, completed-paper PNG/JPEG scans
+and optional private answer-key/reference images may produce an AI draft only;
+the parent must still confirm every question and answer region before an
+immutable attempt or grading job is created. PDF scans continue through the
+manual-review JSON path until server-side PDF rendering is separately enabled.
 The host has persistent Swap and container memory limits. Field-limited browser
 API errors are stored under `/opt/learning-assessment/logs` with bounded file
 rotation; request bodies, credentials, PINs, and URL query strings are excluded.

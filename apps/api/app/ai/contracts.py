@@ -3,6 +3,7 @@ from typing import Any, Literal, Protocol
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.models import GradingOutcome, QuestionType
+from app.tools.import_question_set import ImportDocument
 
 
 class StrictContract(BaseModel):
@@ -34,6 +35,37 @@ class ExtractSourceOutput(StrictContract):
     sections: list[ExtractedSection]
     confidence: float = Field(ge=0, le=1)
     warnings: list[str] = []
+
+
+class CompletedWorksheetAnswerRegion(StrictContract):
+    question_position: int = Field(gt=0)
+    page_numbers: list[int] = Field(min_length=1, max_length=100)
+    regions: list[dict[str, float]] | None = Field(default=None, max_length=20)
+    transcription: str | None = Field(default=None, max_length=4_000)
+    legibility: Literal["clear", "uncertain", "unreadable"] | None = None
+
+
+class CompletedWorksheetAnalysisInput(StrictContract):
+    schema_version: Literal["1.0"] = "1.0"
+    document_language: Literal["en", "ja", "zh"]
+    feedback_language: Literal["en", "ja", "zh"]
+    source_page_count: int = Field(ge=1, le=100)
+    answer_key_page_count: int = Field(default=0, ge=0, le=100)
+    reference_page_count: int = Field(default=0, ge=0, le=100)
+
+
+class CompletedWorksheetAnalysisOutput(StrictContract):
+    """A private AI draft; a parent must confirm it before records are created."""
+
+    schema_version: Literal["1.0"] = "1.0"
+    status: Literal["needs_parent_confirmation"]
+    document: ImportDocument
+    answer_regions: list[CompletedWorksheetAnswerRegion] = Field(
+        min_length=1,
+        max_length=100,
+    )
+    confidence: float = Field(ge=0, le=1)
+    warnings: list[str] = Field(default_factory=list, max_length=30)
 
 
 class GeneratedQuestion(StrictContract):

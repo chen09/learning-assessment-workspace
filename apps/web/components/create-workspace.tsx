@@ -322,6 +322,9 @@ function CreateWorkspaceContent() {
   );
   const [completedReview, setCompletedReview] =
     useState<CompletedPaperReview | null>(null);
+  const [completedReviewSource, setCompletedReviewSource] = useState<
+    "ai" | "file" | null
+  >(null);
   const [completedResponsePaths, setCompletedResponsePaths] = useState<string[]>(
     [],
   );
@@ -351,6 +354,20 @@ function CreateWorkspaceContent() {
 
   const assignmentTimeLimitSeconds =
     assignmentMode === "exam" ? Number(assignmentDurationMinutes) * 60 : null;
+
+  const loadCompletedReviewDraft = (extraction?: Record<string, unknown>) => {
+    if (!extraction) {
+      return;
+    }
+    try {
+      setCompletedReview(parseCompletedPaperReview(JSON.stringify(extraction)));
+      setCompletedReviewSource("ai");
+      setCompletedReviewFile(null);
+      setRequestStatus("idle");
+    } catch {
+      // A fixture or incomplete AI response remains safely manual-review only.
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -410,6 +427,7 @@ function CreateWorkspaceContent() {
         );
         if (active) {
           setCompletedWorksheetStatus(imported.status);
+          loadCompletedReviewDraft(imported.extraction);
         }
       } catch {
         if (active) {
@@ -619,6 +637,7 @@ function CreateWorkspaceContent() {
         setCompletedWorksheetId(imported.id);
         setCompletedWorksheetStatus(imported.status);
         setCompletedResponsePaths(imported.response_paths);
+        loadCompletedReviewDraft(imported.extraction);
         setRequestStatus("idle");
       } catch {
         setRequestStatus("error");
@@ -1187,12 +1206,14 @@ function CreateWorkspaceContent() {
   const selectCompletedReview = async (file: File | null) => {
     setCompletedReviewFile(file);
     setCompletedReview(null);
+    setCompletedReviewSource(null);
     setCompletedPromptCopied(false);
     if (!file) {
       return;
     }
     try {
       setCompletedReview(parseCompletedPaperReview(await readTextFile(file)));
+      setCompletedReviewSource("file");
       setRequestStatus("idle");
     } catch {
       setRequestStatus("error");
@@ -1254,19 +1275,25 @@ function CreateWorkspaceContent() {
             </Link>
           ) : completedWorksheetStatus === "needs_review" ? (
             <div className="stacked-form">
-              <details open>
-                <summary>{t("completedPaper.prepareLocal")}</summary>
-                <p>{t("completedPaper.localDetails")}</p>
-                <button
-                  className="button secondary"
-                  onClick={() => void copyCompletedPaperPrompt()}
-                  type="button"
-                >
-                  {completedPromptCopied
-                    ? t("completedPaper.promptCopied")
-                    : t("completedPaper.copyPrompt")}
-                </button>
-              </details>
+              {completedReviewSource === "ai" ? (
+                <p className="status-pill cool">
+                  {t("completedPaper.serverDraft")}
+                </p>
+              ) : (
+                <details open>
+                  <summary>{t("completedPaper.prepareLocal")}</summary>
+                  <p>{t("completedPaper.localDetails")}</p>
+                  <button
+                    className="button secondary"
+                    onClick={() => void copyCompletedPaperPrompt()}
+                    type="button"
+                  >
+                    {completedPromptCopied
+                      ? t("completedPaper.promptCopied")
+                      : t("completedPaper.copyPrompt")}
+                  </button>
+                </details>
+              )}
               <label className="drop-zone compact-drop-zone">
                 <input
                   accept=".json,application/json"

@@ -2886,7 +2886,7 @@ class PostgresRepository:
                             select id, family_id, child_id, title, subject,
                                    document_language, feedback_language, filenames,
                                    response_paths, answer_source_paths,
-                                   reference_source_paths, status, assignment_id,
+                                   reference_source_paths, extraction, status, assignment_id,
                                    attempt_id, created_at
                             from public.completed_worksheet_imports
                             where id = :id
@@ -2935,7 +2935,7 @@ class PostgresRepository:
                         returning id, family_id, child_id, title, subject,
                                   document_language, feedback_language, filenames,
                                   response_paths, answer_source_paths,
-                                  reference_source_paths, status, assignment_id,
+                                  reference_source_paths, extraction, status, assignment_id,
                                   attempt_id, created_at
                         """
                     ),
@@ -2998,7 +2998,7 @@ class PostgresRepository:
                         select id, family_id, child_id, title, subject,
                                document_language, feedback_language, filenames,
                                response_paths, answer_source_paths,
-                               reference_source_paths, status, assignment_id,
+                               reference_source_paths, extraction, status, assignment_id,
                                attempt_id, created_at
                         from public.completed_worksheet_imports
                         where id = :id
