@@ -45,6 +45,16 @@ test("parent dashboard shows saved family data and opens child practice", async 
 test("authenticated parent legacy link is cleaned and remains responsive in all languages", async ({
   page,
 }, testInfo) => {
+  await page.route("**/v1/families", async (route) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify([]),
+    });
+  });
   await page.goto("/parent/?code=legacy-code-fixture");
   await expect(page).toHaveURL(/\/parent\/$/);
   await expect(
