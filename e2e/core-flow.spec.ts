@@ -185,11 +185,18 @@ test("parent previews an AI JSON file before assigning its structured questions"
     page.getByRole("heading", { name: "What is 2 + 2?" }),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "Edit wording and points" }).click();
+  await page.getByRole("button", { name: "Edit question" }).click();
   await page
     .getByRole("textbox", { name: "Question wording" })
     .fill("What is 3 + 3?");
   await page.getByRole("spinbutton", { name: "Points" }).fill("2");
+  await page.getByRole("combobox", { name: "Response type" }).selectOption(
+    "single_choice",
+  );
+  await page
+    .getByRole("textbox", { name: "Choices, one per line" })
+    .fill("5\n6\n7");
+  await page.getByRole("textbox", { name: "Correct answer" }).fill("6");
   await page.getByRole("button", { name: "Save question" }).click();
   await expect(
     page.getByRole("heading", { name: "What is 3 + 3?" }),
@@ -209,6 +216,9 @@ test("parent previews an AI JSON file before assigning its structured questions"
         {
           prompt: "What is 3 + 3?",
           points: 2,
+          type: "single_choice",
+          options: ["5", "6", "7"],
+          answer_key: { choice: 1 },
         },
       ],
     },

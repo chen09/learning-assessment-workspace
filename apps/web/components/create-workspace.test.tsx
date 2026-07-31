@@ -241,13 +241,19 @@ describe("CreateWorkspace", () => {
     ).toBeInTheDocument();
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Edit wording and points" }),
+      screen.getByRole("button", { name: "Edit question" }),
     );
     fireEvent.change(screen.getByLabelText("Question wording"), {
       target: { value: "If it rains, stay home." },
     });
     fireEvent.change(screen.getByLabelText("Points"), {
       target: { value: "2" },
+    });
+    fireEvent.change(screen.getByLabelText("Choices, one per line"), {
+      target: { value: "When\nIf\nBecause" },
+    });
+    fireEvent.change(screen.getByLabelText("Correct answer"), {
+      target: { value: "When" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save question" }));
     expect(
@@ -267,6 +273,8 @@ describe("CreateWorkspace", () => {
               expect.objectContaining({
                 prompt: "If it rains, stay home.",
                 points: 2,
+                options: ["When", "If", "Because"],
+                answer_key: { choice: 0 },
               }),
             ],
           }),
