@@ -107,6 +107,99 @@ test("parent separates imported material and its private answer key", async ({
   ).toBeEnabled();
 });
 
+test("parent reassigns a confirmed library set with an exam limit", async ({
+  page,
+  request,
+}, testInfo) => {
+  const apiBaseUrl = "http://127.0.0.1:8017";
+  const fixtureKey = `e2e-library-reuse-${testInfo.project.name}-${testInfo.workerIndex}`;
+  const parentHeaders = { Authorization: "Bearer parent-fixture" };
+  const family = (await (
+    await request.post(`${apiBaseUrl}/v1/families`, {
+      headers: { ...parentHeaders, "Idempotency-Key": `${fixtureKey}-family` },
+      data: { name: "Library reuse family" },
+    })
+  ).json()) as { id: string };
+  const child = (await (
+    await request.post(`${apiBaseUrl}/v1/families/${family.id}/children`, {
+      headers: { ...parentHeaders, "Idempotency-Key": `${fixtureKey}-child` },
+      data: {
+        nickname: "Library child",
+        grade_stage: "Junior high 1",
+        ui_language: "en",
+        pin: "123456",
+      },
+    })
+  ).json()) as { id: string };
+  const imported = (await (
+    await request.post(`${apiBaseUrl}/v1/question-sets/imports/structured`, {
+      headers: { ...parentHeaders, "Idempotency-Key": `${fixtureKey}-import` },
+      data: {
+        family_id: family.id,
+        child_id: child.id,
+        source_name: "Library reuse fixture",
+        assignment_mode: "practice",
+        time_limit_seconds: null,
+        parent_note: null,
+        document: {
+          schema_version: "1.0",
+          question_set: {
+            title: "Reusable algebra check",
+            subject: "Mathematics",
+            locale: "en",
+            difficulty: "standard",
+            source_mode: "manual",
+            estimated_minutes: 5,
+            source_summary: { fixture: true },
+          },
+          knowledge_tags: [{ code: "addition", label: "Addition" }],
+          questions: [
+            {
+              position: 1,
+              type: "typed_text",
+              prompt: "What is 2 + 2?",
+              options: [],
+              answer_key: { text: "4" },
+              rubric: { grading_mode: "exact" },
+              points: 1,
+              knowledge_code: "addition",
+            },
+          ],
+        },
+      },
+    })
+  ).json()) as { question_set_id: string };
+
+  await page.goto(`/parent/library/?familyId=${encodeURIComponent(family.id)}`);
+  await expect(
+    page.getByRole("heading", { name: "Reusable algebra check" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Assign to child" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Assign “Reusable algebra check”" }),
+  ).toBeVisible();
+  await page.getByRole("radio", { name: "Exam" }).check();
+  await page.getByRole("combobox", { name: "Time limit" }).selectOption("45");
+  await page.getByLabel("Note for child (optional)").fill("Try this on your own.");
+
+  const assignmentResponse = page.waitForResponse(
+    (response) =>
+      response.url() ===
+        `${apiBaseUrl}/v1/question-sets/${imported.question_set_id}/assignments` &&
+      response.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "Assign practice" }).click();
+  const assignmentRequest = await assignmentResponse;
+  expect(assignmentRequest.request().postDataJSON()).toEqual({
+    child_id: child.id,
+    mode: "exam",
+    time_limit_seconds: 2700,
+    parent_note: "Try this on your own.",
+  });
+  await expect(page.getByText("Assigned to Library child.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Assign practice" })).toBeDisabled();
+});
+
 test("parent previews an AI JSON file before assigning its structured questions", async ({
   page,
   request,

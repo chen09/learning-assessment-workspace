@@ -3302,6 +3302,65 @@ button {
   line-height: 1.5;
 }
 
+.library-assign-button {
+  align-self: flex-start;
+  margin-top: 0.3rem;
+}
+
+.library-assignment-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(20rem, 1.2fr);
+  gap: 1.25rem 2rem;
+  margin-top: 1.2rem;
+  padding: 1.25rem;
+  border-radius: 1.1rem;
+}
+
+.library-assignment-fields {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.library-assignment-fields > label:not(.assignment-note) {
+  display: grid;
+  max-width: 24rem;
+  gap: 0.35rem;
+  color: #f7f8fa;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.library-assignment-fields select {
+  min-height: 2.75rem;
+  border: 1px solid #d7dce3;
+  border-radius: 0.65rem;
+  background: white;
+  color: var(--ink);
+  font: inherit;
+  padding: 0.5rem 0.65rem;
+}
+
+.library-assignment-fields > p[role="alert"] {
+  margin: 0;
+  color: #ffb3a8;
+  font-size: 0.8rem;
+  font-weight: 750;
+}
+
+.library-assignment-fields .confirmed-message {
+  width: fit-content;
+  margin: 0;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.library-assignment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
 .print-preview {
   min-height: 100vh;
   background: #d8d8d8;
@@ -3525,6 +3584,10 @@ button {
 
   .assignment-panel {
     display: grid;
+  }
+
+  .library-assignment-panel {
+    grid-template-columns: 1fr;
   }
 
   .draft-question-list article {
