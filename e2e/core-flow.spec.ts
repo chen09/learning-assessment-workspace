@@ -622,8 +622,10 @@ test("parent collects several manual questions into one assigned practice", asyn
   await expect(
     page.getByRole("heading", { name: "Two question check" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Stop assignment" }).click();
-  await expect(page.getByText("stopped", { exact: true })).toBeVisible();
+  await page.getByLabel("Language").selectOption("zh");
+  await expect(page.getByRole("heading", { name: "学习记录" })).toBeVisible();
+  await page.getByRole("button", { name: "结束练习" }).click();
+  await expect(page.getByText("已结束", { exact: true })).toBeVisible();
 });
 
 test("parent validates a local-AI completed-paper review before submitting it", async ({
