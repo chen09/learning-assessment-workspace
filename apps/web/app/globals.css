@@ -2734,6 +2734,16 @@ button {
   gap: 0.55rem;
 }
 
+.draft-question-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.draft-question-remove {
+  color: #ad4e3e;
+}
+
 .assignment-panel {
   align-items: center;
   background: var(--ink);
@@ -3325,7 +3335,7 @@ button {
     grid-template-columns: auto 1fr;
   }
 
-  .draft-question-list article > .quiet-link {
+  .draft-question-list article > .draft-question-actions {
     grid-column: 2;
     justify-self: start;
   }

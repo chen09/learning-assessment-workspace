@@ -374,6 +374,105 @@ describe("CreateWorkspace", () => {
     });
   });
 
+  it("removes an extra AI question and reorders the remaining draft before assignment", async () => {
+    const document = {
+      schema_version: "1.0" as const,
+      question_set: {
+        title: "Short review",
+        subject: "English",
+        locale: "en" as const,
+        difficulty: "standard" as const,
+        source_mode: "convert" as const,
+        estimated_minutes: 5,
+      },
+      knowledge_tags: [{ code: "review", label: "Review" }],
+      questions: [
+        {
+          position: 1,
+          type: "typed_text" as const,
+          prompt: "Keep this question.",
+          options: [],
+          answer_key: { text: "keep" },
+          rubric: { grading_mode: "exact" },
+          points: 1,
+          knowledge_code: "review",
+        },
+        {
+          position: 2,
+          type: "typed_text" as const,
+          prompt: "Remove this mistaken extraction.",
+          options: [],
+          answer_key: { text: "remove" },
+          rubric: { grading_mode: "exact" },
+          points: 1,
+          knowledge_code: "review",
+        },
+      ],
+    };
+    mocks.previewStructuredQuestionSet.mockResolvedValue({
+      title: "Short review",
+      subject: "English",
+      locale: "en",
+      question_count: 2,
+      total_points: 2,
+      estimated_minutes: 5,
+      knowledge_tag_count: 1,
+      answer_keys_present: true,
+      checksum: "delete12345678",
+      source_summary: {},
+      questions: document.questions,
+    });
+    mocks.importStructuredQuestionSet.mockResolvedValue({
+      question_set_id: "question-set-2",
+      assignment_id: "assignment-2",
+      status: "confirmed",
+      reused_existing: false,
+    });
+
+    render(<CreateWorkspace />);
+
+    await screen.findByRole("combobox", { name: "Child" });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Import AI question JSON" }),
+    );
+    fireEvent.change(screen.getByLabelText("AI question JSON"), {
+      target: {
+        files: [
+          new File([JSON.stringify(document)], "short-review.json", {
+            type: "application/json",
+          }),
+        ],
+      },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Preview questions" }));
+    await screen.findByRole("heading", { name: "Remove this mistaken extraction." });
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove question 2" }));
+    expect(
+      screen.queryByRole("heading", { name: "Remove this mistaken extraction." }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("1 questions · validated JSON · answers stay private")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove question 1" })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Confirm and assign" }));
+    await waitFor(() => {
+      expect(mocks.importStructuredQuestionSet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          document: expect.objectContaining({
+            questions: [
+              expect.objectContaining({
+                position: 1,
+                prompt: "Keep this question.",
+              }),
+            ],
+          }),
+        }),
+        "parent-token",
+        expect.stringContaining("structured-"),
+      );
+    });
+  });
+
   it("requires a parent-authored choice answer to match one listed option", async () => {
     render(<CreateWorkspace />);
 

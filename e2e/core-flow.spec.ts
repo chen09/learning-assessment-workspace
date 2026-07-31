@@ -163,6 +163,16 @@ test("parent previews an AI JSON file before assigning its structured questions"
         points: 1,
         knowledge_code: "addition",
       },
+      {
+        position: 2,
+        type: "typed_text",
+        prompt: "Remove this extra extraction.",
+        options: [],
+        answer_key: { text: "unused" },
+        rubric: { grading_mode: "exact" },
+        points: 1,
+        knowledge_code: "addition",
+      },
     ],
   };
 
@@ -184,6 +194,14 @@ test("parent previews an AI JSON file before assigning its structured questions"
   await expect(
     page.getByRole("heading", { name: "What is 2 + 2?" }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Remove this extra extraction." }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Remove question 2" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Remove this extra extraction." }),
+  ).not.toBeVisible();
 
   await page.getByRole("button", { name: "Edit question" }).click();
   await page
