@@ -240,6 +240,20 @@ describe("CreateWorkspace", () => {
       screen.getByRole("heading", { name: "___ it rains, stay home." }),
     ).toBeInTheDocument();
 
+    fireEvent.click(
+      screen.getByRole("button", { name: "Edit wording and points" }),
+    );
+    fireEvent.change(screen.getByLabelText("Question wording"), {
+      target: { value: "If it rains, stay home." },
+    });
+    fireEvent.change(screen.getByLabelText("Points"), {
+      target: { value: "2" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save question" }));
+    expect(
+      screen.getByRole("heading", { name: "If it rains, stay home." }),
+    ).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole("button", { name: "Confirm and assign" }));
 
     await waitFor(() => {
@@ -248,7 +262,14 @@ describe("CreateWorkspace", () => {
           family_id: "family-1",
           child_id: "child-1",
           source_name: "lesson-2.json",
-          document,
+          document: expect.objectContaining({
+            questions: [
+              expect.objectContaining({
+                prompt: "If it rains, stay home.",
+                points: 2,
+              }),
+            ],
+          }),
         }),
         "parent-token",
         expect.stringContaining("structured-"),
