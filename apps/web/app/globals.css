@@ -2693,7 +2693,8 @@ button {
 }
 
 .draft-question-editor textarea,
-.draft-question-editor input {
+.draft-question-editor input,
+.draft-question-editor select {
   width: 100%;
   border: 1px solid var(--blue);
   border-radius: 0.7rem;
@@ -2710,6 +2711,10 @@ button {
 
 .draft-question-editor input {
   max-width: 8rem;
+}
+
+.draft-question-editor select {
+  max-width: 18rem;
 }
 
 .draft-question-editor > p {

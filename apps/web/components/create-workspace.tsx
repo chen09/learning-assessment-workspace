@@ -314,6 +314,10 @@ export function CreateWorkspace() {
   );
   const [editedQuestionPrompt, setEditedQuestionPrompt] = useState("");
   const [editedQuestionPoints, setEditedQuestionPoints] = useState("1");
+  const [editedQuestionType, setEditedQuestionType] =
+    useState<ManualQuestionType>("typed_text");
+  const [editedQuestionOptions, setEditedQuestionOptions] = useState("");
+  const [editedQuestionAnswer, setEditedQuestionAnswer] = useState("");
   const [editError, setEditError] = useState("");
   const [requestStatus, setRequestStatus] = useState<
     "idle" | "working" | "error"
@@ -793,17 +797,55 @@ export function CreateWorkspace() {
   const beginStructuredQuestionEdit = (
     question: ReviewDraftQuestion,
   ) => {
+    const type: ManualQuestionType =
+      question.type === "single_choice" ||
+      question.type === "typed_text" ||
+      question.type === "handwriting"
+        ? question.type
+        : "typed_text";
+    const choice = question.answer_key.choice;
+    const answer =
+      type === "single_choice" &&
+      typeof choice === "number" &&
+      question.options?.[choice]
+        ? question.options[choice]
+        : typeof question.answer_key.reference === "string"
+          ? question.answer_key.reference
+          : typeof question.answer_key.text === "string"
+            ? question.answer_key.text
+            : "";
     setEditingQuestionId(question.id);
     setEditedQuestionPrompt(question.prompt);
     setEditedQuestionPoints(String(question.points));
+    setEditedQuestionType(type);
+    setEditedQuestionOptions((question.options ?? []).join("\n"));
+    setEditedQuestionAnswer(answer);
     setEditError("");
   };
 
   const saveStructuredQuestionEdit = (questionId: string) => {
     const prompt = editedQuestionPrompt.trim();
     const points = Number(editedQuestionPoints);
-    if (!structuredDocument || !prompt || !Number.isFinite(points) || points <= 0) {
-      setEditError("Add question wording and a positive point value.");
+    const answer = editedQuestionAnswer.trim();
+    const options = editedQuestionOptions
+      .split("\n")
+      .map((option) => option.trim())
+      .filter(Boolean);
+    if (
+      !structuredDocument ||
+      !prompt ||
+      !answer ||
+      !Number.isFinite(points) ||
+      points <= 0
+    ) {
+      setEditError("Add wording, an answer or grading guide, and a positive point value.");
+      return;
+    }
+    if (
+      editedQuestionType === "single_choice" &&
+      (options.length < 2 || !options.includes(answer))
+    ) {
+      setEditError("A choice question needs at least two choices and a matching correct answer.");
       return;
     }
     const question = draftQuestions.find((candidate) => candidate.id === questionId);
@@ -811,10 +853,27 @@ export function CreateWorkspace() {
       setEditError("This draft question is no longer available.");
       return;
     }
+    const answerKey =
+      editedQuestionType === "single_choice"
+        ? { choice: options.indexOf(answer) }
+        : editedQuestionType === "handwriting"
+          ? { reference: answer }
+          : { text: answer };
+    const rubric =
+      editedQuestionType === "handwriting"
+        ? { grading_mode: "parent_review" }
+        : { grading_mode: "exact" };
     setDraftQuestions((current) =>
       current.map((candidate) =>
         candidate.id === questionId
-          ? { ...candidate, prompt, points }
+          ? {
+              ...candidate,
+              prompt,
+              points,
+              type: editedQuestionType,
+              options: options.length > 0 ? options : null,
+              answer_key: answerKey,
+            }
           : candidate,
       ),
     );
@@ -824,7 +883,15 @@ export function CreateWorkspace() {
             ...current,
             questions: current.questions.map((candidate) =>
               candidate.position === question.position
-                ? { ...candidate, prompt, points }
+                ? {
+                    ...candidate,
+                    prompt,
+                    points,
+                    type: editedQuestionType,
+                    options: editedQuestionType === "single_choice" ? options : [],
+                    answer_key: answerKey,
+                    rubric,
+                  }
                 : candidate,
             ),
           }
@@ -1100,7 +1167,56 @@ export function CreateWorkspace() {
                         value={editedQuestionPoints}
                       />
                     </label>
-                    <p>Answer key and response type stay unchanged in this step.</p>
+                    <label>
+                      Response type
+                      <select
+                        aria-label="Response type"
+                        onChange={(event) =>
+                          setEditedQuestionType(
+                            event.target.value as ManualQuestionType,
+                          )
+                        }
+                        value={editedQuestionType}
+                      >
+                        <option value="typed_text">Type an answer</option>
+                        <option value="single_choice">Choose one answer</option>
+                        <option value="handwriting">Write by hand</option>
+                      </select>
+                    </label>
+                    {editedQuestionType === "single_choice" ? (
+                      <label>
+                        Choices, one per line
+                        <textarea
+                          aria-label="Choices, one per line"
+                          onChange={(event) =>
+                            setEditedQuestionOptions(event.target.value)
+                          }
+                          rows={4}
+                          value={editedQuestionOptions}
+                        />
+                      </label>
+                    ) : null}
+                    <label>
+                      {editedQuestionType === "handwriting"
+                        ? "Reference answer or grading guide"
+                        : "Correct answer"}
+                      <textarea
+                        aria-label={
+                          editedQuestionType === "handwriting"
+                            ? "Reference answer or grading guide"
+                            : "Correct answer"
+                        }
+                        onChange={(event) =>
+                          setEditedQuestionAnswer(event.target.value)
+                        }
+                        rows={3}
+                        value={editedQuestionAnswer}
+                      />
+                    </label>
+                    <p>
+                      Handwritten answers go to parent review. Typed and choice
+                      answers use exact matching for now.
+                    </p>
                     {editError ? <p role="alert">{editError}</p> : null}
                     <div className="draft-question-editor-actions">
                       <button
@@ -1144,7 +1260,7 @@ export function CreateWorkspace() {
                   onClick={() => beginStructuredQuestionEdit(question)}
                   type="button"
                 >
-                  Edit wording and points
+                  Edit question
                 </button>
               ) : null}
             </article>
