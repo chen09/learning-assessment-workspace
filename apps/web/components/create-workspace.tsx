@@ -42,6 +42,9 @@ type CreateMode = "generate" | "import" | "completed" | "structured" | "manual";
 type ImportPurpose = "generate_similar" | "use_as_questions";
 type Stage = "compose" | "review";
 type ManualQuestionType = "single_choice" | "typed_text" | "handwriting";
+type ManualDraftQuestion = StructuredQuestionSetDocument["questions"][number] & {
+  id: string;
+};
 
 type CompletedPaperAnswerRegion = {
   question_position: number;
@@ -283,6 +286,9 @@ export function CreateWorkspace() {
   const [manualOptions, setManualOptions] = useState("");
   const [manualAnswer, setManualAnswer] = useState("");
   const [manualPoints, setManualPoints] = useState("1");
+  const [manualDraftQuestions, setManualDraftQuestions] = useState<
+    ManualDraftQuestion[]
+  >([]);
   const [prompt, setPrompt] = useState(
     "Make a short mixed practice from this week’s algebra and English work.",
   );
@@ -408,12 +414,19 @@ export function CreateWorkspace() {
   const manualPointsValue = Number(manualPoints);
   const manualQuestionIsReady =
     Boolean(
-      manualTitle.trim() && manualQuestionPrompt.trim() && manualAnswer.trim(),
+      manualQuestionPrompt.trim() && manualAnswer.trim(),
     ) &&
     Number.isFinite(manualPointsValue) &&
     manualPointsValue > 0 &&
     (manualQuestionType !== "single_choice" ||
       manualOptionList.some((option) => option === manualAnswer.trim()));
+  const manualQuestionHasContent = Boolean(
+    manualQuestionPrompt.trim() || manualOptions.trim() || manualAnswer.trim(),
+  );
+  const manualDraftIsReady =
+    Boolean(manualTitle.trim()) &&
+    (manualDraftQuestions.length > 0 || manualQuestionIsReady) &&
+    (!manualQuestionHasContent || manualQuestionIsReady);
   const canCreate =
     hasAssignmentTarget &&
     (mode === "import" || mode === "completed"
@@ -421,7 +434,7 @@ export function CreateWorkspace() {
       : mode === "structured"
         ? structuredFile !== null
         : mode === "manual"
-          ? manualQuestionIsReady
+          ? manualDraftIsReady
           : true);
   const isLessonOneImport = files.some(
     (file) => file.name === "english_lesson1_similar_practice.pdf",
@@ -450,6 +463,53 @@ export function CreateWorkspace() {
       setChildren([]);
       setRequestStatus("error");
     }
+  };
+
+  const buildManualQuestion = (position: number) => {
+    const answer = manualAnswer.trim();
+    return {
+      position,
+      type: manualQuestionType,
+      prompt: manualQuestionPrompt.trim(),
+      options:
+        manualQuestionType === "single_choice" ? manualOptionList : [],
+      answer_key:
+        manualQuestionType === "single_choice"
+          ? { choice: manualOptionList.indexOf(answer) }
+          : manualQuestionType === "handwriting"
+            ? { reference: answer }
+            : { text: answer },
+      rubric:
+        manualQuestionType === "handwriting"
+          ? { grading_mode: "parent_review" }
+          : { grading_mode: "exact" },
+      points: manualPointsValue,
+      knowledge_code: "manual-practice",
+    };
+  };
+
+  const addManualQuestion = () => {
+    if (!manualQuestionIsReady) {
+      setRequestStatus("error");
+      return;
+    }
+    setManualDraftQuestions((current) => [
+      ...current,
+      { id: `manual-${crypto.randomUUID()}`, ...buildManualQuestion(current.length + 1) },
+    ]);
+    setManualQuestionPrompt("");
+    setManualOptions("");
+    setManualAnswer("");
+    setManualPoints("1");
+    setRequestStatus("idle");
+  };
+
+  const removeManualDraftQuestion = (questionId: string) => {
+    setManualDraftQuestions((current) =>
+      current
+        .filter((question) => question.id !== questionId)
+        .map((question, index) => ({ ...question, position: index + 1 })),
+    );
   };
 
   const createDraft = async () => {
@@ -553,7 +613,7 @@ export function CreateWorkspace() {
     }
 
     if (mode === "manual") {
-      if (!manualQuestionIsReady) {
+      if (!manualDraftIsReady) {
         setRequestStatus("error");
         return;
       }
@@ -562,7 +622,21 @@ export function CreateWorkspace() {
         setRequestStatus("error");
         return;
       }
-      const answer = manualAnswer.trim();
+      const questions = [
+        ...manualDraftQuestions.map((question) => ({
+          position: question.position,
+          type: question.type,
+          prompt: question.prompt,
+          options: question.options,
+          answer_key: question.answer_key,
+          rubric: question.rubric,
+          points: question.points,
+          knowledge_code: question.knowledge_code,
+        })),
+        ...(manualQuestionIsReady
+          ? [buildManualQuestion(manualDraftQuestions.length + 1)]
+          : []),
+      ].map((question, index) => ({ ...question, position: index + 1 }));
       const document: StructuredQuestionSetDocument = {
         schema_version: "1.0",
         question_set: {
@@ -578,27 +652,7 @@ export function CreateWorkspace() {
         knowledge_tags: [
           { code: "manual-practice", label: "Parent-authored practice" },
         ],
-        questions: [
-          {
-            position: 1,
-            type: manualQuestionType,
-            prompt: manualQuestionPrompt.trim(),
-            options:
-              manualQuestionType === "single_choice" ? manualOptionList : [],
-            answer_key:
-              manualQuestionType === "single_choice"
-                ? { choice: manualOptionList.indexOf(answer) }
-                : manualQuestionType === "handwriting"
-                  ? { reference: answer }
-                  : { text: answer },
-            rubric:
-              manualQuestionType === "handwriting"
-                ? { grading_mode: "parent_review" }
-                : { grading_mode: "exact" },
-            points: manualPointsValue,
-            knowledge_code: "manual-practice",
-          },
-        ],
+        questions,
       };
       setRequestStatus("working");
       try {
@@ -1821,10 +1875,10 @@ export function CreateWorkspace() {
               <div className="creation-heading">
                 <span><BookOpenText /></span>
                 <div>
-                  <h2>Start with one structured question</h2>
+                  <h2>Build a structured question set</h2>
                   <p>
-                    Create one question, review it privately, then assign it to
-                    your child.
+                    Add one or more questions, review them privately, then
+                    assign the whole set to your child.
                   </p>
                 </div>
               </div>
@@ -1925,6 +1979,41 @@ export function CreateWorkspace() {
                   value={manualPoints}
                 />
               </label>
+              <div className="manual-question-actions">
+                <button
+                  className="button ghost"
+                  disabled={!manualQuestionIsReady}
+                  onClick={addManualQuestion}
+                  type="button"
+                >
+                  Add question
+                </button>
+                <p>
+                  Add each question to this set, then open one review draft for
+                  all of them.
+                </p>
+              </div>
+              {manualDraftQuestions.length > 0 ? (
+                <ol className="manual-question-queue" aria-label="Questions ready for review">
+                  {manualDraftQuestions.map((question, index) => (
+                    <li key={question.id}>
+                      <div>
+                        <strong>Question {index + 1} ready</strong>
+                        <span>{question.type.replaceAll("_", " ")} · {question.points} point{question.points === 1 ? "" : "s"}</span>
+                        <p>{question.prompt}</p>
+                      </div>
+                      <button
+                        aria-label={`Remove queued question ${index + 1}`}
+                        className="quiet-link draft-question-remove"
+                        onClick={() => removeManualDraftQuestion(question.id)}
+                        type="button"
+                      >
+                        Remove
+                      </button>
+                    </li>
+                  ))}
+                </ol>
+              ) : null}
             </>
           ) : null}
 

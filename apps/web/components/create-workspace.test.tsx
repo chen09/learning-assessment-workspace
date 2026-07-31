@@ -379,6 +379,100 @@ describe("CreateWorkspace", () => {
     });
   });
 
+  it("lets a parent collect several authored questions before opening the review draft", async () => {
+    mocks.previewStructuredQuestionSet.mockResolvedValue({
+      title: "Two question check",
+      subject: "English",
+      locale: "en",
+      question_count: 2,
+      total_points: 3,
+      estimated_minutes: 5,
+      knowledge_tag_count: 1,
+      answer_keys_present: true,
+      checksum: "manual-two-questions",
+      source_summary: { source_kind: "manual" },
+      questions: [
+        {
+          position: 1,
+          type: "typed_text",
+          prompt: "Complete: I ___ ready.",
+          options: [],
+          answer_key: { text: "am" },
+          rubric: { grading_mode: "exact" },
+          points: 1,
+          knowledge_code: "manual-practice",
+        },
+        {
+          position: 2,
+          type: "handwriting",
+          prompt: "Write one sentence about your weekend.",
+          options: [],
+          answer_key: { reference: "Any complete sentence about a weekend." },
+          rubric: { grading_mode: "parent_review" },
+          points: 2,
+          knowledge_code: "manual-practice",
+        },
+      ],
+    });
+
+    render(<CreateWorkspace />);
+
+    await screen.findByRole("combobox", { name: "Child" });
+    fireEvent.click(screen.getByRole("button", { name: "Start simple" }));
+    fireEvent.change(screen.getByLabelText("Practice title"), {
+      target: { value: "Two question check" },
+    });
+    fireEvent.change(screen.getByLabelText("Question"), {
+      target: { value: "Complete: I ___ ready." },
+    });
+    fireEvent.change(screen.getByLabelText("Answer or grading guide"), {
+      target: { value: "am" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add question" }));
+
+    expect(screen.getByText("Question 1 ready")).toBeInTheDocument();
+    expect(screen.getByLabelText("Question")).toHaveValue("");
+
+    fireEvent.change(screen.getByLabelText("Response type"), {
+      target: { value: "handwriting" },
+    });
+    fireEvent.change(screen.getByLabelText("Question"), {
+      target: { value: "Write one sentence about your weekend." },
+    });
+    fireEvent.change(screen.getByLabelText("Answer or grading guide"), {
+      target: { value: "Any complete sentence about a weekend." },
+    });
+    fireEvent.change(screen.getByLabelText("Points"), {
+      target: { value: "2" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create review draft" }));
+
+    await waitFor(() => {
+      expect(mocks.previewStructuredQuestionSet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          question_set: expect.objectContaining({ title: "Two question check" }),
+          questions: [
+            expect.objectContaining({
+              position: 1,
+              prompt: "Complete: I ___ ready.",
+              answer_key: { text: "am" },
+            }),
+            expect.objectContaining({
+              position: 2,
+              type: "handwriting",
+              prompt: "Write one sentence about your weekend.",
+              answer_key: {
+                reference: "Any complete sentence about a weekend.",
+              },
+              points: 2,
+            }),
+          ],
+        }),
+        "parent-token",
+      );
+    });
+  });
+
   it("copies, reorders, and removes AI questions before assignment", async () => {
     const document = {
       schema_version: "1.0" as const,
