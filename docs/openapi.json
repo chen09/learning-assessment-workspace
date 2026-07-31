@@ -2725,6 +2725,15 @@
       },
       "StructuredImportRequest": {
         "properties": {
+          "assignment_mode": {
+            "default": "practice",
+            "enum": [
+              "practice",
+              "exam"
+            ],
+            "title": "Assignment Mode",
+            "type": "string"
+          },
           "child_id": {
             "format": "uuid",
             "title": "Child Id",
@@ -2743,6 +2752,19 @@
             "minLength": 1,
             "title": "Source Name",
             "type": "string"
+          },
+          "time_limit_seconds": {
+            "anyOf": [
+              {
+                "maximum": 14400.0,
+                "minimum": 60.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Limit Seconds"
           }
         },
         "required": [
