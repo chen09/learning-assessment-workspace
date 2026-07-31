@@ -10,7 +10,9 @@ export default defineConfig({
     "postgres-flow.spec.ts",
     "hosted-flow.spec.ts",
   ],
-  fullyParallel: true,
+  // The fixture API has one shared job queue. Keep each project's flows in
+  // source order so one test cannot consume another test's grading job.
+  fullyParallel: false,
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? "github" : "list",
   use: {

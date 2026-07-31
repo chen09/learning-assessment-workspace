@@ -347,6 +347,14 @@ test("parent validates a local-AI completed-paper review before submitting it", 
   await expect(
     page.getByRole("link", { name: "Open grading results" }),
   ).toBeVisible();
+
+  // Confirmation creates a grading job. Consume this test's job so the
+  // subsequent shared-fixture flow cannot accidentally process it.
+  const processedResponse = await request.post(
+    `${apiBaseUrl}/v1/demo/jobs/process-next`,
+    { headers: parentHeaders },
+  );
+  expect(processedResponse.ok()).toBeTruthy();
 });
 
 test("an expired child session returns to PIN login and resumes the requested page", async ({
