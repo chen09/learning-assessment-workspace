@@ -23,9 +23,12 @@ import {
   type Family,
   type StructuredQuestionSetDocument,
   assignQuestionSet,
+  confirmCompletedWorksheetImport,
   confirmQuestionSet,
   createQuestionSetImport,
+  createCompletedWorksheetImport,
   createUploadIntent,
+  getCompletedWorksheetImport,
   getChildren,
   getFamilies,
   getParentAccessToken,
@@ -35,7 +38,7 @@ import {
   uploadToSignedUrl,
 } from "@/lib/api-client";
 
-type CreateMode = "generate" | "import" | "structured" | "manual";
+type CreateMode = "generate" | "import" | "completed" | "structured" | "manual";
 type ImportPurpose = "generate_similar" | "use_as_questions";
 type Stage = "compose" | "review";
 
@@ -97,6 +100,18 @@ export function CreateWorkspace() {
   const [confirmed, setConfirmed] = useState(false);
   const [questionSetId, setQuestionSetId] = useState<string | null>(null);
   const [assignmentId, setAssignmentId] = useState<string | null>(null);
+  const [completedWorksheetId, setCompletedWorksheetId] = useState<string | null>(
+    null,
+  );
+  const [completedReviewFile, setCompletedReviewFile] = useState<File | null>(
+    null,
+  );
+  const [completedAttemptId, setCompletedAttemptId] = useState<string | null>(
+    null,
+  );
+  const [completedWorksheetStatus, setCompletedWorksheetStatus] = useState<
+    "processing" | "needs_review" | "grading" | "results_ready" | null
+  >(null);
   const [draftQuestions, setDraftQuestions] = useState<
     Array<ApiQuestion & { answer_key: Record<string, unknown> }>
   >([]);
@@ -141,12 +156,49 @@ export function CreateWorkspace() {
     };
   }, []);
 
+  useEffect(() => {
+    if (
+      !completedWorksheetId ||
+      completedWorksheetStatus !== "processing"
+    ) {
+      return;
+    }
+
+    let active = true;
+    const poll = async () => {
+      const parentToken = await getParentAccessToken();
+      if (!parentToken || !active) {
+        return;
+      }
+      try {
+        const imported = await getCompletedWorksheetImport(
+          completedWorksheetId,
+          parentToken,
+        );
+        if (active) {
+          setCompletedWorksheetStatus(imported.status);
+        }
+      } catch {
+        if (active) {
+          setRequestStatus("error");
+        }
+      }
+    };
+
+    void poll();
+    const intervalId = window.setInterval(() => void poll(), 2000);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
+  }, [completedWorksheetId, completedWorksheetStatus]);
+
   const hasAssignmentTarget = Boolean(
     selectedFamilyId && selectedChildId,
   );
   const canCreate =
     hasAssignmentTarget &&
-    (mode === "import"
+    (mode === "import" || mode === "completed"
       ? Boolean(fileName)
       : mode === "structured"
         ? structuredFile !== null
@@ -181,6 +233,63 @@ export function CreateWorkspace() {
   };
 
   const createDraft = async () => {
+    if (mode === "completed") {
+      const { familyId, childId } = getRouteIds();
+      if (!familyId || !childId || files.length === 0) {
+        setRequestStatus("error");
+        return;
+      }
+      const parentToken = await getParentAccessToken();
+      if (!parentToken) {
+        setRequestStatus("error");
+        return;
+      }
+      setRequestStatus("working");
+      try {
+        const uploadObjectId = crypto.randomUUID();
+        const responsePaths: string[] = [];
+        for (const [index, file] of files.entries()) {
+          const contentType = (
+            ["application/pdf", "image/png", "image/jpeg"].includes(file.type)
+              ? file.type
+              : "image/jpeg"
+          ) as "application/pdf" | "image/png" | "image/jpeg";
+          const intent = await createUploadIntent(
+            {
+              family_id: familyId,
+              bucket: "responses",
+              object_id: uploadObjectId,
+              filename: file.name,
+              content_type: contentType,
+            },
+            parentToken,
+            `completed-response-${uploadObjectId}-${index}`,
+          );
+          await uploadToSignedUrl(intent, file);
+          responsePaths.push(intent.path);
+        }
+        const imported = await createCompletedWorksheetImport(
+          {
+            family_id: familyId,
+            child_id: childId,
+            title: fileName.slice(0, 160),
+            subject: "Mixed practice",
+            document_language: "ja",
+            feedback_language: "ja",
+            filenames: files.map((file) => file.name),
+            response_paths: responsePaths,
+          },
+          parentToken,
+          `completed-worksheet-${uploadObjectId}`,
+        );
+        setCompletedWorksheetId(imported.id);
+        setCompletedWorksheetStatus(imported.status);
+        setRequestStatus("idle");
+      } catch {
+        setRequestStatus("error");
+      }
+      return;
+    }
     if (mode === "structured") {
       if (!structuredFile) {
         setRequestStatus("error");
@@ -394,6 +503,135 @@ export function CreateWorkspace() {
     }
   };
 
+  const confirmCompletedPaper = async () => {
+    if (!completedWorksheetId || !completedReviewFile) {
+      setRequestStatus("error");
+      return;
+    }
+    const parentToken = await getParentAccessToken();
+    if (!parentToken) {
+      setRequestStatus("error");
+      return;
+    }
+    setRequestStatus("working");
+    try {
+      const review = JSON.parse(
+        await readTextFile(completedReviewFile),
+      ) as {
+        document: StructuredQuestionSetDocument;
+        responses: Array<{
+          question_position: number;
+          kind: "choice" | "text" | "tokens" | "strokes" | "photo";
+          answer: Record<string, unknown>;
+        }>;
+      };
+      const confirmed = await confirmCompletedWorksheetImport(
+        completedWorksheetId,
+        review,
+        parentToken,
+        `confirm-completed-${completedWorksheetId}`,
+      );
+      setAssignmentId(confirmed.assignment.id);
+      setCompletedAttemptId(confirmed.attempt.id);
+      setCompletedWorksheetStatus(confirmed.completed_worksheet.status);
+      setRequestStatus("idle");
+    } catch {
+      setRequestStatus("error");
+    }
+  };
+
+  if (completedWorksheetId) {
+    return (
+      <AppShell currentPath="/parent/create/" role="parent">
+        <header className="page-header">
+          <div>
+            <p className="eyebrow">Completed worksheet received</p>
+            <h1>
+              {completedWorksheetStatus === "processing"
+                ? "Reading the paper"
+                : "Preparing the review draft"}
+            </h1>
+            <p className="lede">
+              The original paper is private. Question boundaries and scoring
+              must be confirmed before it becomes a learning record.
+            </p>
+          </div>
+          <LanguageSwitcher />
+        </header>
+        <section className="assignment-panel">
+          <div>
+            <p className="eyebrow">
+              {completedWorksheetStatus === "processing"
+                ? "Analysis in progress"
+                : "Analysis ready for review"}
+            </p>
+            <h2>
+              {completedAttemptId
+                ? "Submitted for grading"
+                : completedWorksheetStatus === "processing"
+                  ? "Your paper is being prepared"
+                : "Paper upload is safe and not yet assigned"}
+            </h2>
+            <p>
+              {completedAttemptId
+                ? "The paper is now an immutable learning record. Results appear when grading finishes."
+                : completedWorksheetStatus === "processing"
+                  ? "We are preparing a private review draft. This page will update automatically; no child task has been created."
+                : "Confirm the reviewed question and answer regions. Only then will it create a submitted attempt and start grading."}
+            </p>
+          </div>
+          {completedAttemptId ? (
+            <Link
+              className="button primary"
+              href={`/parent/results/?attemptId=${encodeURIComponent(completedAttemptId)}`}
+            >
+              Open grading results
+            </Link>
+          ) : completedWorksheetStatus === "needs_review" ? (
+            <div>
+              <label className="drop-zone compact-drop-zone">
+                <input
+                  accept=".json,application/json"
+                  aria-label="Reviewed completed worksheet JSON"
+                  onChange={(event) =>
+                    setCompletedReviewFile(event.target.files?.[0] ?? null)
+                  }
+                  type="file"
+                />
+                <FileJson2 />
+                <strong>
+                  {completedReviewFile?.name || "Choose reviewed paper JSON"}
+                </strong>
+                <span>
+                  It includes the confirmed questions and answer regions; answer
+                  keys stay private.
+                </span>
+              </label>
+              <button
+                className="button primary"
+                disabled={!completedReviewFile || requestStatus === "working"}
+                onClick={() => void confirmCompletedPaper()}
+                type="button"
+              >
+                {requestStatus === "working"
+                  ? "Confirming…"
+                  : "Confirm and start grading"}
+              </button>
+            </div>
+          ) : (
+            <span className="status-pill warm">Preparing private review</span>
+          )}
+        </section>
+        {requestStatus === "error" ? (
+          <p className="form-error" role="alert">
+            The reviewed JSON must match every confirmed question and answer
+            region. Nothing was assigned; correct it and try again.
+          </p>
+        ) : null}
+      </AppShell>
+    );
+  }
+
   if (stage === "review") {
     return (
       <AppShell currentPath="/parent/create/" role="parent">
@@ -582,6 +820,13 @@ export function CreateWorkspace() {
             <Camera /> Import material
           </button>
           <button
+            className={mode === "completed" ? "active" : ""}
+            onClick={() => setMode("completed")}
+            type="button"
+          >
+            <Camera /> Grade completed paper
+          </button>
+          <button
             className={mode === "structured" ? "active" : ""}
             onClick={() => setMode("structured")}
             type="button"
@@ -750,6 +995,40 @@ export function CreateWorkspace() {
             </>
           ) : null}
 
+          {mode === "completed" ? (
+            <>
+              <div className="creation-heading">
+                <span><Camera /></span>
+                <div>
+                  <h2>Upload a paper the child has already completed</h2>
+                  <p>
+                    Upload the original scan or photos. The handwriting stays
+                    private and is reviewed only after you confirm the draft.
+                  </p>
+                </div>
+              </div>
+              <label className="drop-zone">
+                <input
+                  accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+                  aria-label="Completed worksheet scans"
+                  multiple
+                  onChange={(event) => {
+                    const selectedFiles = Array.from(event.target.files ?? []);
+                    setFiles(selectedFiles);
+                    setFileName(selectedFiles.map((file) => file.name).join(", "));
+                  }}
+                  type="file"
+                />
+                <ImagePlus />
+                <strong>{fileName || "Choose completed worksheet pages"}</strong>
+                <span>
+                  Upload several pages in their photographed order. Nothing is
+                  assigned or graded until you confirm the review draft.
+                </span>
+              </label>
+            </>
+          ) : null}
+
           {mode === "structured" ? (
             <>
               <div className="creation-heading">
@@ -812,7 +1091,7 @@ export function CreateWorkspace() {
             </>
           ) : null}
 
-          {mode !== "structured" ? (
+          {mode !== "structured" && mode !== "completed" ? (
             <div className="creation-options">
               <label>
                 Subject
@@ -841,7 +1120,7 @@ export function CreateWorkspace() {
               </label>
             </div>
           ) : null}
-          {mode !== "structured" ? (
+          {mode !== "structured" && mode !== "completed" ? (
             <label className="toggle-row">
               <input type="checkbox" />
               <Headphones size={18} />
@@ -858,7 +1137,9 @@ export function CreateWorkspace() {
               ? "Preparing draft…"
               : mode === "structured"
                 ? "Preview questions"
-                : "Create review draft"}
+                : mode === "completed"
+                  ? "Upload for review"
+                  : "Create review draft"}
           </button>
           {requestStatus === "error" ? (
             <p className="form-error" role="alert">

@@ -42,6 +42,10 @@ A parent can:
    private source material.
 2. Import ordered PDF, PNG, or JPEG pages and either convert existing exercises
    or generate similar exercises from course material.
+3. Upload a paper that has already been completed by a child. The system first
+   creates a reviewable extraction draft; after a parent confirms question
+   boundaries, points, and scoring references, it creates a real `QuestionSet`,
+   submitted `Attempt`, and learning record for the selected child.
 
 Imports may contain a complete worksheet, textbook pages, an answer section, or
 multiple knowledge points. Irrelevant pages can be excluded. Cross-subject
@@ -64,6 +68,12 @@ only by calculation volume.
 Every generated or imported draft enters `needs_review`. A parent can reprocess,
 replace, or delete flagged questions and must confirm the final structured set
 before assigning or printing it.
+
+Confirmed knowledge blueprints can also generate private variants at
+reinforcement, standard, challenge, or explicit competition difficulty. The
+system varies conceptual demands, representation, and reasoning steps rather
+than merely increasing calculation volume. Generated variants follow the same
+parent-review and assignment flow as every other question set.
 
 ## 4. Question and response types
 
@@ -124,6 +134,18 @@ pages retain capture order. The processing worker identifies the page,
 perspective-corrects it, and crops answers by the printed zone map. If page
 recognition fails, the UI asks for page correction or per-question upload.
 
+Parents may also upload a completed external worksheet without an existing
+assignment or printed zone map. The original answer scan is stored privately and
+immutably as a response artifact. The worker separates printed material from
+student work and proposes question units, answer regions, scores, knowledge
+tags, and references. Nothing is graded or added to history until a parent
+confirms that draft.
+
+The product never destructively erases handwriting from the original scan. A
+clean worksheet is a separately generated, reviewable A4 rendering based on the
+confirmed structure. Red-pencil marks are another separate derived overlay that
+can be hidden, displayed, or downloaded.
+
 ## 7. Submission and grading
 
 - A child may submit the current answered question for asynchronous grading and
@@ -136,6 +158,10 @@ recognition fails, the UI asks for page correction or per-question upload.
   ends; a single-question submission does not complete the attempt.
 - AI receives opaque identifiers, the relevant question/rubric, answer, and
   media only. It never receives family or child identity.
+- For a completed external worksheet, AI returns per-question evidence,
+  confidence, feedback in the member's selected language, and normalized red
+  annotation coordinates. The server validates the response and computes totals;
+  AI does not own the final score calculation.
 - A failed job retries a limited number of times, then allows a parent retry.
 
 Per-question outcomes are:

@@ -30,9 +30,14 @@ from app.domain.models import (
     AttemptResults,
     Child,
     ChildAssignmentSummary,
+    CompletedWorksheetConfirmation,
+    CompletedWorksheetImport,
+    CompletedWorksheetResponseInput,
+    CompletedWorksheetStatus,
     CompleteReviewRequest,
     CreateAssignmentRequest,
     CreateChildRequest,
+    CreateCompletedWorksheetRequest,
     CreateDeletionRequest,
     CreateFamilyInvitationRequest,
     CreateFamilyRequest,
@@ -215,6 +220,7 @@ class PostgresRepository:
         child_id: UUID,
         source_name: str,
         parent_id: str,
+        assign: bool = True,
     ) -> ImportResult:
         return await import_question_set(
             document,
@@ -223,7 +229,7 @@ class PostgresRepository:
             child_id=child_id,
             source_name=source_name,
             confirm=True,
-            assign=True,
+            assign=assign,
             parent_id=_uuid(parent_id),
         )
 
@@ -2731,6 +2737,448 @@ class PostgresRepository:
                 resource_id=imported.id,
             )
             return imported
+
+    async def create_completed_worksheet_import(
+        self,
+        request: CreateCompletedWorksheetRequest,
+        idempotency_key: str,
+        parent_id: str,
+    ) -> CompletedWorksheetImport:
+        """Queue paper analysis; task records are created only after review."""
+        async with self._engine.begin() as connection:
+            await self._require_parent(connection, parent_id, request.family_id)
+            child_exists = await connection.scalar(
+                text(
+                    """
+                    select 1
+                    from public.children
+                    where id = :child_id
+                      and family_id = :family_id
+                      and deleted_at is null
+                    """
+                ),
+                {"child_id": request.child_id, "family_id": request.family_id},
+            )
+            if child_exists is None:
+                raise NotFoundError
+
+            existing_id = await self._idempotent_resource(
+                connection,
+                family_id=request.family_id,
+                actor_id=parent_id,
+                action="create_completed_worksheet_import",
+                idempotency_key=idempotency_key,
+            )
+            if existing_id is not None:
+                existing = (
+                    await connection.execute(
+                        text(
+                            """
+                            select id, family_id, child_id, title, subject,
+                                   document_language, feedback_language, filenames,
+                                   response_paths, answer_source_paths,
+                                   reference_source_paths, status, assignment_id,
+                                   attempt_id, created_at
+                            from public.completed_worksheet_imports
+                            where id = :id
+                            """
+                        ),
+                        {"id": existing_id},
+                    )
+                ).mappings().one()
+                existing_job = (
+                    await connection.execute(
+                        text(
+                            """
+                            select id, family_id, subject_id, type, status, payload,
+                                   attempt_count, created_at, completed_at
+                            from public.jobs
+                            where subject_id = :subject_id
+                              and type = 'analyze_completed_worksheet'
+                            order by created_at desc
+                            limit 1
+                            """
+                        ),
+                        {"subject_id": existing_id},
+                    )
+                ).mappings().one()
+                return CompletedWorksheetImport(
+                    **dict(existing),
+                    job=Job(**dict(existing_job)),
+                )
+
+            created = (
+                await connection.execute(
+                    text(
+                        """
+                        insert into public.completed_worksheet_imports (
+                          family_id, child_id, created_by, title, subject,
+                          document_language, feedback_language, filenames,
+                          response_paths, answer_source_paths,
+                          reference_source_paths
+                        ) values (
+                          :family_id, :child_id, :parent_id, :title, :subject,
+                          :document_language, :feedback_language, cast(:filenames as jsonb),
+                          cast(:response_paths as jsonb),
+                          cast(:answer_source_paths as jsonb),
+                          cast(:reference_source_paths as jsonb)
+                        )
+                        returning id, family_id, child_id, title, subject,
+                                  document_language, feedback_language, filenames,
+                                  response_paths, answer_source_paths,
+                                  reference_source_paths, status, assignment_id,
+                                  attempt_id, created_at
+                        """
+                    ),
+                    {
+                        "family_id": request.family_id,
+                        "child_id": request.child_id,
+                        "parent_id": _uuid(parent_id),
+                        "title": request.title,
+                        "subject": request.subject,
+                        "document_language": request.document_language,
+                        "feedback_language": request.feedback_language,
+                        "filenames": json.dumps(request.filenames),
+                        "response_paths": json.dumps(request.response_paths),
+                        "answer_source_paths": json.dumps(request.answer_source_paths),
+                        "reference_source_paths": json.dumps(
+                            request.reference_source_paths
+                        ),
+                    },
+                )
+            ).mappings().one()
+            job_row = (
+                await connection.execute(
+                    text(
+                        """
+                        insert into public.jobs (family_id, type, subject_id, payload)
+                        values (
+                          :family_id, 'analyze_completed_worksheet', :subject_id,
+                          jsonb_build_object('schema_version', '1.0')
+                        )
+                        returning id, family_id, subject_id, type, status, payload,
+                                  attempt_count, created_at, completed_at
+                        """
+                    ),
+                    {"family_id": request.family_id, "subject_id": created["id"]},
+                )
+            ).mappings().one()
+            await self._remember_idempotency(
+                connection,
+                family_id=request.family_id,
+                actor_id=parent_id,
+                action="create_completed_worksheet_import",
+                idempotency_key=idempotency_key,
+                resource_id=created["id"],
+            )
+            return CompletedWorksheetImport(
+                **dict(created),
+                job=Job(**dict(job_row)),
+            )
+
+    async def get_completed_worksheet_import(
+        self,
+        worksheet_id: str,
+        parent_id: str,
+    ) -> CompletedWorksheetImport:
+        async with self._engine.connect() as connection:
+            imported = (
+                await connection.execute(
+                    text(
+                        """
+                        select id, family_id, child_id, title, subject,
+                               document_language, feedback_language, filenames,
+                               response_paths, answer_source_paths,
+                               reference_source_paths, status, assignment_id,
+                               attempt_id, created_at
+                        from public.completed_worksheet_imports
+                        where id = :id
+                        """
+                    ),
+                    {"id": _uuid(worksheet_id)},
+                )
+            ).mappings().one_or_none()
+            if imported is None:
+                raise NotFoundError
+            await self._require_parent(connection, parent_id, imported["family_id"])
+            job = (
+                await connection.execute(
+                    text(
+                        """
+                        select id, family_id, subject_id, type, status, payload,
+                               attempt_count, created_at, completed_at
+                        from public.jobs
+                        where subject_id = :subject_id
+                          and type = 'analyze_completed_worksheet'
+                        order by created_at desc
+                        limit 1
+                        """
+                    ),
+                    {"subject_id": imported["id"]},
+                )
+            ).mappings().one_or_none()
+            if job is None:
+                raise NotFoundError
+            return CompletedWorksheetImport(
+                **dict(imported),
+                job=Job(**dict(job)),
+            )
+
+    async def confirm_completed_worksheet_import(
+        self,
+        worksheet_id: str,
+        *,
+        document: ImportDocument,
+        responses: list[CompletedWorksheetResponseInput],
+        idempotency_key: str,
+        parent_id: str,
+    ) -> CompletedWorksheetConfirmation:
+        """Persist a reviewed scan as one submitted, non-editable attempt."""
+        worksheet_uuid = _uuid(worksheet_id)
+        imported = await self.get_completed_worksheet_import(worksheet_id, parent_id)
+        if imported.status == CompletedWorksheetStatus.NEEDS_REVIEW:
+            import_result = await self.import_structured_question_set(
+                document,
+                family_id=imported.family_id,
+                child_id=imported.child_id,
+                source_name=f"completed-worksheet:{worksheet_id}",
+                parent_id=parent_id,
+                assign=False,
+            )
+            question_set_id = import_result.question_set_id
+        else:
+            question_set_id = None
+
+        async with self._engine.begin() as connection:
+            imported_row = (
+                await connection.execute(
+                    text(
+                        """
+                        select id, family_id, child_id, status, assignment_id, attempt_id
+                        from public.completed_worksheet_imports
+                        where id = :id
+                        for update
+                        """
+                    ),
+                    {"id": worksheet_uuid},
+                )
+            ).mappings().one_or_none()
+            if imported_row is None:
+                raise NotFoundError
+            await self._require_parent(connection, parent_id, imported_row["family_id"])
+
+            if imported_row["attempt_id"] is not None:
+                assignment_row = (
+                    await connection.execute(
+                        text(
+                            """
+                            select id, family_id, question_set_id, child_id, status, mode,
+                                   time_limit_seconds
+                            from public.assignments where id = :id
+                            """
+                        ),
+                        {"id": imported_row["assignment_id"]},
+                    )
+                ).mappings().one()
+                attempt_row = (
+                    await connection.execute(
+                        text(
+                            """
+                            select id, family_id, assignment_id, child_id, sequence,
+                                   started_at, submitted_at
+                            from public.attempts where id = :id
+                            """
+                        ),
+                        {"id": imported_row["attempt_id"]},
+                    )
+                ).mappings().one()
+                job_row = (
+                    await connection.execute(
+                        text(
+                            """
+                            select id, family_id, subject_id, type, status, payload,
+                                   attempt_count, created_at, completed_at
+                            from public.jobs
+                            where type = 'grade_submission' and subject_id = :attempt_id
+                            order by created_at desc limit 1
+                            """
+                        ),
+                        {"attempt_id": imported_row["attempt_id"]},
+                    )
+                ).mappings().one_or_none()
+                if job_row is None:
+                    raise NotFoundError
+                return CompletedWorksheetConfirmation(
+                    completed_worksheet=await self.get_completed_worksheet_import(
+                        worksheet_id, parent_id
+                    ),
+                    question_set_id=assignment_row["question_set_id"],
+                    assignment=_assignment(assignment_row),
+                    attempt=_attempt(attempt_row),
+                    grading_job=_job(job_row),
+                )
+
+            if (
+                imported_row["status"] != CompletedWorksheetStatus.NEEDS_REVIEW
+                or question_set_id is None
+            ):
+                raise NotFoundError
+
+            assignment_row = (
+                await connection.execute(
+                    text(
+                        """
+                        insert into public.assignments (
+                          family_id, question_set_id, child_id, assigned_by, mode
+                        ) values (
+                          :family_id, :question_set_id, :child_id, :parent_id, 'practice'
+                        )
+                        returning id, family_id, question_set_id, child_id, status, mode,
+                                  time_limit_seconds
+                        """
+                    ),
+                    {
+                        "family_id": imported_row["family_id"],
+                        "question_set_id": question_set_id,
+                        "child_id": imported_row["child_id"],
+                        "parent_id": _uuid(parent_id),
+                    },
+                )
+            ).mappings().one()
+            attempt_row = (
+                await connection.execute(
+                    text(
+                        """
+                        insert into public.attempts (
+                          family_id, assignment_id, child_id, sequence,
+                          client_idempotency_key
+                        ) values (
+                          :family_id, :assignment_id, :child_id, 1, :client_key
+                        )
+                        returning id, family_id, assignment_id, child_id, sequence,
+                                  started_at, submitted_at
+                        """
+                    ),
+                    {
+                        "family_id": imported_row["family_id"],
+                        "assignment_id": assignment_row["id"],
+                        "child_id": imported_row["child_id"],
+                        "client_key": f"completed-worksheet:{worksheet_id}",
+                    },
+                )
+            ).mappings().one()
+            question_rows = (
+                await connection.execute(
+                    text(
+                        """
+                        select id, position
+                        from public.questions
+                        where question_set_id = :question_set_id
+                        order by position
+                        """
+                    ),
+                    {"question_set_id": question_set_id},
+                )
+            ).mappings().all()
+            if len(question_rows) != len(responses):
+                raise NotFoundError
+            for question_row, response in zip(question_rows, responses, strict=True):
+                if question_row["position"] != response.question_position:
+                    raise NotFoundError
+                await connection.execute(
+                    text(
+                        """
+                        insert into public.responses (
+                          family_id, attempt_id, question_id, kind, answer, version
+                        ) values (
+                          :family_id, :attempt_id, :question_id, :kind,
+                          cast(:answer as jsonb), 1
+                        )
+                        """
+                    ),
+                    {
+                        "family_id": imported_row["family_id"],
+                        "attempt_id": attempt_row["id"],
+                        "question_id": question_row["id"],
+                        "kind": response.kind.value,
+                        "answer": json.dumps(response.answer),
+                    },
+                )
+            submitted_at = datetime.now(UTC)
+            await connection.execute(
+                text(
+                    """
+                    update public.attempts set submitted_at = :submitted_at
+                    where id = :attempt_id
+                    """
+                ),
+                {"submitted_at": submitted_at, "attempt_id": attempt_row["id"]},
+            )
+            assignment_data: dict[str, Any] = dict(assignment_row)
+            assignment_data["status"] = AssignmentStatus.GRADING
+            await connection.execute(
+                text(
+                    """
+                    update public.assignments
+                    set status = 'grading', submitted_at = :submitted_at, updated_at = now()
+                    where id = :assignment_id
+                    """
+                ),
+                {"submitted_at": submitted_at, "assignment_id": assignment_data["id"]},
+            )
+            job_row = (
+                await connection.execute(
+                    text(
+                        """
+                        insert into public.jobs (family_id, type, subject_id, payload)
+                        values (
+                          :family_id, 'grade_submission', :attempt_id,
+                          jsonb_build_object(
+                            'source', 'completed_worksheet',
+                            'completed_worksheet_id', cast(:worksheet_id as text),
+                            'idempotency_key', cast(:idempotency_key as text)
+                          )
+                        )
+                        returning id, family_id, subject_id, type, status, payload,
+                                  attempt_count, created_at, completed_at
+                        """
+                    ),
+                    {
+                        "family_id": imported_row["family_id"],
+                        "attempt_id": attempt_row["id"],
+                        "worksheet_id": worksheet_id,
+                        "idempotency_key": idempotency_key,
+                    },
+                )
+            ).mappings().one()
+            await connection.execute(
+                text(
+                    """
+                    update public.completed_worksheet_imports
+                    set status = 'grading', question_set_id = :question_set_id,
+                        assignment_id = :assignment_id, attempt_id = :attempt_id,
+                        updated_at = now()
+                    where id = :id
+                    """
+                ),
+                {
+                    "id": worksheet_uuid,
+                    "question_set_id": question_set_id,
+                    "assignment_id": assignment_data["id"],
+                    "attempt_id": attempt_row["id"],
+                },
+            )
+
+        completed = await self.get_completed_worksheet_import(worksheet_id, parent_id)
+        attempt_data = dict(attempt_row)
+        attempt_data["submitted_at"] = submitted_at
+        return CompletedWorksheetConfirmation(
+            completed_worksheet=completed,
+            question_set_id=question_set_id,
+            assignment=_assignment(cast(RowMapping, assignment_data)),
+            attempt=_attempt(cast(RowMapping, attempt_data)),
+            grading_job=_job(job_row),
+        )
 
     async def get_question_set_draft(
         self,

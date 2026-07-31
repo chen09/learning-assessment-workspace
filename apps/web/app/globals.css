@@ -2564,6 +2564,12 @@ button {
   line-height: 1.5;
 }
 
+.compact-drop-zone {
+  min-height: 8.5rem;
+  margin-bottom: 0.8rem;
+  padding: 1.1rem;
+}
+
 .creation-options {
   display: grid;
   grid-template-columns: 1.2fr 1fr 0.7fr;

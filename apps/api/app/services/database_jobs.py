@@ -98,6 +98,45 @@ async def fixture_job_handler(
             "status": "purged",
             "target_type": deletion["target_type"],
         }
+    if job["type"] == "analyze_completed_worksheet":
+        worksheet = await connection.fetchrow(
+            """
+            select id, family_id, child_id, title, subject, document_language,
+                   feedback_language, filenames, response_paths,
+                   answer_source_paths, reference_source_paths
+            from public.completed_worksheet_imports
+            where id = $1
+            """,
+            job["subject_id"],
+        )
+        if worksheet is None:
+            raise RuntimeError("The completed worksheet upload no longer exists.")
+        extraction = {
+            "schema_version": "1.0",
+            "status": "needs_parent_confirmation",
+            "artifact_kind": "completed_worksheet_scan",
+            "source_page_count": len(list(_json_value(worksheet["response_paths"]))),
+            "question_units": [],
+            "warnings": [
+                "No question boundaries are final until a parent confirms them."
+            ],
+        }
+        await connection.execute(
+            """
+            update public.completed_worksheet_imports
+            set status = 'needs_review', extraction = $2::jsonb, updated_at = now()
+            where id = $1
+            """,
+            worksheet["id"],
+            json.dumps(extraction),
+        )
+        return {
+            "adapter": "fixture-v1",
+            "job_type": job["type"],
+            "schema_version": "1.0",
+            "status": "needs_review",
+            "source_page_count": extraction["source_page_count"],
+        }
     if job["type"] == "extract_source":
         imported = await connection.fetchrow(
             """

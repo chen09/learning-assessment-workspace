@@ -17,6 +17,9 @@ class FixtureJobProcessor:
         if job is None:
             return None
         job.attempt_count += 1
+        if job.type == "analyze_completed_worksheet":
+            self._grader.mark_succeeded(job)
+            return self._repository.complete_completed_worksheet_analysis(job)
         questions = self._repository.questions_for_attempt(str(job.subject_id))
         submitted_question_id = job.payload.get("question_id")
         if isinstance(submitted_question_id, str):

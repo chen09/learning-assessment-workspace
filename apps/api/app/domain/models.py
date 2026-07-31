@@ -421,6 +421,67 @@ class QuestionSetImport(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+class CompletedWorksheetStatus(StrEnum):
+    PROCESSING = "processing"
+    NEEDS_REVIEW = "needs_review"
+    CONFIRMED = "confirmed"
+    GRADING = "grading"
+    RESULTS_READY = "results_ready"
+    FAILED = "failed"
+
+
+class CreateCompletedWorksheetRequest(BaseModel):
+    """A parent-uploaded paper that already contains a child's answers."""
+
+    family_id: UUID
+    child_id: UUID
+    title: str = Field(min_length=1, max_length=160)
+    subject: str = Field(min_length=1, max_length=80)
+    document_language: Literal["en", "ja", "zh"]
+    feedback_language: Literal["en", "ja", "zh"]
+    filenames: list[str] = Field(min_length=1, max_length=100)
+    response_paths: list[str] = Field(min_length=1, max_length=100)
+    answer_source_paths: list[str] = Field(default_factory=list, max_length=30)
+    reference_source_paths: list[str] = Field(default_factory=list, max_length=100)
+
+
+class CompletedWorksheetImport(BaseModel):
+    id: UUID = Field(default_factory=uuid4)
+    family_id: UUID
+    child_id: UUID
+    title: str
+    subject: str
+    document_language: Literal["en", "ja", "zh"]
+    feedback_language: Literal["en", "ja", "zh"]
+    filenames: list[str]
+    response_paths: list[str]
+    answer_source_paths: list[str] = Field(default_factory=list)
+    reference_source_paths: list[str] = Field(default_factory=list)
+    status: CompletedWorksheetStatus = CompletedWorksheetStatus.PROCESSING
+    assignment_id: UUID | None = None
+    attempt_id: UUID | None = None
+    job: Job
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class CompletedWorksheetResponseInput(BaseModel):
+    """One reviewed answer region from an already-completed paper."""
+
+    question_position: int = Field(gt=0)
+    kind: ResponseKind = ResponseKind.PHOTO
+    answer: dict[str, Any] = Field(default_factory=dict)
+
+
+class CompletedWorksheetConfirmation(BaseModel):
+    """The durable learning records created from a parent-confirmed scan."""
+
+    completed_worksheet: CompletedWorksheetImport
+    question_set_id: UUID
+    assignment: Assignment
+    attempt: Attempt
+    grading_job: Job
+
+
 class QuestionSetDraft(BaseModel):
     question_set: QuestionSet
     questions: list[Question]

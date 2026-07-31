@@ -5,10 +5,13 @@ import { CreateWorkspace } from "@/components/create-workspace";
 
 const mocks = vi.hoisted(() => ({
   assignQuestionSet: vi.fn(),
+  confirmCompletedWorksheetImport: vi.fn(),
   confirmQuestionSet: vi.fn(),
+  createCompletedWorksheetImport: vi.fn(),
   createQuestionSetImport: vi.fn(),
   createUploadIntent: vi.fn(),
   getChildren: vi.fn(),
+  getCompletedWorksheetImport: vi.fn(),
   getFamilies: vi.fn(),
   getParentAccessToken: vi.fn(),
   getQuestionSetDraft: vi.fn(),
@@ -254,5 +257,122 @@ describe("CreateWorkspace", () => {
     expect(
       await screen.findByText("Confirmed and assigned"),
     ).toBeInTheDocument();
+  });
+
+  it("keeps a completed paper private until the reviewed JSON creates its submitted attempt", async () => {
+    const document = {
+      schema_version: "1.0",
+      question_set: {
+        title: "Completed factorisation paper",
+        subject: "Math",
+        locale: "ja",
+        difficulty: "standard",
+        source_mode: "convert",
+        estimated_minutes: 10,
+        source_summary: { unit: "factorisation" },
+      },
+      knowledge_tags: [{ code: "factorisation", label: "Factorisation" }],
+      questions: [
+        {
+          position: 1,
+          type: "handwriting",
+          prompt: "Factorise x² − 16.",
+          options: [],
+          answer_key: { accepted_forms: ["(x - 4)(x + 4)"] },
+          rubric: { grading_mode: "parent_review" },
+          points: 1,
+          knowledge_code: "factorisation",
+        },
+      ],
+    };
+    mocks.createUploadIntent.mockResolvedValue({
+      bucket: "responses",
+      path: "family-1/completed-paper/page-1.jpg",
+      token: "upload-token",
+      signed_url: "https://storage.example/upload",
+    });
+    mocks.uploadToSignedUrl.mockResolvedValue(undefined);
+    mocks.createCompletedWorksheetImport.mockResolvedValue({
+      id: "completed-worksheet-1",
+      status: "needs_review",
+      assignment_id: null,
+      attempt_id: null,
+      job: { id: "analysis-job-1", status: "completed", type: "analyze_completed_worksheet" },
+    });
+    mocks.confirmCompletedWorksheetImport.mockResolvedValue({
+      completed_worksheet: { id: "completed-worksheet-1", status: "grading" },
+      question_set_id: "question-set-1",
+      assignment: { id: "assignment-1", status: "grading" },
+      attempt: { id: "attempt-1", submitted_at: "2026-07-31T00:00:00Z" },
+      grading_job: { id: "grading-job-1", status: "queued", type: "grade_submission" },
+    });
+
+    render(<CreateWorkspace />);
+
+    await screen.findByRole("combobox", { name: "Child" });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Grade completed paper" }),
+    );
+    fireEvent.change(screen.getByLabelText("Completed worksheet scans"), {
+      target: {
+        files: [
+          new File(["scan"], "completed-paper.jpg", { type: "image/jpeg" }),
+        ],
+      },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Upload for review" }),
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Preparing the review draft" }),
+    ).toBeInTheDocument();
+    expect(mocks.createCompletedWorksheetImport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        family_id: "family-1",
+        child_id: "child-1",
+        response_paths: ["family-1/completed-paper/page-1.jpg"],
+      }),
+      "parent-token",
+      expect.stringContaining("completed-worksheet-"),
+    );
+
+    const review = {
+      document,
+      responses: [
+        {
+          question_position: 1,
+          kind: "photo",
+          answer: { paths: ["family-1/completed-paper/page-1.jpg"] },
+        },
+      ],
+    };
+    fireEvent.change(
+      screen.getByLabelText("Reviewed completed worksheet JSON"),
+      {
+        target: {
+          files: [
+            new File([JSON.stringify(review)], "reviewed-paper.json", {
+              type: "application/json",
+            }),
+          ],
+        },
+      },
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirm and start grading" }),
+    );
+
+    await waitFor(() => {
+      expect(mocks.confirmCompletedWorksheetImport).toHaveBeenCalledWith(
+        "completed-worksheet-1",
+        review,
+        "parent-token",
+        "confirm-completed-completed-worksheet-1",
+      );
+    });
+    expect(
+      await screen.findByRole("link", { name: "Open grading results" }),
+    ).toHaveAttribute("href", "/parent/results?attemptId=attempt-1");
   });
 });
