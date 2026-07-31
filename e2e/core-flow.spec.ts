@@ -1,5 +1,47 @@
 import { expect, test } from "@playwright/test";
 
+test("parent dashboard shows saved family data and opens child practice", async ({
+  page,
+}) => {
+  await page.route("**/v1/families", async (route) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify([{ id: "dashboard-family", name: "肉肉如意" }]),
+    });
+  });
+  await page.route("**/v1/families/dashboard-family/children", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          id: "dashboard-child",
+          family_id: "dashboard-family",
+          nickname: "肉肉",
+          grade_stage: "Junior high 1",
+          ui_language: "zh",
+        },
+      ]),
+    });
+  });
+
+  await page.goto("/parent/");
+  await expect(page.getByRole("heading", { name: "肉肉如意" })).toBeVisible();
+  await expect(page.getByText("肉肉", { exact: true })).toBeVisible();
+  const createPractice = page.getByRole("link", { name: "Create practice" });
+  await expect(createPractice).toHaveAttribute(
+    "href",
+    "/parent/create/?familyId=dashboard-family&childId=dashboard-child",
+  );
+  await createPractice.click();
+  await expect(page).toHaveURL(
+    /\/parent\/create\/?\?familyId=dashboard-family&childId=dashboard-child$/,
+  );
+});
+
 test("authenticated parent legacy link is cleaned and remains responsive in all languages", async ({
   page,
 }, testInfo) => {

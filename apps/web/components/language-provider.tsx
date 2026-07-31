@@ -43,6 +43,15 @@ const messages = {
     "parentDashboard.accountReadyDetails":
       "Nothing from the sample family is attached to your account. Your workspace starts empty and only shows the people you add or join.",
     "parentDashboard.continueFamilySetup": "Continue to family setup",
+    "parentDashboard.activeFamilyDescription":
+      "{count} children are ready for learning in this family.",
+    "parentDashboard.learningToday": "Learning today",
+    "parentDashboard.noChildren": "Add a child before creating their first practice.",
+    "parentDashboard.quickActions": "Family quick actions",
+    "parentDashboard.workspaceUnavailable": "We could not load your family workspace",
+    "parentDashboard.workspaceUnavailableDetails":
+      "Your account is still signed in. Please try loading your family again.",
+    "parentDashboard.tryAgain": "Try again",
     "family.eyebrow": "Family workspace",
     "family.createTitle": "Create your family",
     "family.loadingTitle": "Loading your workspace…",
@@ -366,6 +375,15 @@ const messages = {
     "parentDashboard.accountReadyDetails":
       "サンプル家族の情報はアカウントに紐づいていません。学習スペースは空の状態から始まり、追加または参加したメンバーだけが表示されます。",
     "parentDashboard.continueFamilySetup": "家族設定へ進む",
+    "parentDashboard.activeFamilyDescription":
+      "この家族には学習の準備ができたお子さまが {count} 人います。",
+    "parentDashboard.learningToday": "今日の学習",
+    "parentDashboard.noChildren": "最初の練習を作る前に、お子さまを追加してください。",
+    "parentDashboard.quickActions": "家族のクイック操作",
+    "parentDashboard.workspaceUnavailable": "家族の学習スペースを読み込めませんでした",
+    "parentDashboard.workspaceUnavailableDetails":
+      "アカウントにはログインしたままです。もう一度家族を読み込んでください。",
+    "parentDashboard.tryAgain": "もう一度試す",
     "family.eyebrow": "家族の学習スペース",
     "family.createTitle": "家族を作成",
     "family.loadingTitle": "学習スペースを読み込み中…",
@@ -687,6 +705,14 @@ const messages = {
     "parentDashboard.accountReadyDetails":
       "示例家庭的数据不会关联到您的账号。家庭学习空间从空白开始，只显示您添加或加入的成员。",
     "parentDashboard.continueFamilySetup": "继续设置家庭",
+    "parentDashboard.activeFamilyDescription": "这个家庭有 {count} 个孩子准备开始学习。",
+    "parentDashboard.learningToday": "今日学习",
+    "parentDashboard.noChildren": "请先添加孩子，再创建第一份练习。",
+    "parentDashboard.quickActions": "家庭快捷操作",
+    "parentDashboard.workspaceUnavailable": "无法加载您的家庭学习空间",
+    "parentDashboard.workspaceUnavailableDetails":
+      "您的账号仍保持登录。请重新加载家庭数据。",
+    "parentDashboard.tryAgain": "重试",
     "family.eyebrow": "家庭学习空间",
     "family.createTitle": "创建您的家庭",
     "family.loadingTitle": "正在加载家庭空间…",
