@@ -279,6 +279,61 @@ def test_parent_can_confirm_structured_json_and_assign_it_without_exposing_answe
     assert "answer_key" not in work.json()["questions"][0]
 
 
+def test_parent_can_assign_structured_json_as_a_timed_exam() -> None:
+    client = TestClient(create_app())
+    fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+    imported = client.post(
+        "/v1/question-sets/imports/structured",
+        headers={
+            **PARENT_HEADERS,
+            "Idempotency-Key": "structured-timed-exam-import",
+        },
+        json={
+            "family_id": fixture["family"]["id"],
+            "child_id": fixture["child"]["id"],
+            "source_name": "timed-lesson.json",
+            "assignment_mode": "exam",
+            "time_limit_seconds": 900,
+            "document": _structured_question_set(),
+        },
+    )
+
+    assert imported.status_code == 201
+    child_session = client.post(
+        f"/v1/children/{fixture['child']['id']}/sessions",
+        json={"pin": "123456"},
+    ).json()
+    work = client.post(
+        f"/v1/assignments/{imported.json()['assignment_id']}/start",
+        headers={"Authorization": f"Bearer {child_session['access_token']}"},
+    )
+
+    assert work.status_code == 200
+    assert work.json()["assignment"]["mode"] == "exam"
+    assert work.json()["assignment"]["time_limit_seconds"] == 900
+
+
+def test_structured_exam_requires_a_time_limit() -> None:
+    client = TestClient(create_app())
+    fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+    response = client.post(
+        "/v1/question-sets/imports/structured",
+        headers={
+            **PARENT_HEADERS,
+            "Idempotency-Key": "structured-exam-no-time",
+        },
+        json={
+            "family_id": fixture["family"]["id"],
+            "child_id": fixture["child"]["id"],
+            "source_name": "invalid-timed-lesson.json",
+            "assignment_mode": "exam",
+            "document": _structured_question_set(),
+        },
+    )
+
+    assert response.status_code == 422
+
+
 def test_import_stays_in_review_then_can_be_confirmed_and_assigned() -> None:
     client = TestClient(create_app())
     fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()

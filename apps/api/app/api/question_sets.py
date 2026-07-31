@@ -1,8 +1,8 @@
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.api.dependencies import Repository, get_repository, require_parent
 from app.domain.errors import NotFoundError
@@ -46,7 +46,17 @@ class StructuredImportRequest(BaseModel):
     family_id: UUID
     child_id: UUID
     source_name: str = Field(min_length=1, max_length=180)
+    assignment_mode: Literal["practice", "exam"] = "practice"
+    time_limit_seconds: int | None = Field(default=None, ge=60, le=14_400)
     document: ImportDocument
+
+    @model_validator(mode="after")
+    def validate_assignment_timing(self) -> "StructuredImportRequest":
+        if self.assignment_mode == "exam" and self.time_limit_seconds is None:
+            raise ValueError("Timed exams require a time limit.")
+        if self.assignment_mode == "practice" and self.time_limit_seconds is not None:
+            raise ValueError("Practice assignments cannot have a time limit.")
+        return self
 
 
 @router.post(
@@ -83,6 +93,8 @@ async def import_structured_question_set(
             child_id=request.child_id,
             source_name=request.source_name,
             parent_id=parent_id,
+            assignment_mode=request.assignment_mode,
+            time_limit_seconds=request.time_limit_seconds,
         )
     except NotFoundError as error:
         raise HTTPException(

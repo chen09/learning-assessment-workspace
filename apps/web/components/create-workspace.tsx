@@ -41,6 +41,7 @@ import {
 type CreateMode = "generate" | "import" | "completed" | "structured" | "manual";
 type ImportPurpose = "generate_similar" | "use_as_questions";
 type Stage = "compose" | "review";
+type AssignmentMode = "practice" | "exam";
 type ManualQuestionType = "single_choice" | "typed_text" | "handwriting";
 type ManualDraftQuestion = StructuredQuestionSetDocument["questions"][number] & {
   id: string;
@@ -282,6 +283,10 @@ export function CreateWorkspace() {
   const [manualLocale, setManualLocale] = useState<"zh" | "ja" | "en">("en");
   const [manualQuestionType, setManualQuestionType] =
     useState<ManualQuestionType>("typed_text");
+  const [assignmentMode, setAssignmentMode] =
+    useState<AssignmentMode>("practice");
+  const [assignmentDurationMinutes, setAssignmentDurationMinutes] =
+    useState("30");
   const [manualQuestionPrompt, setManualQuestionPrompt] = useState("");
   const [manualOptions, setManualOptions] = useState("");
   const [manualAnswer, setManualAnswer] = useState("");
@@ -329,6 +334,9 @@ export function CreateWorkspace() {
   const [requestStatus, setRequestStatus] = useState<
     "idle" | "working" | "error"
   >("idle");
+
+  const assignmentTimeLimitSeconds =
+    assignmentMode === "exam" ? Number(assignmentDurationMinutes) * 60 : null;
 
   useEffect(() => {
     let active = true;
@@ -772,6 +780,10 @@ export function CreateWorkspace() {
         }
       }
       setDraftQuestions(draft.questions);
+      if (isLessonOneImport) {
+        setAssignmentMode("exam");
+        setAssignmentDurationMinutes("45");
+      }
       setStage("review");
       setRequestStatus("idle");
     } catch {
@@ -804,6 +816,8 @@ export function CreateWorkspace() {
             family_id: familyId,
             child_id: childId,
             source_name: structuredFile?.name ?? "Manual question",
+            assignment_mode: assignmentMode,
+            time_limit_seconds: assignmentTimeLimitSeconds,
             document: structuredDocument,
           },
           parentToken,
@@ -840,9 +854,10 @@ export function CreateWorkspace() {
         childId,
         parentToken,
         `assign-${questionSetId}-${childId}`,
-        isLessonOneImport
-          ? { mode: "exam", time_limit_seconds: 2700 }
-          : { mode: "practice", time_limit_seconds: null },
+        {
+          mode: assignmentMode,
+          time_limit_seconds: assignmentTimeLimitSeconds,
+        },
       );
       setAssignmentId(assignment.id);
       setConfirmed(true);
@@ -1307,9 +1322,9 @@ export function CreateWorkspace() {
             {draftQuestions.length || sampleQuestions.length} questions ·{" "}
             {mode === "structured"
               ? "validated JSON · answers stay private"
-              : isLessonOneImport
-              ? "45-minute test"
-              : "about 8 minutes · standard difficulty"}
+              : assignmentMode === "exam"
+                ? `${assignmentDurationMinutes}-minute timed exam`
+                : "practice mode · no timer"}
           </span>
         </div>
         <section className="draft-question-list">
@@ -1501,12 +1516,61 @@ export function CreateWorkspace() {
               {children.find((child) => child.id === selectedChildId)
                 ?.nickname ?? "Selected child"}{" "}
               ·{" "}
-              {isLessonOneImport ? "45-minute test" : "practice mode"}
+              {assignmentMode === "exam"
+                ? `${assignmentDurationMinutes}-minute timed exam`
+                : "practice mode"}
             </h2>
             <p>
-              {isLessonOneImport ? "Timer: 45 minutes. " : "No timer. "}
+              {assignmentMode === "exam"
+                ? `Timer: ${assignmentDurationMinutes} minutes. `
+                : "No timer. "}
               Results appear after the whole set is graded.
             </p>
+            {!confirmed ? (
+              <fieldset className="assignment-mode-selector">
+                <legend>Assignment settings</legend>
+                <label>
+                  <input
+                    aria-label="Practice mode"
+                    checked={assignmentMode === "practice"}
+                    name="assignment-mode"
+                    onChange={() => setAssignmentMode("practice")}
+                    type="radio"
+                  />
+                  Practice
+                </label>
+                <label>
+                  <input
+                    aria-label="Exam mode"
+                    checked={assignmentMode === "exam"}
+                    name="assignment-mode"
+                    onChange={() => setAssignmentMode("exam")}
+                    type="radio"
+                  />
+                  Timed exam
+                </label>
+                {assignmentMode === "exam" ? (
+                  <label>
+                    Time limit
+                    <select
+                      aria-label="Time limit"
+                      onChange={(event) =>
+                        setAssignmentDurationMinutes(event.target.value)
+                      }
+                      value={assignmentDurationMinutes}
+                    >
+                      <option value="10">10 minutes</option>
+                      <option value="15">15 minutes</option>
+                      <option value="30">30 minutes</option>
+                      <option value="45">45 minutes</option>
+                      <option value="60">60 minutes</option>
+                      <option value="90">90 minutes</option>
+                      <option value="120">120 minutes</option>
+                    </select>
+                  </label>
+                ) : null}
+              </fieldset>
+            ) : null}
           </div>
           {confirmed ? (
             <div className="confirmed-message" role="status">

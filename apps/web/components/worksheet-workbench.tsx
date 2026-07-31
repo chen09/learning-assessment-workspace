@@ -12,7 +12,7 @@ import {
   Send,
   Volume2,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import {
@@ -220,6 +220,7 @@ function WorksheetWorkbenchContent() {
   const [regradingQuestionId, setRegradingQuestionId] = useState<string | null>(
     null,
   );
+  const automaticSubmissionAttemptId = useRef<string | null>(null);
   const currentQuestion = questions[currentIndex];
 
   useEffect(() => {
@@ -275,8 +276,19 @@ function WorksheetWorkbenchContent() {
         setAttemptId(work.attempt.id);
         setFamilyId(work.assignment.family_id);
         setExamMode(work.assignment.mode === "exam");
-        if (work.assignment.time_limit_seconds) {
-          setSecondsRemaining(work.assignment.time_limit_seconds);
+        if (
+          work.assignment.mode === "exam" &&
+          work.assignment.time_limit_seconds
+        ) {
+          const elapsedSeconds = Math.max(
+            0,
+            Math.floor(
+              (Date.now() - new Date(work.attempt.started_at).getTime()) / 1000,
+            ),
+          );
+          setSecondsRemaining(
+            Math.max(0, work.assignment.time_limit_seconds - elapsedSeconds),
+          );
         }
         const questionTypes = new Map(
           work.questions.map((question) => [question.id, question.type]),
@@ -432,34 +444,45 @@ function WorksheetWorkbenchContent() {
     if (!examMode) {
       return;
     }
+    const submitForTimeLimit = () => {
+      if (automaticSubmissionAttemptId.current === attemptId) {
+        return;
+      }
+      automaticSubmissionAttemptId.current = attemptId;
+      if (attemptId && childToken) {
+        void submitAttempt(
+          attemptId,
+          childToken,
+          `submit-${attemptId}-time-limit`,
+        )
+          .then(() => removePendingDraftsByPrefix(`${attemptId}:`))
+          .finally(() =>
+            window.location.assign(
+              `/child/submitted/?reason=time-limit&attemptId=${encodeURIComponent(
+                attemptId,
+              )}`,
+            ),
+          );
+        return;
+      }
+      window.location.assign("/child/submitted/?reason=time-limit");
+    };
+    if (secondsRemaining <= 0) {
+      submitForTimeLimit();
+      return;
+    }
     const timer = window.setInterval(() => {
       setSecondsRemaining((current) => {
         if (current <= 1) {
           window.clearInterval(timer);
-          if (attemptId && childToken) {
-            void submitAttempt(
-              attemptId,
-              childToken,
-              `submit-${attemptId}-time-limit`,
-            )
-              .then(() => removePendingDraftsByPrefix(`${attemptId}:`))
-              .finally(() =>
-                window.location.assign(
-                  `/child/submitted/?reason=time-limit&attemptId=${encodeURIComponent(
-                    attemptId,
-                  )}`,
-                ),
-              );
-          } else {
-            window.location.assign("/child/submitted/?reason=time-limit");
-          }
+          submitForTimeLimit();
           return 0;
         }
         return current - 1;
       });
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [attemptId, childToken, examMode]);
+  }, [attemptId, childToken, examMode, secondsRemaining]);
 
   useEffect(() => {
     if (!childToken) {
@@ -1094,10 +1117,8 @@ function WorksheetWorkbenchContent() {
           <h2>{title}</h2>
         </div>
         <div className="work-status">
-          <button
+          <span
             className={examMode ? "exam-toggle active" : "exam-toggle"}
-            onClick={() => setExamMode((current) => !current)}
-            type="button"
           >
             <Clock3 size={15} />
             {examMode
@@ -1105,7 +1126,7 @@ function WorksheetWorkbenchContent() {
                   secondsRemaining % 60,
                 ).padStart(2, "0")}`
               : t("worksheet.practiceMode")}
-          </button>
+          </span>
           <span
             className={`save-state ${saveStatus}`}
             aria-live="polite"

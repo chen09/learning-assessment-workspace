@@ -2816,6 +2816,47 @@ button {
   font-size: 0.7rem;
 }
 
+.assignment-mode-selector {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 0.85rem;
+  margin: 1rem 0 0;
+  border: 0;
+  padding: 0;
+}
+
+.assignment-mode-selector legend {
+  width: 100%;
+  color: #bbc2ca;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.assignment-mode-selector label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #f7f8fa;
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+
+.assignment-mode-selector input {
+  accent-color: var(--blue);
+}
+
+.assignment-mode-selector select {
+  border: 1px solid #d7dce3;
+  border-radius: 0.55rem;
+  background: white;
+  color: var(--ink);
+  font: inherit;
+  padding: 0.35rem 0.45rem;
+}
+
 .confirmed-message {
   display: inline-flex;
   align-items: center;

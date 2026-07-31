@@ -1330,6 +1330,8 @@ class MemoryRepository:
         source_name: str,
         parent_id: str,
         assign: bool = True,
+        assignment_mode: str = "practice",
+        time_limit_seconds: int | None = None,
     ) -> ImportResult:
         family_key = str(family_id)
         child_key = str(child_id)
@@ -1361,6 +1363,8 @@ class MemoryRepository:
                     family_id=family_id,
                     question_set_id=question_set.id,
                     child_id=child_id,
+                    mode=assignment_mode,
+                    time_limit_seconds=time_limit_seconds,
                 )
                 self.assignments[str(assignment.id)] = assignment
             return ImportResult(
@@ -1416,6 +1420,8 @@ class MemoryRepository:
                 family_id=family_id,
                 question_set_id=question_set.id,
                 child_id=child_id,
+                mode=assignment_mode,
+                time_limit_seconds=time_limit_seconds,
             )
             self.assignments[str(assignment.id)] = assignment
         self.structured_imports[record_key] = str(question_set.id)

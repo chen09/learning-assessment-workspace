@@ -44,7 +44,7 @@ const assignmentWork = {
     time_limit_seconds: null,
     status: "in_progress",
   },
-  attempt: { id: "attempt-1" },
+  attempt: { id: "attempt-1", started_at: new Date().toISOString() },
   questions: [
     {
       id: "algebra-choice",
@@ -110,7 +110,10 @@ describe("WorksheetWorkbench", () => {
     mocks.createQuestionRetry.mockReset();
     mocks.createQuestionRetry.mockResolvedValue({
       ...assignmentWork,
-      attempt: { id: "retry-attempt-1" },
+      attempt: {
+        id: "retry-attempt-1",
+        started_at: new Date().toISOString(),
+      },
       questions: [assignmentWork.questions[2]],
       responses: [],
       submitted_question_ids: [],
@@ -194,6 +197,28 @@ describe("WorksheetWorkbench", () => {
         name: "Complete: She ___ to school every day.",
       }),
     ).toBeInTheDocument();
+  });
+
+  it("uses the parent-selected exam timer and does not let the child change it", async () => {
+    mocks.startAssignment.mockResolvedValue({
+      ...assignmentWork,
+      assignment: {
+        ...assignmentWork.assignment,
+        mode: "exam",
+        time_limit_seconds: 900,
+      },
+      attempt: {
+        ...assignmentWork.attempt,
+        started_at: new Date(Date.now() - 121_000).toISOString(),
+      },
+    });
+
+    render(<WorksheetWorkbench />);
+
+    expect(await screen.findByText(/^12:/)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^12:/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("submits only the current answer and keeps the rest of the attempt open", async () => {

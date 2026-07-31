@@ -186,6 +186,8 @@ async def import_question_set(
     confirm: bool,
     assign: bool,
     parent_id: UUID | None = None,
+    assignment_mode: Literal["practice", "exam"] = "practice",
+    time_limit_seconds: int | None = None,
 ) -> ImportResult:
     if assign and not confirm:
         raise ValueError("A question set must be confirmed before it can be assigned.")
@@ -311,9 +313,11 @@ async def import_question_set(
                         text(
                             """
                             insert into public.assignments (
-                              family_id, question_set_id, child_id, assigned_by, mode
+                              family_id, question_set_id, child_id, assigned_by, mode,
+                              time_limit_seconds
                             ) values (
-                              :family_id, :question_set_id, :child_id, :parent_id, 'practice'
+                              :family_id, :question_set_id, :child_id, :parent_id, :mode,
+                              :time_limit_seconds
                             )
                             returning id
                             """
@@ -323,6 +327,8 @@ async def import_question_set(
                             "question_set_id": existing["question_set_id"],
                             "child_id": child_id,
                             "parent_id": parent_id,
+                            "mode": assignment_mode,
+                            "time_limit_seconds": time_limit_seconds,
                         },
                     )
                 return ImportResult(
@@ -465,9 +471,11 @@ async def import_question_set(
                     text(
                         """
                         insert into public.assignments (
-                          family_id, question_set_id, child_id, assigned_by, mode
+                          family_id, question_set_id, child_id, assigned_by, mode,
+                          time_limit_seconds
                         ) values (
-                          :family_id, :question_set_id, :child_id, :parent_id, 'practice'
+                          :family_id, :question_set_id, :child_id, :parent_id, :mode,
+                          :time_limit_seconds
                         )
                         returning id
                         """
@@ -477,6 +485,8 @@ async def import_question_set(
                         "question_set_id": question_set_id,
                         "child_id": child_id,
                         "parent_id": parent_id,
+                        "mode": assignment_mode,
+                        "time_limit_seconds": time_limit_seconds,
                     },
                 )
 
