@@ -170,6 +170,7 @@ class Assignment(BaseModel):
     status: AssignmentStatus = AssignmentStatus.ASSIGNED
     mode: str = "practice"
     time_limit_seconds: int | None = None
+    parent_note: str | None = Field(default=None, max_length=300)
 
 
 class ChildAssignmentSummary(BaseModel):
@@ -178,6 +179,7 @@ class ChildAssignmentSummary(BaseModel):
     status: AssignmentStatus
     mode: str
     time_limit_seconds: int | None
+    parent_note: str | None = None
     question_count: int
     latest_attempt_id: UUID | None = None
 
@@ -501,6 +503,7 @@ class CreateAssignmentRequest(BaseModel):
     child_id: UUID
     mode: Literal["practice", "exam"] = "practice"
     time_limit_seconds: int | None = Field(default=None, ge=60, le=14_400)
+    parent_note: str | None = Field(default=None, max_length=300)
 
 
 class UploadBucket(StrEnum):

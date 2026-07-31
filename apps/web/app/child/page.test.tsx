@@ -9,6 +9,7 @@ const assignment = {
   status: "assigned",
   mode: "practice",
   time_limit_seconds: null,
+  parent_note: "先独立完成，再一起检查。",
   question_count: 3,
   latest_attempt_id: null,
 };
@@ -54,6 +55,7 @@ describe("ChildHomePage", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("3 道题")).toBeInTheDocument();
     expect(screen.getByText("不限时")).toBeInTheDocument();
+    expect(screen.getByText("先独立完成，再一起检查。")).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: /打开练习/ }),
     ).toBeInTheDocument();

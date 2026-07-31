@@ -566,12 +566,35 @@ export async function startAssignment(
   );
 }
 
+export async function withdrawAssignment(
+  assignmentId: string,
+  parentToken: string,
+) {
+  return apiRequest<{ id: string; status: string }>(
+    `/v1/assignments/${encodeURIComponent(assignmentId)}/withdraw`,
+    { method: "POST" },
+    parentToken,
+  );
+}
+
+export async function stopAssignment(
+  assignmentId: string,
+  parentToken: string,
+) {
+  return apiRequest<{ id: string; status: string }>(
+    `/v1/assignments/${encodeURIComponent(assignmentId)}/stop`,
+    { method: "POST" },
+    parentToken,
+  );
+}
+
 export type ChildAssignmentSummary = {
   id: string;
   title: string;
   status: string;
   mode: string;
   time_limit_seconds: number | null;
+  parent_note: string | null;
   question_count: number;
   latest_attempt_id: string | null;
 };
@@ -1134,6 +1157,7 @@ export async function importStructuredQuestionSet(
     source_name: string;
     assignment_mode: "practice" | "exam";
     time_limit_seconds: number | null;
+    parent_note: string | null;
     document: StructuredQuestionSetDocument;
   },
   parentToken: string,
@@ -1197,6 +1221,7 @@ export async function assignQuestionSet(
   options: {
     mode: "practice" | "exam";
     time_limit_seconds: number | null;
+    parent_note?: string | null;
   } = { mode: "practice", time_limit_seconds: null },
 ) {
   return apiRequest<{ id: string; status: string }>(

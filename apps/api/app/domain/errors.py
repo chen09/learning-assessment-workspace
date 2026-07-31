@@ -26,3 +26,7 @@ class QuestionAnswerRequired(DomainError):
 
 class FamilyParentLimitReached(DomainError):
     pass
+
+
+class AssignmentStatusConflict(DomainError):
+    pass

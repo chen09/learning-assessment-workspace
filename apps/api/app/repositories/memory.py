@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 from argon2 import PasswordHasher
 
 from app.domain.errors import (
+    AssignmentStatusConflict,
     FamilyParentLimitReached,
     NotFoundError,
     QuestionAnswerRequired,
@@ -324,7 +325,12 @@ class MemoryRepository:
         child_id: str,
     ) -> AssignmentWork | None:
         assignment = self.assignments.get(assignment_id)
-        if assignment is None or str(assignment.child_id) != child_id:
+        if (
+            assignment is None
+            or str(assignment.child_id) != child_id
+            or assignment.status
+            not in {AssignmentStatus.ASSIGNED, AssignmentStatus.IN_PROGRESS}
+        ):
             return None
 
         existing_attempt = next(
@@ -369,6 +375,40 @@ class MemoryRepository:
             ],
         )
 
+    async def withdraw_assignment(
+        self,
+        assignment_id: str,
+        parent_id: str,
+    ) -> Assignment:
+        assignment = self.assignments.get(assignment_id)
+        if (
+            assignment is None
+            or parent_id not in self.family_parents.get(str(assignment.family_id), set())
+        ):
+            raise NotFoundError
+        if assignment.status != AssignmentStatus.ASSIGNED:
+            raise AssignmentStatusConflict
+        assignment.status = AssignmentStatus.WITHDRAWN
+        self.assignments[assignment_id] = assignment
+        return assignment
+
+    async def stop_assignment(
+        self,
+        assignment_id: str,
+        parent_id: str,
+    ) -> Assignment:
+        assignment = self.assignments.get(assignment_id)
+        if (
+            assignment is None
+            or parent_id not in self.family_parents.get(str(assignment.family_id), set())
+        ):
+            raise NotFoundError
+        if assignment.status != AssignmentStatus.IN_PROGRESS:
+            raise AssignmentStatusConflict
+        assignment.status = AssignmentStatus.STOPPED
+        self.assignments[assignment_id] = assignment
+        return assignment
+
     async def list_child_assignments(
         self,
         child_id: str,
@@ -406,6 +446,7 @@ class MemoryRepository:
                     status=assignment.status,
                     mode=assignment.mode,
                     time_limit_seconds=assignment.time_limit_seconds,
+                    parent_note=assignment.parent_note,
                     question_count=question_count,
                     latest_attempt_id=attempts[0].id if attempts else None,
                 )
@@ -460,6 +501,11 @@ class MemoryRepository:
             raise NotFoundError
         if attempt.submitted_at is not None:
             raise SubmittedAttemptImmutable
+        if self.assignments[str(attempt.assignment_id)].status not in {
+            AssignmentStatus.IN_PROGRESS,
+            AssignmentStatus.CORRECTING,
+        }:
+            raise NotFoundError
         if (attempt_id, question_id) in self.question_submissions:
             raise SubmittedQuestionImmutable
 
@@ -501,6 +547,11 @@ class MemoryRepository:
             raise NotFoundError
         if attempt.submitted_at is not None:
             raise SubmittedAttemptImmutable
+        if self.assignments[str(attempt.assignment_id)].status not in {
+            AssignmentStatus.IN_PROGRESS,
+            AssignmentStatus.CORRECTING,
+        }:
+            raise NotFoundError
         existing_job_id = self.question_submissions.get((attempt_id, question_id))
         if existing_job_id is not None:
             return QuestionSubmissionReceipt(
@@ -625,6 +676,8 @@ class MemoryRepository:
         idempotency_record = (attempt_id, idempotency_key)
         existing_job_id = self.submission_idempotency.get(idempotency_record)
         assignment = self.assignments[str(attempt.assignment_id)]
+        # A retry of the same submission must return its original receipt even
+        # after the attempt became immutable.
         if existing_job_id is not None:
             return SubmissionReceipt(
                 assignment=assignment,
@@ -633,7 +686,11 @@ class MemoryRepository:
             )
         if attempt.submitted_at is not None:
             raise SubmittedAttemptImmutable
-
+        if assignment.status not in {
+            AssignmentStatus.IN_PROGRESS,
+            AssignmentStatus.CORRECTING,
+        }:
+            raise NotFoundError
         attempt.submitted_at = datetime.now(UTC)
         assignment.status = AssignmentStatus.GRADING
         job = Job(
@@ -1125,6 +1182,8 @@ class MemoryRepository:
             attempt is None
             or attempt.submitted_at is not None
             or str(attempt.child_id) != child_id
+            or self.assignments[str(attempt.assignment_id)].status
+            not in {AssignmentStatus.IN_PROGRESS, AssignmentStatus.CORRECTING}
         ):
             raise NotFoundError
         assignment = self.assignments[str(attempt.assignment_id)]
@@ -1332,6 +1391,7 @@ class MemoryRepository:
         assign: bool = True,
         assignment_mode: str = "practice",
         time_limit_seconds: int | None = None,
+        parent_note: str | None = None,
     ) -> ImportResult:
         family_key = str(family_id)
         child_key = str(child_id)
@@ -1365,6 +1425,7 @@ class MemoryRepository:
                     child_id=child_id,
                     mode=assignment_mode,
                     time_limit_seconds=time_limit_seconds,
+                    parent_note=parent_note,
                 )
                 self.assignments[str(assignment.id)] = assignment
             return ImportResult(
@@ -1422,6 +1483,7 @@ class MemoryRepository:
                 child_id=child_id,
                 mode=assignment_mode,
                 time_limit_seconds=time_limit_seconds,
+                parent_note=parent_note,
             )
             self.assignments[str(assignment.id)] = assignment
         self.structured_imports[record_key] = str(question_set.id)
@@ -1485,6 +1547,9 @@ class MemoryRepository:
             family_id=imported.family_id,
             question_set_id=imported_result.question_set_id,
             child_id=imported.child_id,
+            # This is an already-completed paper. It enters the normal
+            # submission transition without exposing an editable task.
+            status=AssignmentStatus.IN_PROGRESS,
         )
         self.assignments[str(assignment.id)] = assignment
         attempt = Attempt(
@@ -1613,6 +1678,7 @@ class MemoryRepository:
             child_id=request.child_id,
             mode=request.mode,
             time_limit_seconds=request.time_limit_seconds,
+            parent_note=request.parent_note,
         )
         self.assignments[str(assignment.id)] = assignment
         self.assignment_idempotency[record_key] = str(assignment.id)

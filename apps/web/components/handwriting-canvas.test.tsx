@@ -72,6 +72,83 @@ describe("HandwritingCanvas", () => {
     expect(canvas).toHaveAttribute("height", "980");
   });
 
+  it("uses an in-page confirmation before clearing handwriting", () => {
+    const onChange = vi.fn();
+
+    render(
+      <HandwritingCanvas
+        initialStrokes={initialStrokes}
+        onChange={onChange}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Clear handwriting" }),
+    );
+
+    expect(screen.getByRole("alertdialog")).toHaveTextContent(
+      "Clear all handwriting?",
+    );
+    expect(onChange).not.toHaveBeenCalled();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Clear now" }),
+    );
+    expect(onChange).toHaveBeenLastCalledWith([], {
+      width: 900,
+      height: 420,
+    });
+  });
+
+  it("closes the clear confirmation from a touch action", () => {
+    const onChange = vi.fn();
+
+    render(
+      <HandwritingCanvas
+        initialStrokes={initialStrokes}
+        onChange={onChange}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Clear handwriting" }),
+    );
+    fireEvent.touchEnd(
+      screen.getByRole("button", { name: "Keep handwriting" }),
+    );
+
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("does not restore an in-progress touch stroke after clearing", () => {
+    const onChange = vi.fn();
+
+    render(<HandwritingCanvas onChange={onChange} />);
+
+    const canvas = screen.getByLabelText("Handwriting answer area");
+    fireEvent.pointerDown(canvas, {
+      clientX: 10,
+      clientY: 10,
+      pointerId: 1,
+    });
+    fireEvent.pointerMove(canvas, {
+      clientX: 30,
+      clientY: 30,
+      pointerId: 1,
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Clear handwriting" }),
+    );
+    fireEvent.pointerUp(canvas, { pointerId: 1 });
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenLastCalledWith([], {
+      width: 900,
+      height: 420,
+    });
+  });
+
   it("shows AI annotations over an immutable handwritten answer", () => {
     const onChange = vi.fn();
 

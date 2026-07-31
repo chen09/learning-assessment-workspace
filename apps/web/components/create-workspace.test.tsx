@@ -268,6 +268,9 @@ describe("CreateWorkspace", () => {
     fireEvent.change(screen.getByLabelText("Time limit"), {
       target: { value: "30" },
     });
+    fireEvent.change(screen.getByLabelText("A note for your child"), {
+      target: { value: "Finish this independently first." },
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "Confirm and assign" }));
 
@@ -279,6 +282,7 @@ describe("CreateWorkspace", () => {
           source_name: "lesson-2.json",
           assignment_mode: "exam",
           time_limit_seconds: 1800,
+          parent_note: "Finish this independently first.",
           document: expect.objectContaining({
             questions: [
               expect.objectContaining({

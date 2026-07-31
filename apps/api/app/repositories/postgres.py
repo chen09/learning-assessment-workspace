@@ -15,6 +15,7 @@ from sqlalchemy.engine import RowMapping
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
 
 from app.domain.errors import (
+    AssignmentStatusConflict,
     FamilyParentLimitReached,
     NotFoundError,
     QuestionAnswerRequired,
@@ -142,6 +143,7 @@ def _assignment(row: RowMapping) -> Assignment:
         status=row["status"],
         mode=row["mode"],
         time_limit_seconds=row["time_limit_seconds"],
+        parent_note=row.get("parent_note"),
     )
 
 
@@ -223,6 +225,7 @@ class PostgresRepository:
         assign: bool = True,
         assignment_mode: Literal["practice", "exam"] = "practice",
         time_limit_seconds: int | None = None,
+        parent_note: str | None = None,
     ) -> ImportResult:
         return await import_question_set(
             document,
@@ -235,6 +238,7 @@ class PostgresRepository:
             parent_id=_uuid(parent_id),
             assignment_mode=assignment_mode,
             time_limit_seconds=time_limit_seconds,
+            parent_note=parent_note,
         )
 
     async def close(self) -> None:
@@ -757,10 +761,12 @@ class PostgresRepository:
                 text(
                     """
                     select a.id, a.family_id, a.question_set_id, a.child_id,
-                           a.status, a.mode, a.time_limit_seconds, qs.title
+                           a.status, a.mode, a.time_limit_seconds, a.parent_note, qs.title
                     from public.assignments a
                     join public.question_sets qs on qs.id = a.question_set_id
-                    where a.id = :assignment_id and a.child_id = :child_id
+                    where a.id = :assignment_id
+                      and a.child_id = :child_id
+                      and a.status in ('assigned', 'in_progress')
                     for update
                     """
                 ),
@@ -894,6 +900,80 @@ class PostgresRepository:
             submitted_question_ids=submitted_question_ids,
         )
 
+    async def withdraw_assignment(
+        self,
+        assignment_id: str,
+        parent_id: str,
+    ) -> Assignment:
+        async with self._engine.begin() as connection:
+            result = await connection.execute(
+                text(
+                    """
+                    select id, family_id, status
+                    from public.assignments
+                    where id = :assignment_id
+                    for update
+                    """
+                ),
+                {"assignment_id": _uuid(assignment_id)},
+            )
+            existing = result.mappings().one_or_none()
+            if existing is None:
+                raise NotFoundError
+            await self._require_parent(connection, parent_id, existing["family_id"])
+            if existing["status"] != AssignmentStatus.ASSIGNED:
+                raise AssignmentStatusConflict
+            updated = await connection.execute(
+                text(
+                    """
+                    update public.assignments
+                    set status = 'withdrawn', updated_at = now()
+                    where id = :assignment_id
+                    returning id, family_id, question_set_id, child_id, status, mode,
+                              time_limit_seconds, parent_note
+                    """
+                ),
+                {"assignment_id": _uuid(assignment_id)},
+            )
+            return _assignment(updated.mappings().one())
+
+    async def stop_assignment(
+        self,
+        assignment_id: str,
+        parent_id: str,
+    ) -> Assignment:
+        async with self._engine.begin() as connection:
+            result = await connection.execute(
+                text(
+                    """
+                    select id, family_id, status
+                    from public.assignments
+                    where id = :assignment_id
+                    for update
+                    """
+                ),
+                {"assignment_id": _uuid(assignment_id)},
+            )
+            existing = result.mappings().one_or_none()
+            if existing is None:
+                raise NotFoundError
+            await self._require_parent(connection, parent_id, existing["family_id"])
+            if existing["status"] != AssignmentStatus.IN_PROGRESS:
+                raise AssignmentStatusConflict
+            updated = await connection.execute(
+                text(
+                    """
+                    update public.assignments
+                    set status = 'stopped', updated_at = now()
+                    where id = :assignment_id
+                    returning id, family_id, question_set_id, child_id, status, mode,
+                              time_limit_seconds, parent_note
+                    """
+                ),
+                {"assignment_id": _uuid(assignment_id)},
+            )
+            return _assignment(updated.mappings().one())
+
     async def save_response(
         self,
         attempt_id: str,
@@ -905,10 +985,12 @@ class PostgresRepository:
             attempt_result = await connection.execute(
                 text(
                     """
-                    select id, family_id, assignment_id, child_id, sequence,
-                           started_at, submitted_at
-                    from public.attempts
-                    where id = :attempt_id and child_id = :child_id
+                    select at.id, at.family_id, at.assignment_id, at.child_id, at.sequence,
+                           at.started_at, at.submitted_at, a.status as assignment_status
+                    from public.attempts at
+                    join public.assignments a on a.id = at.assignment_id
+                    where at.id = :attempt_id
+                      and at.child_id = :child_id
                     for update
                     """
                 ),
@@ -919,6 +1001,11 @@ class PostgresRepository:
                 raise NotFoundError
             if attempt_row["submitted_at"] is not None:
                 raise SubmittedAttemptImmutable
+            if attempt_row["assignment_status"] not in {
+                AssignmentStatus.IN_PROGRESS,
+                AssignmentStatus.CORRECTING,
+            }:
+                raise NotFoundError
             submitted_question_result = await connection.execute(
                 text(
                     """
@@ -1023,10 +1110,12 @@ class PostgresRepository:
                 text(
                     """
                     select at.id, at.family_id, at.assignment_id, at.child_id,
-                           at.submitted_at, a.question_set_id
+                           at.submitted_at, a.question_set_id,
+                           a.status as assignment_status
                     from public.attempts at
                     join public.assignments a on a.id = at.assignment_id
-                    where at.id = :attempt_id and at.child_id = :child_id
+                    where at.id = :attempt_id
+                      and at.child_id = :child_id
                     for update of at
                     """
                 ),
@@ -1037,6 +1126,13 @@ class PostgresRepository:
             )
             attempt_row = attempt_result.mappings().one_or_none()
             if attempt_row is None:
+                raise NotFoundError
+            if attempt_row["submitted_at"] is not None:
+                raise SubmittedAttemptImmutable
+            if attempt_row["assignment_status"] not in {
+                AssignmentStatus.IN_PROGRESS,
+                AssignmentStatus.CORRECTING,
+            }:
                 raise NotFoundError
             existing_result = await connection.execute(
                 text(
@@ -1061,8 +1157,6 @@ class PostgresRepository:
                     question_id=_uuid(question_id),
                     job=_job(existing_job),
                 )
-            if attempt_row["submitted_at"] is not None:
-                raise SubmittedAttemptImmutable
             response_result = await connection.execute(
                 text(
                     """
@@ -1313,10 +1407,12 @@ class PostgresRepository:
             attempt_result = await connection.execute(
                 text(
                     """
-                    select id, family_id, assignment_id, child_id, sequence,
-                           started_at, submitted_at
-                    from public.attempts
-                    where id = :attempt_id and child_id = :child_id
+                    select at.id, at.family_id, at.assignment_id, at.child_id, at.sequence,
+                           at.started_at, at.submitted_at, a.status as assignment_status
+                    from public.attempts at
+                    join public.assignments a on a.id = at.assignment_id
+                    where at.id = :attempt_id
+                      and at.child_id = :child_id
                     for update
                     """
                 ),
@@ -1329,7 +1425,7 @@ class PostgresRepository:
                 text(
                     """
                     select id, family_id, question_set_id, child_id, status, mode,
-                           time_limit_seconds
+                               time_limit_seconds, parent_note
                     from public.assignments where id = :assignment_id
                     """
                 ),
@@ -1361,6 +1457,11 @@ class PostgresRepository:
                 )
             if attempt_row["submitted_at"] is not None:
                 raise SubmittedAttemptImmutable
+            if attempt_row["assignment_status"] not in {
+                AssignmentStatus.IN_PROGRESS,
+                AssignmentStatus.CORRECTING,
+            }:
+                raise NotFoundError
             submitted_at = datetime.now(UTC)
             await connection.execute(
                 text(
@@ -2045,10 +2146,12 @@ class PostgresRepository:
                     text(
                         """
                         select a.id, a.family_id, a.question_set_id, a.child_id,
-                               a.status, a.mode, a.time_limit_seconds, qs.title
+                               a.status, a.mode, a.time_limit_seconds, a.parent_note,
+                               qs.title
                         from public.assignments a
                         join public.question_sets qs on qs.id = a.question_set_id
                         where a.id = :assignment_id
+                          and a.status in ('in_progress', 'correcting')
                         """
                     ),
                     {"assignment_id": attempt_row["assignment_id"]},
@@ -2140,6 +2243,7 @@ class PostgresRepository:
                           a.status,
                           a.mode,
                           a.time_limit_seconds,
+                          a.parent_note,
                           count(distinct q.id)::integer as question_count,
                           latest_attempt.id as latest_attempt_id
                         from public.assignments a
@@ -2162,6 +2266,7 @@ class PostgresRepository:
                           a.status,
                           a.mode,
                           a.time_limit_seconds,
+                          a.parent_note,
                           latest_attempt.id,
                           a.assigned_at
                         order by
@@ -3359,7 +3464,7 @@ class PostgresRepository:
                     text(
                         """
                         select id, family_id, question_set_id, child_id, status, mode,
-                               time_limit_seconds
+                               time_limit_seconds, parent_note
                         from public.assignments where id = :id
                         """
                     ),
@@ -3371,13 +3476,13 @@ class PostgresRepository:
                     """
                     insert into public.assignments (
                       family_id, question_set_id, child_id, assigned_by, mode,
-                      time_limit_seconds
+                      time_limit_seconds, parent_note
                     ) values (
                       :family_id, :question_set_id, :child_id, :parent_id, :mode,
-                      :time_limit_seconds
+                      :time_limit_seconds, :parent_note
                     )
                     returning id, family_id, question_set_id, child_id, status, mode,
-                              time_limit_seconds
+                              time_limit_seconds, parent_note
                     """
                 ),
                 {
@@ -3387,6 +3492,7 @@ class PostgresRepository:
                     "parent_id": _uuid(parent_id),
                     "mode": request.mode,
                     "time_limit_seconds": request.time_limit_seconds,
+                    "parent_note": request.parent_note,
                 },
             )
             row = result.mappings().one()

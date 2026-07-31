@@ -29,6 +29,14 @@ export default defineConfig({
       name: "mobile",
       use: { ...devices["Pixel 7"] },
     },
+    {
+      // Chrome on iPad uses WebKit, which cannot run through local Chrome.
+      // This still exercises the handwriting flow with iPad viewport, touch
+      // input and scale in our Chromium E2E environment.
+      name: "ipad-chrome",
+      testMatch: "core-flow.spec.ts",
+      use: { ...devices["iPad (gen 7)"], browserName: "chromium" },
+    },
   ],
   webServer: [
     {

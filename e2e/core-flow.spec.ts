@@ -467,6 +467,15 @@ test("parent collects several manual questions into one assigned practice", asyn
   await expect(
     page.getByRole("heading", { name: "Complete: I ___ ready." }),
   ).toBeVisible();
+
+  await page.goto(
+    `/parent/history/?familyId=${encodeURIComponent(family.id)}`,
+  );
+  await expect(
+    page.getByRole("heading", { name: "Two question check" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Stop assignment" }).click();
+  await expect(page.getByText("stopped", { exact: true })).toBeVisible();
 });
 
 test("parent validates a local-AI completed-paper review before submitting it", async ({
@@ -906,8 +915,8 @@ test("parent creation reaches child grading and correction through the API", asy
   request,
 }, testInfo) => {
   test.skip(
-    testInfo.project.name !== "desktop",
-    "The shared fixture API flow runs once; responsive UI is covered separately.",
+    !["desktop", "ipad-chrome"].includes(testInfo.project.name),
+    "The shared fixture API flow runs on desktop and the iPad touch simulation.",
   );
   test.setTimeout(120_000);
 
@@ -1012,6 +1021,42 @@ test("parent creation reaches child grading and correction through the API", asy
   });
   await page.mouse.up();
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+
+  const clearHandwriting = page.getByRole("button", {
+    name: "Clear handwriting",
+  });
+  if (testInfo.project.name === "ipad-chrome") {
+    const clearButtonBox = await clearHandwriting.boundingBox();
+    expect(clearButtonBox).not.toBeNull();
+    await page.touchscreen.tap(
+      clearButtonBox!.x + clearButtonBox!.width / 2,
+      clearButtonBox!.y + clearButtonBox!.height / 2,
+    );
+  } else {
+    await clearHandwriting.click();
+  }
+  const clearDialog = page.getByRole("alertdialog", {
+    name: "Clear handwriting",
+  });
+  await expect(clearDialog).toBeVisible();
+  await expect(
+    clearDialog.getByRole("button", { name: "Clear now" }),
+  ).toHaveCSS("min-height", "41.6px");
+  const keepHandwriting = clearDialog.getByRole("button", {
+    name: "Keep handwriting",
+  });
+  if (testInfo.project.name === "ipad-chrome") {
+    await keepHandwriting.scrollIntoViewIfNeeded();
+    const keepButtonBox = await keepHandwriting.boundingBox();
+    expect(keepButtonBox).not.toBeNull();
+    await page.touchscreen.tap(
+      keepButtonBox!.x + keepButtonBox!.width / 2,
+      keepButtonBox!.y + keepButtonBox!.height / 2,
+    );
+  } else {
+    await keepHandwriting.click();
+  }
+  await expect(clearDialog).toBeHidden();
 
   const originalAttemptId = new URL(page.url()).searchParams.get("attemptId");
   expect(originalAttemptId).toBeTruthy();

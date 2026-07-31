@@ -48,6 +48,7 @@ class StructuredImportRequest(BaseModel):
     source_name: str = Field(min_length=1, max_length=180)
     assignment_mode: Literal["practice", "exam"] = "practice"
     time_limit_seconds: int | None = Field(default=None, ge=60, le=14_400)
+    parent_note: str | None = Field(default=None, max_length=300)
     document: ImportDocument
 
     @model_validator(mode="after")
@@ -95,6 +96,7 @@ async def import_structured_question_set(
             parent_id=parent_id,
             assignment_mode=request.assignment_mode,
             time_limit_seconds=request.time_limit_seconds,
+            parent_note=request.parent_note,
         )
     except NotFoundError as error:
         raise HTTPException(

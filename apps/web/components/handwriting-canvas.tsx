@@ -76,6 +76,7 @@ export function HandwritingCanvas({
   const [redoStack, setRedoStack] = useState<Stroke[]>([]);
   const [width, setWidth] = useState(2.5);
   const [eraser, setEraser] = useState(false);
+  const [clearConfirmationOpen, setClearConfirmationOpen] = useState(false);
   const [canvasSize, setCanvasSize] = useState<CanvasSize>(() =>
     normalizeCanvasSize(initialSize),
   );
@@ -136,7 +137,12 @@ export function HandwritingCanvas({
     if (readOnly) {
       return;
     }
-    event.currentTarget.setPointerCapture(event.pointerId);
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // iPad browsers can reject pointer capture for a finger or stylus.
+      // Pointer events still continue to be tracked by drawingRef below.
+    }
     drawingRef.current = {
       points: [pointFromEvent(event)],
       width: eraser ? 18 : width,
@@ -193,16 +199,34 @@ export function HandwritingCanvas({
     onChange(next, canvasSize);
   };
 
-  const clear = () => {
-    if (
-      strokes.length > 0 &&
-      !window.confirm(t("handwriting.clearConfirm"))
-    ) {
-      return;
-    }
+  const clearImmediately = () => {
+    drawingRef.current = null;
+    setClearConfirmationOpen(false);
     setStrokes([]);
     setRedoStack([]);
     onChange([], canvasSize);
+  };
+
+  const requestClear = () => {
+    if (strokes.length > 0) {
+      setClearConfirmationOpen(true);
+      return;
+    }
+    clearImmediately();
+  };
+
+  const keepHandwriting = () => {
+    setClearConfirmationOpen(false);
+  };
+
+  const handleTouchAction = (
+    event: React.TouchEvent<HTMLButtonElement>,
+    action: () => void,
+  ) => {
+    // On iPad Chrome, a toolbar tap can dispatch touch events without the
+    // synthetic click that desktop browsers normally follow with.
+    event.preventDefault();
+    action();
   };
 
   const resizeCanvas = (nextSize: CanvasSize) => {
@@ -307,7 +331,7 @@ export function HandwritingCanvas({
           <button
             aria-label={t("handwriting.clear")}
             disabled={readOnly}
-            onClick={clear}
+            onClick={requestClear}
             type="button"
           >
             <Trash2 size={17} />
@@ -333,6 +357,34 @@ export function HandwritingCanvas({
             ref={canvasRef}
             width={canvasSize.width}
           />
+          {clearConfirmationOpen ? (
+            <div
+              aria-label={t("handwriting.clear")}
+              className="canvas-clear-confirmation"
+              role="alertdialog"
+            >
+              <p>{t("handwriting.clearConfirm")}</p>
+              <div>
+                <button
+                  onClick={keepHandwriting}
+                  onTouchEnd={(event) => handleTouchAction(event, keepHandwriting)}
+                  type="button"
+                >
+                  {t("handwriting.keep")}
+                </button>
+                <button
+                  className="danger"
+                  onClick={clearImmediately}
+                  onTouchEnd={(event) =>
+                    handleTouchAction(event, clearImmediately)
+                  }
+                  type="button"
+                >
+                  {t("handwriting.clearNow")}
+                </button>
+              </div>
+            </div>
+          ) : null}
           {annotations.length > 0 ? (
             <svg
               aria-hidden="true"
