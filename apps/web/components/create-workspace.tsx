@@ -901,6 +901,35 @@ export function CreateWorkspace() {
     setEditError("");
   };
 
+  const removeStructuredQuestion = (questionId: string) => {
+    if (!structuredDocument || draftQuestions.length <= 1) {
+      return;
+    }
+    const question = draftQuestions.find((candidate) => candidate.id === questionId);
+    if (!question) {
+      return;
+    }
+    setDraftQuestions((current) =>
+      current
+        .filter((candidate) => candidate.id !== questionId)
+        .map((candidate, index) => ({ ...candidate, position: index + 1 })),
+    );
+    setStructuredDocument((current) =>
+      current
+        ? {
+            ...current,
+            questions: current.questions
+              .filter((candidate) => candidate.position !== question.position)
+              .map((candidate, index) => ({ ...candidate, position: index + 1 })),
+          }
+        : current,
+    );
+    if (editingQuestionId === questionId) {
+      setEditingQuestionId(null);
+      setEditError("");
+    }
+  };
+
   const confirmCompletedPaper = async () => {
     if (!completedWorksheetId || !completedReview) {
       setRequestStatus("error");
@@ -1255,13 +1284,29 @@ export function CreateWorkspace() {
               </div>
               {(mode === "structured" || mode === "manual") &&
               editingQuestionId !== question.id ? (
-                <button
-                  className="quiet-link"
-                  onClick={() => beginStructuredQuestionEdit(question)}
-                  type="button"
-                >
-                  Edit question
-                </button>
+                <div className="draft-question-actions">
+                  <button
+                    className="quiet-link"
+                    onClick={() => beginStructuredQuestionEdit(question)}
+                    type="button"
+                  >
+                    Edit question
+                  </button>
+                  <button
+                    aria-label={`Remove question ${index + 1}`}
+                    className="quiet-link draft-question-remove"
+                    disabled={draftQuestions.length <= 1}
+                    onClick={() => removeStructuredQuestion(question.id)}
+                    title={
+                      draftQuestions.length <= 1
+                        ? "A practice set needs at least one question"
+                        : "Remove this question from the draft"
+                    }
+                    type="button"
+                  >
+                    Remove
+                  </button>
+                </div>
               ) : null}
             </article>
             ),
