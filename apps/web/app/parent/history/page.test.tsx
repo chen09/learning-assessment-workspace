@@ -31,6 +31,7 @@ describe("ParentHistoryPage", () => {
     );
     mocks.getParentAccessToken.mockReset();
     mocks.getParentAccessToken.mockResolvedValue("parent-token");
+    window.localStorage.clear();
     mocks.getFamilyHistory.mockReset();
     mocks.getFamilyHistory.mockReturnValue(new Promise(() => undefined));
     mocks.stopAssignment.mockReset();
@@ -48,6 +49,20 @@ describe("ParentHistoryPage", () => {
         name: "Algebra & English warm-up",
       }),
     ).not.toBeInTheDocument();
+  });
+
+  it("uses the parent's selected Chinese language for the real family record", async () => {
+    window.localStorage.setItem("luma-language:demo-parent", "zh");
+    mocks.getFamilyHistory.mockResolvedValue([]);
+
+    render(<ParentHistoryPage />);
+
+    expect(await screen.findByRole("heading", { name: "学习记录" })).toBeInTheDocument();
+    expect(screen.getByText("已完成、批改中和已归档的家庭练习。"))
+      .toBeInTheDocument();
+    expect(screen.getByText("目前还没有家庭学习记录。"))
+      .toBeInTheDocument();
+    expect(screen.queryByText("Completed, grading, and archived work for every child in this family.")).not.toBeInTheDocument();
   });
 
   it("lets a parent withdraw work that has not started", async () => {
@@ -78,7 +93,7 @@ describe("ParentHistoryPage", () => {
         "parent-token",
       );
     });
-    expect(await screen.findByText("withdrawn")).toBeInTheDocument();
+    expect(await screen.findByText("Withdrawn")).toBeInTheDocument();
   });
 
   it("lets a parent stop work that is in progress", async () => {
@@ -109,6 +124,6 @@ describe("ParentHistoryPage", () => {
         "parent-token",
       );
     });
-    expect(await screen.findByText("stopped")).toBeInTheDocument();
+    expect(await screen.findByText("Stopped")).toBeInTheDocument();
   });
 });

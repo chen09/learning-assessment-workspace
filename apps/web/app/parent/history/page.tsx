@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { useLanguage } from "@/components/language-provider";
 import {
   getFamilyHistory,
   type HistoryItem,
@@ -16,7 +17,30 @@ import {
 
 type LoadState = "loading" | "ready" | "missing" | "error";
 
+const statusTranslationKeys = {
+  draft: "history.status.draft",
+  confirmed: "history.status.confirmed",
+  assigned: "history.status.assigned",
+  in_progress: "history.status.inProgress",
+  submitted: "history.status.submitted",
+  grading: "history.status.grading",
+  results_ready: "history.status.resultsReady",
+  correcting: "history.status.correcting",
+  completed: "history.status.completed",
+  withdrawn: "parentHistory.status.withdrawn",
+  stopped: "parentHistory.status.stopped",
+} as const;
+
 export default function ParentHistoryPage() {
+  return (
+    <AppShell currentPath="/parent/history/" role="parent">
+      <ParentHistoryContent />
+    </AppShell>
+  );
+}
+
+function ParentHistoryContent() {
+  const { t } = useLanguage();
   const [items, setItems] = useState<HistoryItem[]>([]);
   const [childFilter, setChildFilter] = useState("all");
   const [loadState, setLoadState] = useState<LoadState>("loading");
@@ -98,32 +122,36 @@ export default function ParentHistoryPage() {
         ),
       );
     } catch {
-      setActionError("The assignment status could not be updated. Please retry.");
+      setActionError(t("parentHistory.actionError"));
     } finally {
       setActionAssignmentId(null);
     }
   };
 
+  const statusLabel = (status: string) =>
+    t(
+      statusTranslationKeys[
+        status as keyof typeof statusTranslationKeys
+      ] ?? "history.status.other",
+    );
+
   return (
-    <AppShell currentPath="/parent/history/" role="parent">
+    <>
       <header className="page-header">
         <div>
-          <p className="eyebrow">Learning record</p>
-          <h1>History</h1>
-          <p className="lede">
-            Completed, grading, and archived work for every child in this
-            family.
-          </p>
+          <p className="eyebrow">{t("parentHistory.eyebrow")}</p>
+          <h1>{t("parentHistory.title")}</h1>
+          <p className="lede">{t("parentHistory.description")}</p>
         </div>
         <LanguageSwitcher />
       </header>
-      <section className="filter-row" aria-label="History filters">
+      <section className="filter-row" aria-label={t("parentHistory.filters")}>
         <button
           className={childFilter === "all" ? "active" : ""}
           onClick={() => setChildFilter("all")}
           type="button"
         >
-          All children
+          {t("parentHistory.allChildren")}
         </button>
         {children.map(([id, name]) => (
           <button
@@ -137,15 +165,15 @@ export default function ParentHistoryPage() {
         ))}
       </section>
       <section className="record-table">
-        {loadState === "loading" ? <p>Loading family history…</p> : null}
+        {loadState === "loading" ? <p>{t("parentHistory.loading")}</p> : null}
         {loadState === "missing" ? (
-          <p>Select a family to view its history.</p>
+          <p>{t("parentHistory.missing")}</p>
         ) : null}
         {loadState === "error" ? (
-          <p>Family history could not be loaded.</p>
+          <p>{t("parentHistory.error")}</p>
         ) : null}
         {loadState === "ready" && visibleItems.length === 0 ? (
-          <p>No family history yet.</p>
+          <p>{t("parentHistory.empty")}</p>
         ) : null}
         {actionError ? <p role="alert">{actionError}</p> : null}
         {loadState === "ready"
@@ -162,16 +190,24 @@ export default function ParentHistoryPage() {
                           month: "short",
                           day: "numeric",
                         }).format(new Date(item.submitted_at))
-                      : "Assigned"}
+                      : t("history.assigned")}
                   </p>
                   <h2>{item.title}</h2>
                   <span>
                     {["results_ready", "correcting", "completed"].includes(
                       item.status,
                     )
-                      ? `${item.awarded_points} / ${item.available_points} points · `
+                      ? `${t("parentHistory.points", {
+                          awarded: item.awarded_points,
+                          available: item.available_points,
+                        })} · `
                       : ""}
-                    {item.correction_count} corrections
+                    {t(
+                      item.correction_count === 1
+                        ? "history.correctionOne"
+                        : "history.correctionMany",
+                      { count: item.correction_count },
+                    )}
                   </span>
                 </div>
                 <span
@@ -181,7 +217,7 @@ export default function ParentHistoryPage() {
                       : "status-pill"
                   }
                 >
-                  {item.status.replaceAll("_", " ")}
+                  {statusLabel(item.status)}
                 </span>
                 {item.status === "assigned" ? (
                   <button
@@ -190,7 +226,7 @@ export default function ParentHistoryPage() {
                     onClick={() => void updateAssignmentStatus(item, "withdraw")}
                     type="button"
                   >
-                    Withdraw assignment
+                    {t("parentHistory.withdraw")}
                   </button>
                 ) : null}
                 {item.status === "in_progress" ? (
@@ -200,12 +236,12 @@ export default function ParentHistoryPage() {
                     onClick={() => void updateAssignmentStatus(item, "stop")}
                     type="button"
                   >
-                    Stop assignment
+                    {t("parentHistory.stop")}
                   </button>
                 ) : null}
                 {item.attempt_id ? (
                   <Link
-                    aria-label={`Open ${item.title}`}
+                    aria-label={t("history.openResults", { title: item.title })}
                     href={`/parent/results/?attemptId=${encodeURIComponent(
                       item.attempt_id,
                     )}`}
@@ -217,6 +253,6 @@ export default function ParentHistoryPage() {
             ))
           : null}
       </section>
-    </AppShell>
+    </>
   );
 }
