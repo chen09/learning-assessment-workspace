@@ -229,6 +229,61 @@ test("temporary parent completes the hosted family learning flow", async ({
       (await (await childResponse).json()) as { id: string }
     ).id;
 
+    // A completed paper is a private review source, never a child task by
+    // itself. Keep this check before the structured assignment below so the
+    // test proves that the upload cannot accidentally create an assignment.
+    await page.goto(
+      `/parent/create/?familyId=${encodeURIComponent(familyId)}&childId=${encodeURIComponent(childId)}`,
+    );
+    await page.getByRole("button", { name: "Grade completed paper" }).click();
+    await page.getByLabel("Completed worksheet scans").setInputFiles({
+      name: "hosted-non-personal-completed-paper.png",
+      mimeType: "image/png",
+      buffer: nonPersonalAnswerPng,
+    });
+    const completedPaperResponse = page.waitForResponse(
+      (response) =>
+        response.url() === `${apiBaseUrl}/v1/completed-worksheets` &&
+        response.request().method() === "POST",
+      { timeout: 30_000 },
+    );
+    await page.getByRole("button", { name: "Upload for review" }).click();
+    const completedPaper = (await (
+      await completedPaperResponse
+    ).json()) as {
+      id: string;
+      response_paths: string[];
+      status: "processing" | "needs_review";
+      assignment_id: string | null;
+      attempt_id: string | null;
+    };
+    uploadedResponsePaths.push(...completedPaper.response_paths);
+    expect(completedPaper.assignment_id).toBeNull();
+    expect(completedPaper.attempt_id).toBeNull();
+    expect(["processing", "needs_review"]).toContain(completedPaper.status);
+    await expect(
+      page.getByText("Paper upload is safe and not yet assigned"),
+    ).toBeVisible();
+    const { data: preConfirmationAssignments, error: preConfirmationError } =
+      await supabaseAdmin
+        .from("assignments")
+        .select("id")
+        .eq("family_id", familyId)
+        .eq("child_id", childId);
+    expect(preConfirmationError).toBeNull();
+    expect(preConfirmationAssignments).toEqual([]);
+    const { data: storedCompletedPaper, error: completedPaperError } =
+      await supabaseAdmin
+        .from("completed_worksheet_imports")
+        .select("assignment_id, attempt_id")
+        .eq("id", completedPaper.id)
+        .single();
+    expect(completedPaperError).toBeNull();
+    expect(storedCompletedPaper).toEqual({
+      assignment_id: null,
+      attempt_id: null,
+    });
+
     await page.goto(
       `/parent/create/?familyId=${encodeURIComponent(familyId)}&childId=${encodeURIComponent(childId)}`,
     );
