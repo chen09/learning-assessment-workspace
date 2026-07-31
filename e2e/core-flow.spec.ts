@@ -198,6 +198,9 @@ test("parent reassigns a confirmed library set with an exam limit", async ({
   });
   await expect(page.getByText("Assigned to Library child.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Assign practice" })).toBeDisabled();
+  await expect(
+    page.getByRole("link", { name: "Print A4 worksheet" }),
+  ).toHaveAttribute("href", /\/parent\/print\/?\?assignmentId=/);
 });
 
 test("parent previews an AI JSON file before assigning its structured questions", async ({
