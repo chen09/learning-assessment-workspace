@@ -118,6 +118,10 @@ describe("LibraryPage", () => {
     expect(await screen.findByText("已分配给肉肉。"))
       .toBeInTheDocument();
     expect(screen.getByRole("button", { name: "确认分配" })).toBeDisabled();
+    expect(screen.getByRole("link", { name: "打印 A4 试卷" })).toHaveAttribute(
+      "href",
+      "/parent/print?assignmentId=assignment-1",
+    );
   });
 
   it("keeps an optional exam time limit when assigning from the library", async () => {

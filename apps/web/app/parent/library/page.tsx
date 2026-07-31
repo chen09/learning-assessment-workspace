@@ -1,6 +1,7 @@
 "use client";
 
 import { BookCopy, Search } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
@@ -44,6 +45,7 @@ const copy = {
     cancel: "Cancel",
     assigning: "Assigning…",
     assigned: (child: string) => `Assigned to ${child}.`,
+    printAssignment: "Print A4 worksheet",
     assignmentError: "The practice could not be assigned. Please try again.",
     childrenError: "Children could not be loaded for this family.",
     noChildren: "Add a child in family settings before assigning practice.",
@@ -79,6 +81,7 @@ const copy = {
     cancel: "キャンセル",
     assigning: "割り当て中…",
     assigned: (child: string) => `${child}さんに割り当てました。`,
+    printAssignment: "A4プリントを印刷",
     assignmentError: "割り当てられませんでした。もう一度お試しください。",
     childrenError: "この家族の子どもを読み込めませんでした。",
     noChildren: "先に家族設定で子どもを追加してください。",
@@ -113,6 +116,7 @@ const copy = {
     cancel: "取消",
     assigning: "正在分配…",
     assigned: (child: string) => `已分配给${child}。`,
+    printAssignment: "打印 A4 试卷",
     assignmentError: "无法分配题单，请重试。",
     childrenError: "无法加载这个家庭的孩子资料。",
     noChildren: "请先在家庭设置中添加孩子。",
@@ -156,6 +160,7 @@ function LibraryContent() {
     "idle" | "loading_children" | "submitting" | "success" | "error"
   >("idle");
   const [assignmentMessage, setAssignmentMessage] = useState("");
+  const [newAssignmentId, setNewAssignmentId] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -218,6 +223,7 @@ function LibraryContent() {
     setChildren([]);
     setAssignmentChildId("");
     setAssignmentNote("");
+    setNewAssignmentId(null);
     setAssignmentMode("practice");
     setAssignmentMinutes(20);
     setAssignmentMessage("");
@@ -252,7 +258,7 @@ function LibraryContent() {
       return;
     }
     try {
-      await assignQuestionSet(
+      const assignment = await assignQuestionSet(
         assignmentSet.id,
         assignmentChildId,
         token,
@@ -265,6 +271,7 @@ function LibraryContent() {
         },
       );
       const child = children.find((candidate) => candidate.id === assignmentChildId);
+      setNewAssignmentId(assignment.id);
       setAssignmentStatus("success");
       setAssignmentMessage(text.assigned(child?.nickname ?? ""));
     } catch {
@@ -451,6 +458,16 @@ function LibraryContent() {
                 >
                   {text.cancel}
                 </button>
+                {newAssignmentId ? (
+                  <Link
+                    className="button secondary"
+                    href={`/parent/print/?assignmentId=${encodeURIComponent(
+                      newAssignmentId,
+                    )}`}
+                  >
+                    {text.printAssignment}
+                  </Link>
+                ) : null}
                 <button
                   className="button primary"
                   disabled={
