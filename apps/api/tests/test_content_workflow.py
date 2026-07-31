@@ -174,7 +174,7 @@ def test_parent_confirmation_turns_completed_worksheet_into_submitted_attempt() 
                 "question_position": 1,
                 "kind": "photo",
                 "answer": {
-                    "source_paths": ["family/completed/completed-check.jpg"],
+                    "source_paths": ["untrusted/other-family-paper.jpg"],
                     "page_numbers": [1],
                 },
             },
@@ -202,6 +202,16 @@ def test_parent_confirmation_turns_completed_worksheet_into_submitted_attempt() 
     assert payload["attempt"]["submitted_at"] is not None
     assert payload["grading_job"]["type"] == "grade_submission"
     assert repeated.json()["attempt"]["id"] == payload["attempt"]["id"]
+    stored_response = next(
+        iter(
+            client.app.state.repository.responses_for_attempt(
+                payload["attempt"]["id"]
+            ).values()
+        )
+    )
+    assert stored_response.answer["source_paths"] == [
+        "family/completed/completed-check.jpg"
+    ]
 
     session = client.post(
         f"/v1/children/{fixture['child']['id']}/sessions",

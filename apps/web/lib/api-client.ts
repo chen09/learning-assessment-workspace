@@ -92,6 +92,7 @@ export type CompletedWorksheetImport = {
   status: "processing" | "needs_review" | "grading" | "results_ready";
   assignment_id: string | null;
   attempt_id: string | null;
+  response_paths: string[];
   job: { id: string; status: string; type: string };
 };
 

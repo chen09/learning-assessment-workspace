@@ -278,7 +278,7 @@ describe("CreateWorkspace", () => {
           type: "handwriting",
           prompt: "Factorise x² − 16.",
           options: [],
-          answer_key: { accepted_forms: ["(x - 4)(x + 4)"] },
+          answer_key: { reference: "(x - 4)(x + 4)" },
           rubric: { grading_mode: "parent_review" },
           points: 1,
           knowledge_code: "factorisation",
@@ -297,6 +297,7 @@ describe("CreateWorkspace", () => {
       status: "needs_review",
       assignment_id: null,
       attempt_id: null,
+      response_paths: ["family-1/completed-paper/page-1.jpg"],
       job: { id: "analysis-job-1", status: "completed", type: "analyze_completed_worksheet" },
     });
     mocks.confirmCompletedWorksheetImport.mockResolvedValue({
@@ -339,14 +340,19 @@ describe("CreateWorkspace", () => {
 
     const review = {
       document,
-      responses: [
+      answer_regions: [
         {
           question_position: 1,
-          kind: "photo",
-          answer: { paths: ["family-1/completed-paper/page-1.jpg"] },
+          page_numbers: [1],
+          regions: [{ x: 0.12, y: 0.45, width: 0.7, height: 0.2 }],
+          transcription: "(x - 4)(x + 4)",
+          legibility: "clear",
         },
       ],
     };
+    expect(
+      screen.getByRole("button", { name: "Copy local AI prompt" }),
+    ).toBeInTheDocument();
     fireEvent.change(
       screen.getByLabelText("Reviewed completed worksheet JSON"),
       {
@@ -359,6 +365,10 @@ describe("CreateWorkspace", () => {
         },
       },
     );
+    expect(
+      await screen.findByText("Review ready: 1 question and 1 answer region"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Factorise x² − 16.")).toBeInTheDocument();
     fireEvent.click(
       screen.getByRole("button", { name: "Confirm and start grading" }),
     );
@@ -366,7 +376,22 @@ describe("CreateWorkspace", () => {
     await waitFor(() => {
       expect(mocks.confirmCompletedWorksheetImport).toHaveBeenCalledWith(
         "completed-worksheet-1",
-        review,
+        {
+          document,
+          responses: [
+            {
+              question_position: 1,
+              kind: "photo",
+              answer: {
+                source_paths: ["family-1/completed-paper/page-1.jpg"],
+                page_numbers: [1],
+                regions: [{ x: 0.12, y: 0.45, width: 0.7, height: 0.2 }],
+                transcription: "(x - 4)(x + 4)",
+                legibility: "clear",
+              },
+            },
+          ],
+        },
         "parent-token",
         "confirm-completed-completed-worksheet-1",
       );

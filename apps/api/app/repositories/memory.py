@@ -1501,7 +1501,10 @@ class MemoryRepository:
                 attempt_id=attempt.id,
                 question_id=question.id,
                 kind=response.kind,
-                answer=response.answer,
+                answer={
+                    **response.answer,
+                    "source_paths": imported.response_paths,
+                },
             )
         receipt = await self.submit_attempt(
             str(attempt.id),
