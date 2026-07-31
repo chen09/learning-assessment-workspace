@@ -658,19 +658,21 @@ describe("CreateWorkspace", () => {
         },
       ],
     };
-    mocks.createUploadIntent.mockResolvedValue({
-      bucket: "responses",
-      path: "family-1/completed-paper/page-1.jpg",
-      token: "upload-token",
-      signed_url: "https://storage.example/upload",
-    });
+    mocks.createUploadIntent.mockImplementation((payload) =>
+      Promise.resolve({
+        bucket: payload.bucket,
+        path: `family-1/completed-paper/${payload.bucket}-${payload.filename}`,
+        token: "upload-token",
+        signed_url: "https://storage.example/upload",
+      }),
+    );
     mocks.uploadToSignedUrl.mockResolvedValue(undefined);
     mocks.createCompletedWorksheetImport.mockResolvedValue({
       id: "completed-worksheet-1",
       status: "needs_review",
       assignment_id: null,
       attempt_id: null,
-      response_paths: ["family-1/completed-paper/page-1.jpg"],
+      response_paths: ["family-1/completed-paper/responses-completed-paper.jpg"],
       job: { id: "analysis-job-1", status: "completed", type: "analyze_completed_worksheet" },
     });
     mocks.confirmCompletedWorksheetImport.mockResolvedValue({
@@ -697,6 +699,27 @@ describe("CreateWorkspace", () => {
         ],
       },
     });
+    fireEvent.change(screen.getByLabelText("Answer key (private, optional)"), {
+      target: {
+        files: [
+          new File(["answers"], "completed-paper-answers.pdf", {
+            type: "application/pdf",
+          }),
+        ],
+      },
+    });
+    fireEvent.change(
+      screen.getByLabelText("Original material or examples (private, optional)"),
+      {
+        target: {
+          files: [
+            new File(["reference"], "lesson-reference.pdf", {
+              type: "application/pdf",
+            }),
+          ],
+        },
+      },
+    );
     fireEvent.click(
       screen.getByRole("button", { name: "Upload for review" }),
     );
@@ -710,7 +733,13 @@ describe("CreateWorkspace", () => {
         child_id: "child-1",
         document_language: "en",
         feedback_language: "zh",
-        response_paths: ["family-1/completed-paper/page-1.jpg"],
+        response_paths: ["family-1/completed-paper/responses-completed-paper.jpg"],
+        answer_source_paths: [
+          "family-1/completed-paper/sources-completed-paper-answers.pdf",
+        ],
+        reference_source_paths: [
+          "family-1/completed-paper/sources-lesson-reference.pdf",
+        ],
       }),
       "parent-token",
       expect.stringContaining("completed-worksheet-"),
@@ -761,7 +790,9 @@ describe("CreateWorkspace", () => {
               question_position: 1,
               kind: "photo",
               answer: {
-                source_paths: ["family-1/completed-paper/page-1.jpg"],
+                source_paths: [
+                  "family-1/completed-paper/responses-completed-paper.jpg",
+                ],
                 page_numbers: [1],
                 regions: [{ x: 0.12, y: 0.45, width: 0.7, height: 0.2 }],
                 transcription: "(x - 4)(x + 4)",

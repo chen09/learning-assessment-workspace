@@ -552,19 +552,20 @@ function CreateWorkspaceContent() {
       try {
         const uploadObjectId = crypto.randomUUID();
         const responsePaths: string[] = [];
+        const answerSourcePaths: string[] = [];
+        const referenceSourcePaths: string[] = [];
+        const uploadContentType = (file: File) =>
+          (["application/pdf", "image/png", "image/jpeg"].includes(file.type)
+            ? file.type
+            : "image/jpeg") as "application/pdf" | "image/png" | "image/jpeg";
         for (const [index, file] of files.entries()) {
-          const contentType = (
-            ["application/pdf", "image/png", "image/jpeg"].includes(file.type)
-              ? file.type
-              : "image/jpeg"
-          ) as "application/pdf" | "image/png" | "image/jpeg";
           const intent = await createUploadIntent(
             {
               family_id: familyId,
               bucket: "responses",
               object_id: uploadObjectId,
               filename: file.name,
-              content_type: contentType,
+              content_type: uploadContentType(file),
             },
             parentToken,
             `completed-response-${uploadObjectId}-${index}`,
@@ -572,6 +573,33 @@ function CreateWorkspaceContent() {
           await uploadToSignedUrl(intent, file);
           responsePaths.push(intent.path);
         }
+        const uploadPrivateSources = async (
+          selectedFiles: File[],
+          role: "answers" | "references",
+          target: string[],
+        ) => {
+          for (const [index, file] of selectedFiles.entries()) {
+            const intent = await createUploadIntent(
+              {
+                family_id: familyId,
+                bucket: "sources",
+                object_id: uploadObjectId,
+                filename: file.name,
+                content_type: uploadContentType(file),
+              },
+              parentToken,
+              `completed-${role}-${uploadObjectId}-${index}`,
+            );
+            await uploadToSignedUrl(intent, file);
+            target.push(intent.path);
+          }
+        };
+        await uploadPrivateSources(answerFiles, "answers", answerSourcePaths);
+        await uploadPrivateSources(
+          referenceFiles,
+          "references",
+          referenceSourcePaths,
+        );
         const imported = await createCompletedWorksheetImport(
           {
             family_id: familyId,
@@ -582,6 +610,8 @@ function CreateWorkspaceContent() {
             feedback_language: feedbackLanguage,
             filenames: files.map((file) => file.name),
             response_paths: responsePaths,
+            answer_source_paths: answerSourcePaths,
+            reference_source_paths: referenceSourcePaths,
           },
           parentToken,
           `completed-worksheet-${uploadObjectId}`,
@@ -1927,6 +1957,44 @@ function CreateWorkspaceContent() {
                   <option value="en">{t("language.option.en")}</option>
                 </select>
                 <span>{t("completedPaper.documentLanguageHelp")}</span>
+              </label>
+              <label className="drop-zone completed-paper-private-file">
+                <input
+                  accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+                  aria-label={t("completedPaper.answerKey")}
+                  multiple
+                  onChange={(event) => {
+                    const selectedFiles = Array.from(event.target.files ?? []);
+                    setAnswerFiles(selectedFiles);
+                    setAnswerFileName(
+                      selectedFiles.map((file) => file.name).join(", "),
+                    );
+                  }}
+                  type="file"
+                />
+                <Check />
+                <strong>{answerFileName || t("completedPaper.chooseAnswerKey")}</strong>
+                <span>{t("completedPaper.answerKeyHelp")}</span>
+              </label>
+              <label className="drop-zone completed-paper-private-file">
+                <input
+                  accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+                  aria-label={t("completedPaper.referenceMaterial")}
+                  multiple
+                  onChange={(event) => {
+                    const selectedFiles = Array.from(event.target.files ?? []);
+                    setReferenceFiles(selectedFiles);
+                    setReferenceFileName(
+                      selectedFiles.map((file) => file.name).join(", "),
+                    );
+                  }}
+                  type="file"
+                />
+                <BookOpenText />
+                <strong>
+                  {referenceFileName || t("completedPaper.chooseReferenceMaterial")}
+                </strong>
+                <span>{t("completedPaper.referenceMaterialHelp")}</span>
               </label>
             </>
           ) : null}

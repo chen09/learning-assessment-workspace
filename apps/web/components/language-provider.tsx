@@ -381,6 +381,14 @@ const messages = {
     "completedPaper.documentLanguage": "Worksheet language",
     "completedPaper.documentLanguageHelp":
       "This is the language printed on the paper, not the child's interface language.",
+    "completedPaper.answerKey": "Answer key (private, optional)",
+    "completedPaper.chooseAnswerKey": "Choose answer key",
+    "completedPaper.answerKeyHelp":
+      "Only the parent and the grading service can use it. Children never receive it.",
+    "completedPaper.referenceMaterial": "Original material or examples (private, optional)",
+    "completedPaper.chooseReferenceMaterial": "Add original material or examples",
+    "completedPaper.referenceMaterialHelp":
+      "Use this privately to identify the learning goal and interpret the worksheet.",
     "completedPaper.choosePages": "Choose completed worksheet pages",
     "completedPaper.pagesHelp":
       "Upload several pages in their photographed order. Nothing is assigned or graded until you confirm the review draft.",
@@ -772,6 +780,14 @@ const messages = {
     "completedPaper.documentLanguage": "プリントの言語",
     "completedPaper.documentLanguageHelp":
       "子どもの画面言語ではなく、プリントに印刷された言語を選んでください。",
+    "completedPaper.answerKey": "解答・採点基準（非公開・任意）",
+    "completedPaper.chooseAnswerKey": "解答・採点基準を選択",
+    "completedPaper.answerKeyHelp":
+      "保護者と採点サービスのみが使います。子どもには表示されません。",
+    "completedPaper.referenceMaterial": "元教材・例題（非公開・任意）",
+    "completedPaper.chooseReferenceMaterial": "元教材・例題を追加",
+    "completedPaper.referenceMaterialHelp":
+      "学習目標の特定とプリントの解釈にのみ、非公開で使用します。",
     "completedPaper.choosePages": "解答済みプリントのページを選択",
     "completedPaper.pagesHelp":
       "撮影した順番で複数ページをアップロードできます。確認用下書きを確定するまで、課題の割り当てや採点は行われません。",
@@ -1146,6 +1162,14 @@ const messages = {
     "completedPaper.documentLanguage": "试卷语言",
     "completedPaper.documentLanguageHelp":
       "请选择试卷印刷内容的语言，而不是孩子的界面语言。",
+    "completedPaper.answerKey": "答案与评分标准（私密，可选）",
+    "completedPaper.chooseAnswerKey": "选择答案或评分标准",
+    "completedPaper.answerKeyHelp":
+      "仅家长和批改服务可用，孩子端永远不会看到。",
+    "completedPaper.referenceMaterial": "原教材或例题（私密，可选）",
+    "completedPaper.chooseReferenceMaterial": "添加原教材或例题",
+    "completedPaper.referenceMaterialHelp":
+      "仅用于识别学习目标和理解试卷内容，不会向孩子展示。",
     "completedPaper.choosePages": "选择已完成试卷页面",
     "completedPaper.pagesHelp":
       "可按拍摄顺序上传多页。在确认审核草稿前，不会安排练习或开始批改。",
