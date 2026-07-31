@@ -271,7 +271,7 @@ test("parent previews an AI JSON file before assigning its structured questions"
   await expect(
     page.getByRole("heading", { name: "What is 3 + 3?" }),
   ).toBeVisible();
-  await expect(page.locator(".exam-toggle")).toContainText("15:");
+  await expect(page.locator(".exam-toggle")).toContainText(/1[45]:/);
 
   await page.goto("/child/work/");
   await expect(page).toHaveURL(/\/child\/work\/\?attemptId=/);
@@ -281,7 +281,7 @@ test("parent previews an AI JSON file before assigning its structured questions"
   await expect(
     page.getByRole("heading", { name: "What is 3 + 3?" }),
   ).toBeVisible();
-  await expect(page.locator(".exam-toggle")).toContainText("15:");
+  await expect(page.locator(".exam-toggle")).toContainText(/1[45]:/);
 });
 
 test("parent authors one question and assigns it through the reviewed draft", async ({

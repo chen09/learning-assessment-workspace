@@ -68,6 +68,7 @@ export type AssignmentWork = {
   };
   attempt: {
     id: string;
+    started_at: string;
   };
   questions: ApiQuestion[];
   responses: Array<{
