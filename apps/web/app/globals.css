@@ -2679,6 +2679,56 @@ button {
   font-size: 0.68rem;
 }
 
+.draft-question-editor {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.draft-question-editor label {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--ink);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.draft-question-editor textarea,
+.draft-question-editor input {
+  width: 100%;
+  border: 1px solid var(--blue);
+  border-radius: 0.7rem;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  padding: 0.7rem 0.8rem;
+}
+
+.draft-question-editor textarea {
+  min-height: 5.6rem;
+  resize: vertical;
+}
+
+.draft-question-editor input {
+  max-width: 8rem;
+}
+
+.draft-question-editor > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.draft-question-editor > p[role="alert"] {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.draft-question-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
 .assignment-panel {
   align-items: center;
   background: var(--ink);
@@ -3264,6 +3314,15 @@ button {
 
   .assignment-panel {
     display: grid;
+  }
+
+  .draft-question-list article {
+    grid-template-columns: auto 1fr;
+  }
+
+  .draft-question-list article > .quiet-link {
+    grid-column: 2;
+    justify-self: start;
   }
 
   .record-table article {

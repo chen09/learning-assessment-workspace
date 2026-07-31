@@ -185,6 +185,16 @@ test("parent previews an AI JSON file before assigning its structured questions"
     page.getByRole("heading", { name: "What is 2 + 2?" }),
   ).toBeVisible();
 
+  await page.getByRole("button", { name: "Edit wording and points" }).click();
+  await page
+    .getByRole("textbox", { name: "Question wording" })
+    .fill("What is 3 + 3?");
+  await page.getByRole("spinbutton", { name: "Points" }).fill("2");
+  await page.getByRole("button", { name: "Save question" }).click();
+  await expect(
+    page.getByRole("heading", { name: "What is 3 + 3?" }),
+  ).toBeVisible();
+
   const importResponse = page.waitForResponse(
     (response) =>
       response.url() ===
@@ -192,9 +202,20 @@ test("parent previews an AI JSON file before assigning its structured questions"
       response.request().method() === "POST",
   );
   await page.getByRole("button", { name: "Confirm and assign" }).click();
-  const assignmentId = (
-    (await (await importResponse).json()) as { assignment_id: string }
-  ).assignment_id;
+  const importedRequest = await importResponse;
+  expect(importedRequest.request().postDataJSON()).toMatchObject({
+    document: {
+      questions: [
+        {
+          prompt: "What is 3 + 3?",
+          points: 2,
+        },
+      ],
+    },
+  });
+  const assignmentId = (await importedRequest.json() as {
+    assignment_id: string;
+  }).assignment_id;
   await expect(page.getByText("Confirmed and assigned")).toBeVisible();
 
   await page.goto(
@@ -206,7 +227,7 @@ test("parent previews an AI JSON file before assigning its structured questions"
   await page.getByRole("button", { name: "Open my work" }).click();
   await expect(page.getByText("0/1", { exact: true })).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "What is 2 + 2?" }),
+    page.getByRole("heading", { name: "What is 3 + 3?" }),
   ).toBeVisible();
 
   await page.goto("/child/work/");
@@ -215,7 +236,7 @@ test("parent previews an AI JSON file before assigning its structured questions"
     page.getByRole("heading", { name: "Uploaded JSON practice" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "What is 2 + 2?" }),
+    page.getByRole("heading", { name: "What is 3 + 3?" }),
   ).toBeVisible();
 });
 

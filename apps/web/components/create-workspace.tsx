@@ -102,20 +102,40 @@ Return this JSON shape exactly:
   }]
 }`;
 
-const sampleQuestions = [
+type ReviewDraftQuestion = ApiQuestion & {
+  answer_key: Record<string, unknown>;
+  answer?: string;
+};
+
+const sampleQuestions: ReviewDraftQuestion[] = [
   {
-    type: "Choice",
+    id: "sample-choice",
+    position: 1,
+    type: "single_choice",
     prompt: "Choose the sentence that uses the present simple correctly.",
+    options: [],
+    points: 1,
+    answer_key: { answer: "B · She walks to school every day." },
     answer: "B · She walks to school every day.",
   },
   {
-    type: "Type or handwrite",
+    id: "sample-type",
+    position: 2,
+    type: "typed_text",
     prompt: "Complete: My brother ___ tennis on Sundays.",
+    options: [],
+    points: 1,
+    answer_key: { answer: "plays" },
     answer: "plays",
   },
   {
-    type: "Handwrite",
+    id: "sample-handwrite",
+    position: 3,
+    type: "handwriting",
     prompt: "Explain why (a + b)(a − b) = a² − b².",
+    options: [],
+    points: 1,
+    answer_key: { answer: "Expand and combine the middle terms." },
     answer: "Expand and combine the middle terms.",
   },
 ];
@@ -276,9 +296,15 @@ export function CreateWorkspace() {
   const [completedWorksheetStatus, setCompletedWorksheetStatus] = useState<
     "processing" | "needs_review" | "grading" | "results_ready" | null
   >(null);
-  const [draftQuestions, setDraftQuestions] = useState<
-    Array<ApiQuestion & { answer_key: Record<string, unknown> }>
-  >([]);
+  const [draftQuestions, setDraftQuestions] = useState<ReviewDraftQuestion[]>(
+    [],
+  );
+  const [editingQuestionId, setEditingQuestionId] = useState<string | null>(
+    null,
+  );
+  const [editedQuestionPrompt, setEditedQuestionPrompt] = useState("");
+  const [editedQuestionPoints, setEditedQuestionPoints] = useState("1");
+  const [editError, setEditError] = useState("");
   const [requestStatus, setRequestStatus] = useState<
     "idle" | "working" | "error"
   >("idle");
@@ -668,6 +694,50 @@ export function CreateWorkspace() {
     }
   };
 
+  const beginStructuredQuestionEdit = (
+    question: ReviewDraftQuestion,
+  ) => {
+    setEditingQuestionId(question.id);
+    setEditedQuestionPrompt(question.prompt);
+    setEditedQuestionPoints(String(question.points));
+    setEditError("");
+  };
+
+  const saveStructuredQuestionEdit = (questionId: string) => {
+    const prompt = editedQuestionPrompt.trim();
+    const points = Number(editedQuestionPoints);
+    if (!structuredDocument || !prompt || !Number.isFinite(points) || points <= 0) {
+      setEditError("Add question wording and a positive point value.");
+      return;
+    }
+    const question = draftQuestions.find((candidate) => candidate.id === questionId);
+    if (!question) {
+      setEditError("This draft question is no longer available.");
+      return;
+    }
+    setDraftQuestions((current) =>
+      current.map((candidate) =>
+        candidate.id === questionId
+          ? { ...candidate, prompt, points }
+          : candidate,
+      ),
+    );
+    setStructuredDocument((current) =>
+      current
+        ? {
+            ...current,
+            questions: current.questions.map((candidate) =>
+              candidate.position === question.position
+                ? { ...candidate, prompt, points }
+                : candidate,
+            ),
+          }
+        : current,
+    );
+    setEditingQuestionId(null);
+    setEditError("");
+  };
+
   const confirmCompletedPaper = async () => {
     if (!completedWorksheetId || !completedReview) {
       setRequestStatus("error");
@@ -907,22 +977,78 @@ export function CreateWorkspace() {
             <article key={question.prompt}>
               <div className="draft-question-number">{index + 1}</div>
               <div>
-                <span className="question-type">
-                  {question.type.replaceAll("_", " ")}
-                </span>
-                <h2>{question.prompt}</h2>
-                <details>
-                  <summary>Answer and grading guide</summary>
-                  <p>
-                    {"answer_key" in question
-                      ? JSON.stringify(question.answer_key)
-                      : question.answer}
-                  </p>
-                </details>
+                {mode === "structured" && editingQuestionId === question.id ? (
+                  <div className="draft-question-editor">
+                    <label>
+                      Question wording
+                      <textarea
+                        aria-label="Question wording"
+                        onChange={(event) =>
+                          setEditedQuestionPrompt(event.target.value)
+                        }
+                        rows={3}
+                        value={editedQuestionPrompt}
+                      />
+                    </label>
+                    <label>
+                      Points
+                      <input
+                        aria-label="Points"
+                        min="0.5"
+                        onChange={(event) =>
+                          setEditedQuestionPoints(event.target.value)
+                        }
+                        step="0.5"
+                        type="number"
+                        value={editedQuestionPoints}
+                      />
+                    </label>
+                    <p>Answer key and response type stay unchanged in this step.</p>
+                    {editError ? <p role="alert">{editError}</p> : null}
+                    <div className="draft-question-editor-actions">
+                      <button
+                        className="button primary"
+                        onClick={() => saveStructuredQuestionEdit(question.id)}
+                        type="button"
+                      >
+                        Save question
+                      </button>
+                      <button
+                        className="button ghost"
+                        onClick={() => {
+                          setEditingQuestionId(null);
+                          setEditError("");
+                        }}
+                        type="button"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <span className="question-type">
+                      {question.type.replaceAll("_", " ")}
+                    </span>
+                    <h2>{question.prompt}</h2>
+                    <details>
+                      <summary>Answer and grading guide</summary>
+                      <p>
+                        {question.answer ?? JSON.stringify(question.answer_key)}
+                      </p>
+                    </details>
+                  </>
+                )}
               </div>
-              <button className="quiet-link" type="button">
-                Edit
-              </button>
+              {mode === "structured" && editingQuestionId !== question.id ? (
+                <button
+                  className="quiet-link"
+                  onClick={() => beginStructuredQuestionEdit(question)}
+                  type="button"
+                >
+                  Edit wording and points
+                </button>
+              ) : null}
             </article>
             ),
           )}
