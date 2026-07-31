@@ -1421,13 +1421,6 @@ class PostgresRepository:
             attempt_row = attempt_result.mappings().one_or_none()
             if attempt_row is None:
                 raise NotFoundError
-            if attempt_row["submitted_at"] is not None:
-                raise SubmittedAttemptImmutable
-            if attempt_row["assignment_status"] not in {
-                AssignmentStatus.IN_PROGRESS,
-                AssignmentStatus.CORRECTING,
-            }:
-                raise NotFoundError
             assignment_result = await connection.execute(
                 text(
                     """
@@ -1462,6 +1455,13 @@ class PostgresRepository:
                     attempt=_attempt(attempt_row),
                     job=_job(existing_job),
                 )
+            if attempt_row["submitted_at"] is not None:
+                raise SubmittedAttemptImmutable
+            if attempt_row["assignment_status"] not in {
+                AssignmentStatus.IN_PROGRESS,
+                AssignmentStatus.CORRECTING,
+            }:
+                raise NotFoundError
             submitted_at = datetime.now(UTC)
             await connection.execute(
                 text(

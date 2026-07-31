@@ -527,6 +527,13 @@ def test_submitting_the_whole_attempt_marks_unanswered_questions_incorrect() -> 
             "Idempotency-Key": "submit-with-unanswered",
         },
     )
+    repeated_submission = client.post(
+        f"/v1/attempts/{attempt_id}/submit",
+        headers={
+            **child_headers,
+            "Idempotency-Key": "submit-with-unanswered",
+        },
+    )
     processed = client.post(
         "/v1/demo/jobs/process-next",
         headers=PARENT_HEADERS,
@@ -538,6 +545,8 @@ def test_submitting_the_whole_attempt_marks_unanswered_questions_incorrect() -> 
 
     assert saved.status_code == 200
     assert submitted.status_code == 202
+    assert repeated_submission.status_code == 202
+    assert repeated_submission.json()["job"]["id"] == submitted.json()["job"]["id"]
     assert processed.status_code == 200
     assert results.status_code == 200
     assert results.json()["complete"] is True

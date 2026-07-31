@@ -676,6 +676,14 @@ class MemoryRepository:
         idempotency_record = (attempt_id, idempotency_key)
         existing_job_id = self.submission_idempotency.get(idempotency_record)
         assignment = self.assignments[str(attempt.assignment_id)]
+        # A retry of the same submission must return its original receipt even
+        # after the attempt became immutable.
+        if existing_job_id is not None:
+            return SubmissionReceipt(
+                assignment=assignment,
+                attempt=attempt,
+                job=self.jobs[existing_job_id],
+            )
         if attempt.submitted_at is not None:
             raise SubmittedAttemptImmutable
         if assignment.status not in {
@@ -683,12 +691,6 @@ class MemoryRepository:
             AssignmentStatus.CORRECTING,
         }:
             raise NotFoundError
-        if existing_job_id is not None:
-            return SubmissionReceipt(
-                assignment=assignment,
-                attempt=attempt,
-                job=self.jobs[existing_job_id],
-            )
         attempt.submitted_at = datetime.now(UTC)
         assignment.status = AssignmentStatus.GRADING
         job = Job(
