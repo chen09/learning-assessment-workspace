@@ -16,6 +16,7 @@ import {
 import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
+import { useLanguage } from "@/components/language-provider";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import {
   type ApiQuestion,
@@ -259,6 +260,15 @@ function parseCompletedPaperReview(value: string): CompletedPaperReview {
 }
 
 export function CreateWorkspace() {
+  return (
+    <AppShell currentPath="/parent/create/" role="parent">
+      <CreateWorkspaceContent />
+    </AppShell>
+  );
+}
+
+function CreateWorkspaceContent() {
+  const { t } = useLanguage();
   const [families, setFamilies] = useState<Family[]>([]);
   const [children, setChildren] = useState<ChildProfile[]>([]);
   const [selectedFamilyId, setSelectedFamilyId] = useState("");
@@ -528,6 +538,8 @@ export function CreateWorkspace() {
         setRequestStatus("error");
         return;
       }
+      const feedbackLanguage =
+        children.find((child) => child.id === childId)?.ui_language ?? "en";
       const parentToken = await getParentAccessToken();
       if (!parentToken) {
         setRequestStatus("error");
@@ -564,7 +576,7 @@ export function CreateWorkspace() {
             title: fileName.slice(0, 160),
             subject: "Mixed practice",
             document_language: "ja",
-            feedback_language: "ja",
+            feedback_language: feedbackLanguage,
             filenames: files.map((file) => file.name),
             response_paths: responsePaths,
           },
@@ -1165,19 +1177,16 @@ export function CreateWorkspace() {
 
   if (completedWorksheetId) {
     return (
-      <AppShell currentPath="/parent/create/" role="parent">
+      <>
         <header className="page-header">
           <div>
-            <p className="eyebrow">Completed worksheet received</p>
+            <p className="eyebrow">{t("completedPaper.eyebrow")}</p>
             <h1>
               {completedWorksheetStatus === "processing"
-                ? "Reading the paper"
-                : "Preparing the review draft"}
+                ? t("completedPaper.readingTitle")
+                : t("completedPaper.reviewTitle")}
             </h1>
-            <p className="lede">
-              The original paper is private. Question boundaries and scoring
-              must be confirmed before it becomes a learning record.
-            </p>
+            <p className="lede">{t("completedPaper.description")}</p>
           </div>
           <LanguageSwitcher />
         </header>
@@ -1185,22 +1194,22 @@ export function CreateWorkspace() {
           <div>
             <p className="eyebrow">
               {completedWorksheetStatus === "processing"
-                ? "Analysis in progress"
-                : "Analysis ready for review"}
+                ? t("completedPaper.analysisProcessing")
+                : t("completedPaper.analysisReady")}
             </p>
             <h2>
               {completedAttemptId
-                ? "Submitted for grading"
+                ? t("completedPaper.submitted")
                 : completedWorksheetStatus === "processing"
-                  ? "Your paper is being prepared"
-                : "Paper upload is safe and not yet assigned"}
+                  ? t("completedPaper.preparing")
+                  : t("completedPaper.notAssigned")}
             </h2>
             <p>
               {completedAttemptId
-                ? "The paper is now an immutable learning record. Results appear when grading finishes."
+                ? t("completedPaper.submittedDetails")
                 : completedWorksheetStatus === "processing"
-                  ? "We are preparing a private review draft. This page will update automatically; no child task has been created."
-                : "Confirm the reviewed question and answer regions. Only then will it create a submitted attempt and start grading."}
+                  ? t("completedPaper.preparingDetails")
+                  : t("completedPaper.reviewDetails")}
             </p>
           </div>
           {completedAttemptId ? (
@@ -1208,29 +1217,27 @@ export function CreateWorkspace() {
               className="button primary"
               href={`/parent/results/?attemptId=${encodeURIComponent(completedAttemptId)}`}
             >
-              Open grading results
+              {t("completedPaper.openResults")}
             </Link>
           ) : completedWorksheetStatus === "needs_review" ? (
             <div className="stacked-form">
               <details open>
-                <summary>Prepare a local AI review JSON</summary>
-                <p>
-                  Attach the original pages to your local AI, copy this prompt,
-                  and save its JSON-only response. The prompt never asks for a
-                  storage path; this app adds the private paper reference itself.
-                </p>
+                <summary>{t("completedPaper.prepareLocal")}</summary>
+                <p>{t("completedPaper.localDetails")}</p>
                 <button
                   className="button secondary"
                   onClick={() => void copyCompletedPaperPrompt()}
                   type="button"
                 >
-                  {completedPromptCopied ? "Prompt copied" : "Copy local AI prompt"}
+                  {completedPromptCopied
+                    ? t("completedPaper.promptCopied")
+                    : t("completedPaper.copyPrompt")}
                 </button>
               </details>
               <label className="drop-zone compact-drop-zone">
                 <input
                   accept=".json,application/json"
-                  aria-label="Reviewed completed worksheet JSON"
+                  aria-label={t("completedPaper.reviewJson")}
                   onChange={(event) =>
                     void selectCompletedReview(event.target.files?.[0] ?? null)
                   }
@@ -1238,29 +1245,28 @@ export function CreateWorkspace() {
                 />
                 <FileJson2 />
                 <strong>
-                  {completedReviewFile?.name || "Choose reviewed paper JSON"}
+                  {completedReviewFile?.name || t("completedPaper.chooseJson")}
                 </strong>
-                <span>
-                  The app validates question order and answer regions before
-                  creating a learning record.
-                </span>
+                <span>{t("completedPaper.jsonHelp")}</span>
               </label>
               {completedReview ? (
                 <>
                   <p className="status-pill cool">
-                    Review ready: {completedReview.document.questions.length} question
-                    {completedReview.document.questions.length === 1 ? "" : "s"} and {" "}
-                    {completedReview.answer_regions.length} answer region
-                    {completedReview.answer_regions.length === 1 ? "" : "s"}
+                    {t("completedPaper.reviewReady", {
+                      questions: completedReview.document.questions.length,
+                      regions: completedReview.answer_regions.length,
+                    })}
                   </p>
                   <details open>
-                    <summary>Preview confirmed questions</summary>
+                    <summary>{t("completedPaper.previewQuestions")}</summary>
                     <ol>
                       {completedReview.document.questions.map((question, index) => (
                         <li key={question.position}>
                           <strong>{question.prompt}</strong>
                           <span>
-                            Page {completedReview.answer_regions[index]?.page_numbers.join(", ")}
+                            {t("completedPaper.page", {
+                              pages: completedReview.answer_regions[index]?.page_numbers.join(", ") ?? "",
+                            })}
                             {completedReview.answer_regions[index]?.legibility
                               ? ` · ${completedReview.answer_regions[index].legibility}`
                               : ""}
@@ -1278,27 +1284,28 @@ export function CreateWorkspace() {
                 type="button"
               >
                 {requestStatus === "working"
-                  ? "Confirming…"
-                  : "Confirm and start grading"}
+                  ? t("completedPaper.confirming")
+                  : t("completedPaper.confirm")}
               </button>
             </div>
           ) : (
-            <span className="status-pill warm">Preparing private review</span>
+            <span className="status-pill warm">
+              {t("completedPaper.preparingReview")}
+            </span>
           )}
         </section>
         {requestStatus === "error" ? (
           <p className="form-error" role="alert">
-            The reviewed JSON must match every confirmed question and answer
-            region. Nothing was assigned; correct it and try again.
+            {t("completedPaper.error")}
           </p>
         ) : null}
-      </AppShell>
+      </>
     );
   }
 
   if (stage === "review") {
     return (
-      <AppShell currentPath="/parent/create/" role="parent">
+      <>
         <header className="page-header">
           <div>
             <button
@@ -1618,12 +1625,12 @@ export function CreateWorkspace() {
             <Printer size={17} /> Print A4 instead
           </Link>
         </section>
-      </AppShell>
+      </>
     );
   }
 
   return (
-    <AppShell currentPath="/parent/create/" role="parent">
+    <>
       <header className="page-header">
         <div>
           <p className="eyebrow">New question set</p>
@@ -1705,7 +1712,7 @@ export function CreateWorkspace() {
             onClick={() => setMode("completed")}
             type="button"
           >
-            <Camera /> Grade completed paper
+            <Camera /> {t("completedPaper.mode")}
           </button>
           <button
             className={mode === "structured" ? "active" : ""}
@@ -1881,17 +1888,14 @@ export function CreateWorkspace() {
               <div className="creation-heading">
                 <span><Camera /></span>
                 <div>
-                  <h2>Upload a paper the child has already completed</h2>
-                  <p>
-                    Upload the original scan or photos. The handwriting stays
-                    private and is reviewed only after you confirm the draft.
-                  </p>
+                  <h2>{t("completedPaper.composeTitle")}</h2>
+                  <p>{t("completedPaper.composeDescription")}</p>
                 </div>
               </div>
               <label className="drop-zone">
                 <input
                   accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
-                  aria-label="Completed worksheet scans"
+                  aria-label={t("completedPaper.scans")}
                   multiple
                   onChange={(event) => {
                     const selectedFiles = Array.from(event.target.files ?? []);
@@ -1901,11 +1905,8 @@ export function CreateWorkspace() {
                   type="file"
                 />
                 <ImagePlus />
-                <strong>{fileName || "Choose completed worksheet pages"}</strong>
-                <span>
-                  Upload several pages in their photographed order. Nothing is
-                  assigned or graded until you confirm the review draft.
-                </span>
+                <strong>{fileName || t("completedPaper.choosePages")}</strong>
+                <span>{t("completedPaper.pagesHelp")}</span>
               </label>
             </>
           ) : null}
@@ -2154,6 +2155,6 @@ export function CreateWorkspace() {
           ) : null}
         </section>
       </div>
-    </AppShell>
+    </>
   );
 }

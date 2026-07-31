@@ -339,6 +339,48 @@ const messages = {
     "parentHistory.status.stopped": "Stopped",
     "parentHistory.actionError":
       "The assignment status could not be updated. Please retry.",
+    "completedPaper.eyebrow": "Completed worksheet received",
+    "completedPaper.mode": "Grade completed paper",
+    "completedPaper.readingTitle": "Reading the paper",
+    "completedPaper.reviewTitle": "Preparing the review draft",
+    "completedPaper.description":
+      "The original paper is private. Question boundaries and scoring must be confirmed before it becomes a learning record.",
+    "completedPaper.analysisProcessing": "Analysis in progress",
+    "completedPaper.analysisReady": "Analysis ready for review",
+    "completedPaper.submitted": "Submitted for grading",
+    "completedPaper.preparing": "Your paper is being prepared",
+    "completedPaper.notAssigned": "Paper upload is safe and not yet assigned",
+    "completedPaper.submittedDetails":
+      "The paper is now an immutable learning record. Results appear when grading finishes.",
+    "completedPaper.preparingDetails":
+      "We are preparing a private review draft. This page will update automatically; no child task has been created.",
+    "completedPaper.reviewDetails":
+      "Confirm the reviewed question and answer regions. Only then will it create a submitted attempt and start grading.",
+    "completedPaper.openResults": "Open grading results",
+    "completedPaper.prepareLocal": "Prepare a local AI review JSON",
+    "completedPaper.localDetails":
+      "Attach the original pages to your local AI, copy this prompt, and save its JSON-only response. The prompt never asks for a storage path; this app adds the private paper reference itself.",
+    "completedPaper.promptCopied": "Prompt copied",
+    "completedPaper.copyPrompt": "Copy local AI prompt",
+    "completedPaper.reviewJson": "Reviewed completed worksheet JSON",
+    "completedPaper.chooseJson": "Choose reviewed paper JSON",
+    "completedPaper.jsonHelp":
+      "The app validates question order and answer regions before creating a learning record.",
+    "completedPaper.reviewReady": "Review ready · questions: {questions} · answer regions: {regions}",
+    "completedPaper.previewQuestions": "Preview confirmed questions",
+    "completedPaper.page": "Page {pages}",
+    "completedPaper.confirm": "Confirm and start grading",
+    "completedPaper.confirming": "Confirming…",
+    "completedPaper.preparingReview": "Preparing private review",
+    "completedPaper.error":
+      "The reviewed JSON must match every confirmed question and answer region. Nothing was assigned; correct it and try again.",
+    "completedPaper.composeTitle": "Upload a paper the child has already completed",
+    "completedPaper.composeDescription":
+      "Upload the original scan or photos. The handwriting stays private and is reviewed only after you confirm the draft.",
+    "completedPaper.scans": "Completed worksheet scans",
+    "completedPaper.choosePages": "Choose completed worksheet pages",
+    "completedPaper.pagesHelp":
+      "Upload several pages in their photographed order. Nothing is assigned or graded until you confirm the review draft.",
     "childExit.eyebrow": "Parent check",
     "childExit.title": "Enter your management PIN",
     "childExit.help":
@@ -685,6 +727,48 @@ const messages = {
     "parentHistory.status.withdrawn": "取り消し済み",
     "parentHistory.status.stopped": "終了済み",
     "parentHistory.actionError": "課題の状態を更新できませんでした。もう一度お試しください。",
+    "completedPaper.eyebrow": "解答済みのプリントを受け取りました",
+    "completedPaper.mode": "解答済みのプリントを採点",
+    "completedPaper.readingTitle": "プリントを読み込んでいます",
+    "completedPaper.reviewTitle": "確認用の下書きを準備しています",
+    "completedPaper.description":
+      "元のプリントは非公開です。学習記録になる前に、問題の区切りと採点方法を確認してください。",
+    "completedPaper.analysisProcessing": "解析中",
+    "completedPaper.analysisReady": "解析結果を確認できます",
+    "completedPaper.submitted": "採点に提出しました",
+    "completedPaper.preparing": "プリントを準備しています",
+    "completedPaper.notAssigned": "プリントは安全に保存され、まだ割り当てられていません",
+    "completedPaper.submittedDetails":
+      "このプリントは変更できない学習記録になりました。採点が終わると結果が表示されます。",
+    "completedPaper.preparingDetails":
+      "非公開の確認用下書きを準備しています。この画面は自動で更新され、まだ子どもの課題は作成されません。",
+    "completedPaper.reviewDetails":
+      "確認済みの問題と解答エリアを確定してください。その後で提出済みの解答を作成し、採点を始めます。",
+    "completedPaper.openResults": "採点結果を開く",
+    "completedPaper.prepareLocal": "ローカル AI 用の確認 JSON を準備",
+    "completedPaper.localDetails":
+      "元のページをローカル AI に添付し、このプロンプトをコピーして JSON だけの回答を保存してください。プロンプトは保存先パスを求めず、このアプリが非公開のプリント参照を追加します。",
+    "completedPaper.promptCopied": "プロンプトをコピーしました",
+    "completedPaper.copyPrompt": "ローカル AI プロンプトをコピー",
+    "completedPaper.reviewJson": "確認済みプリントの JSON",
+    "completedPaper.chooseJson": "確認済みプリント JSON を選択",
+    "completedPaper.jsonHelp":
+      "学習記録を作成する前に、問題の順序と解答エリアを検証します。",
+    "completedPaper.reviewReady": "確認の準備完了 · 問題: {questions} · 解答エリア: {regions}",
+    "completedPaper.previewQuestions": "確認済みの問題をプレビュー",
+    "completedPaper.page": "{pages} ページ",
+    "completedPaper.confirm": "確認して採点を始める",
+    "completedPaper.confirming": "確認中…",
+    "completedPaper.preparingReview": "非公開の確認を準備中",
+    "completedPaper.error":
+      "確認用 JSON は、確定するすべての問題と解答エリアに対応する必要があります。割り当ては行われていません。修正してもう一度お試しください。",
+    "completedPaper.composeTitle": "子どもが解き終えたプリントをアップロード",
+    "completedPaper.composeDescription":
+      "元のスキャンまたは写真をアップロードします。手書きは非公開のまま、下書きを確認した後だけレビューされます。",
+    "completedPaper.scans": "解答済みプリントのスキャン",
+    "completedPaper.choosePages": "解答済みプリントのページを選択",
+    "completedPaper.pagesHelp":
+      "撮影した順番で複数ページをアップロードできます。確認用下書きを確定するまで、課題の割り当てや採点は行われません。",
     "childExit.eyebrow": "保護者の確認",
     "childExit.title": "保護者管理 PIN を入力",
     "childExit.help":
@@ -1014,6 +1098,48 @@ const messages = {
     "parentHistory.status.withdrawn": "已撤回",
     "parentHistory.status.stopped": "已结束",
     "parentHistory.actionError": "无法更新练习状态，请重试。",
+    "completedPaper.eyebrow": "已收到已完成的试卷",
+    "completedPaper.mode": "批改已完成的试卷",
+    "completedPaper.readingTitle": "正在读取试卷",
+    "completedPaper.reviewTitle": "正在准备审核草稿",
+    "completedPaper.description":
+      "原始试卷保持私密。必须确认题目边界与评分方式，才会成为学习记录。",
+    "completedPaper.analysisProcessing": "正在解析",
+    "completedPaper.analysisReady": "解析已可审核",
+    "completedPaper.submitted": "已提交批改",
+    "completedPaper.preparing": "正在准备你的试卷",
+    "completedPaper.notAssigned": "试卷已安全保存，尚未安排给孩子",
+    "completedPaper.submittedDetails":
+      "这份试卷现在是不可修改的学习记录。批改完成后会显示结果。",
+    "completedPaper.preparingDetails":
+      "正在准备私密审核草稿。页面会自动更新，尚未创建任何孩子任务。",
+    "completedPaper.reviewDetails":
+      "请确认审核后的题目和答题区域。确认后才会创建已提交的作答并开始批改。",
+    "completedPaper.openResults": "打开批改结果",
+    "completedPaper.prepareLocal": "准备本地 AI 审核 JSON",
+    "completedPaper.localDetails":
+      "将原始页面附给本地 AI，复制此提示词，并保存它只含 JSON 的回答。提示词不会要求存储路径；应用会自行添加私密试卷引用。",
+    "completedPaper.promptCopied": "提示词已复制",
+    "completedPaper.copyPrompt": "复制本地 AI 提示词",
+    "completedPaper.reviewJson": "已审核试卷 JSON",
+    "completedPaper.chooseJson": "选择已审核试卷 JSON",
+    "completedPaper.jsonHelp":
+      "应用会在创建学习记录前验证题目顺序和答题区域。",
+    "completedPaper.reviewReady": "审核准备就绪 · 题目：{questions} · 答题区域：{regions}",
+    "completedPaper.previewQuestions": "预览已确认题目",
+    "completedPaper.page": "第 {pages} 页",
+    "completedPaper.confirm": "确认并开始批改",
+    "completedPaper.confirming": "正在确认…",
+    "completedPaper.preparingReview": "正在准备私密审核",
+    "completedPaper.error":
+      "审核 JSON 必须匹配每一道已确认题目和答题区域。尚未安排任何练习；请修正后重试。",
+    "completedPaper.composeTitle": "上传孩子已经做完的试卷",
+    "completedPaper.composeDescription":
+      "上传原始扫描件或照片。手写内容保持私密，只会在你确认草稿后审核。",
+    "completedPaper.scans": "已完成试卷扫描件",
+    "completedPaper.choosePages": "选择已完成试卷页面",
+    "completedPaper.pagesHelp":
+      "可按拍摄顺序上传多页。在确认审核草稿前，不会安排练习或开始批改。",
     "childExit.eyebrow": "家长确认",
     "childExit.title": "输入家长管理 PIN",
     "childExit.help":

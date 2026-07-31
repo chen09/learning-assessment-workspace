@@ -38,6 +38,7 @@ describe("CreateWorkspace", () => {
         ui_language: "en",
       },
     ]);
+    window.localStorage.clear();
     window.history.replaceState({}, "", "/parent/create/");
   });
 
@@ -623,6 +624,15 @@ describe("CreateWorkspace", () => {
   });
 
   it("keeps a completed paper private until the reviewed JSON creates its submitted attempt", async () => {
+    mocks.getChildren.mockResolvedValue([
+      {
+        id: "child-1",
+        family_id: "family-1",
+        nickname: "Fixture child",
+        grade_stage: "Junior high 1",
+        ui_language: "zh",
+      },
+    ]);
     const document = {
       schema_version: "1.0",
       question_set: {
@@ -695,6 +705,7 @@ describe("CreateWorkspace", () => {
       expect.objectContaining({
         family_id: "family-1",
         child_id: "child-1",
+        feedback_language: "zh",
         response_paths: ["family-1/completed-paper/page-1.jpg"],
       }),
       "parent-token",
@@ -729,7 +740,7 @@ describe("CreateWorkspace", () => {
       },
     );
     expect(
-      await screen.findByText("Review ready: 1 question and 1 answer region"),
+      await screen.findByText("Review ready · questions: 1 · answer regions: 1"),
     ).toBeInTheDocument();
     expect(screen.getByText("Factorise x² − 16.")).toBeInTheDocument();
     fireEvent.click(
@@ -762,5 +773,23 @@ describe("CreateWorkspace", () => {
     expect(
       await screen.findByRole("link", { name: "Open grading results" }),
     ).toHaveAttribute("href", "/parent/results?attemptId=attempt-1");
+  });
+
+  it("translates the completed-paper entry in the parent's selected language", async () => {
+    window.localStorage.setItem("luma-language:demo-parent", "zh");
+
+    render(<CreateWorkspace />);
+
+    await screen.findByRole("combobox", { name: "Child" });
+    fireEvent.click(screen.getByRole("button", { name: "批改已完成的试卷" }));
+
+    expect(
+      screen.getByRole("heading", { name: "上传孩子已经做完的试卷" }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("已完成试卷扫描件")).toBeInTheDocument();
+    expect(screen.getByText(/手写内容保持私密/)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Grade completed paper" }),
+    ).not.toBeInTheDocument();
   });
 });

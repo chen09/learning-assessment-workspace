@@ -725,7 +725,7 @@ test("parent validates a local-AI completed-paper review before submitting it", 
     buffer: Buffer.from(JSON.stringify(review)),
   });
   await expect(
-    page.getByText("Review ready: 1 question and 1 answer region"),
+    page.getByText("Review ready · questions: 1 · answer regions: 1"),
   ).toBeVisible();
   await expect(page.getByText("Factorise x² - 16.")).toBeVisible();
 
