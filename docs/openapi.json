@@ -535,6 +535,11 @@
             "title": "Document Language",
             "type": "string"
           },
+          "extraction": {
+            "additionalProperties": true,
+            "title": "Extraction",
+            "type": "object"
+          },
           "family_id": {
             "format": "uuid",
             "title": "Family Id",
