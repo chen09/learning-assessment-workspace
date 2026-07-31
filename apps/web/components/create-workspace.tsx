@@ -42,6 +42,66 @@ type CreateMode = "generate" | "import" | "completed" | "structured" | "manual";
 type ImportPurpose = "generate_similar" | "use_as_questions";
 type Stage = "compose" | "review";
 
+type CompletedPaperAnswerRegion = {
+  question_position: number;
+  page_numbers: number[];
+  regions?: Array<{ x: number; y: number; width: number; height: number }>;
+  transcription?: string;
+  legibility?: "clear" | "uncertain" | "unreadable";
+};
+
+type CompletedPaperReview = {
+  document: StructuredQuestionSetDocument;
+  answer_regions: CompletedPaperAnswerRegion[];
+};
+
+const LOCAL_COMPLETED_PAPER_REVIEW_PROMPT = `You are a careful school worksheet reviewer. Read the attached completed worksheet pages locally and return JSON only. Do not return Markdown, explanation, or an annotated image.
+
+Goal: turn the printed questions and the student's handwritten answers into a parent-reviewable learning record. Preserve the original wording. Do not invent an answer when print or handwriting is unclear.
+
+Rules:
+1. Make one question for each separately scored unit. Keep positions 1, 2, 3... in reading order.
+2. Use type single_choice, multiple_choice, typed_text, word_order, handwriting, photo, or listening. Use handwriting when the answer needs visual interpretation.
+3. Include answer_key and rubric only when they can be verified from the paper or an attached answer key. Handwriting requires answer_key.reference (a private reference answer) and rubric.grading_mode "parent_review". For uncertain handwriting, set legibility to "uncertain" or "unreadable".
+4. Keep question_set.locale as ja, zh, or en based on the worksheet. Keep prompts in the worksheet's language.
+5. Do not include student names, storage paths, URLs, tokens, or any image data. Do not draw red marks or alter the original paper.
+6. Every question must have exactly one matching answer_regions item. page_numbers are one-based. Regions are optional normalized coordinates: x/y/width/height must be 0..1.
+
+Return this JSON shape exactly:
+{
+  "document": {
+    "schema_version": "1.0",
+    "question_set": {
+      "title": "Worksheet title",
+      "subject": "Mathematics or English",
+      "locale": "ja",
+      "difficulty": "standard",
+      "source_mode": "convert",
+      "instructions": "Answer every question.",
+      "estimated_minutes": 20,
+      "source_summary": { "source_kind": "completed_worksheet" }
+    },
+    "knowledge_tags": [{ "code": "topic-code", "label": "Topic" }],
+    "questions": [{
+      "position": 1,
+      "type": "handwriting",
+      "prompt": "Printed question text",
+      "options": [],
+      "answer_key": { "reference": "verified reference answer" },
+      "rubric": { "grading_mode": "parent_review" },
+      "points": 1,
+      "knowledge_code": "topic-code"
+    }]
+  },
+  "answer_regions": [{
+    "question_position": 1,
+    "page_numbers": [1],
+    "regions": [{ "x": 0.1, "y": 0.2, "width": 0.7, "height": 0.12 }],
+    "transcription": "optional careful transcription",
+    "legibility": "clear"
+  }]
+}`;
+
 const sampleQuestions = [
   {
     type: "Choice",
@@ -75,6 +135,104 @@ function readTextFile(file: File) {
   });
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseCompletedPaperReview(value: string): CompletedPaperReview {
+  const parsed: unknown = JSON.parse(value);
+  if (!isRecord(parsed) || !isRecord(parsed.document)) {
+    throw new Error("The review must include a document object.");
+  }
+  const document = parsed.document as StructuredQuestionSetDocument;
+  const questions = document.questions;
+  if (!Array.isArray(questions) || questions.length === 0) {
+    throw new Error("The review needs at least one confirmed question.");
+  }
+  if (!Array.isArray(parsed.answer_regions)) {
+    throw new Error("The review must include answer_regions.");
+  }
+
+  const expectedPositions = questions.map((question) => question.position);
+  if (expectedPositions.some((position, index) => position !== index + 1)) {
+    throw new Error("Question positions must be contiguous and ordered from 1.");
+  }
+  for (const question of questions) {
+    if (
+      question.type === "handwriting" &&
+      (!isRecord(question.answer_key) ||
+        typeof question.answer_key.reference !== "string" ||
+        !question.answer_key.reference.trim() ||
+        !isRecord(question.rubric) ||
+        question.rubric.grading_mode !== "parent_review")
+    ) {
+      throw new Error(
+        "Handwriting questions need a private reference answer and parent review.",
+      );
+    }
+  }
+  const answerRegions = parsed.answer_regions.map((candidate) => {
+    if (!isRecord(candidate)) {
+      throw new Error("Each answer region must be an object.");
+    }
+    const position = candidate.question_position;
+    const pageNumbers = candidate.page_numbers;
+    if (
+      typeof position !== "number" ||
+      !Number.isInteger(position) ||
+      !Array.isArray(pageNumbers) ||
+      pageNumbers.length === 0 ||
+      pageNumbers.some(
+        (page) => typeof page !== "number" || !Number.isInteger(page) || page < 1,
+      )
+    ) {
+      throw new Error("Each answer region needs a question position and page number.");
+    }
+    const regions = candidate.regions;
+    if (
+      regions !== undefined &&
+      (!Array.isArray(regions) ||
+        regions.some(
+          (region) =>
+            !isRecord(region) ||
+            ["x", "y", "width", "height"].some(
+              (key) =>
+                typeof region[key] !== "number" ||
+                (region[key] as number) < 0 ||
+                (region[key] as number) > 1,
+            ),
+        ))
+    ) {
+      throw new Error("Answer region coordinates must be normalized between 0 and 1.");
+    }
+    if (
+      candidate.legibility !== undefined &&
+      !["clear", "uncertain", "unreadable"].includes(String(candidate.legibility))
+    ) {
+      throw new Error("Legibility must be clear, uncertain, or unreadable.");
+    }
+    return {
+      question_position: position,
+      page_numbers: pageNumbers as number[],
+      regions: regions as CompletedPaperAnswerRegion["regions"],
+      transcription:
+        typeof candidate.transcription === "string"
+          ? candidate.transcription
+          : undefined,
+      legibility: candidate.legibility as CompletedPaperAnswerRegion["legibility"],
+    };
+  });
+  if (
+    answerRegions.length !== expectedPositions.length ||
+    answerRegions.some(
+      (region, index) => region.question_position !== expectedPositions[index],
+    )
+  ) {
+    throw new Error("Answer regions must match every confirmed question in order.");
+  }
+  return { document, answer_regions: answerRegions };
+}
+
 export function CreateWorkspace() {
   const [families, setFamilies] = useState<Family[]>([]);
   const [children, setChildren] = useState<ChildProfile[]>([]);
@@ -106,6 +264,12 @@ export function CreateWorkspace() {
   const [completedReviewFile, setCompletedReviewFile] = useState<File | null>(
     null,
   );
+  const [completedReview, setCompletedReview] =
+    useState<CompletedPaperReview | null>(null);
+  const [completedResponsePaths, setCompletedResponsePaths] = useState<string[]>(
+    [],
+  );
+  const [completedPromptCopied, setCompletedPromptCopied] = useState(false);
   const [completedAttemptId, setCompletedAttemptId] = useState<string | null>(
     null,
   );
@@ -284,6 +448,7 @@ export function CreateWorkspace() {
         );
         setCompletedWorksheetId(imported.id);
         setCompletedWorksheetStatus(imported.status);
+        setCompletedResponsePaths(imported.response_paths);
         setRequestStatus("idle");
       } catch {
         setRequestStatus("error");
@@ -504,7 +669,7 @@ export function CreateWorkspace() {
   };
 
   const confirmCompletedPaper = async () => {
-    if (!completedWorksheetId || !completedReviewFile) {
+    if (!completedWorksheetId || !completedReview) {
       setRequestStatus("error");
       return;
     }
@@ -515,19 +680,24 @@ export function CreateWorkspace() {
     }
     setRequestStatus("working");
     try {
-      const review = JSON.parse(
-        await readTextFile(completedReviewFile),
-      ) as {
-        document: StructuredQuestionSetDocument;
-        responses: Array<{
-          question_position: number;
-          kind: "choice" | "text" | "tokens" | "strokes" | "photo";
-          answer: Record<string, unknown>;
-        }>;
-      };
       const confirmed = await confirmCompletedWorksheetImport(
         completedWorksheetId,
-        review,
+        {
+          document: completedReview.document,
+          responses: completedReview.answer_regions.map((region) => ({
+            question_position: region.question_position,
+            kind: "photo" as const,
+            answer: {
+              source_paths: completedResponsePaths,
+              page_numbers: region.page_numbers,
+              ...(region.regions ? { regions: region.regions } : {}),
+              ...(region.transcription
+                ? { transcription: region.transcription }
+                : {}),
+              ...(region.legibility ? { legibility: region.legibility } : {}),
+            },
+          })),
+        },
         parentToken,
         `confirm-completed-${completedWorksheetId}`,
       );
@@ -535,6 +705,30 @@ export function CreateWorkspace() {
       setCompletedAttemptId(confirmed.attempt.id);
       setCompletedWorksheetStatus(confirmed.completed_worksheet.status);
       setRequestStatus("idle");
+    } catch {
+      setRequestStatus("error");
+    }
+  };
+
+  const selectCompletedReview = async (file: File | null) => {
+    setCompletedReviewFile(file);
+    setCompletedReview(null);
+    setCompletedPromptCopied(false);
+    if (!file) {
+      return;
+    }
+    try {
+      setCompletedReview(parseCompletedPaperReview(await readTextFile(file)));
+      setRequestStatus("idle");
+    } catch {
+      setRequestStatus("error");
+    }
+  };
+
+  const copyCompletedPaperPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(LOCAL_COMPLETED_PAPER_REVIEW_PROMPT);
+      setCompletedPromptCopied(true);
     } catch {
       setRequestStatus("error");
     }
@@ -588,13 +782,28 @@ export function CreateWorkspace() {
               Open grading results
             </Link>
           ) : completedWorksheetStatus === "needs_review" ? (
-            <div>
+            <div className="stacked-form">
+              <details open>
+                <summary>Prepare a local AI review JSON</summary>
+                <p>
+                  Attach the original pages to your local AI, copy this prompt,
+                  and save its JSON-only response. The prompt never asks for a
+                  storage path; this app adds the private paper reference itself.
+                </p>
+                <button
+                  className="button secondary"
+                  onClick={() => void copyCompletedPaperPrompt()}
+                  type="button"
+                >
+                  {completedPromptCopied ? "Prompt copied" : "Copy local AI prompt"}
+                </button>
+              </details>
               <label className="drop-zone compact-drop-zone">
                 <input
                   accept=".json,application/json"
                   aria-label="Reviewed completed worksheet JSON"
                   onChange={(event) =>
-                    setCompletedReviewFile(event.target.files?.[0] ?? null)
+                    void selectCompletedReview(event.target.files?.[0] ?? null)
                   }
                   type="file"
                 />
@@ -603,13 +812,39 @@ export function CreateWorkspace() {
                   {completedReviewFile?.name || "Choose reviewed paper JSON"}
                 </strong>
                 <span>
-                  It includes the confirmed questions and answer regions; answer
-                  keys stay private.
+                  The app validates question order and answer regions before
+                  creating a learning record.
                 </span>
               </label>
+              {completedReview ? (
+                <>
+                  <p className="status-pill cool">
+                    Review ready: {completedReview.document.questions.length} question
+                    {completedReview.document.questions.length === 1 ? "" : "s"} and {" "}
+                    {completedReview.answer_regions.length} answer region
+                    {completedReview.answer_regions.length === 1 ? "" : "s"}
+                  </p>
+                  <details open>
+                    <summary>Preview confirmed questions</summary>
+                    <ol>
+                      {completedReview.document.questions.map((question, index) => (
+                        <li key={question.position}>
+                          <strong>{question.prompt}</strong>
+                          <span>
+                            Page {completedReview.answer_regions[index]?.page_numbers.join(", ")}
+                            {completedReview.answer_regions[index]?.legibility
+                              ? ` · ${completedReview.answer_regions[index].legibility}`
+                              : ""}
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
+                  </details>
+                </>
+              ) : null}
               <button
                 className="button primary"
-                disabled={!completedReviewFile || requestStatus === "working"}
+                disabled={!completedReview || requestStatus === "working"}
                 onClick={() => void confirmCompletedPaper()}
                 type="button"
               >

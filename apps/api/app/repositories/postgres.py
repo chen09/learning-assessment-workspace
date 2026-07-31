@@ -3101,7 +3101,12 @@ class PostgresRepository:
                         "attempt_id": attempt_row["id"],
                         "question_id": question_row["id"],
                         "kind": response.kind.value,
-                        "answer": json.dumps(response.answer),
+                        "answer": json.dumps(
+                            {
+                                **response.answer,
+                                "source_paths": imported.response_paths,
+                            }
+                        ),
                     },
                 )
             submitted_at = datetime.now(UTC)

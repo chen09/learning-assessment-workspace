@@ -219,6 +219,144 @@ test("parent previews an AI JSON file before assigning its structured questions"
   ).toBeVisible();
 });
 
+test("parent validates a local-AI completed-paper review before submitting it", async ({
+  page,
+  request,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "The completed-paper confirmation flow runs once; responsive UI is covered separately.",
+  );
+  const apiBaseUrl = "http://127.0.0.1:8017";
+  const fixtureKey = `e2e-completed-paper-${testInfo.workerIndex}`;
+  const parentHeaders = { Authorization: "Bearer parent-fixture" };
+  const family = (await (
+    await request.post(`${apiBaseUrl}/v1/families`, {
+      headers: { ...parentHeaders, "Idempotency-Key": `${fixtureKey}-family` },
+      data: { name: "Completed paper family" },
+    })
+  ).json()) as { id: string };
+  const child = (await (
+    await request.post(`${apiBaseUrl}/v1/families/${family.id}/children`, {
+      headers: { ...parentHeaders, "Idempotency-Key": `${fixtureKey}-child` },
+      data: {
+        nickname: "Paper child",
+        grade_stage: "Junior high 1",
+        ui_language: "en",
+        pin: "123456",
+      },
+    })
+  ).json()) as { id: string };
+  const document = {
+    schema_version: "1.0",
+    question_set: {
+      title: "Completed paper review",
+      subject: "Mathematics",
+      locale: "ja",
+      difficulty: "standard",
+      source_mode: "convert",
+      estimated_minutes: 5,
+      source_summary: { fixture: true },
+    },
+    knowledge_tags: [{ code: "factorisation", label: "Factorisation" }],
+    questions: [
+      {
+        position: 1,
+        type: "handwriting",
+        prompt: "Factorise x² - 16.",
+        options: [],
+        answer_key: { reference: "(x - 4)(x + 4)" },
+        rubric: { grading_mode: "parent_review" },
+        points: 1,
+        knowledge_code: "factorisation",
+      },
+    ],
+  };
+  const review = {
+    document,
+    answer_regions: [
+      {
+        question_position: 1,
+        page_numbers: [1],
+        regions: [{ x: 0.1, y: 0.2, width: 0.7, height: 0.12 }],
+        transcription: "(x - 4)(x + 4)",
+        legibility: "clear",
+      },
+    ],
+  };
+
+  await page.goto(
+    `/parent/create/?familyId=${encodeURIComponent(family.id)}&childId=${encodeURIComponent(child.id)}`,
+  );
+  await page.getByRole("button", { name: "Grade completed paper" }).click();
+  await page.getByLabel("Completed worksheet scans").setInputFiles({
+    name: "completed-paper.jpg",
+    mimeType: "image/jpeg",
+    buffer: Buffer.from("completed-paper"),
+  });
+  const uploadResponse = page.waitForResponse(
+    (response) =>
+      response.url() === `${apiBaseUrl}/v1/completed-worksheets` &&
+      response.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "Upload for review" }).click();
+  const imported = (await (await uploadResponse).json()) as {
+    id: string;
+    response_paths: string[];
+  };
+  await request.post(`${apiBaseUrl}/v1/demo/jobs/process-next`, {
+    headers: parentHeaders,
+  });
+  await expect(
+    page.getByRole("button", { name: "Copy local AI prompt" }),
+  ).toBeVisible();
+  await page.getByLabel("Reviewed completed worksheet JSON").setInputFiles({
+    name: "completed-paper-review.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(review)),
+  });
+  await expect(
+    page.getByText("Review ready: 1 question and 1 answer region"),
+  ).toBeVisible();
+  await expect(page.getByText("Factorise x² - 16.")).toBeVisible();
+
+  const confirmRequest = page.waitForRequest(
+    (request) =>
+      request.url() ===
+        `${apiBaseUrl}/v1/completed-worksheets/${imported.id}/confirm` &&
+      request.method() === "POST",
+  );
+  const confirmResponse = page.waitForResponse(
+    (response) =>
+      response.url() ===
+        `${apiBaseUrl}/v1/completed-worksheets/${imported.id}/confirm` &&
+      response.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "Confirm and start grading" }).click();
+  const confirmationBody = JSON.parse((await confirmRequest).postData() ?? "{}") as {
+    responses: Array<{ answer: { source_paths: string[] } }>;
+  };
+  expect(confirmationBody.responses[0]?.answer.source_paths).toEqual(
+    imported.response_paths,
+  );
+  const confirmationResponse = await confirmResponse;
+  expect(
+    confirmationResponse.status(),
+    await confirmationResponse.text(),
+  ).toBe(201);
+  await expect(
+    page.getByRole("link", { name: "Open grading results" }),
+  ).toBeVisible();
+
+  // Confirmation creates a grading job. Consume this test's job so the
+  // subsequent shared-fixture flow cannot accidentally process it.
+  const processedResponse = await request.post(
+    `${apiBaseUrl}/v1/demo/jobs/process-next`,
+    { headers: parentHeaders },
+  );
+  expect(processedResponse.ok()).toBeTruthy();
+});
+
 test("an expired child session returns to PIN login and resumes the requested page", async ({
   page,
   request,
