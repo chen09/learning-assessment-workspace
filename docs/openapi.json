@@ -23,6 +23,18 @@
             "title": "Mode",
             "type": "string"
           },
+          "parent_note": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Note"
+          },
           "question_set_id": {
             "format": "uuid",
             "title": "Question Set Id",
@@ -252,6 +264,17 @@
           "mode": {
             "title": "Mode",
             "type": "string"
+          },
+          "parent_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Note"
           },
           "question_count": {
             "title": "Question Count",
@@ -654,6 +677,18 @@
             ],
             "title": "Mode",
             "type": "string"
+          },
+          "parent_note": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Note"
           },
           "time_limit_seconds": {
             "anyOf": [
@@ -2747,6 +2782,18 @@
             "title": "Family Id",
             "type": "string"
           },
+          "parent_note": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Note"
+          },
           "source_name": {
             "maxLength": 180,
             "minLength": 1,
@@ -3097,6 +3144,124 @@
           }
         },
         "summary": "Start Assignment",
+        "tags": [
+          "assignments"
+        ]
+      }
+    },
+    "/v1/assignments/{assignment_id}/stop": {
+      "post": {
+        "operationId": "stop_assignment_v1_assignments__assignment_id__stop_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assignment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Assignment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Assignment"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stop Assignment",
+        "tags": [
+          "assignments"
+        ]
+      }
+    },
+    "/v1/assignments/{assignment_id}/withdraw": {
+      "post": {
+        "operationId": "withdraw_assignment_v1_assignments__assignment_id__withdraw_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assignment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Assignment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Assignment"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Withdraw Assignment",
         "tags": [
           "assignments"
         ]
