@@ -225,6 +225,9 @@ test("parent previews an AI JSON file before assigning its structured questions"
     page.getByRole("heading", { name: "What is 3 + 3?" }),
   ).toBeVisible();
 
+  await page.getByLabel("Exam mode").check();
+  await page.getByLabel("Time limit").selectOption("15");
+
   const importResponse = page.waitForResponse(
     (response) =>
       response.url() ===
@@ -234,6 +237,8 @@ test("parent previews an AI JSON file before assigning its structured questions"
   await page.getByRole("button", { name: "Confirm and assign" }).click();
   const importedRequest = await importResponse;
   expect(importedRequest.request().postDataJSON()).toMatchObject({
+    assignment_mode: "exam",
+    time_limit_seconds: 900,
     document: {
       questions: [
         {
@@ -266,6 +271,7 @@ test("parent previews an AI JSON file before assigning its structured questions"
   await expect(
     page.getByRole("heading", { name: "What is 3 + 3?" }),
   ).toBeVisible();
+  await expect(page.locator(".exam-toggle")).toContainText("15:");
 
   await page.goto("/child/work/");
   await expect(page).toHaveURL(/\/child\/work\/\?attemptId=/);
@@ -275,6 +281,7 @@ test("parent previews an AI JSON file before assigning its structured questions"
   await expect(
     page.getByRole("heading", { name: "What is 3 + 3?" }),
   ).toBeVisible();
+  await expect(page.locator(".exam-toggle")).toContainText("15:");
 });
 
 test("parent authors one question and assigns it through the reviewed draft", async ({

@@ -5,7 +5,7 @@ import secrets
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 from urllib.parse import quote
 from uuid import UUID
 
@@ -221,6 +221,8 @@ class PostgresRepository:
         source_name: str,
         parent_id: str,
         assign: bool = True,
+        assignment_mode: Literal["practice", "exam"] = "practice",
+        time_limit_seconds: int | None = None,
     ) -> ImportResult:
         return await import_question_set(
             document,
@@ -231,6 +233,8 @@ class PostgresRepository:
             confirm=True,
             assign=assign,
             parent_id=_uuid(parent_id),
+            assignment_mode=assignment_mode,
+            time_limit_seconds=time_limit_seconds,
         )
 
     async def close(self) -> None:

@@ -196,6 +196,24 @@ describe("WorksheetWorkbench", () => {
     ).toBeInTheDocument();
   });
 
+  it("uses the parent-selected exam timer and does not let the child change it", async () => {
+    mocks.startAssignment.mockResolvedValue({
+      ...assignmentWork,
+      assignment: {
+        ...assignmentWork.assignment,
+        mode: "exam",
+        time_limit_seconds: 900,
+      },
+    });
+
+    render(<WorksheetWorkbench />);
+
+    expect(await screen.findByText("15:00")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "15:00" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("submits only the current answer and keeps the rest of the attempt open", async () => {
     render(<WorksheetWorkbench />);
 

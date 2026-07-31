@@ -264,6 +264,11 @@ describe("CreateWorkspace", () => {
       screen.getByRole("heading", { name: "If it rains, stay home." }),
     ).toBeInTheDocument();
 
+    fireEvent.click(screen.getByLabelText("Exam mode"));
+    fireEvent.change(screen.getByLabelText("Time limit"), {
+      target: { value: "30" },
+    });
+
     fireEvent.click(screen.getByRole("button", { name: "Confirm and assign" }));
 
     await waitFor(() => {
@@ -272,6 +277,8 @@ describe("CreateWorkspace", () => {
           family_id: "family-1",
           child_id: "child-1",
           source_name: "lesson-2.json",
+          assignment_mode: "exam",
+          time_limit_seconds: 1800,
           document: expect.objectContaining({
             questions: [
               expect.objectContaining({

@@ -1094,10 +1094,8 @@ function WorksheetWorkbenchContent() {
           <h2>{title}</h2>
         </div>
         <div className="work-status">
-          <button
+          <span
             className={examMode ? "exam-toggle active" : "exam-toggle"}
-            onClick={() => setExamMode((current) => !current)}
-            type="button"
           >
             <Clock3 size={15} />
             {examMode
@@ -1105,7 +1103,7 @@ function WorksheetWorkbenchContent() {
                   secondsRemaining % 60,
                 ).padStart(2, "0")}`
               : t("worksheet.practiceMode")}
-          </button>
+          </span>
           <span
             className={`save-state ${saveStatus}`}
             aria-live="polite"

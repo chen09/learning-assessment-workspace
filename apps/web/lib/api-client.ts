@@ -1131,6 +1131,8 @@ export async function importStructuredQuestionSet(
     family_id: string;
     child_id: string;
     source_name: string;
+    assignment_mode: "practice" | "exam";
+    time_limit_seconds: number | null;
     document: StructuredQuestionSetDocument;
   },
   parentToken: string,
