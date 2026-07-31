@@ -10,6 +10,8 @@ import {
   getFamilyHistory,
   type HistoryItem,
   getParentAccessToken,
+  stopAssignment,
+  withdrawAssignment,
 } from "@/lib/api-client";
 
 type LoadState = "loading" | "ready" | "missing" | "error";
@@ -18,6 +20,10 @@ export default function ParentHistoryPage() {
   const [items, setItems] = useState<HistoryItem[]>([]);
   const [childFilter, setChildFilter] = useState("all");
   const [loadState, setLoadState] = useState<LoadState>("loading");
+  const [actionAssignmentId, setActionAssignmentId] = useState<string | null>(
+    null,
+  );
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -69,6 +75,35 @@ export default function ParentHistoryPage() {
       ? items
       : items.filter((item) => item.child_id === childFilter);
 
+  const updateAssignmentStatus = async (
+    item: HistoryItem,
+    action: "withdraw" | "stop",
+  ) => {
+    setActionAssignmentId(item.assignment_id);
+    setActionError(null);
+    try {
+      const token = await getParentAccessToken();
+      if (!token) {
+        throw new Error("missing parent session");
+      }
+      const assignment =
+        action === "withdraw"
+          ? await withdrawAssignment(item.assignment_id, token)
+          : await stopAssignment(item.assignment_id, token);
+      setItems((current) =>
+        current.map((candidate) =>
+          candidate.assignment_id === item.assignment_id
+            ? { ...candidate, status: assignment.status }
+            : candidate,
+        ),
+      );
+    } catch {
+      setActionError("The assignment status could not be updated. Please retry.");
+    } finally {
+      setActionAssignmentId(null);
+    }
+  };
+
   return (
     <AppShell currentPath="/parent/history/" role="parent">
       <header className="page-header">
@@ -112,6 +147,7 @@ export default function ParentHistoryPage() {
         {loadState === "ready" && visibleItems.length === 0 ? (
           <p>No family history yet.</p>
         ) : null}
+        {actionError ? <p role="alert">{actionError}</p> : null}
         {loadState === "ready"
           ? visibleItems.map((item) => (
               <article key={item.assignment_id}>
@@ -147,6 +183,26 @@ export default function ParentHistoryPage() {
                 >
                   {item.status.replaceAll("_", " ")}
                 </span>
+                {item.status === "assigned" ? (
+                  <button
+                    className="record-action"
+                    disabled={actionAssignmentId === item.assignment_id}
+                    onClick={() => void updateAssignmentStatus(item, "withdraw")}
+                    type="button"
+                  >
+                    Withdraw assignment
+                  </button>
+                ) : null}
+                {item.status === "in_progress" ? (
+                  <button
+                    className="record-action"
+                    disabled={actionAssignmentId === item.assignment_id}
+                    onClick={() => void updateAssignmentStatus(item, "stop")}
+                    type="button"
+                  >
+                    Stop assignment
+                  </button>
+                ) : null}
                 {item.attempt_id ? (
                   <Link
                     aria-label={`Open ${item.title}`}

@@ -9,8 +9,9 @@ from app.api.dependencies import (
     require_child,
     require_parent,
 )
-from app.domain.errors import NotFoundError
+from app.domain.errors import AssignmentStatusConflict, NotFoundError
 from app.domain.models import (
+    Assignment,
     AssignmentWork,
     ChildAssignmentSummary,
     ChildSessionClaims,
@@ -59,3 +60,43 @@ async def start_assignment(
             detail="The assignment is not available to this child.",
         )
     return work
+
+
+@router.post("/{assignment_id}/withdraw", response_model=Assignment)
+async def withdraw_assignment(
+    assignment_id: UUID,
+    repository: Annotated[Repository, Depends(get_repository)],
+    parent_id: Annotated[str, Depends(require_parent)],
+) -> Assignment:
+    try:
+        return await repository.withdraw_assignment(str(assignment_id), parent_id)
+    except AssignmentStatusConflict as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "assignment_cannot_be_withdrawn"},
+        ) from error
+    except NotFoundError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The assignment is not available.",
+        ) from error
+
+
+@router.post("/{assignment_id}/stop", response_model=Assignment)
+async def stop_assignment(
+    assignment_id: UUID,
+    repository: Annotated[Repository, Depends(get_repository)],
+    parent_id: Annotated[str, Depends(require_parent)],
+) -> Assignment:
+    try:
+        return await repository.stop_assignment(str(assignment_id), parent_id)
+    except AssignmentStatusConflict as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "assignment_cannot_be_stopped"},
+        ) from error
+    except NotFoundError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The assignment is not available.",
+        ) from error

@@ -140,6 +140,11 @@ function ChildHomeContent() {
                 : t("childHome.practiceMode")}
             </p>
             <h2>{current.title}</h2>
+            {current.parent_note ? (
+              <p className="assignment-parent-note">
+                {current.parent_note}
+              </p>
+            ) : null}
             <div className="continue-meta">
               <span>
                 <BookOpen size={16} />{" "}

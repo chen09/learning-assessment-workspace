@@ -67,10 +67,103 @@ def test_child_pin_opens_a_scoped_assignment_session() -> None:
             "status": "in_progress",
             "mode": "practice",
             "time_limit_seconds": None,
+            "parent_note": None,
             "question_count": 3,
             "latest_attempt_id": work["attempt"]["id"],
         }
     ]
+
+
+def test_parent_can_withdraw_unstarted_assignment_before_child_can_open_it() -> None:
+    client = TestClient(create_app())
+    fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+    session = client.post(
+        f"/v1/children/{fixture['child']['id']}/sessions",
+        json={"pin": "123456"},
+    ).json()
+    child_headers = {"Authorization": f"Bearer {session['access_token']}"}
+
+    withdrawn = client.post(
+        f"/v1/assignments/{fixture['assignment']['id']}/withdraw",
+        headers=PARENT_HEADERS,
+    )
+    unavailable = client.post(
+        f"/v1/assignments/{fixture['assignment']['id']}/start",
+        headers=child_headers,
+    )
+    assignments = client.get("/v1/assignments", headers=child_headers)
+
+    assert withdrawn.status_code == 200
+    assert withdrawn.json()["status"] == "withdrawn"
+    assert unavailable.status_code == 404
+    assert assignments.json() == []
+
+
+def test_parent_can_stop_started_assignment_without_allowing_more_changes() -> None:
+    client = TestClient(create_app())
+    fixture, child_headers, work = start_fixture_assignment(client)
+    attempt_id = work["attempt"]["id"]
+    question_id = work["questions"][0]["id"]
+    saved = client.put(
+        f"/v1/attempts/{attempt_id}/responses/{question_id}",
+        headers=child_headers,
+        json={
+            "kind": "choice",
+            "answer": {"choices": [0]},
+            "expected_version": 0,
+        },
+    )
+
+    stopped = client.post(
+        f"/v1/assignments/{fixture['assignment']['id']}/stop",
+        headers=PARENT_HEADERS,
+    )
+    later_save = client.put(
+        f"/v1/attempts/{attempt_id}/responses/{question_id}",
+        headers=child_headers,
+        json={
+            "kind": "choice",
+            "answer": {"choices": [1]},
+            "expected_version": 1,
+        },
+    )
+    later_question_submit = client.post(
+        f"/v1/attempts/{attempt_id}/questions/{question_id}/submit",
+        headers={**child_headers, "Idempotency-Key": "stopped-question-submit"},
+    )
+    later_attempt_submit = client.post(
+        f"/v1/attempts/{attempt_id}/submit",
+        headers={**child_headers, "Idempotency-Key": "stopped-attempt-submit"},
+    )
+    reopened = client.get(
+        f"/v1/attempts/{attempt_id}/work",
+        headers=child_headers,
+    )
+
+    assert saved.status_code == 200
+    assert stopped.status_code == 200
+    assert stopped.json()["status"] == "stopped"
+    assert later_save.status_code == 404
+    assert later_question_submit.status_code == 404
+    assert later_attempt_submit.status_code == 404
+    assert reopened.status_code == 404
+
+
+def test_parent_can_attach_a_short_note_when_assigning_work() -> None:
+    client = TestClient(create_app())
+    fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+
+    assigned = client.post(
+        f"/v1/question-sets/{fixture['question_set']['id']}/assignments",
+        headers={**PARENT_HEADERS, "Idempotency-Key": "assign-with-note"},
+        json={
+            "child_id": fixture["child"]["id"],
+            "parent_note": "先独立完成，再和我一起检查。",
+        },
+    )
+
+    assert assigned.status_code == 201
+    assert assigned.json()["parent_note"] == "先独立完成，再和我一起检查。"
 
 
 def test_five_wrong_child_pins_lock_entry_for_five_minutes() -> None:

@@ -287,6 +287,7 @@ export function CreateWorkspace() {
     useState<AssignmentMode>("practice");
   const [assignmentDurationMinutes, setAssignmentDurationMinutes] =
     useState("30");
+  const [assignmentNote, setAssignmentNote] = useState("");
   const [manualQuestionPrompt, setManualQuestionPrompt] = useState("");
   const [manualOptions, setManualOptions] = useState("");
   const [manualAnswer, setManualAnswer] = useState("");
@@ -818,6 +819,7 @@ export function CreateWorkspace() {
             source_name: structuredFile?.name ?? "Manual question",
             assignment_mode: assignmentMode,
             time_limit_seconds: assignmentTimeLimitSeconds,
+            parent_note: assignmentNote.trim() || null,
             document: structuredDocument,
           },
           parentToken,
@@ -857,6 +859,7 @@ export function CreateWorkspace() {
         {
           mode: assignmentMode,
           time_limit_seconds: assignmentTimeLimitSeconds,
+          parent_note: assignmentNote.trim() || null,
         },
       );
       setAssignmentId(assignment.id);
@@ -1569,6 +1572,18 @@ export function CreateWorkspace() {
                     </select>
                   </label>
                 ) : null}
+                <label className="assignment-note">
+                  A note for your child (optional)
+                  <textarea
+                    aria-label="A note for your child"
+                    maxLength={300}
+                    onChange={(event) => setAssignmentNote(event.target.value)}
+                    placeholder="For example: Try this on your own first."
+                    rows={2}
+                    value={assignmentNote}
+                  />
+                  <span>{assignmentNote.length}/300</span>
+                </label>
               </fieldset>
             ) : null}
           </div>
