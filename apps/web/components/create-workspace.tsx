@@ -273,6 +273,7 @@ export function CreateWorkspace() {
   const [structuredDocument, setStructuredDocument] =
     useState<StructuredQuestionSetDocument | null>(null);
   const [structuredChecksum, setStructuredChecksum] = useState("");
+  const [structuredImportKey, setStructuredImportKey] = useState("");
   const [manualTitle, setManualTitle] = useState("New practice");
   const [manualSubject, setManualSubject] = useState("Mixed practice");
   const [manualLocale, setManualLocale] = useState<"zh" | "ja" | "en">("en");
@@ -531,6 +532,7 @@ export function CreateWorkspace() {
         );
         setStructuredDocument(document);
         setStructuredChecksum(preview.checksum);
+        setStructuredImportKey(crypto.randomUUID());
         setDraftQuestions(
           preview.questions.map((question) => ({
             id: `preview-${question.position}`,
@@ -603,6 +605,7 @@ export function CreateWorkspace() {
         const preview = await previewStructuredQuestionSet(document, parentToken);
         setStructuredDocument(document);
         setStructuredChecksum(preview.checksum);
+        setStructuredImportKey(crypto.randomUUID());
         setDraftQuestions(
           preview.questions.map((question) => ({
             id: `preview-${question.position}`,
@@ -729,7 +732,8 @@ export function CreateWorkspace() {
         !familyId ||
         !childId ||
         !structuredDocument ||
-        !structuredChecksum
+        !structuredChecksum ||
+        !structuredImportKey
       ) {
         setRequestStatus("error");
         return;
@@ -749,7 +753,7 @@ export function CreateWorkspace() {
             document: structuredDocument,
           },
           parentToken,
-          `${mode}-${structuredChecksum}-${childId}`,
+          `${mode}-${structuredImportKey}-${childId}`,
         );
         setQuestionSetId(imported.question_set_id);
         setAssignmentId(imported.assignment_id);
@@ -899,6 +903,7 @@ export function CreateWorkspace() {
     );
     setEditingQuestionId(null);
     setEditError("");
+    setStructuredImportKey(crypto.randomUUID());
   };
 
   const removeStructuredQuestion = (questionId: string) => {
@@ -928,6 +933,96 @@ export function CreateWorkspace() {
       setEditingQuestionId(null);
       setEditError("");
     }
+    setStructuredImportKey(crypto.randomUUID());
+  };
+
+  const moveStructuredQuestion = (questionId: string, direction: -1 | 1) => {
+    if (!structuredDocument) {
+      return;
+    }
+    const currentIndex = draftQuestions.findIndex(
+      (candidate) => candidate.id === questionId,
+    );
+    const targetIndex = currentIndex + direction;
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= draftQuestions.length) {
+      return;
+    }
+    const currentQuestion = draftQuestions[currentIndex];
+    const targetQuestion = draftQuestions[targetIndex];
+    setDraftQuestions((current) => {
+      const next = [...current];
+      [next[currentIndex], next[targetIndex]] = [
+        next[targetIndex],
+        next[currentIndex],
+      ];
+      return next.map((candidate, index) => ({ ...candidate, position: index + 1 }));
+    });
+    setStructuredDocument((current) =>
+      current
+        ? {
+            ...current,
+            questions: current.questions
+              .map((candidate) =>
+                candidate.position === currentQuestion.position
+                  ? { ...candidate, position: targetQuestion.position }
+                  : candidate.position === targetQuestion.position
+                    ? { ...candidate, position: currentQuestion.position }
+                    : candidate,
+              )
+              .sort((left, right) => left.position - right.position),
+          }
+        : current,
+    );
+    setStructuredImportKey(crypto.randomUUID());
+  };
+
+  const duplicateStructuredQuestion = (questionId: string) => {
+    if (!structuredDocument) {
+      return;
+    }
+    const currentIndex = draftQuestions.findIndex(
+      (candidate) => candidate.id === questionId,
+    );
+    if (currentIndex < 0) {
+      return;
+    }
+    const question = draftQuestions[currentIndex];
+    const copiedPrompt = `${question.prompt} (copy)`;
+    setDraftQuestions((current) => {
+      const next = [...current];
+      next.splice(currentIndex + 1, 0, {
+        ...question,
+        id: `copy-${crypto.randomUUID()}`,
+        prompt: copiedPrompt,
+        options: question.options ? [...question.options] : null,
+        answer_key: { ...question.answer_key },
+      });
+      return next.map((candidate, index) => ({ ...candidate, position: index + 1 }));
+    });
+    setStructuredDocument((current) =>
+      current
+        ? {
+            ...current,
+            questions: current.questions
+              .flatMap((candidate) =>
+                candidate.position === question.position
+                  ? [
+                      candidate,
+                      {
+                        ...candidate,
+                        prompt: copiedPrompt,
+                        options: [...candidate.options],
+                        answer_key: { ...candidate.answer_key },
+                        rubric: { ...candidate.rubric },
+                      },
+                    ]
+                  : [candidate],
+              )
+              .map((candidate, index) => ({ ...candidate, position: index + 1 })),
+          }
+        : current,
+    );
+    setStructuredImportKey(crypto.randomUUID());
   };
 
   const confirmCompletedPaper = async () => {
@@ -1286,6 +1381,39 @@ export function CreateWorkspace() {
               editingQuestionId !== question.id ? (
                 <div className="draft-question-actions">
                   <button
+                    aria-label={`Move question ${index + 1} up`}
+                    className="quiet-link"
+                    disabled={index === 0}
+                    onClick={() => moveStructuredQuestion(question.id, -1)}
+                    type="button"
+                  >
+                    Move up
+                  </button>
+                  <button
+                    aria-label={`Move question ${index + 1} down`}
+                    className="quiet-link"
+                    disabled={
+                      index ===
+                      (draftQuestions.length > 0
+                        ? draftQuestions.length
+                        : sampleQuestions.length) -
+                        1
+                    }
+                    onClick={() => moveStructuredQuestion(question.id, 1)}
+                    type="button"
+                  >
+                    Move down
+                  </button>
+                  <button
+                    aria-label={`Duplicate question ${index + 1}`}
+                    className="quiet-link"
+                    onClick={() => duplicateStructuredQuestion(question.id)}
+                    type="button"
+                  >
+                    Duplicate
+                  </button>
+                  <button
+                    aria-label={`Edit question ${index + 1}`}
                     className="quiet-link"
                     onClick={() => beginStructuredQuestionEdit(question)}
                     type="button"

@@ -159,6 +159,10 @@ describe("CreateWorkspace", () => {
   });
 
   it("previews an AI JSON file before the confirmed data is imported and assigned", async () => {
+    const randomUUID = vi
+      .spyOn(globalThis.crypto, "randomUUID")
+      .mockReturnValueOnce("preview-import-key")
+      .mockReturnValueOnce("edited-import-key");
     const document = {
       schema_version: "1.0",
       question_set: {
@@ -241,7 +245,7 @@ describe("CreateWorkspace", () => {
     ).toBeInTheDocument();
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Edit question" }),
+      screen.getByRole("button", { name: "Edit question 1" }),
     );
     fireEvent.change(screen.getByLabelText("Question wording"), {
       target: { value: "If it rains, stay home." },
@@ -280,9 +284,10 @@ describe("CreateWorkspace", () => {
           }),
         }),
         "parent-token",
-        expect.stringContaining("structured-"),
+        "structured-edited-import-key-child-1",
       );
     });
+    randomUUID.mockRestore();
     expect(
       await screen.findByText("Confirmed and assigned"),
     ).toBeInTheDocument();
@@ -374,7 +379,7 @@ describe("CreateWorkspace", () => {
     });
   });
 
-  it("removes an extra AI question and reorders the remaining draft before assignment", async () => {
+  it("copies, reorders, and removes AI questions before assignment", async () => {
     const document = {
       schema_version: "1.0" as const,
       question_set: {
@@ -447,12 +452,18 @@ describe("CreateWorkspace", () => {
     fireEvent.click(screen.getByRole("button", { name: "Preview questions" }));
     await screen.findByRole("heading", { name: "Remove this mistaken extraction." });
 
+    fireEvent.click(screen.getByRole("button", { name: "Duplicate question 1" }));
+    expect(
+      screen.getByRole("heading", { name: "Keep this question. (copy)" }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Move question 3 up" }));
     fireEvent.click(screen.getByRole("button", { name: "Remove question 2" }));
     expect(
       screen.queryByRole("heading", { name: "Remove this mistaken extraction." }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText("1 questions · validated JSON · answers stay private")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Remove question 1" })).toBeDisabled();
+    expect(
+      screen.getByText("2 questions · validated JSON · answers stay private"),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Confirm and assign" }));
     await waitFor(() => {
@@ -463,6 +474,10 @@ describe("CreateWorkspace", () => {
               expect.objectContaining({
                 position: 1,
                 prompt: "Keep this question.",
+              }),
+              expect.objectContaining({
+                position: 2,
+                prompt: "Keep this question. (copy)",
               }),
             ],
           }),
