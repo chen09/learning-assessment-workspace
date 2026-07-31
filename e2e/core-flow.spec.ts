@@ -198,12 +198,17 @@ test("parent previews an AI JSON file before assigning its structured questions"
     page.getByRole("heading", { name: "Remove this extra extraction." }),
   ).toBeVisible();
 
+  await page.getByRole("button", { name: "Duplicate question 1" }).click();
+  await expect(
+    page.getByRole("heading", { name: "What is 2 + 2? (copy)" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Move question 3 up" }).click();
   await page.getByRole("button", { name: "Remove question 2" }).click();
   await expect(
     page.getByRole("heading", { name: "Remove this extra extraction." }),
   ).not.toBeVisible();
 
-  await page.getByRole("button", { name: "Edit question" }).click();
+  await page.getByRole("button", { name: "Edit question 1" }).click();
   await page
     .getByRole("textbox", { name: "Question wording" })
     .fill("What is 3 + 3?");
@@ -238,6 +243,10 @@ test("parent previews an AI JSON file before assigning its structured questions"
           options: ["5", "6", "7"],
           answer_key: { choice: 1 },
         },
+        {
+          position: 2,
+          prompt: "What is 2 + 2? (copy)",
+        },
       ],
     },
   });
@@ -253,7 +262,7 @@ test("parent previews an AI JSON file before assigning its structured questions"
     await page.getByRole("button", { name: digit, exact: true }).click();
   }
   await page.getByRole("button", { name: "Open my work" }).click();
-  await expect(page.getByText("0/1", { exact: true })).toBeVisible();
+  await expect(page.getByText("0/2", { exact: true })).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "What is 3 + 3?" }),
   ).toBeVisible();
