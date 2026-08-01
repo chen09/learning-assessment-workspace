@@ -52,6 +52,7 @@ export default defineConfig({
       // behind the desktop browser engine.
       name: "ipad-webkit",
       testMatch: "core-flow.spec.ts",
+      grep: /parent creation reaches child grading and correction through the API/,
       use: { ...devices["iPad (gen 7)"], browserName: "webkit" },
     },
   ],
