@@ -891,6 +891,13 @@ describe("CreateWorkspace", () => {
     expect(
       screen.queryByLabelText("Correct word order for question 5"),
     ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add handwritten question" }));
+    fireEvent.change(screen.getByLabelText("Question 5 wording"), {
+      target: { value: "Explain your factorisation." },
+    });
+    fireEvent.change(screen.getByLabelText("Reference answer for question 5"), {
+      target: { value: "Show the two factors." },
+    });
     fireEvent.click(
       screen.getByRole("button", { name: "Confirm and start grading" }),
     );
@@ -913,6 +920,10 @@ describe("CreateWorkspace", () => {
               }),
               expect.objectContaining({
                 answer_key: { choices: [1, 2] },
+              }),
+              expect.objectContaining({
+                prompt: "Explain your factorisation.",
+                answer_key: { reference: "Show the two factors." },
               }),
             ],
           }),
@@ -964,6 +975,17 @@ describe("CreateWorkspace", () => {
                 page_numbers: [1],
                 transcription: "She walks to school. They walk to school.",
                 legibility: "clear",
+              },
+            },
+            {
+              question_position: 5,
+              kind: "photo",
+              answer: {
+                source_paths: [
+                  "family-1/completed-paper/responses-completed-paper.jpg",
+                ],
+                page_numbers: [1],
+                legibility: "uncertain",
               },
             },
           ],

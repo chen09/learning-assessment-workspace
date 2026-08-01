@@ -2783,6 +2783,10 @@ button {
   cursor: not-allowed;
 }
 
+.completed-paper-add-question {
+  margin-top: 0.9rem;
+}
+
 @media (max-width: 48rem) {
   .completed-paper-region-fields {
     grid-template-columns: 1fr;

@@ -1343,6 +1343,43 @@ function CreateWorkspaceContent() {
     });
   };
 
+  const addCompletedPaperHandwritingQuestion = () => {
+    setCompletedReview((current) => {
+      if (!current) {
+        return current;
+      }
+      const position = current.document.questions.length + 1;
+      return {
+        ...current,
+        document: {
+          ...current.document,
+          questions: [
+            ...current.document.questions,
+            {
+              position,
+              type: "handwriting",
+              prompt: "",
+              options: [],
+              answer_key: { reference: "" },
+              rubric: { grading_mode: "parent_review" },
+              points: 1,
+              knowledge_code:
+                current.document.knowledge_tags[0]?.code ?? "parent-added",
+            },
+          ],
+        },
+        answer_regions: [
+          ...current.answer_regions,
+          {
+            question_position: position,
+            page_numbers: [1],
+            legibility: "uncertain",
+          },
+        ],
+      };
+    });
+  };
+
   const updateCompletedPaperAnswerRegion = (
     position: number,
     update: (region: CompletedPaperAnswerRegion) => CompletedPaperAnswerRegion,
@@ -1767,6 +1804,13 @@ function CreateWorkspaceContent() {
                         </li>
                       ))}
                     </ol>
+                    <button
+                      className="button secondary completed-paper-add-question"
+                      onClick={addCompletedPaperHandwritingQuestion}
+                      type="button"
+                    >
+                      {t("completedPaper.addHandwritingQuestion")}
+                    </button>
                   </details>
                 </>
               ) : null}

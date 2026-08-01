@@ -811,6 +811,11 @@ test("parent validates a local-AI completed-paper review before submitting it", 
   await expect(
     page.getByLabel("Correct word order for question 5"),
   ).toHaveCount(0);
+  await page.getByRole("button", { name: "Add handwritten question" }).click();
+  await page.getByLabel("Question 5 wording").fill("Explain your factorisation.");
+  await page
+    .getByLabel("Reference answer for question 5")
+    .fill("Show the two factors.");
   await page.getByLabel("Answer page numbers for question 1").fill("2");
   await page
     .getByLabel("Answer transcription for question 1")
@@ -859,10 +864,14 @@ test("parent validates a local-AI completed-paper review before submitting it", 
   expect(confirmationBody.document.questions[3]).toMatchObject({
     answer_key: { choices: [1, 2] },
   });
-  expect(confirmationBody.document.questions).toHaveLength(4);
-  expect(confirmationBody.responses).toHaveLength(4);
+  expect(confirmationBody.document.questions).toHaveLength(5);
+  expect(confirmationBody.document.questions[4]).toMatchObject({
+    prompt: "Explain your factorisation.",
+    answer_key: { reference: "Show the two factors." },
+  });
+  expect(confirmationBody.responses).toHaveLength(5);
   expect(confirmationBody.responses.map((response) => response.question_position)).toEqual(
-    [1, 2, 3, 4],
+    [1, 2, 3, 4, 5],
   );
   expect(confirmationBody.responses[0]?.answer.source_paths).toEqual(
     imported.response_paths,
