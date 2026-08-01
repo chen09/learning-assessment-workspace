@@ -1,3 +1,4 @@
+import json
 import os
 from uuid import uuid4
 
@@ -17,10 +18,12 @@ from app.domain.models import (
     CreateDeletionRequest,
     CreateFamilyInvitationRequest,
     CreateImportRequest,
+    CreateLibrarySubmissionRequest,
     CreateUploadIntentRequest,
     ImportPurpose,
     ParentDecisionRequest,
     ResponseKind,
+    ReviewLibrarySubmissionRequest,
     SaveResponseRequest,
     UploadBucket,
 )
@@ -647,3 +650,135 @@ async def test_postgres_vertical_flow_and_family_isolation() -> None:
             )
         finally:
             await cleanup.close()
+
+
+@pytest.mark.asyncio
+async def test_public_library_copy_keeps_answers_private_and_creates_a_standalone_set() -> None:
+    """A public item is anonymous, but its copied family set remains gradeable."""
+    assert DATABASE_URL is not None
+    asyncpg_url = DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://", 1)
+    parent_id = uuid4()
+    source_family_id = uuid4()
+    destination_family_id = uuid4()
+    source_set_id = uuid4()
+    connection = await asyncpg.connect(asyncpg_url)
+    repository = PostgresRepository(
+        DATABASE_URL,
+        supabase_url="http://127.0.0.1:54321",
+        service_role_key="",
+    )
+    try:
+        await connection.execute(
+            """
+            insert into auth.users (
+              id, instance_id, aud, role, email, encrypted_password,
+              email_confirmed_at, created_at, updated_at
+            ) values (
+              $1, '00000000-0000-0000-0000-000000000000',
+              'authenticated', 'authenticated', $2, '', now(), now(), now()
+            )
+            """,
+            parent_id,
+            f"{parent_id}@example.test",
+        )
+        await connection.executemany(
+            "insert into public.families (id, name, created_by) values ($1, $2, $3)",
+            [
+                (source_family_id, "Library source", parent_id),
+                (destination_family_id, "Library destination", parent_id),
+            ],
+        )
+        await connection.executemany(
+            "insert into public.family_members (family_id, user_id) values ($1, $2)",
+            [(source_family_id, parent_id), (destination_family_id, parent_id)],
+        )
+        await connection.execute(
+            """
+            insert into public.question_sets (
+              id, family_id, created_by, title, subject, status, source_summary,
+              confirmed_at
+            ) values ($1, $2, $3, 'Published algebra', 'Mathematics', 'confirmed',
+              $4::jsonb, now())
+            """,
+            source_set_id,
+            source_family_id,
+            parent_id,
+            json.dumps({"source_material_title": "Private algebra book"}),
+        )
+        await connection.execute(
+            """
+            insert into public.questions (
+              family_id, question_set_id, position, type, prompt, options,
+              answer_key, rubric, points
+            ) values ($1, $2, 1, 'typed_text', $3::jsonb, null, $4::jsonb, $5::jsonb, 2)
+            """,
+            source_family_id,
+            source_set_id,
+            json.dumps({"ja": "x² - 9 を因数分解しなさい。"}),
+            json.dumps({"text": "(x - 3)(x + 3)"}),
+            json.dumps({"grading_mode": "exact"}),
+        )
+        submission = await repository.create_library_submission(
+            CreateLibrarySubmissionRequest(
+                family_id=source_family_id,
+                question_set_id=source_set_id,
+                rights_confirmed=True,
+                privacy_confirmed=True,
+            ),
+            "integration-public-library-submit",
+            str(parent_id),
+        )
+        approved = await repository.review_library_submission(
+            str(submission.id),
+            ReviewLibrarySubmissionRequest(decision="approve"),
+            "integration-public-library-approve",
+            str(parent_id),
+        )
+        public_items = await repository.list_public_library_items()
+        copied = await repository.copy_public_library_item(
+            str(public_items[0].id),
+            destination_family_id,
+            "integration-public-library-copy",
+            str(parent_id),
+        )
+        repeated = await repository.copy_public_library_item(
+            str(public_items[0].id),
+            destination_family_id,
+            "integration-public-library-copy",
+            str(parent_id),
+        )
+
+        public_snapshot = await connection.fetchval(
+            "select snapshot from public.library_items where id = $1",
+            public_items[0].id,
+        )
+        private_snapshot = await connection.fetchval(
+            "select content from private.library_item_private_content where library_item_id = $1",
+            public_items[0].id,
+        )
+        copied_question = await connection.fetchrow(
+            "select answer_key, prompt from public.questions where question_set_id = $1",
+            copied.question_set_id,
+        )
+
+        assert approved.status == "published"
+        assert public_items[0].title == "Published algebra"
+        assert "answer_key" not in json.dumps(public_snapshot)
+        assert "Private algebra book" not in json.dumps(public_snapshot)
+        assert private_snapshot["questions"][0]["answer_key"] == {
+            "text": "(x - 3)(x + 3)"
+        }
+        assert copied.family_id == destination_family_id
+        assert copied.reused_existing is False
+        assert repeated.question_set_id == copied.question_set_id
+        assert repeated.reused_existing is True
+        assert copied_question["answer_key"] == {"text": "(x - 3)(x + 3)"}
+        assert copied_question["prompt"] == {"ja": "x² - 9 を因数分解しなさい。"}
+    finally:
+        await repository.close()
+        await connection.execute(
+            "delete from public.families where id = any($1::uuid[])",
+            [source_family_id, destination_family_id],
+        )
+        await connection.execute("delete from auth.users where id = $1", parent_id)
+        await connection.close()

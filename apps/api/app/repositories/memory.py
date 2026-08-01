@@ -53,6 +53,8 @@ from app.domain.models import (
     ParentHistoryItem,
     ParentReviewItem,
     PrintableAssignment,
+    PublicLibraryCopy,
+    PublicLibraryItem,
     Question,
     QuestionResult,
     QuestionSet,
@@ -133,6 +135,7 @@ class MemoryRepository:
         self.library_submissions: dict[str, LibrarySubmission] = {}
         self.library_idempotency: dict[tuple[str, str], str] = {}
         self.library_review_idempotency: dict[tuple[str, str], str] = {}
+        self.library_copy_idempotency: dict[tuple[str, str], str] = {}
         self.library_items: dict[str, dict[str, object]] = {}
         self.parent_decisions: dict[str, ParentDecision] = {}
         self.family_invitations: dict[str, FamilyInvitation] = {}
@@ -1772,6 +1775,170 @@ class MemoryRepository:
             reverse=True,
         )
 
+    async def list_public_library_items(self) -> list[PublicLibraryItem]:
+        items: list[PublicLibraryItem] = []
+        for submission_id, item in self.library_items.items():
+            submission = self.library_submissions.get(submission_id)
+            if submission is None or submission.status != "published":
+                continue
+            metadata = item["metadata"]
+            item_id = item.get("id")
+            revision = item.get("revision")
+            if (
+                not isinstance(metadata, dict)
+                or not isinstance(item_id, UUID)
+                or not isinstance(revision, int)
+            ):
+                continue
+            items.append(
+                PublicLibraryItem(
+                    id=item_id,
+                    title=str(metadata["title"]),
+                    subject=str(metadata["subject"]),
+                    question_count=int(metadata["question_count"]),
+                    revision=revision,
+                    published_at=submission.published_at or submission.created_at,
+                )
+            )
+        return sorted(items, key=lambda item: item.published_at, reverse=True)
+
+    async def copy_public_library_item(
+        self,
+        library_item_id: str,
+        family_id: UUID,
+        idempotency_key: str,
+        parent_id: str,
+    ) -> PublicLibraryCopy:
+        family_key = str(family_id)
+        if (
+            family_key not in self.families
+            or parent_id not in self.family_parents.get(family_key, set())
+        ):
+            raise NotFoundError
+
+        item = next(
+            (
+                candidate
+                for candidate in self.library_items.values()
+                if str(candidate["id"]) == library_item_id
+            ),
+            None,
+        )
+        if item is None:
+            raise NotFoundError
+        item_id = item.get("id")
+        revision = item.get("revision")
+        if not isinstance(item_id, UUID) or not isinstance(revision, int):
+            raise NotFoundError
+        submission = self.library_submissions.get(str(item["submission_id"]))
+        if submission is None or submission.status != "published":
+            raise NotFoundError
+
+        record_key = (library_item_id, idempotency_key)
+        existing_set_id = self.library_copy_idempotency.get(record_key)
+        if existing_set_id is not None:
+            question_set = self.question_sets[existing_set_id]
+            return PublicLibraryCopy(
+                library_item_id=item_id,
+                library_revision=revision,
+                question_set_id=question_set.id,
+                family_id=family_id,
+                question_count=sum(
+                    question.question_set_id == question_set.id
+                    for question in self.questions.values()
+                ),
+                reused_existing=True,
+            )
+
+        existing_question_set = next(
+            (
+                question_set
+                for question_set in self.question_sets.values()
+                if question_set.family_id == family_id
+                and question_set.source_summary.get("public_library_item_id")
+                == library_item_id
+                and question_set.source_summary.get("public_library_revision") == revision
+            ),
+            None,
+        )
+        if existing_question_set is not None:
+            self.library_copy_idempotency[record_key] = str(existing_question_set.id)
+            return PublicLibraryCopy(
+                library_item_id=item_id,
+                library_revision=revision,
+                question_set_id=existing_question_set.id,
+                family_id=family_id,
+                question_count=sum(
+                    question.question_set_id == existing_question_set.id
+                    for question in self.questions.values()
+                ),
+                reused_existing=True,
+            )
+
+        private_content = item.get("private_content")
+        snapshot = item.get("snapshot")
+        if not isinstance(private_content, dict) or not isinstance(snapshot, dict):
+            raise NotFoundError
+        private_questions = private_content.get("questions")
+        public_questions = snapshot.get("questions")
+        private_question_set = private_content.get("question_set")
+        public_question_set = snapshot.get("question_set")
+        if (
+            not isinstance(private_questions, list)
+            or not isinstance(public_questions, list)
+            or not isinstance(private_question_set, dict)
+            or not isinstance(public_question_set, dict)
+            or len(private_questions) != len(public_questions)
+        ):
+            raise NotFoundError
+
+        question_set = QuestionSet(
+            family_id=family_id,
+            title=str(public_question_set["title"]),
+            subject=str(public_question_set["subject"]),
+            status=QuestionSetStatus.CONFIRMED,
+            source_summary={
+                "imported_via": "public_library_copy",
+                "public_library_item_id": library_item_id,
+                "public_library_revision": revision,
+                "question_count": len(public_questions),
+                "answer_keys_present": True,
+            },
+        )
+        self.question_sets[str(question_set.id)] = question_set
+        public_by_position = {
+            int(question["position"]): question
+            for question in public_questions
+            if isinstance(question, dict)
+        }
+        for private_question in private_questions:
+            if not isinstance(private_question, dict):
+                raise NotFoundError
+            position = int(private_question["position"])
+            public_question = public_by_position.get(position)
+            if public_question is None:
+                raise NotFoundError
+            question = Question(
+                family_id=family_id,
+                question_set_id=question_set.id,
+                position=position,
+                type=private_question["type"],
+                prompt=str(public_question["prompt"]),
+                options=public_question.get("options"),
+                answer_key=private_question["answer_key"],
+                points=float(private_question["points"]),
+            )
+            self.questions[str(question.id)] = question
+
+        self.library_copy_idempotency[record_key] = str(question_set.id)
+        return PublicLibraryCopy(
+            library_item_id=item_id,
+            library_revision=revision,
+            question_set_id=question_set.id,
+            family_id=family_id,
+            question_count=len(public_questions),
+        )
+
     async def confirm_question_set(
         self,
         question_set_id: str,
@@ -1953,6 +2120,9 @@ class MemoryRepository:
                 key=lambda question: question.position,
             )
             self.library_items[submission_id] = {
+                "id": uuid4(),
+                "submission_id": submission_id,
+                "revision": 1,
                 "snapshot": {
                     "schema_version": "1.0",
                     "question_set": {
@@ -1965,6 +2135,21 @@ class MemoryRepository:
                             "type": question.type.value,
                             "prompt": question.prompt,
                             "options": question.options,
+                            "points": question.points,
+                        }
+                        for question in questions
+                    ],
+                },
+                "private_content": {
+                    "schema_version": "1.0",
+                    "question_set": {
+                        "locale": "en",
+                    },
+                    "questions": [
+                        {
+                            "position": question.position,
+                            "type": question.type.value,
+                            "answer_key": question.answer_key,
                             "points": question.points,
                         }
                         for question in questions

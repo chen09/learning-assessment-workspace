@@ -667,6 +667,20 @@
         "title": "ConfirmCompletedWorksheetRequest",
         "type": "object"
       },
+      "CopyPublicLibraryItemRequest": {
+        "properties": {
+          "family_id": {
+            "format": "uuid",
+            "title": "Family Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "family_id"
+        ],
+        "title": "CopyPublicLibraryItemRequest",
+        "type": "object"
+      },
       "CreateAssignmentRequest": {
         "properties": {
           "child_id": {
@@ -2182,6 +2196,89 @@
           "questions"
         ],
         "title": "PrintableAssignment",
+        "type": "object"
+      },
+      "PublicLibraryCopy": {
+        "description": "A new family-owned question set copied from an immutable revision.",
+        "properties": {
+          "family_id": {
+            "format": "uuid",
+            "title": "Family Id",
+            "type": "string"
+          },
+          "library_item_id": {
+            "format": "uuid",
+            "title": "Library Item Id",
+            "type": "string"
+          },
+          "library_revision": {
+            "title": "Library Revision",
+            "type": "integer"
+          },
+          "question_count": {
+            "title": "Question Count",
+            "type": "integer"
+          },
+          "question_set_id": {
+            "format": "uuid",
+            "title": "Question Set Id",
+            "type": "string"
+          },
+          "reused_existing": {
+            "default": false,
+            "title": "Reused Existing",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "library_item_id",
+          "library_revision",
+          "question_set_id",
+          "family_id",
+          "question_count"
+        ],
+        "title": "PublicLibraryCopy",
+        "type": "object"
+      },
+      "PublicLibraryItem": {
+        "description": "Anonymous metadata for a published, reusable question set.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "published_at": {
+            "format": "date-time",
+            "title": "Published At",
+            "type": "string"
+          },
+          "question_count": {
+            "title": "Question Count",
+            "type": "integer"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "subject",
+          "question_count",
+          "revision",
+          "published_at"
+        ],
+        "title": "PublicLibraryItem",
         "type": "object"
       },
       "Question": {
@@ -6062,6 +6159,140 @@
           }
         },
         "summary": "List Family Library Submissions",
+        "tags": [
+          "library"
+        ]
+      }
+    },
+    "/v1/library/items": {
+      "get": {
+        "description": "List anonymous public metadata only; never expose answers or sources.",
+        "operationId": "list_public_library_items_v1_library_items_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PublicLibraryItem"
+                  },
+                  "title": "Response List Public Library Items V1 Library Items Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Public Library Items",
+        "tags": [
+          "library"
+        ]
+      }
+    },
+    "/v1/library/items/{library_item_id}/copies": {
+      "post": {
+        "description": "Create a standalone family copy from the reviewed private snapshot.",
+        "operationId": "copy_public_library_item_v1_library_items__library_item_id__copies_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "library_item_id",
+            "required": true,
+            "schema": {
+              "title": "Library Item Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 120,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CopyPublicLibraryItemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicLibraryCopy"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Copy Public Library Item",
         "tags": [
           "library"
         ]

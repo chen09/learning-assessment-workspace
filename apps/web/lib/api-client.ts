@@ -440,6 +440,49 @@ export type LibraryReviewSubmission = {
   created_at: string;
 };
 
+export type PublicLibraryItem = {
+  id: string;
+  title: string;
+  subject: string;
+  question_count: number;
+  revision: number;
+  published_at: string;
+};
+
+export type PublicLibraryCopy = {
+  library_item_id: string;
+  library_revision: number;
+  question_set_id: string;
+  family_id: string;
+  question_count: number;
+  reused_existing: boolean;
+};
+
+export async function getPublicLibraryItems(parentToken: string) {
+  return apiRequest<PublicLibraryItem[]>(
+    "/v1/library/items",
+    { method: "GET" },
+    parentToken,
+  );
+}
+
+export async function copyPublicLibraryItem(
+  libraryItemId: string,
+  familyId: string,
+  parentToken: string,
+  idempotencyKey: string,
+) {
+  return apiRequest<PublicLibraryCopy>(
+    `/v1/library/items/${encodeURIComponent(libraryItemId)}/copies`,
+    {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify({ family_id: familyId }),
+    },
+    parentToken,
+  );
+}
+
 export async function getLibraryReviewerAccess(parentToken: string) {
   return apiRequest<{ is_reviewer: boolean }>(
     "/v1/library/review/access",

@@ -606,3 +606,29 @@ class ReviewLibrarySubmissionRequest(BaseModel):
 
 class LibraryReviewerAccess(BaseModel):
     is_reviewer: bool
+
+
+class PublicLibraryItem(BaseModel):
+    """Anonymous metadata for a published, reusable question set."""
+
+    id: UUID
+    title: str
+    subject: str
+    question_count: int
+    revision: int
+    published_at: datetime
+
+
+class CopyPublicLibraryItemRequest(BaseModel):
+    family_id: UUID
+
+
+class PublicLibraryCopy(BaseModel):
+    """A new family-owned question set copied from an immutable revision."""
+
+    library_item_id: UUID
+    library_revision: int
+    question_set_id: UUID
+    family_id: UUID
+    question_count: int
+    reused_existing: bool = False

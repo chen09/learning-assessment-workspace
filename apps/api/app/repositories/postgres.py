@@ -61,6 +61,8 @@ from app.domain.models import (
     ParentHistoryItem,
     ParentReviewItem,
     PrintableAssignment,
+    PublicLibraryCopy,
+    PublicLibraryItem,
     Question,
     QuestionResult,
     QuestionSet,
@@ -3699,6 +3701,238 @@ class PostgresRepository:
             ).mappings().all()
         return [LibraryReviewSubmission(**dict(row)) for row in rows]
 
+    async def list_public_library_items(self) -> list[PublicLibraryItem]:
+        async with self._engine.connect() as connection:
+            rows = (
+                await connection.execute(
+                    text(
+                        """
+                        select id, metadata ->> 'title' as title,
+                               metadata ->> 'subject' as subject,
+                               (metadata ->> 'question_count')::integer as question_count,
+                               revision, published_at
+                        from public.library_items
+                        where published_at is not null
+                          and unpublished_at is null
+                        order by published_at desc
+                        """
+                    )
+                )
+            ).mappings().all()
+        return [PublicLibraryItem(**dict(row)) for row in rows]
+
+    async def copy_public_library_item(
+        self,
+        library_item_id: str,
+        family_id: UUID,
+        idempotency_key: str,
+        parent_id: str,
+    ) -> PublicLibraryCopy:
+        item_id = _uuid(library_item_id)
+        async with self._engine.begin() as connection:
+            await self._require_parent(connection, parent_id, family_id)
+            item = (
+                await connection.execute(
+                    text(
+                        """
+                        select li.id, li.revision, li.snapshot, li.metadata,
+                               private_content.content as private_content
+                        from public.library_items li
+                        join private.library_item_private_content private_content
+                          on private_content.library_item_id = li.id
+                        where li.id = :library_item_id
+                          and li.published_at is not null
+                          and li.unpublished_at is null
+                        for update of li
+                        """
+                    ),
+                    {"library_item_id": item_id},
+                )
+            ).mappings().one_or_none()
+            if item is None:
+                raise NotFoundError
+
+            existing_id = await self._idempotent_resource(
+                connection,
+                family_id=family_id,
+                actor_id=parent_id,
+                action="copy_public_library_item",
+                idempotency_key=idempotency_key,
+            )
+            if existing_id is not None:
+                existing = (
+                    await connection.execute(
+                        text(
+                            """
+                            select id, family_id, source_summary
+                            from public.question_sets
+                            where id = :question_set_id
+                            """
+                        ),
+                        {"question_set_id": existing_id},
+                    )
+                ).mappings().one_or_none()
+                if existing is None:
+                    raise NotFoundError
+                summary = cast(dict[str, Any], existing["source_summary"] or {})
+                return PublicLibraryCopy(
+                    library_item_id=item["id"],
+                    library_revision=item["revision"],
+                    question_set_id=existing["id"],
+                    family_id=existing["family_id"],
+                    question_count=int(summary.get("question_count", 0)),
+                    reused_existing=True,
+                )
+
+            existing = (
+                await connection.execute(
+                    text(
+                        """
+                        select id, source_summary
+                        from public.question_sets
+                        where family_id = :family_id
+                          and deleted_at is null
+                          and source_summary ->> 'public_library_item_id' = :library_item_id
+                          and source_summary ->> 'public_library_revision' = :revision
+                        order by created_at
+                        limit 1
+                        """
+                    ),
+                    {
+                        "family_id": family_id,
+                        "library_item_id": str(item["id"]),
+                        "revision": str(item["revision"]),
+                    },
+                )
+            ).mappings().one_or_none()
+            if existing is not None:
+                await self._remember_idempotency(
+                    connection,
+                    family_id=family_id,
+                    actor_id=parent_id,
+                    action="copy_public_library_item",
+                    idempotency_key=idempotency_key,
+                    resource_id=existing["id"],
+                )
+                summary = cast(dict[str, Any], existing["source_summary"] or {})
+                return PublicLibraryCopy(
+                    library_item_id=item["id"],
+                    library_revision=item["revision"],
+                    question_set_id=existing["id"],
+                    family_id=family_id,
+                    question_count=int(summary.get("question_count", 0)),
+                    reused_existing=True,
+                )
+
+            snapshot = cast(dict[str, Any], item["snapshot"])
+            private_content = cast(dict[str, Any], item["private_content"])
+            public_set = snapshot.get("question_set")
+            public_questions = snapshot.get("questions")
+            private_questions = private_content.get("questions")
+            if (
+                not isinstance(public_set, dict)
+                or not isinstance(public_questions, list)
+                or not isinstance(private_questions, list)
+                or len(public_questions) != len(private_questions)
+            ):
+                raise NotFoundError
+
+            source_summary = {
+                "imported_via": "public_library_copy",
+                "public_library_item_id": str(item["id"]),
+                "public_library_revision": item["revision"],
+                "question_count": len(public_questions),
+                "answer_keys_present": True,
+            }
+            question_set_id = await connection.scalar(
+                text(
+                    """
+                    insert into public.question_sets (
+                      family_id, created_by, title, subject, status, difficulty,
+                      source_mode, locale, source_summary, confirmed_at
+                    ) values (
+                      :family_id, :parent_id, :title, :subject, 'confirmed', 'standard',
+                      'manual', 'en', cast(:source_summary as jsonb), now()
+                    )
+                    returning id
+                    """
+                ),
+                {
+                    "family_id": family_id,
+                    "parent_id": _uuid(parent_id),
+                    "title": str(public_set.get("title", "Published practice")),
+                    "subject": str(public_set.get("subject", "General")),
+                    "source_summary": json.dumps(source_summary, ensure_ascii=False),
+                },
+            )
+            if question_set_id is None:
+                raise NotFoundError
+            public_by_position = {
+                int(question["position"]): question
+                for question in public_questions
+                if isinstance(question, dict)
+            }
+            for private_question in private_questions:
+                if not isinstance(private_question, dict):
+                    raise NotFoundError
+                position = int(private_question["position"])
+                public_question = public_by_position.get(position)
+                if public_question is None:
+                    raise NotFoundError
+                await connection.execute(
+                    text(
+                        """
+                        insert into public.questions (
+                          family_id, question_set_id, position, type, prompt, options,
+                          answer_key, rubric, points, transcript_policy
+                        ) values (
+                          :family_id, :question_set_id, :position,
+                          cast(:type as public.question_type),
+                          cast(:prompt as jsonb), cast(:options as jsonb),
+                          cast(:answer_key as jsonb), cast(:rubric as jsonb), :points,
+                          :transcript_policy
+                        )
+                        """
+                    ),
+                    {
+                        "family_id": family_id,
+                        "question_set_id": question_set_id,
+                        "position": position,
+                        "type": private_question["type"],
+                        "prompt": json.dumps(public_question["prompt"], ensure_ascii=False),
+                        "options": (
+                            json.dumps(public_question["options"], ensure_ascii=False)
+                            if public_question.get("options") is not None
+                            else None
+                        ),
+                        "answer_key": json.dumps(
+                            private_question["answer_key"],
+                            ensure_ascii=False,
+                        ),
+                        "rubric": json.dumps(
+                            private_question.get("rubric", {}),
+                            ensure_ascii=False,
+                        ),
+                        "points": float(private_question["points"]),
+                        "transcript_policy": private_question.get("transcript_policy", "never"),
+                    },
+                )
+            await self._remember_idempotency(
+                connection,
+                family_id=family_id,
+                actor_id=parent_id,
+                action="copy_public_library_item",
+                idempotency_key=idempotency_key,
+                resource_id=question_set_id,
+            )
+        return PublicLibraryCopy(
+            library_item_id=item["id"],
+            library_revision=item["revision"],
+            question_set_id=question_set_id,
+            family_id=family_id,
+            question_count=len(public_questions),
+        )
+
     async def confirm_question_set(
         self,
         question_set_id: str,
@@ -4103,7 +4337,7 @@ class PostgresRepository:
                 text(
                     """
                     select ls.id, ls.family_id, ls.question_set_id, ls.status,
-                           qs.title, qs.subject
+                           qs.title, qs.subject, qs.locale
                     from public.library_submissions ls
                     join public.question_sets qs on qs.id = ls.question_set_id
                     where ls.id = :submission_id
@@ -4131,7 +4365,8 @@ class PostgresRepository:
                         await connection.execute(
                             text(
                                 """
-                                select position, type, prompt, options, points
+                                select position, type, prompt, options, answer_key, rubric,
+                                       points, transcript_policy
                                 from public.questions
                                 where question_set_id = :question_set_id
                                 order by position
@@ -4157,6 +4392,23 @@ class PostgresRepository:
                             for row in question_rows
                         ],
                     }
+                    private_content = {
+                        "schema_version": "1.0",
+                        "question_set": {
+                            "locale": submission["locale"],
+                        },
+                        "questions": [
+                            {
+                                "position": row["position"],
+                                "type": row["type"],
+                                "answer_key": row["answer_key"],
+                                "rubric": row["rubric"],
+                                "points": float(row["points"]),
+                                "transcript_policy": row["transcript_policy"],
+                            }
+                            for row in question_rows
+                        ],
+                    }
                     metadata = {
                         "title": submission["title"],
                         "subject": submission["subject"],
@@ -4178,6 +4430,25 @@ class PostgresRepository:
                             "submission_id": submission["id"],
                             "snapshot": json.dumps(snapshot),
                             "metadata": json.dumps(metadata),
+                        },
+                    )
+                    await connection.execute(
+                        text(
+                            """
+                            insert into private.library_item_private_content (
+                              library_item_id, content
+                            )
+                            select id, cast(:private_content as jsonb)
+                            from public.library_items
+                            where submission_id = :submission_id
+                            """
+                        ),
+                        {
+                            "submission_id": submission["id"],
+                            "private_content": json.dumps(
+                                private_content,
+                                ensure_ascii=False,
+                            ),
                         },
                     )
                 review_status = (

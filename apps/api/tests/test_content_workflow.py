@@ -830,3 +830,86 @@ def test_explicit_reviewer_can_reject_once_but_not_change_a_final_decision(
         assert changed.json()["detail"]["code"] == "library_submission_cannot_be_reviewed"
     finally:
         get_settings.cache_clear()
+
+
+def test_parent_can_copy_a_published_library_item_without_receiving_answers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("LIBRARY_REVIEWER_PARENT_IDS", '["parent-fixture"]')
+    get_settings.cache_clear()
+    try:
+        application = create_app()
+        client = TestClient(application)
+        fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+        submitted = client.post(
+            "/v1/library/submissions",
+            headers={**PARENT_HEADERS, "Idempotency-Key": "publish-copy-source"},
+            json={
+                "family_id": fixture["family"]["id"],
+                "question_set_id": fixture["question_set"]["id"],
+                "rights_confirmed": True,
+                "privacy_confirmed": True,
+            },
+        )
+        approved = client.post(
+            f"/v1/library/review/submissions/{submitted.json()['id']}/decision",
+            headers={**PARENT_HEADERS, "Idempotency-Key": "publish-copy-source-v1"},
+            json={"decision": "approve"},
+        )
+        destination_family = client.post(
+            "/v1/families",
+            headers={**PARENT_HEADERS, "Idempotency-Key": "public-library-destination"},
+            json={"name": "Copied library family"},
+        )
+
+        public_items = client.get("/v1/library/items", headers=PARENT_HEADERS)
+        item = public_items.json()[0]
+        copied = client.post(
+            f"/v1/library/items/{item['id']}/copies",
+            headers={**PARENT_HEADERS, "Idempotency-Key": "copy-public-item-v1"},
+            json={"family_id": destination_family.json()["id"]},
+        )
+        repeated = client.post(
+            f"/v1/library/items/{item['id']}/copies",
+            headers={**PARENT_HEADERS, "Idempotency-Key": "copy-public-item-v1"},
+            json={"family_id": destination_family.json()["id"]},
+        )
+        destination_sets = client.get(
+            f"/v1/library/families/{destination_family.json()['id']}/question-sets",
+            headers=PARENT_HEADERS,
+        )
+
+        assert approved.status_code == 200
+        assert public_items.status_code == 200
+        assert set(item) == {
+            "id",
+            "title",
+            "subject",
+            "question_count",
+            "revision",
+            "published_at",
+        }
+        assert copied.status_code == 201
+        assert copied.json()["family_id"] == destination_family.json()["id"]
+        assert copied.json()["reused_existing"] is False
+        assert repeated.status_code == 201
+        assert repeated.json()["question_set_id"] == copied.json()["question_set_id"]
+        assert repeated.json()["reused_existing"] is True
+        assert destination_sets.json()[0]["source_summary"] == {
+            "imported_via": "public_library_copy",
+            "public_library_item_id": item["id"],
+            "public_library_revision": 1,
+            "question_count": item["question_count"],
+            "answer_keys_present": True,
+        }
+
+        copied_question = application.state.repository.questions[
+            next(
+                question_id
+                for question_id, question in application.state.repository.questions.items()
+                if str(question.question_set_id) == copied.json()["question_set_id"]
+            )
+        ]
+        assert copied_question.answer_key == {"choice": 0}
+    finally:
+        get_settings.cache_clear()

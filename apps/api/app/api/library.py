@@ -6,11 +6,14 @@ from app.api.dependencies import Repository, get_repository, require_parent
 from app.config import get_settings
 from app.domain.errors import LibrarySubmissionStatusConflict, NotFoundError
 from app.domain.models import (
+    CopyPublicLibraryItemRequest,
     CreateLibrarySubmissionRequest,
     FamilyLibraryQuestionSet,
     LibraryReviewerAccess,
     LibraryReviewSubmission,
     LibrarySubmission,
+    PublicLibraryCopy,
+    PublicLibraryItem,
     ReviewLibrarySubmissionRequest,
 )
 
@@ -23,6 +26,45 @@ def _require_library_reviewer(parent_id: str) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"code": "library_reviewer_required"},
         )
+
+
+@router.get("/items", response_model=list[PublicLibraryItem])
+async def list_public_library_items(
+    repository: Annotated[Repository, Depends(get_repository)],
+    _: Annotated[str, Depends(require_parent)],
+) -> list[PublicLibraryItem]:
+    """List anonymous public metadata only; never expose answers or sources."""
+    return await repository.list_public_library_items()
+
+
+@router.post(
+    "/items/{library_item_id}/copies",
+    response_model=PublicLibraryCopy,
+    status_code=status.HTTP_201_CREATED,
+)
+async def copy_public_library_item(
+    library_item_id: str,
+    request: CopyPublicLibraryItemRequest,
+    repository: Annotated[Repository, Depends(get_repository)],
+    parent_id: Annotated[str, Depends(require_parent)],
+    idempotency_key: Annotated[
+        str,
+        Header(alias="Idempotency-Key", min_length=8, max_length=120),
+    ],
+) -> PublicLibraryCopy:
+    """Create a standalone family copy from the reviewed private snapshot."""
+    try:
+        return await repository.copy_public_library_item(
+            library_item_id,
+            request.family_id,
+            idempotency_key,
+            parent_id,
+        )
+    except (NotFoundError, ValueError) as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The published library item is not available.",
+        ) from error
 
 
 @router.get(

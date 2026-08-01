@@ -40,6 +40,7 @@ const copy = {
     empty: "No question sets yet.",
     error: "The family library could not be loaded.",
     reviewLink: "Review submissions",
+    publicLink: "Browse public library",
     published: "Published to the public library",
     rejected: "Review needs changes",
     assign: "Assign to child",
@@ -81,6 +82,7 @@ const copy = {
     empty: "問題セットはまだありません。",
     error: "家族の問題ライブラリを読み込めませんでした。",
     reviewLink: "投稿を確認する",
+    publicLink: "公開問題を探す",
     published: "公開問題ライブラリに掲載済み",
     rejected: "レビューで修正が必要",
     assign: "子どもに割り当てる",
@@ -121,6 +123,7 @@ const copy = {
     empty: "还没有题单。",
     error: "无法加载家庭题库。",
     reviewLink: "审核投稿",
+    publicLink: "浏览公共题库",
     published: "已发布到公共题库",
     rejected: "审核需要修改",
     assign: "分配给孩子",
@@ -431,6 +434,9 @@ function LibraryContent() {
             </select>
           ) : null}
           <LanguageSwitcher />
+          <Link className="button secondary" href="/parent/library/public/">
+            {text.publicLink}
+          </Link>
           {isLibraryReviewer ? (
             <Link className="button secondary" href="/parent/library/review/">
               {text.reviewLink}
