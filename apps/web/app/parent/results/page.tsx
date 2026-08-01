@@ -4,6 +4,7 @@ import {
   AlertCircle,
   Check,
   CircleHelp,
+  Download,
   History,
   Image as ImageIcon,
   PenLine,
@@ -105,6 +106,58 @@ function HandwritingPreview({
       )}
     </div>
   );
+}
+
+function xmlEscape(value: string) {
+  return value.replace(/[&<>'"]/g, (character) => {
+    const entities: Record<string, string> = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      "'": "&apos;",
+      '"': "&quot;",
+    };
+    return entities[character];
+  });
+}
+
+function annotationSvg(annotations: GradingAnnotation[]) {
+  const marks = annotations
+    .map((annotation) => {
+      const title = `<title>${xmlEscape(annotation.label)}</title>`;
+      if (annotation.kind === "underline") {
+        return `<line x1="${annotation.x}" y1="${annotation.y + annotation.height}" x2="${annotation.x + annotation.width}" y2="${annotation.y + annotation.height}">${title}</line>`;
+      }
+      if (annotation.kind === "cross") {
+        return `<g>${title}<line x1="${annotation.x}" y1="${annotation.y}" x2="${annotation.x + annotation.width}" y2="${annotation.y + annotation.height}"/><line x1="${annotation.x + annotation.width}" y1="${annotation.y}" x2="${annotation.x}" y2="${annotation.y + annotation.height}"/></g>`;
+      }
+      return `<rect x="${annotation.x}" y="${annotation.y}" width="${annotation.width}" height="${annotation.height}" rx="0.01">${title}</rect>`;
+    })
+    .join("");
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1" preserveAspectRatio="none"><g fill="none" stroke="#dc2626" stroke-width="0.006" vector-effect="non-scaling-stroke">${marks}</g></svg>`;
+}
+
+function downloadAnnotationOverlay(
+  sourcePath: string | undefined,
+  pageIndex: number,
+  annotations: GradingAnnotation[],
+) {
+  if (!annotations.length || typeof document === "undefined") {
+    return;
+  }
+  const originalFilename = sourcePath?.split("/").at(-1) || `page-${pageIndex + 1}`;
+  const filename = `${originalFilename.replace(/\.[^.]+$/, "") || `page-${pageIndex + 1}`}-red-pencil.svg`;
+  const overlay = new Blob([annotationSvg(annotations)], {
+    type: "image/svg+xml;charset=utf-8",
+  });
+  const url = URL.createObjectURL(overlay);
+  const anchor = document.createElement("a");
+  anchor.download = filename;
+  anchor.href = url;
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }
 
 function PhotoPreview({
@@ -228,6 +281,22 @@ function PhotoPreview({
                 <figcaption>
                   {paths[index]?.split("/").at(-1) ?? `${index + 1}`}
                 </figcaption>
+                {pageAnnotations.length ? (
+                  <button
+                    className="button ghost red-pencil-download"
+                    onClick={() =>
+                      downloadAnnotationOverlay(
+                        paths[index],
+                        index,
+                        pageAnnotations,
+                      )
+                    }
+                    type="button"
+                  >
+                    <Download aria-hidden="true" />
+                    {t("parentResults.downloadRedMarks")}
+                  </button>
+                ) : null}
               </figure>
             );
           })}

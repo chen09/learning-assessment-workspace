@@ -263,6 +263,75 @@ describe("ParentResultsPage", () => {
     expect(screen.queryByTestId("red-pencil-mark")).not.toBeInTheDocument();
   });
 
+  it("downloads a separate red-pencil overlay without changing the original paper photo", async () => {
+    const completeReview = await mocks.getParentAttemptReview();
+    mocks.getParentAttemptReview.mockReset().mockResolvedValue({
+      ...completeReview,
+      reviews: [
+        {
+          ...completeReview.reviews[0],
+          question_type: "photo",
+          response_kind: "photo",
+          response_answer: {
+            paths: ["family-id/attempt-id/factorisation-page.png"],
+          },
+          photo_urls: [
+            "https://storage.example.test/signed/factorisation-page.png?token=short-lived",
+          ],
+          automated_feedback: {
+            summary: "平方のかかる範囲を確認",
+            action: "保護者が確認してください。",
+            annotations: [
+              {
+                kind: "underline",
+                page_index: 0,
+                x: 0.22,
+                y: 0.61,
+                width: 0.31,
+                height: 0.04,
+                label: "平方のかかる範囲を確認",
+              },
+            ],
+          },
+        },
+      ],
+    });
+    const createObjectURL = vi.fn(() => "blob:annotation-download");
+    const revokeObjectURL = vi.fn();
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: createObjectURL,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: revokeObjectURL,
+    });
+    const downloadedNames: string[] = [];
+    const anchorClick = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(function captureDownload(this: HTMLAnchorElement) {
+        downloadedNames.push(this.download);
+      });
+
+    render(<ParentResultsPage />);
+
+    const originalPhoto = await screen.findByRole("img", {
+      name: "已上传的答案照片 1",
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "下载 AI 红笔标注图层" }),
+    );
+
+    await waitFor(() => expect(createObjectURL).toHaveBeenCalledTimes(1));
+    expect(downloadedNames).toEqual(["factorisation-page-red-pencil.svg"]);
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:annotation-download");
+    expect(originalPhoto).toHaveAttribute(
+      "src",
+      "https://storage.example.test/signed/factorisation-page.png?token=short-lived",
+    );
+    expect(anchorClick).toHaveBeenCalledTimes(1);
+  });
+
   it("shows a path-free photo revision timeline to the parent", async () => {
     const completeReview = await mocks.getParentAttemptReview();
     mocks.getParentAttemptReview.mockReset().mockResolvedValue({

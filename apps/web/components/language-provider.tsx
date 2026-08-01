@@ -297,6 +297,7 @@ const messages = {
     "parentResults.photoList": "Uploaded answer photos",
     "parentResults.showRedMarks": "Show AI red-pencil marks",
     "parentResults.hideRedMarks": "Hide AI red-pencil marks",
+    "parentResults.downloadRedMarks": "Download AI red-pencil overlay",
     "parentResults.parentNeeded":
       "The system did not score this visual answer. Please decide from the child's work.",
     "parentResults.markCorrect": "Mark correct",
@@ -784,6 +785,7 @@ const messages = {
     "parentResults.photoList": "アップロードした解答写真",
     "parentResults.showRedMarks": "AI の赤ペンを表示",
     "parentResults.hideRedMarks": "AI の赤ペンを隠す",
+    "parentResults.downloadRedMarks": "AI の赤ペンレイヤーをダウンロード",
     "parentResults.parentNeeded":
       "この画像の解答は自動採点していません。内容を見て判定してください。",
     "parentResults.markCorrect": "正解にする",
@@ -1254,6 +1256,7 @@ const messages = {
     "parentResults.photoList": "已上传的答案照片",
     "parentResults.showRedMarks": "显示 AI 红笔标注",
     "parentResults.hideRedMarks": "隐藏 AI 红笔标注",
+    "parentResults.downloadRedMarks": "下载 AI 红笔标注图层",
     "parentResults.parentNeeded":
       "系统没有自动判断这份图像答案，请家长根据孩子的作答来裁定。",
     "parentResults.markCorrect": "判为正确",

@@ -3430,6 +3430,17 @@ button {
   color: #a62222;
 }
 
+.red-pencil-download {
+  align-self: flex-start;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+  padding: 0.45rem 0.65rem;
+}
+
+.red-pencil-download svg {
+  width: 0.95rem;
+}
+
 .photo-answer-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr));
