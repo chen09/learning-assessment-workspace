@@ -581,7 +581,7 @@ function LibraryContent() {
           {assignmentStatus === "loading_children" ? (
             <p>{text.assigning}</p>
           ) : (
-            <>
+            <div className="library-assignment-controls">
               <div className="library-assignment-fields">
                 <label>
                   <span>{text.child}</span>
@@ -691,7 +691,7 @@ function LibraryContent() {
                     : text.confirmAssignment}
                 </button>
               </div>
-            </>
+            </div>
           )}
         </section>
       ) : null}

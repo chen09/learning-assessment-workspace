@@ -3743,6 +3743,13 @@ button {
   gap: 0.9rem;
 }
 
+.library-assignment-controls {
+  display: grid;
+  grid-column: 2;
+  gap: 1rem;
+  min-width: 0;
+}
+
 .library-assignment-fields > label:not(.assignment-note) {
   display: grid;
   max-width: 24rem;
@@ -3783,9 +3790,8 @@ button {
   gap: 0.65rem;
 }
 
-.library-assignment-panel > .library-assignment-actions {
+.library-assignment-controls > .library-assignment-actions {
   align-self: end;
-  grid-column: 2;
 }
 
 .print-preview {
@@ -4024,9 +4030,13 @@ button {
     align-items: stretch;
   }
 
-  .library-assignment-panel > .library-assignment-actions {
+  .library-assignment-controls {
+    grid-column: auto;
+    width: 100%;
+  }
+
+  .library-assignment-controls > .library-assignment-actions {
     align-self: stretch;
-    grid-column: 1;
   }
 
   .draft-question-list article {
