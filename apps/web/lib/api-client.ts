@@ -780,6 +780,16 @@ export type ParentReviewItem = {
   };
 };
 
+export type ResponseRevision = {
+  question_id: string;
+  question_position: number;
+  response_version: number;
+  change: "photo_added" | "photo_updated" | "photo_removed";
+  previous_page_count: number;
+  page_count: number;
+  saved_at: string;
+};
+
 export type ParentAttemptReview = {
   attempt_id: string;
   child_nickname: string;
@@ -791,6 +801,7 @@ export type ParentAttemptReview = {
   correction_count: number;
   pending_review_count: number;
   reviews: ParentReviewItem[];
+  response_revisions: ResponseRevision[];
 };
 
 export async function getParentAttemptReview(

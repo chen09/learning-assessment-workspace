@@ -50,6 +50,7 @@ describe("ParentResultsPage", () => {
       correct_count: 1,
       correction_count: 1,
       pending_review_count: 1,
+      response_revisions: [],
       reviews: [
         {
           result_id: "result-1",
@@ -197,5 +198,32 @@ describe("ParentResultsPage", () => {
       "src",
       "https://storage.example.test/signed/answer.png?token=short-lived",
     );
+  });
+
+  it("shows a path-free photo revision timeline to the parent", async () => {
+    const completeReview = await mocks.getParentAttemptReview();
+    mocks.getParentAttemptReview.mockReset().mockResolvedValue({
+      ...completeReview,
+      response_revisions: [
+        {
+          question_id: "question-3",
+          question_position: 3,
+          response_version: 2,
+          change: "photo_removed",
+          previous_page_count: 1,
+          page_count: 0,
+          saved_at: "2026-08-02T09:00:00Z",
+        },
+      ],
+    });
+
+    render(<ParentResultsPage />);
+
+    expect(await screen.findByText("作答照片记录")).toBeInTheDocument();
+    expect(screen.getByText("移除了 1 张作答照片")).toBeInTheDocument();
+    expect(screen.getByText(/保存版本 2/)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/first-photo\.png/i),
+    ).not.toBeInTheDocument();
   });
 });

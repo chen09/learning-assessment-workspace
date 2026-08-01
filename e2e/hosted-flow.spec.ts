@@ -685,6 +685,12 @@ test("temporary parent completes the hosted family learning flow", async ({
         { message: "The private signed photo preview should load." },
       )
       .toBeGreaterThan(0);
+    await expect(page.getByText("Answer activity")).toBeVisible();
+    await expect(
+      page.getByText("Removed 1 answer photo(s)"),
+    ).toBeVisible();
+    await expect(page.getByText("Added 1 answer photo(s)")).toHaveCount(2);
+    await expect(page.getByText(restoredPhotoName)).toHaveCount(0);
 
     await page.getByRole("button", { name: "Mark correct" }).first().click();
     await page.getByRole("button", { name: "Mark correct" }).first().click();

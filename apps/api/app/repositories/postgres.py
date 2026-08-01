@@ -65,6 +65,8 @@ from app.domain.models import (
     QuestionSetImport,
     QuestionSubmissionReceipt,
     QuestionView,
+    ResponseKind,
+    ResponseRevision,
     ReviewCompletion,
     ReviewItemView,
     SavedResponse,
@@ -98,6 +100,27 @@ def _localized_text(value: Any) -> str:
 
 def _float(value: Decimal | float | int | None) -> float | None:
     return None if value is None else float(value)
+
+
+def _photo_paths(kind: Any, answer: Any) -> list[str]:
+    if kind not in {ResponseKind.PHOTO, ResponseKind.PHOTO.value}:
+        return []
+    if not isinstance(answer, dict):
+        return []
+    paths = answer.get("paths")
+    if not isinstance(paths, list):
+        return []
+    return [path for path in paths if isinstance(path, str)]
+
+
+def _photo_revision_change(
+    previous_paths: list[str], next_paths: list[str]
+) -> Literal["photo_added", "photo_updated", "photo_removed"]:
+    if not previous_paths:
+        return "photo_added"
+    if not next_paths:
+        return "photo_removed"
+    return "photo_updated"
 
 
 def _question(row: RowMapping) -> Question:
@@ -1039,7 +1062,7 @@ class PostgresRepository:
             current_result = await connection.execute(
                 text(
                     """
-                    select id, version
+                    select id, version, kind, answer
                     from public.responses
                     where attempt_id = :attempt_id and question_id = :question_id
                     for update
@@ -1096,6 +1119,49 @@ class PostgresRepository:
                     },
                 )
             row = response_result.mappings().one()
+            previous_paths = _photo_paths(
+                current["kind"] if current is not None else None,
+                current["answer"] if current is not None else None,
+            )
+            next_paths = _photo_paths(request.kind, request.answer)
+            if previous_paths != next_paths and (
+                request.kind == ResponseKind.PHOTO
+                or (
+                    current is not None
+                    and current["kind"]
+                    in {ResponseKind.PHOTO, ResponseKind.PHOTO.value}
+                )
+            ):
+                await connection.execute(
+                    text(
+                        """
+                        insert into public.audit_events (
+                          family_id, actor_child_id, action, subject_type,
+                          subject_id, metadata
+                        ) values (
+                          :family_id, :child_id, 'response.photo_revised',
+                          'response', :response_id, cast(:metadata as jsonb)
+                        )
+                        """
+                    ),
+                    {
+                        "family_id": attempt_row["family_id"],
+                        "child_id": attempt_row["child_id"],
+                        "response_id": row["id"],
+                        "metadata": json.dumps(
+                            {
+                                "attempt_id": str(attempt_row["id"]),
+                                "question_id": str(question_id),
+                                "response_version": int(row["version"]),
+                                "change": _photo_revision_change(
+                                    previous_paths, next_paths
+                                ),
+                                "previous_page_count": len(previous_paths),
+                                "page_count": len(next_paths),
+                            }
+                        ),
+                    },
+                )
         return SavedResponse(**dict(row))
 
     async def submit_question(
@@ -1725,11 +1791,71 @@ class PostgresRepository:
                     )
                 ).scalars()
                 valid_photo_paths = set(asset_rows)
+            question_positions = {
+                str(row["question_id"]): int(row["position"])
+                for row in result_rows
+            }
+            revision_rows = (
+                await connection.execute(
+                    text(
+                        """
+                        select metadata, created_at
+                        from public.audit_events
+                        where family_id = :family_id
+                          and actor_child_id = :child_id
+                          and action = 'response.photo_revised'
+                          and metadata ->> 'attempt_id' = :attempt_id
+                        order by created_at desc, id desc
+                        """
+                    ),
+                    {
+                        "family_id": attempt_row["family_id"],
+                        "child_id": attempt_row["child_id"],
+                        "attempt_id": str(attempt_uuid),
+                    },
+                )
+            ).mappings().all()
 
         signed_photo_urls = await self._sign_response_photo_urls(
             sorted(valid_photo_paths)
         )
         reviews: list[ParentReviewItem] = []
+        response_revisions: list[ResponseRevision] = []
+        for revision_row in revision_rows:
+            metadata = revision_row["metadata"]
+            if not isinstance(metadata, dict):
+                continue
+            question_id = metadata.get("question_id")
+            question_position = question_positions.get(str(question_id))
+            change = metadata.get("change")
+            version = metadata.get("response_version")
+            previous_page_count = metadata.get("previous_page_count")
+            page_count = metadata.get("page_count")
+            if (
+                question_position is None
+                or change
+                not in {"photo_added", "photo_updated", "photo_removed"}
+                or not isinstance(version, int)
+                or not isinstance(previous_page_count, int)
+                or not isinstance(page_count, int)
+                or previous_page_count < 0
+                or page_count < 0
+            ):
+                continue
+            try:
+                response_revisions.append(
+                    ResponseRevision(
+                        question_id=_uuid(str(question_id)),
+                        question_position=question_position,
+                        response_version=version,
+                        change=change,
+                        previous_page_count=previous_page_count,
+                        page_count=page_count,
+                        saved_at=revision_row["created_at"],
+                    )
+                )
+            except ValueError:
+                continue
         awarded_points = 0.0
         correct_count = 0
         correction_count = 0
@@ -1798,6 +1924,7 @@ class PostgresRepository:
             correction_count=correction_count,
             pending_review_count=len(reviews),
             reviews=reviews,
+            response_revisions=response_revisions,
         )
 
     async def create_correction(

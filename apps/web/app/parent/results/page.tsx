@@ -4,6 +4,7 @@ import {
   AlertCircle,
   Check,
   CircleHelp,
+  History,
   Image as ImageIcon,
   PenLine,
   ShieldCheck,
@@ -24,6 +25,7 @@ import {
   getParentAttemptReview,
   type ParentAttemptReview,
   type ParentReviewItem,
+  type ResponseRevision,
 } from "@/lib/api-client";
 
 type Decision = "correct" | "incorrect";
@@ -153,6 +155,37 @@ function PhotoPreview({
   );
 }
 
+function revisionText(
+  revision: ResponseRevision,
+  t: ReturnType<typeof useLanguage>["t"],
+) {
+  if (revision.change === "photo_added") {
+    return t("parentResults.revision.photoAdded", {
+      count: revision.page_count,
+    });
+  }
+  if (revision.change === "photo_removed") {
+    return t("parentResults.revision.photoRemoved", {
+      count: revision.previous_page_count,
+    });
+  }
+  return t("parentResults.revision.photoUpdated", {
+    from: revision.previous_page_count,
+    to: revision.page_count,
+  });
+}
+
+function revisionTimestamp(savedAt: string, language: ReturnType<typeof useLanguage>["language"]) {
+  const date = new Date(savedAt);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return new Intl.DateTimeFormat(
+    language === "ja" ? "ja-JP" : language === "zh" ? "zh-CN" : "en-US",
+    { dateStyle: "medium", timeStyle: "short" },
+  ).format(date);
+}
+
 export default function ParentResultsPage() {
   return (
     <AppShell currentPath="/parent/history/" role="parent">
@@ -162,7 +195,7 @@ export default function ParentResultsPage() {
 }
 
 function ParentResultsContent() {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const attemptId = useSyncExternalStore(
     subscribeToHydration,
     getRequestedAttemptId,
@@ -405,6 +438,39 @@ function ParentResultsContent() {
               </div>
             </dl>
             <p>{t("parentResults.releaseNote")}</p>
+            {review.response_revisions.length ? (
+              <section className="response-revision-timeline">
+                <header>
+                  <History aria-hidden="true" />
+                  <div>
+                    <h3>{t("parentResults.revision.title")}</h3>
+                    <p>{t("parentResults.revision.description")}</p>
+                  </div>
+                </header>
+                <ol>
+                  {review.response_revisions.map((revision) => (
+                    <li
+                      key={`${revision.question_id}-${revision.response_version}`}
+                    >
+                      <strong>
+                        {t("parentResults.question", {
+                          number: revision.question_position,
+                          type: t("parentResults.photo"),
+                        })}
+                      </strong>
+                      <span>{revisionText(revision, t)}</span>
+                      <small>
+                        {t("parentResults.revision.version", {
+                          version: revision.response_version,
+                        })}
+                        {" · "}
+                        {revisionTimestamp(revision.saved_at, language)}
+                      </small>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            ) : null}
           </aside>
         </section>
       ) : null}

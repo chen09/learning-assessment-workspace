@@ -295,6 +295,13 @@ const messages = {
     "parentResults.pending": "Parent review",
     "parentResults.releaseNote":
       "Automatic results and parent decisions are combined into the final score.",
+    "parentResults.revision.title": "Answer activity",
+    "parentResults.revision.description":
+      "This private record shows only photo-page counts. Removed images are not shown.",
+    "parentResults.revision.photoAdded": "Added {count} answer photo(s)",
+    "parentResults.revision.photoUpdated": "Changed answer photos: {from} → {to}",
+    "parentResults.revision.photoRemoved": "Removed {count} answer photo(s)",
+    "parentResults.revision.version": "Saved version {version}",
     "review.today": "Today's review",
     "review.quickOne": "{count} quick question",
     "review.quickMany": "{count} quick questions",
@@ -734,6 +741,13 @@ const messages = {
     "parentResults.pending": "保護者確認",
     "parentResults.releaseNote":
       "自動採点と保護者の判定を合わせて最終得点を計算します。",
+    "parentResults.revision.title": "解答写真の記録",
+    "parentResults.revision.description":
+      "写真の枚数だけを記録します。削除した画像は表示しません。",
+    "parentResults.revision.photoAdded": "解答写真を {count} 枚追加",
+    "parentResults.revision.photoUpdated": "解答写真を変更：{from} → {to} 枚",
+    "parentResults.revision.photoRemoved": "解答写真を {count} 枚削除",
+    "parentResults.revision.version": "保存バージョン {version}",
     "review.today": "今日の復習",
     "review.quickOne": "すぐできる復習 {count} 問",
     "review.quickMany": "すぐできる復習 {count} 問",
@@ -1157,6 +1171,13 @@ const messages = {
     "parentResults.pending": "家长确认",
     "parentResults.releaseNote":
       "自动判题结果和家长裁定会共同组成最终成绩。",
+    "parentResults.revision.title": "作答照片记录",
+    "parentResults.revision.description":
+      "这里只记录照片页数；已移除的图片不会显示。",
+    "parentResults.revision.photoAdded": "新增了 {count} 张作答照片",
+    "parentResults.revision.photoUpdated": "作答照片已变更：{from} → {to} 张",
+    "parentResults.revision.photoRemoved": "移除了 {count} 张作答照片",
+    "parentResults.revision.version": "保存版本 {version}",
     "review.today": "今日复习",
     "review.quickOne": "{count} 道快速复习题",
     "review.quickMany": "{count} 道快速复习题",

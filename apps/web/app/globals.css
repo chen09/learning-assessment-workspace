@@ -3501,6 +3501,65 @@ button {
   font-weight: 800;
 }
 
+.response-revision-timeline {
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--line);
+  padding-top: 1.15rem;
+}
+
+.response-revision-timeline > header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+}
+
+.response-revision-timeline > header > svg {
+  width: 1.1rem;
+  color: var(--blue-dark);
+}
+
+.response-revision-timeline h3,
+.response-revision-timeline p {
+  margin: 0;
+}
+
+.response-revision-timeline h3 {
+  font-size: 0.9rem;
+}
+
+.response-revision-timeline > header p {
+  margin-top: 0.2rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
+.response-revision-timeline ol {
+  display: grid;
+  gap: 0.65rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.response-revision-timeline li {
+  display: grid;
+  gap: 0.18rem;
+  border-left: 2px solid #d7defb;
+  padding-left: 0.7rem;
+}
+
+.response-revision-timeline li strong,
+.response-revision-timeline li span,
+.response-revision-timeline li small {
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+.response-revision-timeline li small {
+  color: var(--muted);
+}
+
 .settings-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

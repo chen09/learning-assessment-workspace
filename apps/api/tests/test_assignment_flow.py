@@ -636,11 +636,28 @@ def test_submission_is_immutable_and_fixture_grading_releases_full_results() -> 
             {"strokes": [{"points": [[10, 10], [20, 20]], "width": 2}]},
         ),
     ]
-    for question, (kind, answer) in zip(questions, answers, strict=True):
+    photo_uploaded = client.put(
+        f"/v1/attempts/{attempt_id}/responses/{questions[2]['id']}",
+        headers=child_headers,
+        json={
+            "kind": "photo",
+            "answer": {"paths": ["family/attempt/first-photo.png"]},
+            "expected_version": 0,
+        },
+    )
+    assert photo_uploaded.status_code == 200
+
+    for index, (question, (kind, answer)) in enumerate(
+        zip(questions, answers, strict=True)
+    ):
         save = client.put(
             f"/v1/attempts/{attempt_id}/responses/{question['id']}",
             headers=child_headers,
-            json={"kind": kind, "answer": answer, "expected_version": 0},
+            json={
+                "kind": kind,
+                "answer": answer,
+                "expected_version": 1 if index == 2 else 0,
+            },
         )
         assert save.status_code == 200
 
@@ -694,6 +711,40 @@ def test_submission_is_immutable_and_fixture_grading_releases_full_results() -> 
     assert parent_results.json()["correct_count"] == 1
     assert parent_results.json()["correction_count"] == 1
     assert parent_results.json()["pending_review_count"] == 1
+    revisions = parent_results.json()["response_revisions"]
+    assert [
+        {
+            key: revision[key]
+            for key in (
+                "question_id",
+                "question_position",
+                "response_version",
+                "change",
+                "previous_page_count",
+                "page_count",
+            )
+        }
+        for revision in revisions
+    ] == [
+        {
+            "question_id": questions[2]["id"],
+            "question_position": 3,
+            "response_version": 2,
+            "change": "photo_removed",
+            "previous_page_count": 1,
+            "page_count": 0,
+        },
+        {
+            "question_id": questions[2]["id"],
+            "question_position": 3,
+            "response_version": 1,
+            "change": "photo_added",
+            "previous_page_count": 0,
+            "page_count": 1,
+        },
+    ]
+    assert all("paths" not in revision for revision in revisions)
+    assert all("saved_at" in revision for revision in revisions)
     assert parent_results.json()["reviews"] == [
         {
             "result_id": results.json()["results"][2]["id"],

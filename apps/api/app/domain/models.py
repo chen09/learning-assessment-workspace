@@ -317,6 +317,23 @@ class ParentReviewItem(BaseModel):
     automated_feedback: dict[str, Any]
 
 
+class ResponseRevision(BaseModel):
+    """A privacy-preserving record of a photo-answer change.
+
+    The timeline deliberately contains no object path, filename, signed URL,
+    or image metadata. The parent's current-answer preview is the only place
+    that can expose a currently attached private image.
+    """
+
+    question_id: UUID
+    question_position: int
+    response_version: int
+    change: Literal["photo_added", "photo_updated", "photo_removed"]
+    previous_page_count: int = Field(ge=0)
+    page_count: int = Field(ge=0)
+    saved_at: datetime
+
+
 class ParentAttemptReview(BaseModel):
     attempt_id: UUID
     child_nickname: str
@@ -328,6 +345,7 @@ class ParentAttemptReview(BaseModel):
     correction_count: int
     pending_review_count: int
     reviews: list[ParentReviewItem]
+    response_revisions: list[ResponseRevision] = Field(default_factory=list)
 
 
 class ReviewItemView(BaseModel):

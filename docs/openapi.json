@@ -1759,6 +1759,13 @@
             "title": "Pending Review Count",
             "type": "integer"
           },
+          "response_revisions": {
+            "items": {
+              "$ref": "#/components/schemas/ResponseRevision"
+            },
+            "title": "Response Revisions",
+            "type": "array"
+          },
           "reviews": {
             "items": {
               "$ref": "#/components/schemas/ParentReviewItem"
@@ -2538,6 +2545,59 @@
         ],
         "title": "ResponseKind",
         "type": "string"
+      },
+      "ResponseRevision": {
+        "description": "A privacy-preserving record of a photo-answer change.\n\nThe timeline deliberately contains no object path, filename, signed URL,\nor image metadata. The parent's current-answer preview is the only place\nthat can expose a currently attached private image.",
+        "properties": {
+          "change": {
+            "enum": [
+              "photo_added",
+              "photo_updated",
+              "photo_removed"
+            ],
+            "title": "Change",
+            "type": "string"
+          },
+          "page_count": {
+            "minimum": 0.0,
+            "title": "Page Count",
+            "type": "integer"
+          },
+          "previous_page_count": {
+            "minimum": 0.0,
+            "title": "Previous Page Count",
+            "type": "integer"
+          },
+          "question_id": {
+            "format": "uuid",
+            "title": "Question Id",
+            "type": "string"
+          },
+          "question_position": {
+            "title": "Question Position",
+            "type": "integer"
+          },
+          "response_version": {
+            "title": "Response Version",
+            "type": "integer"
+          },
+          "saved_at": {
+            "format": "date-time",
+            "title": "Saved At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "question_id",
+          "question_position",
+          "response_version",
+          "change",
+          "previous_page_count",
+          "page_count",
+          "saved_at"
+        ],
+        "title": "ResponseRevision",
+        "type": "object"
       },
       "ReviewCompletion": {
         "properties": {

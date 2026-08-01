@@ -1,5 +1,6 @@
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Literal
 from uuid import UUID, uuid4
 
 from argon2 import PasswordHasher
@@ -58,6 +59,8 @@ from app.domain.models import (
     QuestionSubmissionReceipt,
     QuestionType,
     QuestionView,
+    ResponseKind,
+    ResponseRevision,
     ReviewCompletion,
     ReviewItemView,
     SavedResponse,
@@ -77,6 +80,25 @@ from app.tools.import_question_set import (
 )
 
 
+def _photo_paths(kind: ResponseKind | None, answer: object) -> list[str]:
+    if kind != ResponseKind.PHOTO or not isinstance(answer, dict):
+        return []
+    paths = answer.get("paths")
+    if not isinstance(paths, list):
+        return []
+    return [path for path in paths if isinstance(path, str)]
+
+
+def _photo_revision_change(
+    previous_paths: list[str], next_paths: list[str]
+) -> Literal["photo_added", "photo_updated", "photo_removed"]:
+    if not previous_paths:
+        return "photo_added"
+    if not next_paths:
+        return "photo_removed"
+    return "photo_updated"
+
+
 class MemoryRepository:
     """Fixture-backed repository used by tests and local UI development."""
 
@@ -88,6 +110,7 @@ class MemoryRepository:
         self.assignments: dict[str, Assignment] = {}
         self.attempts: dict[str, Attempt] = {}
         self.responses: dict[tuple[str, str], SavedResponse] = {}
+        self.response_revisions: dict[str, list[ResponseRevision]] = {}
         self.jobs: dict[str, Job] = {}
         self.question_results: dict[str, list[QuestionResult]] = {}
         self.submission_idempotency: dict[tuple[str, str], str] = {}
@@ -527,6 +550,26 @@ class MemoryRepository:
             response_data["id"] = existing.id
         response = SavedResponse(**response_data)
         self.responses[key] = response
+        previous_paths = _photo_paths(
+            existing.kind if existing is not None else None,
+            existing.answer if existing is not None else None,
+        )
+        next_paths = _photo_paths(request.kind, request.answer)
+        if previous_paths != next_paths and (
+            request.kind == ResponseKind.PHOTO
+            or (existing is not None and existing.kind == ResponseKind.PHOTO)
+        ):
+            self.response_revisions.setdefault(attempt_id, []).append(
+                ResponseRevision(
+                    question_id=question.id,
+                    question_position=question.position,
+                    response_version=response.version,
+                    change=_photo_revision_change(previous_paths, next_paths),
+                    previous_page_count=len(previous_paths),
+                    page_count=len(next_paths),
+                    saved_at=response.saved_at,
+                )
+            )
         return response
 
     async def submit_question(
@@ -1048,6 +1091,9 @@ class MemoryRepository:
             correction_count=correction_count,
             pending_review_count=len(reviews),
             reviews=reviews,
+            response_revisions=list(
+                reversed(self.response_revisions.get(attempt_id, []))
+            ),
         )
 
     async def create_correction(
