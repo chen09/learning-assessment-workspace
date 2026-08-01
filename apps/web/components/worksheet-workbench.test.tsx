@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   submitAttempt: vi.fn(),
   submitQuestion: vi.fn(),
   uploadToSignedUrl: vi.fn(),
+  rotateAnswerImage: vi.fn(),
 }));
 
 vi.mock("@/lib/api-client", async (importOriginal) => ({
@@ -41,6 +42,10 @@ vi.mock("@/lib/api-client", async (importOriginal) => ({
   submitAttempt: mocks.submitAttempt,
   submitQuestion: mocks.submitQuestion,
   uploadToSignedUrl: mocks.uploadToSignedUrl,
+}));
+
+vi.mock("@/lib/photo-rotation", () => ({
+  rotateAnswerImage: mocks.rotateAnswerImage,
 }));
 
 const assignmentWork = {
@@ -196,6 +201,12 @@ describe("WorksheetWorkbench", () => {
     });
     mocks.uploadToSignedUrl.mockReset();
     mocks.uploadToSignedUrl.mockResolvedValue(undefined);
+    mocks.rotateAnswerImage.mockReset();
+    mocks.rotateAnswerImage.mockResolvedValue(
+      new File(["rotated"], "answer-page-rotated-90.jpg", {
+        type: "image/jpeg",
+      }),
+    );
   });
 
   it("autosaves an answer and lets the child move to the next question", async () => {
@@ -596,6 +607,75 @@ describe("WorksheetWorkbench", () => {
         expires_in: 300,
       },
       expect.objectContaining({ name: "replacement-answer.jpg" }),
+    );
+  });
+
+  it("rotates an uploaded response photo into a new private answer object", async () => {
+    mocks.createChildUploadIntent
+      .mockResolvedValueOnce({
+        bucket: "responses",
+        path: "family-1/attempt-1/original-answer.jpg",
+        upload_url: "https://storage.example.test/upload/original",
+        expires_in: 300,
+      })
+      .mockResolvedValueOnce({
+        bucket: "responses",
+        path: "family-1/attempt-1/answer-page-rotated-90.jpg",
+        upload_url: "https://storage.example.test/upload/rotated",
+        expires_in: 300,
+      });
+
+    render(<WorksheetWorkbench />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Go to question 4" }),
+    );
+    fireEvent.change(screen.getByLabelText(/Take a photo or choose images/), {
+      target: {
+        files: [
+          new File(["original"], "original-answer.jpg", {
+            type: "image/jpeg",
+          }),
+        ],
+      },
+    });
+    await screen.findByRole("button", {
+      name: "Rotate original-answer.jpg clockwise",
+    });
+    await screen.findByText("Saved");
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Rotate original-answer.jpg clockwise",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mocks.rotateAnswerImage).toHaveBeenCalledWith(
+        "blob:preview/original-answer.jpg",
+        "original-answer.jpg",
+      );
+      expect(mocks.saveAttemptResponse).toHaveBeenLastCalledWith(
+        "attempt-1",
+        "math-photo",
+        {
+          kind: "photo",
+          answer: {
+            paths: ["family-1/attempt-1/answer-page-rotated-90.jpg"],
+          },
+          expected_version: 1,
+        },
+        "child-token",
+      );
+    });
+
+    expect(
+      mocks.uploadToSignedUrl,
+    ).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        upload_url: "https://storage.example.test/upload/rotated",
+      }),
+      expect.objectContaining({ name: "answer-page-rotated-90.jpg" }),
     );
   });
 

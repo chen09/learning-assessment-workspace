@@ -12,6 +12,7 @@ import {
   Focus,
   Grid2X2,
   RefreshCw,
+  RotateCw,
   Send,
   Trash2,
   Volume2,
@@ -52,6 +53,7 @@ import {
   uploadToSignedUrl,
 } from "@/lib/api-client";
 import { getAvailableWordOrderTokens } from "@/lib/word-order";
+import { rotateAnswerImage } from "@/lib/photo-rotation";
 
 type Question = {
   id: string;
@@ -1038,63 +1040,86 @@ function WorksheetWorkbenchContent() {
           clarityWarnings.filter((_, photoIndex) => photoIndex !== index),
         );
       };
+      const replaceStoredPhoto = (index: number, file: File, path?: string) => {
+        const names = [...photoNames];
+        names[index] = file.name;
+        const paths = [...photoPaths];
+        if (path !== undefined) {
+          paths[index] = path;
+        }
+        updatePhotos(names, paths);
+
+        const previews = [...photoPreviews];
+        const previousPreview = previews[index];
+        if (previousPreview && photoObjectUrls.current.delete(previousPreview)) {
+          URL.revokeObjectURL(previousPreview);
+        }
+        const previewUrl = URL.createObjectURL(file);
+        photoObjectUrls.current.add(previewUrl);
+        previews[index] = previewUrl;
+        updatePhotoPreviews(previews);
+
+        const warnings = [...clarityWarnings];
+        warnings[index] = file.size < MINIMUM_PHOTO_FILE_BYTES;
+        updateClarityWarnings(warnings);
+      };
+      const uploadReplacementPhoto = async (index: number, file: File) => {
+        if (!attemptId || !familyId || !childToken) {
+          replaceStoredPhoto(index, file);
+          return;
+        }
+        const uploadKey = `response-replace-${attemptId}-${question.id}-${index}-${file.lastModified}`;
+        const intent = await createChildUploadIntent(
+          {
+            family_id: familyId,
+            bucket: "responses",
+            object_id: attemptId,
+            filename: file.name,
+            content_type:
+              file.type === "image/png" ? "image/png" : "image/jpeg",
+          },
+          childToken,
+          uploadKey,
+        );
+        await uploadToSignedUrl(intent, file);
+        // The original response file remains private and untouched; only this answer reference changes.
+        replaceStoredPhoto(index, file, intent.path);
+      };
       const replacePhoto = (index: number, file: File) => {
         if (isSavingPhotoAnswer || !canManagePhotoOrder) {
           return;
         }
-
-        const replaceStoredPhoto = (path?: string) => {
-          const names = [...photoNames];
-          names[index] = file.name;
-          const paths = [...photoPaths];
-          if (path !== undefined) {
-            paths[index] = path;
-          }
-          updatePhotos(names, paths);
-
-          const previews = [...photoPreviews];
-          const previousPreview = previews[index];
-          if (
-            previousPreview &&
-            photoObjectUrls.current.delete(previousPreview)
-          ) {
-            URL.revokeObjectURL(previousPreview);
-          }
-          const previewUrl = URL.createObjectURL(file);
-          photoObjectUrls.current.add(previewUrl);
-          previews[index] = previewUrl;
-          updatePhotoPreviews(previews);
-
-          const warnings = [...clarityWarnings];
-          warnings[index] = file.size < MINIMUM_PHOTO_FILE_BYTES;
-          updateClarityWarnings(warnings);
-        };
-
-        if (!attemptId || !familyId || !childToken) {
-          replaceStoredPhoto();
-          return;
-        }
-
         setSaveStatus("saving");
         setPhotoUploadQuestionId(question.id);
         void (async () => {
           try {
-            const uploadKey = `response-replace-${attemptId}-${question.id}-${index}-${file.lastModified}`;
-            const intent = await createChildUploadIntent(
-              {
-                family_id: familyId,
-                bucket: "responses",
-                object_id: attemptId,
-                filename: file.name,
-                content_type:
-                  file.type === "image/png" ? "image/png" : "image/jpeg",
-              },
-              childToken,
-              uploadKey,
+            await uploadReplacementPhoto(index, file);
+          } catch {
+            setSaveStatus("offline");
+          } finally {
+            setPhotoUploadQuestionId((current) =>
+              current === question.id ? null : current,
             );
-            await uploadToSignedUrl(intent, file);
-            // The original response file remains private and untouched; only this answer reference changes.
-            replaceStoredPhoto(intent.path);
+          }
+        })();
+      };
+      const rotatePhoto = (index: number) => {
+        const previewUrl = photoPreviews[index];
+        const name = photoNames[index];
+        if (
+          isSavingPhotoAnswer ||
+          !canManagePhotoOrder ||
+          !previewUrl ||
+          !name
+        ) {
+          return;
+        }
+        setSaveStatus("saving");
+        setPhotoUploadQuestionId(question.id);
+        void (async () => {
+          try {
+            const rotatedFile = await rotateAnswerImage(previewUrl, name);
+            await uploadReplacementPhoto(index, rotatedFile);
           } catch {
             setSaveStatus("offline");
           } finally {
@@ -1251,6 +1276,14 @@ function WorksheetWorkbenchContent() {
                         />
                         <RefreshCw aria-hidden="true" size={15} />
                       </label>
+                      <button
+                        aria-label={t("worksheet.rotatePhoto", { name })}
+                        disabled={isSavingPhotoAnswer || !photoPreviews[index]}
+                        onClick={() => rotatePhoto(index)}
+                        type="button"
+                      >
+                        <RotateCw size={15} />
+                      </button>
                       <button
                         aria-label={t("worksheet.movePhotoEarlier", {
                           name,
