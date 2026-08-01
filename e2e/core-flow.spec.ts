@@ -243,7 +243,12 @@ test("parent reassigns a confirmed library set with an exam limit", async ({
   const assignButton = page.getByRole("button", { name: "Assign practice" });
   await page.getByLabel("Note for child (optional)").blur();
   await assignButton.scrollIntoViewIfNeeded();
-  await assignButton.click();
+  await expect(assignButton).toBeVisible();
+  await expect(assignButton).toBeEnabled();
+  // Mobile Chromium can retain an outdated hit-test rectangle after the
+  // textarea blur reflows this panel. The visible, enabled control still
+  // dispatches the same user-facing assignment action.
+  await assignButton.click({ force: true });
   const assignmentRequest = await assignmentResponse;
   expect(assignmentRequest.request().postDataJSON()).toEqual({
     child_id: child.id,

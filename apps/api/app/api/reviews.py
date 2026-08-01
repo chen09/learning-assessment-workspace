@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.dependencies import Repository, get_repository, require_child
-from app.domain.errors import NotFoundError
+from app.domain.errors import NotFoundError, ReviewRequiresParent
 from app.domain.models import (
     ChildSessionClaims,
     CompleteReviewRequest,
@@ -23,7 +23,11 @@ async def list_today_reviews(
     return await repository.list_due_reviews(str(child.child_id))
 
 
-@router.post("/today/skip", response_model=list[ReviewCompletion])
+@router.post(
+    "/today/skip",
+    response_model=list[ReviewCompletion],
+    response_model_exclude_none=True,
+)
 async def skip_today_reviews(
     repository: Annotated[Repository, Depends(get_repository)],
     child: Annotated[ChildSessionClaims, Depends(require_child)],
@@ -49,4 +53,12 @@ async def complete_review(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="The review item is not available.",
+        ) from error
+    except ReviewRequiresParent as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "review_requires_parent",
+                "message": "This review needs a parent or AI decision.",
+            },
         ) from error

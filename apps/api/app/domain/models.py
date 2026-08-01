@@ -3,7 +3,7 @@ from enum import StrEnum
 from typing import Any, Literal
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class QuestionSetStatus(StrEnum):
@@ -389,16 +389,25 @@ class ParentAttemptReview(BaseModel):
 
 class ReviewItemView(BaseModel):
     id: UUID
-    child_id: UUID
+    child_id: UUID = Field(exclude=True)
     source_question_id: UUID
     prompt: str
+    type: QuestionType
+    options: list[str] | None
+    answer_mode: Literal["choice", "text", "tokens", "parent_review"]
     due_on: date
     interval_days: int
     level: Literal["reinforcement", "standard", "challenge"]
 
 
 class CompleteReviewRequest(BaseModel):
-    outcome: Literal["correct", "incorrect"]
+    """A child answer; the server derives correctness from the source question."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    choices: list[int] | None = Field(default=None, max_length=20)
+    text: str | None = Field(default=None, max_length=5000)
+    tokens: list[str] | None = Field(default=None, max_length=100)
 
 
 class ReviewCompletion(BaseModel):
@@ -406,6 +415,7 @@ class ReviewCompletion(BaseModel):
     old_interval_days: int
     new_interval_days: int
     next_due_on: date
+    outcome: Literal["correct", "incorrect"] | None = None
 
 
 class HistoryItem(BaseModel):

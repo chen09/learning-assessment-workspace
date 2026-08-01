@@ -1068,6 +1068,16 @@ export type ReviewItem = {
   id: string;
   source_question_id: string;
   prompt: string;
+  type:
+    | "single_choice"
+    | "multiple_choice"
+    | "typed_text"
+    | "word_order"
+    | "handwriting"
+    | "photo"
+    | "listening";
+  options: string[] | null;
+  answer_mode: "choice" | "text" | "tokens" | "parent_review";
   due_on: string;
   interval_days: number;
   level: "reinforcement" | "standard" | "challenge";
@@ -1086,6 +1096,13 @@ export type ReviewCompletion = {
   old_interval_days: number;
   new_interval_days: number;
   next_due_on: string;
+  outcome?: "correct" | "incorrect";
+};
+
+export type ReviewAnswer = {
+  choices?: number[];
+  text?: string;
+  tokens?: string[];
 };
 
 export async function skipTodayReviews(childToken: string) {
@@ -1098,14 +1115,14 @@ export async function skipTodayReviews(childToken: string) {
 
 export async function completeReview(
   itemId: string,
-  outcome: "correct" | "incorrect",
+  answer: ReviewAnswer,
   childToken: string,
 ) {
   return apiRequest<ReviewCompletion>(
     `/v1/reviews/${encodeURIComponent(itemId)}/complete`,
     {
       method: "POST",
-      body: JSON.stringify({ outcome }),
+      body: JSON.stringify(answer),
     },
     childToken,
   );

@@ -474,10 +474,35 @@ async def test_postgres_vertical_flow_and_family_isolation() -> None:
         # spaced review yet. When local Storage is unavailable, the fallback
         # path has three deterministic incorrect results instead.
         assert len(reviews) == (2 if uploaded_path else 3)
+        deterministic_review = next(
+            review for review in reviews if review.answer_mode != "parent_review"
+        )
+        review_question = next(
+            question
+            for question in work.questions
+            if question.id == deterministic_review.source_question_id
+        )
+        if review_question.type.value in {"single_choice", "multiple_choice"}:
+            choices = review_question.answer_key.get("choices")
+            review_answer = CompleteReviewRequest(
+                choices=(
+                    choices
+                    if isinstance(choices, list)
+                    else [review_question.answer_key["choice"]]
+                )
+            )
+        elif review_question.type.value == "typed_text":
+            review_answer = CompleteReviewRequest(
+                text=review_question.answer_key.get("text", "")
+            )
+        else:
+            review_answer = CompleteReviewRequest(
+                tokens=review_question.answer_key.get("tokens", [])
+            )
         completion = await repository.complete_review(
-            str(reviews[0].id),
+            str(deterministic_review.id),
             str(child_a),
-            CompleteReviewRequest(outcome="correct"),
+            review_answer,
         )
         assert completion.old_interval_days == 1
         assert completion.new_interval_days == 3

@@ -66,6 +66,9 @@ def test_child_can_skip_todays_reviews_without_resetting_their_interval() -> Non
         child_id=UUID(fixture["child"]["id"]),
         source_question_id=UUID(fixture["questions"][0]["id"]),
         prompt="Choose the correct expansion.",
+        type="single_choice",
+        options=["a² − b²", "a² + b²", "a² − 2ab + b²"],
+        answer_mode="choice",
         due_on=datetime.now(UTC).date(),
         interval_days=7,
         level="standard",
@@ -85,6 +88,99 @@ def test_child_can_skip_todays_reviews_without_resetting_their_interval() -> Non
         }
     ]
     assert today.json() == []
+
+
+def test_child_review_requires_an_answer_and_is_graded_server_side() -> None:
+    client = TestClient(create_app())
+    fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+    session = client.post(
+        f"/v1/children/{fixture['child']['id']}/sessions",
+        json={"pin": "123456"},
+    ).json()
+    child_headers = {"Authorization": f"Bearer {session['access_token']}"}
+    repository = client.app.state.repository
+    typed_question = fixture["questions"][1]
+    first_review = ReviewItemView(
+        id=uuid4(),
+        child_id=UUID(fixture["child"]["id"]),
+        source_question_id=UUID(typed_question["id"]),
+        prompt=typed_question["prompt"],
+        due_on=datetime.now(UTC).date(),
+        interval_days=3,
+        level="standard",
+        type="typed_text",
+        options=None,
+        answer_mode="text",
+    )
+    second_review = first_review.model_copy(update={"id": uuid4(), "interval_days": 1})
+    handwriting_question = fixture["questions"][2]
+    handwriting_review = ReviewItemView(
+        id=uuid4(),
+        child_id=UUID(fixture["child"]["id"]),
+        source_question_id=UUID(handwriting_question["id"]),
+        prompt=handwriting_question["prompt"],
+        due_on=datetime.now(UTC).date(),
+        interval_days=1,
+        level="standard",
+        type="handwriting",
+        options=None,
+        answer_mode="parent_review",
+    )
+    repository.review_items[str(first_review.id)] = first_review
+    repository.review_items[str(second_review.id)] = second_review
+    repository.review_items[str(handwriting_review.id)] = handwriting_review
+
+    today = client.get("/v1/reviews/today", headers=child_headers)
+
+    assert today.status_code == 200
+    assert today.json()[0] == {
+        "id": str(first_review.id),
+        "source_question_id": typed_question["id"],
+        "prompt": typed_question["prompt"],
+        "due_on": str(datetime.now(UTC).date()),
+        "interval_days": 3,
+        "level": "standard",
+        "type": "typed_text",
+        "options": None,
+        "answer_mode": "text",
+    }
+    assert "answer_key" not in today.text
+
+    fabricated = client.post(
+        f"/v1/reviews/{first_review.id}/complete",
+        headers=child_headers,
+        json={"outcome": "correct"},
+    )
+    wrong = client.post(
+        f"/v1/reviews/{first_review.id}/complete",
+        headers=child_headers,
+        json={"text": "go"},
+    )
+    correct = client.post(
+        f"/v1/reviews/{second_review.id}/complete",
+        headers=child_headers,
+        json={"text": "goes"},
+    )
+    visual_review = client.post(
+        f"/v1/reviews/{handwriting_review.id}/complete",
+        headers=child_headers,
+        json={},
+    )
+
+    assert fabricated.status_code == 422
+    assert wrong.status_code == 200
+    assert wrong.json() == {
+        "item_id": str(first_review.id),
+        "old_interval_days": 3,
+        "new_interval_days": 1,
+        "next_due_on": str(datetime.now(UTC).date() + timedelta(days=1)),
+        "outcome": "incorrect",
+    }
+    assert correct.status_code == 200
+    assert correct.json()["new_interval_days"] == 3
+    assert correct.json()["outcome"] == "correct"
+    assert visual_review.status_code == 409
+    assert visual_review.json()["detail"]["code"] == "review_requires_parent"
 
 
 def test_child_pin_opens_a_scoped_assignment_session() -> None:

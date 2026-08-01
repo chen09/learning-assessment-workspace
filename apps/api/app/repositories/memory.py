@@ -82,6 +82,11 @@ from app.fixtures.english_lesson_one import (
     lesson_one_source_summary,
     matches_lesson_one_import,
 )
+from app.services.review_schedule import (
+    grade_review_answer,
+    next_interval_days,
+    review_answer_mode,
+)
 from app.tools.import_question_set import (
     ImportDocument,
     ImportResult,
@@ -874,6 +879,9 @@ class MemoryRepository:
                 child_id=attempt.child_id,
                 source_question_id=result.question_id,
                 prompt=question.prompt,
+                type=question.type,
+                options=question.options,
+                answer_mode=review_answer_mode(question.type),
                 due_on=(datetime.now(UTC) + timedelta(days=1)).date(),
                 interval_days=1,
                 level="standard",
@@ -1038,13 +1046,12 @@ class MemoryRepository:
         item = self.review_items.get(item_id)
         if item is None or str(item.child_id) != child_id:
             raise NotFoundError
+        question = self.questions.get(str(item.source_question_id))
+        if question is None:
+            raise NotFoundError
         old_interval = item.interval_days
-        intervals = [1, 3, 7, 14, 30]
-        if request.outcome == "incorrect":
-            new_interval = 1
-        else:
-            current_index = intervals.index(old_interval)
-            new_interval = intervals[min(current_index + 1, len(intervals) - 1)]
+        outcome = grade_review_answer(question, request)
+        new_interval = next_interval_days(old_interval, outcome)
         next_due = datetime.now(UTC).date() + timedelta(days=new_interval)
         self.review_items[item_id] = item.model_copy(
             update={"interval_days": new_interval, "due_on": next_due}
@@ -1054,6 +1061,7 @@ class MemoryRepository:
             old_interval_days=old_interval,
             new_interval_days=new_interval,
             next_due_on=next_due,
+            outcome=outcome,
         )
 
     async def get_attempt_results(

@@ -436,19 +436,52 @@
         "type": "object"
       },
       "CompleteReviewRequest": {
+        "additionalProperties": false,
+        "description": "A child answer; the server derives correctness from the source question.",
         "properties": {
-          "outcome": {
-            "enum": [
-              "correct",
-              "incorrect"
+          "choices": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Outcome",
-            "type": "string"
+            "title": "Choices"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "maxLength": 5000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "tokens": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 100,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tokens"
           }
         },
-        "required": [
-          "outcome"
-        ],
         "title": "CompleteReviewRequest",
         "type": "object"
       },
@@ -3132,6 +3165,21 @@
           "old_interval_days": {
             "title": "Old Interval Days",
             "type": "integer"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "enum": [
+                  "correct",
+                  "incorrect"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
           }
         },
         "required": [
@@ -3145,9 +3193,14 @@
       },
       "ReviewItemView": {
         "properties": {
-          "child_id": {
-            "format": "uuid",
-            "title": "Child Id",
+          "answer_mode": {
+            "enum": [
+              "choice",
+              "text",
+              "tokens",
+              "parent_review"
+            ],
+            "title": "Answer Mode",
             "type": "string"
           },
           "due_on": {
@@ -3173,6 +3226,20 @@
             "title": "Level",
             "type": "string"
           },
+          "options": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Options"
+          },
           "prompt": {
             "title": "Prompt",
             "type": "string"
@@ -3181,13 +3248,18 @@
             "format": "uuid",
             "title": "Source Question Id",
             "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/QuestionType"
           }
         },
         "required": [
           "id",
-          "child_id",
           "source_question_id",
           "prompt",
+          "type",
+          "options",
+          "answer_mode",
           "due_on",
           "interval_days",
           "level"

@@ -11,8 +11,29 @@ import {
   getChildAccessToken,
   getTodayReviews,
   skipTodayReviews,
+  type ReviewAnswer,
   type ReviewItem,
 } from "@/lib/api-client";
+
+type CompletedReview = {
+  nextDueOn: string;
+  outcome?: "correct" | "incorrect";
+};
+
+function getAvailableTokens(options: string[], selected: string[]) {
+  const selectedCounts = new Map<string, number>();
+  for (const token of selected) {
+    selectedCounts.set(token, (selectedCounts.get(token) ?? 0) + 1);
+  }
+  return options.filter((token) => {
+    const count = selectedCounts.get(token) ?? 0;
+    if (count === 0) {
+      return true;
+    }
+    selectedCounts.set(token, count - 1);
+    return false;
+  });
+}
 
 export default function ChildReviewPage() {
   return (
@@ -25,9 +46,13 @@ export default function ChildReviewPage() {
 function ChildReviewContent() {
   const { language, t } = useLanguage();
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
-  const [completed, setCompleted] = useState<Record<string, string>>({});
+  const [answers, setAnswers] = useState<Record<string, ReviewAnswer>>({});
+  const [completed, setCompleted] = useState<Record<string, CompletedReview>>(
+    {},
+  );
   const [loading, setLoading] = useState(true);
   const [skipping, setSkipping] = useState(false);
+  const [submittingId, setSubmittingId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -59,19 +84,32 @@ function ChildReviewContent() {
     };
   }, []);
 
-  const record = async (
-    review: ReviewItem,
-    outcome: "correct" | "incorrect",
-  ) => {
+  const updateAnswer = (reviewId: string, answer: ReviewAnswer) => {
+    setAnswers((current) => ({ ...current, [reviewId]: answer }));
+  };
+
+  const record = async (review: ReviewItem) => {
     const childToken = getChildAccessToken();
-    if (!childToken) {
+    if (!childToken || submittingId === review.id) {
       return;
     }
-    const result = await completeReview(review.id, outcome, childToken);
-    setCompleted((current) => ({
-      ...current,
-      [review.id]: result.next_due_on,
-    }));
+    setSubmittingId(review.id);
+    try {
+      const result = await completeReview(
+        review.id,
+        answers[review.id] ?? {},
+        childToken,
+      );
+      setCompleted((current) => ({
+        ...current,
+        [review.id]: {
+          nextDueOn: result.next_due_on,
+          outcome: result.outcome,
+        },
+      }));
+    } finally {
+      setSubmittingId(null);
+    }
   };
 
   const skipToday = async () => {
@@ -85,7 +123,7 @@ function ChildReviewContent() {
       setCompleted((current) => ({
         ...current,
         ...Object.fromEntries(
-          skipped.map((item) => [item.item_id, item.next_due_on]),
+          skipped.map((item) => [item.item_id, { nextDueOn: item.next_due_on }]),
         ),
       }));
     } finally {
@@ -96,6 +134,98 @@ function ChildReviewContent() {
   const countKey =
     reviews.length === 1 ? "review.quickOne" : "review.quickMany";
   const dateLocale = { en: "en-US", ja: "ja-JP", zh: "zh-CN" }[language];
+
+  const isAnswerReady = (review: ReviewItem) => {
+    const answer = answers[review.id];
+    if (review.answer_mode === "choice") {
+      return Boolean(answer?.choices?.length);
+    }
+    if (review.answer_mode === "text") {
+      return Boolean(answer?.text?.trim());
+    }
+    if (review.answer_mode === "tokens") {
+      return Boolean(answer?.tokens?.length);
+    }
+    return false;
+  };
+
+  const renderAnswer = (review: ReviewItem) => {
+    const answer = answers[review.id] ?? {};
+    if (review.answer_mode === "choice") {
+      const multiple = review.type === "multiple_choice";
+      return (
+        <fieldset className="choice-list">
+          <legend>{t("review.chooseAnswer")}</legend>
+          {review.options?.map((option, index) => {
+            const selected = answer.choices?.includes(index) ?? false;
+            return (
+              <label className={selected ? "choice active" : "choice"} key={option}>
+                <input
+                  checked={selected}
+                  name={review.id}
+                  onChange={() => {
+                    const choices = multiple
+                      ? selected
+                        ? (answer.choices ?? []).filter((choice) => choice !== index)
+                        : [...(answer.choices ?? []), index].sort((left, right) => left - right)
+                      : [index];
+                    updateAnswer(review.id, { choices });
+                  }}
+                  type={multiple ? "checkbox" : "radio"}
+                />
+                <span aria-hidden="true" className="choice-letter">
+                  {String.fromCharCode(65 + index)}
+                </span>
+                <strong>{option}</strong>
+              </label>
+            );
+          })}
+        </fieldset>
+      );
+    }
+    if (review.answer_mode === "text") {
+      return (
+        <label className="typed-answer">
+          {t("review.writeAnswer")}
+          <input
+            onChange={(event) => updateAnswer(review.id, { text: event.target.value })}
+            placeholder={t("review.writeAnswer")}
+            type="text"
+            value={answer.text ?? ""}
+          />
+        </label>
+      );
+    }
+    if (review.answer_mode === "tokens") {
+      const selectedTokens = answer.tokens ?? [];
+      return (
+        <div className="typed-answer">
+          <span>{t("review.buildSentence")}</span>
+          <p>{selectedTokens.join(" ") || t("review.chooseWords")}</p>
+          <div className="header-actions">
+            {getAvailableTokens(review.options ?? [], selectedTokens).map((token, index) => (
+              <button
+                className="button ghost"
+                key={`${token}-${index}`}
+                onClick={() => updateAnswer(review.id, { tokens: [...selectedTokens, token] })}
+                type="button"
+              >
+                {token}
+              </button>
+            ))}
+            <button
+              className="quiet-link"
+              onClick={() => updateAnswer(review.id, { tokens: [] })}
+              type="button"
+            >
+              {t("review.reset")}
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return <p className="form-notice">{t("review.parentReview")}</p>;
+  };
 
   return (
     <>
@@ -132,31 +262,35 @@ function ChildReviewContent() {
                 <h2>{review.prompt}</h2>
                 {completed[review.id] ? (
                   <p className="form-notice">
+                    {completed[review.id].outcome === "correct"
+                      ? t("review.result.correct")
+                      : completed[review.id].outcome === "incorrect"
+                        ? t("review.result.incorrect")
+                        : null}{" "}
                     {t("review.next", {
                       date: new Intl.DateTimeFormat(dateLocale, {
                         dateStyle: "long",
                         timeZone: "UTC",
                       }).format(
-                        new Date(`${completed[review.id]}T00:00:00Z`),
+                        new Date(`${completed[review.id].nextDueOn}T00:00:00Z`),
                       ),
                     })}
                   </p>
                 ) : (
-                  <div className="header-actions">
-                    <button
-                      className="button primary"
-                      onClick={() => void record(review, "correct")}
-                      type="button"
-                    >
-                      {t("review.gotIt")}
-                    </button>
-                    <button
-                      className="button ghost"
-                      onClick={() => void record(review, "incorrect")}
-                      type="button"
-                    >
-                      {t("review.anotherTry")}
-                    </button>
+                  <div className="review-answer">
+                    {renderAnswer(review)}
+                    {review.answer_mode !== "parent_review" ? (
+                      <button
+                        className="button primary"
+                        disabled={!isAnswerReady(review) || submittingId === review.id}
+                        onClick={() => void record(review)}
+                        type="button"
+                      >
+                        {submittingId === review.id
+                          ? t("review.submitting")
+                          : t("review.submit")}
+                      </button>
+                    ) : null}
                   </div>
                 )}
               </div>

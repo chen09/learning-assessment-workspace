@@ -33,6 +33,9 @@ vi.mock("@/lib/api-client", async (importOriginal) => {
         id: "review-1",
         source_question_id: "question-1",
         prompt: "What is 7 × 8?",
+        type: "typed_text" as const,
+        options: null,
+        answer_mode: "text" as const,
         due_on: "2026-07-29",
         interval_days: 1,
         level: "standard" as const,
@@ -49,7 +52,7 @@ describe("ChildReviewPage", () => {
     window.localStorage.setItem("luma-language:demo-child", "ja");
   });
 
-  it("localizes the review controls while keeping the question unchanged", async () => {
+  it("localizes the answer form and sends a real answer for server-side grading", async () => {
     render(<ChildReviewPage />);
 
     expect(await screen.findByText("What is 7 × 8?")).toBeInTheDocument();
@@ -59,12 +62,15 @@ describe("ChildReviewPage", () => {
       screen.queryByText("Today’s review"),
     ).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "できた" }));
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "56" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "答えを確認" }));
 
     expect(await screen.findByText(/次の復習/)).toBeInTheDocument();
     expect(completeReview).toHaveBeenCalledWith(
       "review-1",
-      "correct",
+      { text: "56" },
       "child-token",
     );
     expect(

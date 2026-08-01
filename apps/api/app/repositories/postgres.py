@@ -85,6 +85,11 @@ from app.domain.models import (
     SubmissionReceipt,
     UploadIntent,
 )
+from app.services.review_schedule import (
+    grade_review_answer,
+    next_interval_days,
+    review_answer_mode,
+)
 from app.tools.import_question_set import (
     ImportDocument,
     ImportResult,
@@ -2581,7 +2586,7 @@ class PostgresRepository:
                     text(
                         """
                         select r.id, r.child_id, r.source_question_id, q.prompt,
-                               r.due_on, r.interval_days, r.level
+                               q.type, q.options, r.due_on, r.interval_days, r.level
                         from public.review_items r
                         join public.questions q on q.id = r.source_question_id
                         where r.child_id = :child_id
@@ -2600,6 +2605,13 @@ class PostgresRepository:
                 child_id=row["child_id"],
                 source_question_id=row["source_question_id"],
                 prompt=_localized_text(row["prompt"]),
+                type=row["type"],
+                options=(
+                    [str(option) for option in row["options"]]
+                    if isinstance(row["options"], list)
+                    else None
+                ),
+                answer_mode=review_answer_mode(row["type"]),
                 due_on=row["due_on"],
                 interval_days=row["interval_days"],
                 level=row["level"],
@@ -2957,11 +2969,13 @@ class PostgresRepository:
             result = await connection.execute(
                 text(
                     """
-                    select id, family_id, interval_days
-                    from public.review_items
-                    where id = :item_id
-                      and child_id = :child_id
-                      and completed_at is null
+                    select r.id as review_id, r.family_id as review_family_id,
+                           r.interval_days, q.*
+                    from public.review_items r
+                    join public.questions q on q.id = r.source_question_id
+                    where r.id = :item_id
+                      and r.child_id = :child_id
+                      and r.completed_at is null
                     for update
                     """
                 ),
@@ -2971,12 +2985,8 @@ class PostgresRepository:
             if row is None:
                 raise NotFoundError
             old_interval = int(row["interval_days"])
-            intervals = [1, 3, 7, 14, 30]
-            if request.outcome == "incorrect":
-                new_interval = 1
-            else:
-                current_index = intervals.index(old_interval)
-                new_interval = intervals[min(current_index + 1, len(intervals) - 1)]
+            outcome = grade_review_answer(_question(row), request)
+            new_interval = next_interval_days(old_interval, outcome)
             due_result = await connection.execute(
                 text(
                     """
@@ -2996,7 +3006,7 @@ class PostgresRepository:
                 ),
                 {
                     "new_interval": new_interval,
-                    "outcome": request.outcome,
+                    "outcome": outcome,
                     "item_id": _uuid(item_id),
                 },
             )
@@ -3014,9 +3024,9 @@ class PostgresRepository:
                     """
                 ),
                 {
-                    "family_id": row["family_id"],
+                    "family_id": row["review_family_id"],
                     "item_id": _uuid(item_id),
-                    "outcome": request.outcome,
+                    "outcome": outcome,
                     "old_interval": old_interval,
                     "new_interval": new_interval,
                 },
@@ -3026,6 +3036,7 @@ class PostgresRepository:
             old_interval_days=old_interval,
             new_interval_days=new_interval,
             next_due_on=next_due,
+            outcome=outcome,
         )
 
     async def create_import(

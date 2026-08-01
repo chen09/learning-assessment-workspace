@@ -24,6 +24,12 @@ class QuestionAnswerRequired(DomainError):
     pass
 
 
+class ReviewRequiresParent(DomainError):
+    """A visual or listening review cannot be self-graded in the child flow."""
+
+    pass
+
+
 class ListeningReplayLimitReached(DomainError):
     pass
 
