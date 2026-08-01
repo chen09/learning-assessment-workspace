@@ -8,7 +8,9 @@ from argon2 import PasswordHasher
 from app.domain.errors import (
     AssignmentStatusConflict,
     FamilyParentLimitReached,
+    LibrarySubmissionContainsPrivateAudio,
     LibrarySubmissionStatusConflict,
+    ListeningReplayLimitReached,
     NotFoundError,
     QuestionAnswerRequired,
     ResponseVersionConflict,
@@ -47,6 +49,7 @@ from app.domain.models import (
     JobStatus,
     LibraryReviewSubmission,
     LibrarySubmission,
+    ListeningPlaybackReceipt,
     ParentAttemptReview,
     ParentDecision,
     ParentDecisionRequest,
@@ -105,6 +108,32 @@ def _photo_revision_change(
     return "photo_updated"
 
 
+def _question_view(question: Question, *, play_count: int = 0) -> QuestionView:
+    listening = question.listening
+    return QuestionView(
+        id=question.id,
+        position=question.position,
+        type=question.type,
+        prompt=question.prompt,
+        options=question.options,
+        points=question.points,
+        listening=(
+            {
+                "audio_url": None,
+                "replay_limit": listening.replay_limit,
+                "play_count": play_count,
+                "transcript": (
+                    listening.transcript
+                    if listening.transcript_policy == "always"
+                    else None
+                ),
+            }
+            if listening is not None
+            else None
+        ),
+    )
+
+
 class MemoryRepository:
     """Fixture-backed repository used by tests and local UI development."""
 
@@ -121,6 +150,7 @@ class MemoryRepository:
         self.question_results: dict[str, list[QuestionResult]] = {}
         self.submission_idempotency: dict[tuple[str, str], str] = {}
         self.question_submissions: dict[tuple[str, str], str] = {}
+        self.listening_play_counts: dict[tuple[str, str], int] = {}
         self.child_pin_hashes: dict[str, str] = {}
         self.child_pin_failures: dict[str, int] = {}
         self.child_pin_locked_until: dict[str, datetime] = {}
@@ -132,6 +162,7 @@ class MemoryRepository:
         self.confirm_idempotency: dict[tuple[str, str], str] = {}
         self.assignment_idempotency: dict[tuple[str, str], str] = {}
         self.upload_intents: dict[tuple[str, str], UploadIntent] = {}
+        self.private_audio_paths: set[tuple[str, str]] = set()
         self.library_submissions: dict[str, LibrarySubmission] = {}
         self.library_idempotency: dict[tuple[str, str], str] = {}
         self.library_review_idempotency: dict[tuple[str, str], str] = {}
@@ -211,9 +242,7 @@ class MemoryRepository:
             child=child,
             question_set=question_set,
             assignment=assignment,
-            questions=[
-                QuestionView.model_validate(question.model_dump()) for question in questions
-            ],
+            questions=[_question_view(question) for question in questions],
         )
 
     async def list_families(self, parent_id: str) -> list[Family]:
@@ -397,7 +426,13 @@ class MemoryRepository:
             assignment=assignment,
             attempt=attempt,
             questions=[
-                QuestionView.model_validate(question.model_dump()) for question in questions
+                _question_view(
+                    question,
+                    play_count=self.listening_play_counts.get(
+                        (str(attempt.id), str(question.id)), 0
+                    ),
+                )
+                for question in questions
             ],
             responses=list(self.responses_for_attempt(str(attempt.id)).values()),
             submitted_question_ids=[
@@ -1031,10 +1066,23 @@ class MemoryRepository:
             raise NotFoundError
         results = self.question_results.get(attempt_id, [])
         questions = self.questions_for_attempt(attempt_id)
+        question_by_id = {str(question.id): question for question in questions}
+        visible_results = []
+        for result in results:
+            listening = question_by_id.get(str(result.question_id))
+            transcript = (
+                listening.listening.transcript
+                if listening is not None
+                and listening.listening is not None
+                and listening.listening.transcript_policy
+                in {"always", "after_submission"}
+                else None
+            )
+            visible_results.append(result.model_copy(update={"transcript": transcript}))
         return AttemptResults(
             attempt_id=attempt.id,
-            complete=len(results) == len(questions),
-            results=results,
+            complete=len(visible_results) == len(questions),
+            results=visible_results,
         )
 
     async def get_parent_attempt_review(
@@ -1261,7 +1309,14 @@ class MemoryRepository:
             title=self.question_sets[str(assignment.question_set_id)].title,
             assignment=assignment,
             attempt=retry,
-            questions=[QuestionView.model_validate(question.model_dump())],
+            questions=[
+                _question_view(
+                    question,
+                    play_count=self.listening_play_counts.get(
+                        (str(retry.id), str(question.id)), 0
+                    ),
+                )
+            ],
             responses=list(self.responses_for_attempt(str(retry.id)).values()),
         )
 
@@ -1293,7 +1348,12 @@ class MemoryRepository:
             assignment=assignment,
             attempt=attempt,
             questions=[
-                QuestionView.model_validate(question.model_dump())
+                _question_view(
+                    question,
+                    play_count=self.listening_play_counts.get(
+                        (attempt_id, str(question.id)), 0
+                    ),
+                )
                 for question in questions
             ],
             responses=list(self.responses_for_attempt(attempt_id).values()),
@@ -1302,6 +1362,38 @@ class MemoryRepository:
                 for saved_attempt_id, question_id in self.question_submissions
                 if saved_attempt_id == attempt_id
             ],
+        )
+
+    async def record_listening_playback(
+        self,
+        attempt_id: str,
+        question_id: str,
+        child_id: str,
+    ) -> ListeningPlaybackReceipt:
+        attempt = self.attempts.get(attempt_id)
+        question = self.questions.get(question_id)
+        if (
+            attempt is None
+            or question is None
+            or attempt.submitted_at is not None
+            or str(attempt.child_id) != child_id
+            or question.question_set_id
+            != self.assignments[str(attempt.assignment_id)].question_set_id
+            or question.type != QuestionType.LISTENING
+            or question.listening is None
+        ):
+            raise NotFoundError
+        key = (attempt_id, question_id)
+        play_count = self.listening_play_counts.get(key, 0)
+        if play_count >= question.listening.replay_limit:
+            raise ListeningReplayLimitReached
+        next_count = play_count + 1
+        self.listening_play_counts[key] = next_count
+        return ListeningPlaybackReceipt(
+            question_id=question.id,
+            play_count=next_count,
+            replay_limit=question.listening.replay_limit,
+            audio_url=f"fixture://private-audio/{question.id}",
         )
 
     async def create_import(
@@ -1557,6 +1649,17 @@ class MemoryRepository:
         )
         self.question_sets[str(question_set.id)] = question_set
         for item in document.questions:
+            listening = None
+            if item.type == QuestionType.LISTENING:
+                if item.listening is None:
+                    raise ValueError(
+                        f"Listening question {item.position} needs a private audio file."
+                    )
+                listening = item.listening.private_config()
+                if (family_key, listening.audio_path) not in self.private_audio_paths:
+                    raise ValueError(
+                        "A listening audio file is not available to this family."
+                    )
             question = Question(
                 family_id=family_id,
                 question_set_id=question_set.id,
@@ -1566,6 +1669,7 @@ class MemoryRepository:
                 options=item.options or None,
                 answer_key=item.answer_key,
                 points=float(item.points),
+                listening=listening,
             )
             self.questions[str(question.id)] = question
         assignment = None
@@ -2008,6 +2112,8 @@ class MemoryRepository:
             upload_url=f"fixture://private-upload/{request.bucket}/{path}",
         )
         self.upload_intents[record_key] = intent
+        if request.bucket.value == "audio":
+            self.private_audio_paths.add((family_id, path))
         return intent
 
     async def create_child_upload_intent(
@@ -2048,6 +2154,12 @@ class MemoryRepository:
             or question_set.status != QuestionSetStatus.CONFIRMED
         ):
             raise NotFoundError
+        if any(
+            question.question_set_id == question_set.id
+            and question.type == QuestionType.LISTENING
+            for question in self.questions.values()
+        ):
+            raise LibrarySubmissionContainsPrivateAudio
         record_key = (str(request.family_id), idempotency_key)
         existing_id = self.library_idempotency.get(record_key)
         if existing_id is not None:

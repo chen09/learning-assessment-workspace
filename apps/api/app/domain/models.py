@@ -141,6 +141,33 @@ class QuestionSet(BaseModel):
     source_summary: dict[str, Any] = Field(default_factory=dict)
 
 
+class ListeningConfig(BaseModel):
+    """Private configuration saved with a listening question.
+
+    The storage path and transcript never travel in the default child question
+    shape. Repositories explicitly create a signed, short-lived view for an
+    active attempt instead.
+    """
+
+    audio_path: str = Field(min_length=1, max_length=500)
+    replay_limit: int = Field(default=2, ge=0, le=10)
+    transcript: str | None = Field(default=None, max_length=10_000)
+    transcript_policy: Literal["never", "after_submission", "always"] = "never"
+
+
+class ListeningQuestionView(BaseModel):
+    """The safe, child-facing subset of a listening question.
+
+    Audio URLs are absent until the child deliberately starts a permitted
+    playback. This prevents a work payload from becoming a reusable media URL.
+    """
+
+    audio_url: str | None = None
+    replay_limit: int = Field(ge=0, le=10)
+    play_count: int = Field(default=0, ge=0, le=10)
+    transcript: str | None = None
+
+
 class Question(BaseModel):
     id: UUID = Field(default_factory=uuid4)
     family_id: UUID
@@ -151,6 +178,7 @@ class Question(BaseModel):
     options: list[str] | None = None
     answer_key: dict[str, Any]
     points: float = 1
+    listening: ListeningConfig | None = Field(default=None, exclude=True)
 
 
 class QuestionView(BaseModel):
@@ -160,6 +188,7 @@ class QuestionView(BaseModel):
     prompt: str
     options: list[str] | None = None
     points: float
+    listening: ListeningQuestionView | None = None
 
 
 class Assignment(BaseModel):
@@ -285,6 +314,13 @@ class QuestionSubmissionReceipt(BaseModel):
     job: Job
 
 
+class ListeningPlaybackReceipt(BaseModel):
+    question_id: UUID
+    play_count: int = Field(ge=0, le=10)
+    replay_limit: int = Field(ge=0, le=10)
+    audio_url: str
+
+
 class QuestionResult(BaseModel):
     id: UUID = Field(default_factory=uuid4)
     family_id: UUID
@@ -295,6 +331,7 @@ class QuestionResult(BaseModel):
     confidence: float
     feedback: dict[str, Any]
     grader_version: str = "fixture-v1"
+    transcript: str | None = None
 
 
 class AttemptResults(BaseModel):

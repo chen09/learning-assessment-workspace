@@ -14,6 +14,12 @@ export type ApiQuestion = {
   prompt: string;
   options: string[] | null;
   points: number;
+  listening?: {
+    audio_url: string | null;
+    replay_limit: number;
+    play_count: number;
+    transcript: string | null;
+  } | null;
 };
 
 export type StructuredQuestion = {
@@ -25,6 +31,12 @@ export type StructuredQuestion = {
   rubric: Record<string, unknown>;
   points: number;
   knowledge_code: string;
+  listening?: {
+    audio_path?: string | null;
+    replay_limit?: number;
+    transcript?: string | null;
+    transcript_policy?: "never" | "after_submission" | "always";
+  } | null;
 };
 
 export type StructuredQuestionSetDocument = {
@@ -892,7 +904,25 @@ export type AttemptResult = {
     evidence?: string[];
     annotations?: GradingAnnotation[];
   };
+  transcript?: string | null;
 };
+
+export async function recordListeningPlayback(
+  attemptId: string,
+  questionId: string,
+  childToken: string,
+) {
+  return apiRequest<{
+    question_id: string;
+    play_count: number;
+    replay_limit: number;
+    audio_url: string;
+  }>(
+    `/v1/attempts/${encodeURIComponent(attemptId)}/questions/${encodeURIComponent(questionId)}/audio-playbacks`,
+    { method: "POST" },
+    childToken,
+  );
+}
 
 export type ParentReviewItem = {
   result_id: string;

@@ -281,6 +281,177 @@ def test_parent_can_confirm_structured_json_and_assign_it_without_exposing_answe
     assert "answer_key" not in work.json()["questions"][0]
 
 
+def test_listening_question_uses_private_audio_and_hides_transcript_until_submission() -> None:
+    """A child receives a private audio URL only after a permitted playback."""
+    client = TestClient(create_app())
+    fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+    audio_intent = client.post(
+        "/v1/uploads/intents",
+        headers={
+            **PARENT_HEADERS,
+            "Idempotency-Key": "listening-audio-upload-intent",
+        },
+        json={
+            "family_id": fixture["family"]["id"],
+            "bucket": "audio",
+            "object_id": "4e4e1e8b-bd3a-438d-8e1c-04fb8c7e8713",
+            "filename": "lesson-two.mp3",
+            "content_type": "audio/mpeg",
+        },
+    )
+    assert audio_intent.status_code == 201
+
+    document = _structured_question_set()
+    questions = document["questions"]
+    assert isinstance(questions, list)
+    questions[0].update(
+        {
+            "type": "listening",
+            "prompt": "Listen and choose the place.",
+            "options": ["The library", "School"],
+            "answer_key": {"choice": 1},
+            "listening": {
+                "audio_path": audio_intent.json()["path"],
+                "replay_limit": 1,
+                "transcript": "I walk to school every morning.",
+                "transcript_policy": "after_submission",
+            },
+        }
+    )
+    imported = client.post(
+        "/v1/question-sets/imports/structured",
+        headers={
+            **PARENT_HEADERS,
+            "Idempotency-Key": "structured-listening-import",
+        },
+        json={
+            "family_id": fixture["family"]["id"],
+            "child_id": fixture["child"]["id"],
+            "source_name": "lesson-two-listening.json",
+            "document": document,
+        },
+    )
+    assert imported.status_code == 201
+
+    child_session = client.post(
+        f"/v1/children/{fixture['child']['id']}/sessions",
+        json={"pin": "123456"},
+    ).json()
+    work = client.post(
+        f"/v1/assignments/{imported.json()['assignment_id']}/start",
+        headers={"Authorization": f"Bearer {child_session['access_token']}"},
+    )
+
+    assert work.status_code == 200
+    listening = work.json()["questions"][0]["listening"]
+    assert listening["audio_url"] is None
+    assert listening["replay_limit"] == 1
+    assert listening["play_count"] == 0
+    assert listening["transcript"] is None
+    assert audio_intent.json()["path"] not in str(work.json())
+
+    child_headers = {"Authorization": f"Bearer {child_session['access_token']}"}
+    played = client.post(
+        f"/v1/attempts/{work.json()['attempt']['id']}/questions/"
+        f"{work.json()['questions'][0]['id']}/audio-playbacks",
+        headers=child_headers,
+    )
+    replay_blocked = client.post(
+        f"/v1/attempts/{work.json()['attempt']['id']}/questions/"
+        f"{work.json()['questions'][0]['id']}/audio-playbacks",
+        headers=child_headers,
+    )
+    reopened = client.get(
+        f"/v1/attempts/{work.json()['attempt']['id']}/work",
+        headers=child_headers,
+    )
+
+    assert played.status_code == 200
+    assert played.json()["audio_url"].startswith("fixture://private-audio/")
+    assert played.json()["play_count"] == 1
+    assert replay_blocked.status_code == 409
+    assert replay_blocked.json()["detail"]["code"] == "listening_replay_limit_reached"
+    assert reopened.json()["questions"][0]["listening"]["play_count"] == 1
+
+    saved = client.put(
+        f"/v1/attempts/{work.json()['attempt']['id']}/responses/"
+        f"{work.json()['questions'][0]['id']}",
+        headers=child_headers,
+        json={"kind": "choice", "answer": {"choices": [1]}, "expected_version": 0},
+    )
+    submitted = client.post(
+        f"/v1/attempts/{work.json()['attempt']['id']}/questions/"
+        f"{work.json()['questions'][0]['id']}/submit",
+        headers={**child_headers, "Idempotency-Key": "submit-listening-question"},
+    )
+    processed = client.post("/v1/demo/jobs/process-next", headers=PARENT_HEADERS)
+    results = client.get(
+        f"/v1/attempts/{work.json()['attempt']['id']}/results",
+        headers=child_headers,
+    )
+
+    assert saved.status_code == 200
+    assert submitted.status_code == 202
+    assert processed.status_code == 200
+    assert results.json()["complete"] is True
+    assert results.json()["results"][0]["transcript"] == "I walk to school every morning."
+
+
+def test_listening_question_set_cannot_copy_private_audio_into_public_library() -> None:
+    client = TestClient(create_app())
+    fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+    audio_intent = client.post(
+        "/v1/uploads/intents",
+        headers={**PARENT_HEADERS, "Idempotency-Key": "library-listening-audio"},
+        json={
+            "family_id": fixture["family"]["id"],
+            "bucket": "audio",
+            "object_id": "1b39ec7e-f4a4-4da1-a164-177c600620c1",
+            "filename": "private-listening.mp3",
+            "content_type": "audio/mpeg",
+        },
+    )
+    assert audio_intent.status_code == 201
+    document = _structured_question_set()
+    questions = document["questions"]
+    assert isinstance(questions, list)
+    questions[0].update(
+        {
+            "type": "listening",
+            "options": ["School", "Library"],
+            "answer_key": {"choice": 0},
+            "listening": {"audio_path": audio_intent.json()["path"]},
+        }
+    )
+    imported = client.post(
+        "/v1/question-sets/imports/structured",
+        headers={**PARENT_HEADERS, "Idempotency-Key": "library-listening-import"},
+        json={
+            "family_id": fixture["family"]["id"],
+            "child_id": fixture["child"]["id"],
+            "source_name": "private-listening.json",
+            "document": document,
+        },
+    )
+    assert imported.status_code == 201
+
+    submitted = client.post(
+        "/v1/library/submissions",
+        headers={**PARENT_HEADERS, "Idempotency-Key": "share-private-listening"},
+        json={
+            "family_id": fixture["family"]["id"],
+            "question_set_id": imported.json()["question_set_id"],
+            "rights_confirmed": True,
+            "privacy_confirmed": True,
+        },
+    )
+
+    assert submitted.status_code == 409
+    assert submitted.json()["detail"]["code"] == (
+        "library_submission_contains_private_audio"
+    )
+
+
 def test_parent_can_assign_structured_json_as_a_timed_exam() -> None:
     client = TestClient(create_app())
     fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()

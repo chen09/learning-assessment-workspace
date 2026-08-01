@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   getChildAssignments: vi.fn(),
   getQuestionGradingJob: vi.fn(),
   regradeQuestion: vi.fn(),
+  recordListeningPlayback: vi.fn(),
   saveAttemptResponse: vi.fn(),
   startAssignment: vi.fn(),
   submitAttempt: vi.fn(),
@@ -34,6 +35,7 @@ vi.mock("@/lib/api-client", async (importOriginal) => ({
   getChildAssignments: mocks.getChildAssignments,
   getQuestionGradingJob: mocks.getQuestionGradingJob,
   regradeQuestion: mocks.regradeQuestion,
+  recordListeningPlayback: mocks.recordListeningPlayback,
   saveAttemptResponse: mocks.saveAttemptResponse,
   startAssignment: mocks.startAssignment,
   submitAttempt: mocks.submitAttempt,
@@ -157,6 +159,13 @@ describe("WorksheetWorkbench", () => {
       question_id: "algebra-proof",
       job: { id: "regrade-job-1", status: "queued" },
     });
+    mocks.recordListeningPlayback.mockReset();
+    mocks.recordListeningPlayback.mockResolvedValue({
+      question_id: "english-listening",
+      play_count: 1,
+      replay_limit: 1,
+      audio_url: "https://storage.example/private-listening-refreshed.mp3",
+    });
     mocks.saveAttemptResponse.mockReset();
     mocks.saveAttemptResponse.mockResolvedValue({ version: 1 });
     mocks.startAssignment.mockReset();
@@ -233,6 +242,57 @@ describe("WorksheetWorkbench", () => {
     expect(
       screen.queryByRole("button", { name: /^12:/ }),
     ).not.toBeInTheDocument();
+  });
+
+  it("plays private listening audio only after the server records a replay", async () => {
+    const play = vi
+      .spyOn(HTMLMediaElement.prototype, "play")
+      .mockResolvedValue(undefined);
+    vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => undefined);
+    mocks.startAssignment.mockResolvedValue({
+      ...assignmentWork,
+      questions: assignmentWork.questions.map((question) =>
+        question.id === "english-listening"
+          ? {
+              ...question,
+              listening: {
+                audio_url: null,
+                replay_limit: 1,
+                play_count: 0,
+                transcript: null,
+              },
+            }
+          : question,
+      ),
+    });
+
+    render(<WorksheetWorkbench />);
+    await screen.findByRole("heading", {
+      name: "Choose the correct expansion of (a + b)(a − b).",
+    });
+    for (let index = 0; index < 4; index += 1) {
+      fireEvent.click(screen.getByRole("button", { name: "Next question" }));
+    }
+
+    const playButton = await screen.findByRole("button", {
+      name: "Play at 0.85×",
+    });
+    expect(document.querySelector("audio")).not.toHaveAttribute("src");
+    fireEvent.click(playButton);
+
+    await waitFor(() => {
+      expect(mocks.recordListeningPlayback).toHaveBeenCalledWith(
+        "attempt-1",
+        "english-listening",
+        "child-token",
+      );
+    });
+    expect(play).toHaveBeenCalled();
+    await waitFor(() => expect(playButton).toBeDisabled());
+    expect(document.querySelector("audio")).toHaveAttribute(
+      "src",
+      "https://storage.example/private-listening-refreshed.mp3",
+    );
   });
 
   it("submits only the current answer and keeps the rest of the attempt open", async () => {

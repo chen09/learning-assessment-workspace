@@ -42,6 +42,7 @@ import {
   getChildAccessToken,
   getChildAssignments,
   getQuestionGradingJob,
+  recordListeningPlayback,
   regradeQuestion,
   saveAttemptResponse,
   startAssignment,
@@ -66,6 +67,7 @@ type Question = {
   prompt: string;
   options?: string[];
   points: number;
+  listening?: ApiQuestion["listening"];
 };
 
 type Answer = {
@@ -172,6 +174,7 @@ function questionFromApi(question: ApiQuestion): Question {
     prompt: question.prompt,
     options: question.options ?? undefined,
     points: question.points,
+    listening: question.listening,
   };
 }
 
@@ -201,6 +204,7 @@ function WorksheetWorkbenchContent() {
   >("idle");
   const [dirtyQuestionId, setDirtyQuestionId] = useState<string | null>(null);
   const [playCounts, setPlayCounts] = useState<Record<string, number>>({});
+  const audioRefs = useRef<Record<string, HTMLAudioElement | null>>({});
   const [examMode, setExamMode] = useState(false);
   const [secondsRemaining, setSecondsRemaining] = useState(10 * 60);
   const [attemptId, setAttemptId] = useState<string | null>(null);
@@ -345,6 +349,16 @@ function WorksheetWorkbenchContent() {
         );
         const submittedIds = work.submitted_question_ids ?? [];
         setSubmittedQuestionIds(submittedIds);
+        setPlayCounts(
+          Object.fromEntries(
+            work.questions
+              .filter((question) => question.listening)
+              .map((question) => [
+                question.id,
+                question.listening?.play_count ?? 0,
+              ]),
+          ),
+        );
         setQuestions(work.questions.map(questionFromApi));
         setIsRetryAttempt(retryAttempt);
         setLoadState("ready");
@@ -629,6 +643,16 @@ function WorksheetWorkbenchContent() {
       setAttemptId(work.attempt.id);
       setFamilyId(work.assignment.family_id);
       setQuestions(work.questions.map(questionFromApi));
+      setPlayCounts(
+        Object.fromEntries(
+          work.questions
+            .filter((question) => question.listening)
+            .map((question) => [
+              question.id,
+              question.listening?.play_count ?? 0,
+            ]),
+        ),
+      );
       setAnswers({});
       setResponseVersions({});
       setSubmittedQuestionIds([]);
@@ -744,6 +768,54 @@ function WorksheetWorkbenchContent() {
     setSaveStatus("saving");
   };
 
+  const playListeningAudio = async (question: Question) => {
+    const listening = question.listening;
+    const audio = audioRefs.current[question.id];
+    if (
+      !listening ||
+      !audio ||
+      !attemptId ||
+      !childToken ||
+      (playCounts[question.id] ?? 0) >= listening.replay_limit
+    ) {
+      return;
+    }
+    try {
+      const receipt = await recordListeningPlayback(
+        attemptId,
+        question.id,
+        childToken,
+      );
+      audio.pause();
+      audio.src = receipt.audio_url;
+      audio.currentTime = 0;
+      audio.playbackRate = examMode ? 1 : 0.85;
+      setQuestions((current) =>
+        current.map((candidate) =>
+          candidate.id === question.id && candidate.listening
+            ? {
+                ...candidate,
+                listening: {
+                  ...candidate.listening,
+                  audio_url: receipt.audio_url,
+                },
+              }
+            : candidate,
+        ),
+      );
+      setPlayCounts((current) => ({
+        ...current,
+        [question.id]: receipt.play_count,
+      }));
+      // A successful receipt already consumed the replay. Media playback may
+      // still reject for a device-specific decoder issue, which must not make
+      // the app report a false network/offline error or re-enable the replay.
+      void audio.play().catch(() => undefined);
+    } catch {
+      setSaveStatus("offline");
+    }
+  };
+
   const renderResponse = (question: Question) => {
     const answer = answers[question.id] ?? {};
     if (question.type === "multiple_choice") {
@@ -826,32 +898,40 @@ function WorksheetWorkbenchContent() {
         <>
           {question.type === "listening" ? (
             <div className="listening-player">
+              {question.listening ? (
+                <audio
+                  preload="metadata"
+                  ref={(element) => {
+                    audioRefs.current[question.id] = element;
+                  }}
+                  src={question.listening.audio_url ?? undefined}
+                />
+              ) : null}
               <button
                 className="button dark"
-                disabled={(playCounts[question.id] ?? 0) >= 2}
-                onClick={() => {
-                  const utterance = new SpeechSynthesisUtterance(
-                    "Every morning, I walk to school with my sister.",
-                  );
-                  utterance.lang = "en-US";
-                  utterance.rate = 0.85;
-                  window.speechSynthesis.speak(utterance);
-                  setPlayCounts((current) => ({
-                    ...current,
-                    [question.id]: (current[question.id] ?? 0) + 1,
-                  }));
-                }}
+                disabled={
+                  !question.listening ||
+                  (playCounts[question.id] ?? 0) >=
+                    question.listening.replay_limit
+                }
+                onClick={() => void playListeningAudio(question)}
                 type="button"
               >
                 <Volume2 size={17} />
-                {t("worksheet.playSlow")}
+                {t(examMode ? "worksheet.playAudio" : "worksheet.playSlow")}
               </button>
               <span>
                 {t("worksheet.playsUsed", {
                   count: playCounts[question.id] ?? 0,
-                  limit: 2,
+                  limit: question.listening?.replay_limit ?? 0,
                 })}
               </span>
+              {question.listening?.transcript ? (
+                <details className="listening-transcript">
+                  <summary>{t("worksheet.transcript")}</summary>
+                  <p>{question.listening.transcript}</p>
+                </details>
+              ) : null}
             </div>
           ) : null}
           <fieldset className="choice-list">

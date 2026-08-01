@@ -15,7 +15,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.config import get_settings
-from app.domain.models import QuestionType
+from app.domain.models import ListeningConfig, QuestionType
 
 
 class StrictModel(BaseModel):
@@ -38,6 +38,30 @@ class KnowledgeTagInput(StrictModel):
     label: str = Field(min_length=1)
 
 
+class ListeningInput(StrictModel):
+    """Audio details added by the parent browser after JSON preview.
+
+    AI-produced JSON intentionally has no private storage paths. The parent
+    selects an audio file during review, and the browser inserts its private
+    path before final import.
+    """
+
+    audio_path: str | None = Field(default=None, min_length=1, max_length=500)
+    replay_limit: int = Field(default=2, ge=0, le=10)
+    transcript: str | None = Field(default=None, max_length=10_000)
+    transcript_policy: Literal["never", "after_submission", "always"] = "never"
+
+    def private_config(self) -> ListeningConfig:
+        if not self.audio_path:
+            raise ValueError("Listening questions need a private audio file.")
+        return ListeningConfig(
+            audio_path=self.audio_path,
+            replay_limit=self.replay_limit,
+            transcript=self.transcript,
+            transcript_policy=self.transcript_policy,
+        )
+
+
 class QuestionInput(StrictModel):
     position: int = Field(gt=0)
     type: QuestionType
@@ -47,10 +71,11 @@ class QuestionInput(StrictModel):
     rubric: dict[str, Any] = Field(default_factory=dict)
     points: Decimal = Field(gt=0)
     knowledge_code: str = Field(min_length=1)
+    listening: ListeningInput | None = None
 
     @model_validator(mode="after")
     def validate_answer_key(self) -> "QuestionInput":
-        if self.type == QuestionType.SINGLE_CHOICE:
+        if self.type in {QuestionType.SINGLE_CHOICE, QuestionType.LISTENING}:
             choice = self.answer_key.get("choice")
             if (
                 not isinstance(choice, int)
@@ -104,6 +129,8 @@ class QuestionInput(StrictModel):
                 raise ValueError(
                     "Handwriting questions need parent_review and a reference answer."
                 )
+        if self.type != QuestionType.LISTENING and self.listening is not None:
+            raise ValueError("Only listening questions may include listening settings.")
         return self
 
 
@@ -362,6 +389,42 @@ async def import_question_set(
                     checksum=checksum,
                 )
 
+            listening_assets: dict[str, UUID] = {}
+            listening_configs: dict[int, ListeningConfig] = {}
+            for question in document.questions:
+                if question.type != QuestionType.LISTENING:
+                    continue
+                if question.listening is None:
+                    raise ValueError(
+                        f"Listening question {question.position} needs a private audio file."
+                    )
+                config = question.listening.private_config()
+                listening_configs[question.position] = config
+
+            if listening_configs:
+                audio_paths = [config.audio_path for config in listening_configs.values()]
+                asset_rows = (
+                    await connection.execute(
+                        text(
+                            """
+                            select id, object_path
+                            from public.assets
+                            where family_id = :family_id
+                              and bucket_id = 'audio'
+                              and deleted_at is null
+                              and object_path = any(cast(:audio_paths as text[]))
+                            """
+                        ),
+                        {"family_id": family_id, "audio_paths": audio_paths},
+                    )
+                ).mappings().all()
+                listening_assets = {
+                    str(row["object_path"]): row["id"] for row in asset_rows
+                }
+                missing_audio_paths = sorted(set(audio_paths) - set(listening_assets))
+                if missing_audio_paths:
+                    raise ValueError("A listening audio file is not available to this family.")
+
             knowledge_tag_ids: dict[str, UUID] = {}
             for tag in document.knowledge_tags:
                 tag_id = await connection.scalar(
@@ -444,18 +507,24 @@ async def import_question_set(
                 raise RuntimeError("Could not create the question set.")
 
             for question in document.questions:
-                await connection.execute(
+                listening = listening_configs.get(question.position)
+                stored_rubric = dict(question.rubric)
+                if listening is not None:
+                    stored_rubric["_listening"] = listening.model_dump()
+                question_id = await connection.scalar(
                     text(
                         """
                         insert into public.questions (
                           family_id, question_set_id, position, type, prompt, options,
-                          answer_key, rubric, points, primary_knowledge_tag_id
+                          answer_key, rubric, points, primary_knowledge_tag_id,
+                          transcript_policy
                         ) values (
                           :family_id, :question_set_id, :position, :type,
                           cast(:prompt as jsonb), cast(:options as jsonb),
                           cast(:answer_key as jsonb), cast(:rubric as jsonb),
-                          :points, :knowledge_tag_id
+                          :points, :knowledge_tag_id, :transcript_policy
                         )
+                        returning id
                         """
                     ),
                     {
@@ -476,11 +545,32 @@ async def import_question_set(
                             question.answer_key,
                             ensure_ascii=False,
                         ),
-                        "rubric": json.dumps(question.rubric, ensure_ascii=False),
+                        "rubric": json.dumps(stored_rubric, ensure_ascii=False),
                         "points": question.points,
                         "knowledge_tag_id": knowledge_tag_ids[question.knowledge_code],
+                        "transcript_policy": (
+                            listening.transcript_policy if listening is not None else "never"
+                        ),
                     },
                 )
+                if question_id is None:
+                    raise RuntimeError("Could not save question.")
+                if listening is not None:
+                    await connection.execute(
+                        text(
+                            """
+                            insert into public.question_assets (
+                              question_id, asset_id, purpose, position
+                            ) values (
+                              :question_id, :asset_id, 'audio', 1
+                            )
+                            """
+                        ),
+                        {
+                            "question_id": question_id,
+                            "asset_id": listening_assets[listening.audio_path],
+                        },
+                    )
 
             new_assignment_id: UUID | None = None
             if assign:

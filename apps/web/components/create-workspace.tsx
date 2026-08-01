@@ -140,13 +140,14 @@ Return this strict JSON shape:
 
 Rules:
 1. Positions must be continuous from 1. Every question must use one listed knowledge_code.
-2. Use single_choice only with options and answer_key.choice as a zero-based number. Use typed_text with answer_key.text. Use handwriting for work that must be handwritten; then use answer_key.reference and rubric.grading_mode "parent_review".
+2. Use single_choice only with options and answer_key.choice as a zero-based number. Use typed_text with answer_key.text. Use handwriting for work that must be handwritten; then use answer_key.reference and rubric.grading_mode "parent_review". A listening question uses type listening, options, answer_key.choice, and a listening object with replay_limit (0–10), transcript, and transcript_policy (never, after_submission, or always). Do not provide audio_path: the parent attaches the private audio file during review.
 3. Keep answers and rubrics private in the JSON. Never include answer keys inside the child-facing prompt.
 4. Make the requested difficulty genuinely easier, similar, harder, or competition-level by changing reasoning demands, not merely calculation length.`;
 
-type ReviewDraftQuestion = ApiQuestion & {
+type ReviewDraftQuestion = Omit<ApiQuestion, "listening"> & {
   answer_key: Record<string, unknown>;
   answer?: string;
+  listening?: StructuredQuestionSetDocument["questions"][number]["listening"];
 };
 
 const sampleQuestions: ReviewDraftQuestion[] = [
@@ -442,6 +443,9 @@ function CreateWorkspaceContent() {
   const [draftQuestions, setDraftQuestions] = useState<ReviewDraftQuestion[]>(
     [],
   );
+  const [listeningAudioFiles, setListeningAudioFiles] = useState<
+    Record<string, File>
+  >({});
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(
     null,
   );
@@ -793,8 +797,10 @@ function CreateWorkspaceContent() {
             options: question.options.length > 0 ? question.options : null,
             points: question.points,
             answer_key: question.answer_key,
+            listening: question.listening,
           })),
         );
+        setListeningAudioFiles({});
         setStage("review");
         setRequestStatus("idle");
       } catch {
@@ -860,8 +866,10 @@ function CreateWorkspaceContent() {
             options: question.options.length > 0 ? question.options : null,
             points: question.points,
             answer_key: question.answer_key,
+            listening: question.listening,
           })),
         );
+        setListeningAudioFiles({});
         setStage("review");
         setRequestStatus("idle");
       } catch {
@@ -1024,6 +1032,65 @@ function CreateWorkspaceContent() {
       }
       setRequestStatus("working");
       try {
+        const draftQuestionByPosition = new Map(
+          draftQuestions.map((question) => [question.position, question]),
+        );
+        const documentWithPrivateAudio: StructuredQuestionSetDocument = {
+          ...structuredDocument,
+          questions: await Promise.all(
+            structuredDocument.questions.map(async (question) => {
+              if (question.type !== "listening") {
+                return question;
+              }
+              const draftQuestion = draftQuestionByPosition.get(
+                question.position,
+              );
+              const audioFile = draftQuestion
+                ? listeningAudioFiles[draftQuestion.id]
+                : undefined;
+              if (!audioFile && !question.listening?.audio_path) {
+                throw new Error(
+                  `Listening question ${question.position} needs an audio file.`,
+                );
+              }
+              if (!audioFile) {
+                return question;
+              }
+              const contentType =
+                audioFile.type === "audio/mpeg" ||
+                audioFile.name.toLowerCase().endsWith(".mp3")
+                  ? "audio/mpeg"
+                  : audioFile.type === "audio/mp4" ||
+                      audioFile.type === "audio/x-m4a" ||
+                      audioFile.name.toLowerCase().endsWith(".m4a") ||
+                      audioFile.name.toLowerCase().endsWith(".mp4")
+                    ? "audio/mp4"
+                    : null;
+              if (!contentType) {
+                throw new Error("Use an MP3, M4A, or MP4 audio file.");
+              }
+              const intent = await createUploadIntent(
+                {
+                  family_id: familyId,
+                  bucket: "audio",
+                  object_id: crypto.randomUUID(),
+                  filename: audioFile.name,
+                  content_type: contentType,
+                },
+                parentToken,
+                `listening-audio-${structuredImportKey}-${question.position}`,
+              );
+              await uploadToSignedUrl(intent, audioFile);
+              return {
+                ...question,
+                listening: {
+                  ...question.listening,
+                  audio_path: intent.path,
+                },
+              };
+            }),
+          ),
+        };
         const imported = await importStructuredQuestionSet(
           {
             family_id: familyId,
@@ -1032,7 +1099,7 @@ function CreateWorkspaceContent() {
             assignment_mode: assignmentMode,
             time_limit_seconds: assignmentTimeLimitSeconds,
             parent_note: assignmentNote.trim() || null,
-            document: structuredDocument,
+            document: documentWithPrivateAudio,
           },
           parentToken,
           `${mode}-${structuredImportKey}-${childId}`,
@@ -2139,6 +2206,32 @@ function CreateWorkspaceContent() {
                         {question.answer ?? JSON.stringify(question.answer_key)}
                       </p>
                     </details>
+                    {question.type === "listening" ? (
+                      <label className="draft-listening-audio">
+                        Private audio file (MP3, M4A, or MP4)
+                        <input
+                          accept="audio/mpeg,audio/mp4,.mp3,.m4a,.mp4"
+                          aria-label={`Audio for question ${index + 1}`}
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            if (!file) {
+                              return;
+                            }
+                            setListeningAudioFiles((current) => ({
+                              ...current,
+                              [question.id]: file,
+                            }));
+                          }}
+                          type="file"
+                        />
+                        <span>
+                          {listeningAudioFiles[question.id]?.name ??
+                            (question.listening?.audio_path
+                              ? "Private audio already attached"
+                              : "Audio is required before assigning")}
+                        </span>
+                      </label>
+                    ) : null}
                   </>
                 )}
               </div>

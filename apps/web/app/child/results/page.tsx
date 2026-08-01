@@ -230,6 +230,12 @@ function ChildResultsContent() {
                         {result.feedback.action}
                       </p>
                     ) : null}
+                    {result.transcript ? (
+                      <details className="result-transcript">
+                        <summary>{t("worksheet.transcript")}</summary>
+                        <p>{result.transcript}</p>
+                      </details>
+                    ) : null}
                   </div>
                 </article>
               );

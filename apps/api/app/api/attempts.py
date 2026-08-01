@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, status
 
 from app.api.dependencies import Repository, get_repository, require_child
 from app.domain.errors import (
+    ListeningReplayLimitReached,
     NotFoundError,
     QuestionAnswerRequired,
     ResponseVersionConflict,
@@ -16,6 +17,7 @@ from app.domain.models import (
     AttemptResults,
     ChildSessionClaims,
     Job,
+    ListeningPlaybackReceipt,
     QuestionSubmissionReceipt,
     SavedResponse,
     SaveResponseRequest,
@@ -40,6 +42,34 @@ async def get_attempt_work(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="The attempt is not available for work.",
+        ) from error
+
+
+@router.post(
+    "/{attempt_id}/questions/{question_id}/audio-playbacks",
+    response_model=ListeningPlaybackReceipt,
+)
+async def record_listening_playback(
+    attempt_id: UUID,
+    question_id: UUID,
+    repository: Annotated[Repository, Depends(get_repository)],
+    child: Annotated[ChildSessionClaims, Depends(require_child)],
+) -> ListeningPlaybackReceipt:
+    try:
+        return await repository.record_listening_playback(
+            str(attempt_id),
+            str(question_id),
+            str(child.child_id),
+        )
+    except ListeningReplayLimitReached as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "listening_replay_limit_reached"},
+        ) from error
+    except NotFoundError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The listening question is not available.",
         ) from error
 
 

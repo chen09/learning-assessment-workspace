@@ -11,12 +11,19 @@ export default defineConfig({
     "hosted-flow.spec.ts",
   ],
   // The fixture API has one shared job queue. Keep each project's flows in
-  // source order so one test cannot consume another test's grading job.
+  // source order so one test cannot consume another test's grading job. Next's
+  // development server also serves one shared on-demand chunk cache, so the
+  // cross-project touch suites must not race its initial compilation.
   fullyParallel: false,
+  workers: 1,
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? "github" : "list",
   use: {
     baseURL: webBaseUrl,
+    // The functional flows deliberately run without a retained service-worker
+    // cache. PWA installation/cache behavior has a separate concern; sharing
+    // a cache between end-to-end scenarios can mask current-page regressions.
+    serviceWorkers: "block",
     trace: "retain-on-failure",
   },
   projects: [
@@ -52,7 +59,8 @@ export default defineConfig({
       // behind the desktop browser engine.
       name: "ipad-webkit",
       testMatch: "core-flow.spec.ts",
-      grep: /parent creation reaches child grading and correction through the API/,
+      grep:
+        /(parent creation reaches child grading and correction through the API|listening audio stays private until a child starts an allowed playback)/,
       use: { ...devices["iPad (gen 7)"], browserName: "webkit" },
     },
   ],
@@ -73,7 +81,7 @@ export default defineConfig({
     },
     {
       command:
-        "npm run dev --workspace @learning-assessment/web -- --hostname 127.0.0.1 --port 3107",
+        "npm run build --workspace @learning-assessment/web && python3 -m http.server 3107 --directory apps/web/out",
       url: webBaseUrl,
       env: {
         NEXT_PUBLIC_API_URL: apiBaseUrl,

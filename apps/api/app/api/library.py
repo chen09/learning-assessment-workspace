@@ -4,7 +4,11 @@ from fastapi import APIRouter, Depends, Header, HTTPException, status
 
 from app.api.dependencies import Repository, get_repository, require_parent
 from app.config import get_settings
-from app.domain.errors import LibrarySubmissionStatusConflict, NotFoundError
+from app.domain.errors import (
+    LibrarySubmissionContainsPrivateAudio,
+    LibrarySubmissionStatusConflict,
+    NotFoundError,
+)
 from app.domain.models import (
     CopyPublicLibraryItemRequest,
     CreateLibrarySubmissionRequest,
@@ -182,6 +186,11 @@ async def create_library_submission(
             idempotency_key,
             parent_id,
         )
+    except LibrarySubmissionContainsPrivateAudio as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "library_submission_contains_private_audio"},
+        ) from error
     except NotFoundError as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

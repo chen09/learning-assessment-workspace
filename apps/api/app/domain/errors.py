@@ -24,6 +24,10 @@ class QuestionAnswerRequired(DomainError):
     pass
 
 
+class ListeningReplayLimitReached(DomainError):
+    pass
+
+
 class FamilyParentLimitReached(DomainError):
     pass
 
@@ -33,4 +37,10 @@ class AssignmentStatusConflict(DomainError):
 
 
 class LibrarySubmissionStatusConflict(DomainError):
+    pass
+
+
+class LibrarySubmissionContainsPrivateAudio(DomainError):
+    """Audio cannot enter the public library until asset sharing is explicit."""
+
     pass

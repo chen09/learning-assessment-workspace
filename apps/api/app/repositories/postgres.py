@@ -17,7 +17,9 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_en
 from app.domain.errors import (
     AssignmentStatusConflict,
     FamilyParentLimitReached,
+    LibrarySubmissionContainsPrivateAudio,
     LibrarySubmissionStatusConflict,
+    ListeningReplayLimitReached,
     NotFoundError,
     QuestionAnswerRequired,
     ResponseVersionConflict,
@@ -55,6 +57,9 @@ from app.domain.models import (
     Job,
     LibraryReviewSubmission,
     LibrarySubmission,
+    ListeningConfig,
+    ListeningPlaybackReceipt,
+    ListeningQuestionView,
     ParentAttemptReview,
     ParentDecision,
     ParentDecisionRequest,
@@ -136,6 +141,20 @@ def _question(row: RowMapping) -> Question:
         if isinstance(raw_options, list)
         else None
     )
+    rubric = cast(dict[str, Any], row.get("rubric") or {})
+    listening = None
+    if row["type"] == "listening":
+        raw_listening = rubric.get("_listening")
+        if isinstance(raw_listening, dict):
+            try:
+                listening = ListeningConfig.model_validate(
+                    {
+                        **raw_listening,
+                        "transcript_policy": row.get("transcript_policy", "never"),
+                    }
+                )
+            except ValueError:
+                logger.warning("Ignoring malformed private listening settings.")
     return Question(
         id=row["id"],
         family_id=row["family_id"],
@@ -146,6 +165,7 @@ def _question(row: RowMapping) -> Question:
         options=options,
         answer_key=cast(dict[str, Any], row["answer_key"]),
         points=float(row["points"]),
+        listening=listening,
     )
 
 
@@ -287,9 +307,16 @@ class PostgresRepository:
         self,
         paths: list[str],
     ) -> dict[str, str]:
+        return await self._sign_private_asset_urls("responses", paths)
+
+    async def _sign_private_asset_urls(
+        self,
+        bucket: Literal["responses", "audio"],
+        paths: list[str],
+    ) -> dict[str, str]:
         if not paths or not self._service_role_key:
             return {}
-        endpoint = f"{self._supabase_url}/storage/v1/object/sign/responses"
+        endpoint = f"{self._supabase_url}/storage/v1/object/sign/{bucket}"
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 response = await client.post(
@@ -305,7 +332,8 @@ class PostgresRepository:
                 payload = cast(list[dict[str, Any]], response.json())
         except (httpx.HTTPError, TypeError, ValueError):
             logger.warning(
-                "Could not create signed response-photo URLs.",
+                "Could not create signed private asset URLs for %s.",
+                bucket,
                 exc_info=True,
             )
             return {}
@@ -882,62 +910,9 @@ class PostgresRepository:
                 ),
                 {"assignment_id": _uuid(assignment_id)},
             )
-            question_result = await connection.execute(
-                text(
-                    """
-                    select id, family_id, question_set_id, position, type, prompt,
-                           options, answer_key, points
-                    from public.questions
-                    where question_set_id = :question_set_id
-                    order by position
-                    """
-                ),
-                {"question_set_id": assignment_row["question_set_id"]},
-            )
-            question_rows = question_result.mappings().all()
-            response_rows = (
-                await connection.execute(
-                    text(
-                        """
-                        select id, family_id, attempt_id, question_id, kind,
-                               answer, version, saved_at
-                        from public.responses
-                        where attempt_id = :attempt_id
-                        order by saved_at
-                        """
-                    ),
-                    {"attempt_id": attempt_row["id"]},
-                )
-            ).mappings().all()
-            submitted_question_ids = list(
-                (
-                    await connection.execute(
-                        text(
-                            """
-                            select question_id
-                            from public.question_submissions
-                            where attempt_id = :attempt_id
-                            order by submitted_at
-                            """
-                        ),
-                        {"attempt_id": attempt_row["id"]},
-                    )
-                ).scalars()
-            )
-
-        assignment_data = dict(assignment_row)
-        assignment_data["status"] = AssignmentStatus.IN_PROGRESS
-        questions = [_question(row) for row in question_rows]
-        return AssignmentWork(
-            title=str(assignment_row["title"]),
-            assignment=_assignment(cast(RowMapping, assignment_data)),
-            attempt=_attempt(attempt_row),
-            questions=[
-                QuestionView.model_validate(question.model_dump()) for question in questions
-            ],
-            responses=[SavedResponse(**dict(row)) for row in response_rows],
-            submitted_question_ids=submitted_question_ids,
-        )
+        # Reuse the active-attempt reader so first-open and reopen share the
+        # same private-asset signing and transcript rules.
+        return await self.get_attempt_work(str(attempt_row["id"]), child_id)
 
     async def withdraw_assignment(
         self,
@@ -1689,17 +1664,33 @@ class PostgresRepository:
                 await connection.execute(
                     text(
                         """
-                        select id, family_id, attempt_id, question_id, outcome,
-                               awarded_points, confidence, feedback, grader_version
-                        from public.question_results
-                        where attempt_id = :attempt_id
-                        order by created_at
+                        select result.id, result.family_id, result.attempt_id,
+                               result.question_id, result.outcome,
+                               result.awarded_points, result.confidence,
+                               result.feedback, result.grader_version,
+                               question.rubric, question.transcript_policy
+                        from public.question_results result
+                        join public.questions question on question.id = result.question_id
+                        where result.attempt_id = :attempt_id
+                        order by result.created_at
                         """
                     ),
                     {"attempt_id": _uuid(attempt_id)},
                 )
             ).mappings().all()
-        results = [_result(row) for row in result_rows]
+        results: list[QuestionResult] = []
+        for row in result_rows:
+            result = _result(row)
+            rubric = cast(dict[str, Any], row["rubric"] or {})
+            raw_listening = rubric.get("_listening")
+            transcript = (
+                raw_listening.get("transcript")
+                if isinstance(raw_listening, dict)
+                and row["transcript_policy"] in {"always", "after_submission"}
+                and isinstance(raw_listening.get("transcript"), str)
+                else None
+            )
+            results.append(result.model_copy(update={"transcript": transcript}))
         return AttemptResults(
             attempt_id=_uuid(attempt_id),
             complete=question_count > 0 and len(results) == question_count,
@@ -2055,66 +2046,17 @@ class PostgresRepository:
                             "correction_attempt_id": correction_row["id"],
                         },
                     )
-            assignment_result = await connection.execute(
+            await connection.execute(
                 text(
                     """
-                    with updated as (
-                      update public.assignments
-                      set status = 'correcting', updated_at = now()
-                      where id = :assignment_id
-                      returning id, family_id, question_set_id, child_id, status,
-                                mode, time_limit_seconds
-                    )
-                    select updated.*, qs.title
-                    from updated
-                    join public.question_sets qs on qs.id = updated.question_set_id
+                    update public.assignments
+                    set status = 'correcting', updated_at = now()
+                    where id = :assignment_id
                     """
                 ),
                 {"assignment_id": original["assignment_id"]},
             )
-            assignment_row = assignment_result.mappings().one()
-            question_rows = (
-                await connection.execute(
-                    text(
-                        """
-                        select q.id, q.family_id, q.question_set_id, q.position,
-                               q.type, q.prompt, q.options, q.answer_key, q.points
-                        from public.correction_links cl
-                        join public.question_results qr
-                          on qr.id = cl.original_result_id
-                        join public.questions q on q.id = qr.question_id
-                        where cl.correction_attempt_id = :correction_attempt_id
-                        order by q.position
-                        """
-                    ),
-                    {"correction_attempt_id": correction_row["id"]},
-                )
-            ).mappings().all()
-            response_rows = (
-                await connection.execute(
-                    text(
-                        """
-                        select id, family_id, attempt_id, question_id, kind,
-                               answer, version, saved_at
-                        from public.responses
-                        where attempt_id = :attempt_id
-                        order by saved_at
-                        """
-                    ),
-                    {"attempt_id": correction_row["id"]},
-                )
-            ).mappings().all()
-        questions = [_question(row) for row in question_rows]
-        return AssignmentWork(
-            title=str(assignment_row["title"]),
-            assignment=_assignment(assignment_row),
-            attempt=_attempt(correction_row),
-            questions=[
-                QuestionView.model_validate(question.model_dump())
-                for question in questions
-            ],
-            responses=[SavedResponse(**dict(row)) for row in response_rows],
-        )
+        return await self.get_attempt_work(str(correction_row["id"]), child_id)
 
     async def create_question_retry(
         self,
@@ -2212,61 +2154,17 @@ class PostgresRepository:
                         "correction_attempt_id": retry_row["id"],
                     },
                 )
-            assignment_result = await connection.execute(
+            await connection.execute(
                 text(
                     """
-                    with updated as (
-                      update public.assignments
-                      set status = 'correcting', updated_at = now()
-                      where id = :assignment_id
-                      returning id, family_id, question_set_id, child_id,
-                                status, mode, time_limit_seconds
-                    )
-                    select updated.*, qs.title
-                    from updated
-                    join public.question_sets qs
-                      on qs.id = updated.question_set_id
+                    update public.assignments
+                    set status = 'correcting', updated_at = now()
+                    where id = :assignment_id
                     """
                 ),
                 {"assignment_id": original["assignment_id"]},
             )
-            assignment_row = assignment_result.mappings().one()
-            question_result = await connection.execute(
-                text(
-                    """
-                    select q.id, q.family_id, q.question_set_id, q.position,
-                           q.type, q.prompt, q.options, q.answer_key, q.points
-                    from public.questions q
-                    where q.id = :question_id
-                    """
-                ),
-                {"question_id": _uuid(question_id)},
-            )
-            question_row = question_result.mappings().one_or_none()
-            if question_row is None:
-                raise NotFoundError
-            response_rows = (
-                await connection.execute(
-                    text(
-                        """
-                        select id, family_id, attempt_id, question_id, kind,
-                               answer, version, saved_at
-                        from public.responses
-                        where attempt_id = :attempt_id
-                        order by saved_at
-                        """
-                    ),
-                    {"attempt_id": retry_row["id"]},
-                )
-            ).mappings().all()
-        question = _question(question_row)
-        return AssignmentWork(
-            title=str(assignment_row["title"]),
-            assignment=_assignment(assignment_row),
-            attempt=_attempt(retry_row),
-            questions=[QuestionView.model_validate(question.model_dump())],
-            responses=[SavedResponse(**dict(row)) for row in response_rows],
-        )
+        return await self.get_attempt_work(str(retry_row["id"]), child_id)
 
     async def get_attempt_work(
         self,
@@ -2311,8 +2209,25 @@ class PostgresRepository:
                     text(
                         """
                         select q.id, q.family_id, q.question_set_id, q.position,
-                               q.type, q.prompt, q.options, q.answer_key, q.points
+                               q.type, q.prompt, q.options, q.answer_key, q.rubric,
+                               q.points, q.transcript_policy, audio.object_path as audio_path,
+                               coalesce(playback.play_count, 0) as audio_play_count
                         from public.questions q
+                        left join lateral (
+                          select asset.object_path
+                          from public.question_assets question_asset
+                          join public.assets asset on asset.id = question_asset.asset_id
+                          where question_asset.question_id = q.id
+                            and question_asset.purpose = 'audio'
+                            and asset.family_id = q.family_id
+                            and asset.bucket_id = 'audio'
+                            and asset.deleted_at is null
+                          order by question_asset.position
+                          limit 1
+                        ) audio on q.type = 'listening'
+                        left join public.attempt_audio_playbacks playback
+                          on playback.attempt_id = :attempt_id
+                         and playback.question_id = q.id
                         where q.question_set_id = :question_set_id
                           and (
                             :attempt_kind <> 'correction'
@@ -2428,12 +2343,122 @@ class PostgresRepository:
             assignment=_assignment(assignment_row),
             attempt=_attempt(attempt_row),
             questions=[
-                QuestionView.model_validate(question.model_dump())
-                for question in questions
+                QuestionView.model_validate(question.model_dump()).model_copy(
+                    update={
+                        "listening": (
+                            ListeningQuestionView(
+                                replay_limit=question.listening.replay_limit,
+                                play_count=int(row["audio_play_count"]),
+                                transcript=(
+                                    question.listening.transcript
+                                    if question.listening.transcript_policy == "always"
+                                    else None
+                                ),
+                            )
+                            if question.listening is not None
+                            else None
+                        )
+                    }
+                )
+                for row, question in zip(question_rows, questions, strict=True)
             ],
             responses=saved_responses,
             submitted_question_ids=submitted_question_ids,
         )
+
+    async def record_listening_playback(
+        self,
+        attempt_id: str,
+        question_id: str,
+        child_id: str,
+    ) -> ListeningPlaybackReceipt:
+        async with self._engine.begin() as connection:
+            question_result = await connection.execute(
+                text(
+                    """
+                    select q.id, q.rubric, q.transcript_policy,
+                           audio.object_path as audio_path
+                    from public.attempts attempt
+                    join public.assignments assignment
+                      on assignment.id = attempt.assignment_id
+                    join public.questions q
+                      on q.question_set_id = assignment.question_set_id
+                    join lateral (
+                      select asset.object_path
+                      from public.question_assets question_asset
+                      join public.assets asset on asset.id = question_asset.asset_id
+                      where question_asset.question_id = q.id
+                        and question_asset.purpose = 'audio'
+                        and asset.family_id = attempt.family_id
+                        and asset.bucket_id = 'audio'
+                        and asset.deleted_at is null
+                      order by question_asset.position
+                      limit 1
+                    ) audio on true
+                    where attempt.id = :attempt_id
+                      and attempt.child_id = :child_id
+                      and attempt.submitted_at is null
+                      and assignment.status in ('in_progress', 'correcting')
+                      and q.id = :question_id
+                      and q.type = 'listening'
+                    for update of attempt
+                    """
+                ),
+                {
+                    "attempt_id": _uuid(attempt_id),
+                    "child_id": _uuid(child_id),
+                    "question_id": _uuid(question_id),
+                },
+            )
+            question_row = question_result.mappings().one_or_none()
+            if question_row is None:
+                raise NotFoundError
+            rubric = cast(dict[str, Any], question_row["rubric"] or {})
+            raw_listening = rubric.get("_listening")
+            try:
+                listening = ListeningConfig.model_validate(
+                    {
+                        **cast(dict[str, Any], raw_listening),
+                        "transcript_policy": question_row["transcript_policy"],
+                    }
+                )
+            except (TypeError, ValueError):
+                raise NotFoundError from None
+            audio_path = str(question_row["audio_path"])
+            signed_audio_urls = await self._sign_private_asset_urls(
+                "audio", [audio_path]
+            )
+            audio_url = signed_audio_urls.get(audio_path)
+            if audio_url is None:
+                raise NotFoundError
+            playback_result = await connection.execute(
+                text(
+                    """
+                    insert into public.attempt_audio_playbacks (
+                      attempt_id, question_id, play_count
+                    ) values (:attempt_id, :question_id, 1)
+                    on conflict (attempt_id, question_id) do update
+                    set play_count = public.attempt_audio_playbacks.play_count + 1,
+                        updated_at = now()
+                    where public.attempt_audio_playbacks.play_count < :replay_limit
+                    returning play_count
+                    """
+                ),
+                {
+                    "attempt_id": _uuid(attempt_id),
+                    "question_id": _uuid(question_id),
+                    "replay_limit": listening.replay_limit,
+                },
+            )
+            play_count = playback_result.scalar_one_or_none()
+            if play_count is None:
+                raise ListeningReplayLimitReached
+            return ListeningPlaybackReceipt(
+                question_id=_uuid(question_id),
+                play_count=int(play_count),
+                replay_limit=listening.replay_limit,
+                audio_url=audio_url,
+            )
 
     async def list_child_assignments(
         self,
@@ -4218,6 +4243,20 @@ class PostgresRepository:
                 )
                 if set_result.scalar_one_or_none() is None:
                     raise NotFoundError
+                contains_audio_result = await connection.execute(
+                    text(
+                        """
+                        select exists (
+                          select 1 from public.questions
+                          where question_set_id = :question_set_id
+                            and type = 'listening'
+                        )
+                        """
+                    ),
+                    {"question_set_id": request.question_set_id},
+                )
+                if bool(contains_audio_result.scalar_one()):
+                    raise LibrarySubmissionContainsPrivateAudio
                 existing_pending = await connection.execute(
                     text(
                         """

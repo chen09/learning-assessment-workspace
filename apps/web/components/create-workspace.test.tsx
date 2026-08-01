@@ -493,6 +493,106 @@ describe("CreateWorkspace", () => {
     });
   });
 
+  it("uploads private audio before assigning a listening question", async () => {
+    const document = {
+      schema_version: "1.0" as const,
+      question_set: {
+        title: "Listening check",
+        subject: "English",
+        locale: "en" as const,
+        difficulty: "standard" as const,
+        source_mode: "convert" as const,
+        estimated_minutes: 5,
+      },
+      knowledge_tags: [{ code: "listening", label: "Listening" }],
+      questions: [
+        {
+          position: 1,
+          type: "listening" as const,
+          prompt: "Listen and choose.",
+          options: ["School", "Library"],
+          answer_key: { choice: 0 },
+          rubric: { grading_mode: "exact" },
+          points: 1,
+          knowledge_code: "listening",
+          listening: {
+            replay_limit: 1,
+            transcript: "I go to school.",
+            transcript_policy: "after_submission" as const,
+          },
+        },
+      ],
+    };
+    mocks.previewStructuredQuestionSet.mockResolvedValue({
+      title: "Listening check",
+      subject: "English",
+      locale: "en",
+      question_count: 1,
+      total_points: 1,
+      estimated_minutes: 5,
+      knowledge_tag_count: 1,
+      answer_keys_present: true,
+      checksum: "listening-preview",
+      source_summary: {},
+      questions: document.questions,
+    });
+    mocks.createUploadIntent.mockResolvedValue({
+      bucket: "audio",
+      path: "family-1/audio/listening.mp3",
+      upload_url: "fixture://audio-upload",
+      expires_in: 300,
+    });
+    mocks.uploadToSignedUrl.mockResolvedValue(undefined);
+    mocks.importStructuredQuestionSet.mockResolvedValue({
+      question_set_id: "listening-set",
+      assignment_id: "listening-assignment",
+      status: "confirmed",
+      reused_existing: false,
+    });
+    window.history.replaceState(
+      {},
+      "",
+      "/parent/create/?familyId=family-1&childId=child-1",
+    );
+
+    render(<CreateWorkspace />);
+    await screen.findByRole("combobox", { name: "Child" });
+    fireEvent.click(screen.getByRole("button", { name: "Import AI question JSON" }));
+    fireEvent.change(screen.getByLabelText("AI question JSON"), {
+      target: { files: [new File([JSON.stringify(document)], "listening.json")] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Preview questions" }));
+    await screen.findByRole("heading", { name: "Review before assigning" });
+    fireEvent.change(screen.getByLabelText("Audio for question 1"), {
+      target: { files: [new File(["audio"], "lesson.mp3", { type: "audio/mpeg" })] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm and assign" }));
+
+    await waitFor(() => {
+      expect(mocks.createUploadIntent).toHaveBeenCalledWith(
+        expect.objectContaining({ bucket: "audio", content_type: "audio/mpeg" }),
+        "parent-token",
+        expect.stringContaining("listening-audio-"),
+      );
+      expect(mocks.uploadToSignedUrl).toHaveBeenCalled();
+      expect(mocks.importStructuredQuestionSet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          document: expect.objectContaining({
+            questions: [
+              expect.objectContaining({
+                listening: expect.objectContaining({
+                  audio_path: "family-1/audio/listening.mp3",
+                }),
+              }),
+            ],
+          }),
+        }),
+        "parent-token",
+        expect.any(String),
+      );
+    });
+  });
+
   it("lets a parent collect several authored questions before opening the review draft", async () => {
     mocks.previewStructuredQuestionSet.mockResolvedValue({
       title: "Two question check",

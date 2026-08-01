@@ -103,6 +103,11 @@ async def import_structured_question_set(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="The active family or child is not available.",
         ) from error
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(error),
+        ) from error
 
 
 @router.post(
