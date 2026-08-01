@@ -2670,6 +2670,13 @@
           "kind": {
             "$ref": "#/components/schemas/ResponseKind"
           },
+          "photo_urls": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Photo Urls",
+            "type": "array"
+          },
           "question_id": {
             "format": "uuid",
             "title": "Question Id",
