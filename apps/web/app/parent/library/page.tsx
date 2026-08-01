@@ -32,6 +32,8 @@ const copy = {
     questions: (count: number) => `${count} questions`,
     references: (count: number) =>
       `Based on ${count} private source ${count === 1 ? "file" : "files"}`,
+    source: (title: string, subject: string) =>
+      `Based on private material: ${title}${subject ? ` · ${subject}` : ""}`,
     empty: "No question sets yet.",
     error: "The family library could not be loaded.",
     assign: "Assign to child",
@@ -68,6 +70,8 @@ const copy = {
     family: "家族",
     questions: (count: number) => `${count}問`,
     references: (count: number) => `非公開の元教材 ${count}件に基づく`,
+    source: (title: string, subject: string) =>
+      `元教材：${title}${subject ? ` · ${subject}` : ""}`,
     empty: "問題セットはまだありません。",
     error: "家族の問題ライブラリを読み込めませんでした。",
     assign: "子どもに割り当てる",
@@ -103,6 +107,8 @@ const copy = {
     family: "家庭",
     questions: (count: number) => `${count} 道题`,
     references: (count: number) => `来自 ${count} 份原教材资料`,
+    source: (title: string, subject: string) =>
+      `基于教材：${title}${subject ? ` · ${subject}` : ""}`,
     empty: "还没有题单。",
     error: "无法加载家庭题库。",
     assign: "分配给孩子",
@@ -391,6 +397,10 @@ function LibraryContent() {
         {filteredSets.map((set) => {
           const referenceCount =
             set.source_summary.reference_file_count ?? 0;
+          const sourceMaterialTitle =
+            set.source_summary.source_material_title?.trim();
+          const sourceMaterialSubject =
+            set.source_summary.source_material_subject?.trim() ?? "";
           return (
             <article className="library-card" key={set.id}>
               <span className="library-icon">
@@ -403,6 +413,9 @@ function LibraryContent() {
               <p>{text.questions(set.question_count)}</p>
               {referenceCount > 0 ? (
                 <p>{text.references(referenceCount)}</p>
+              ) : null}
+              {sourceMaterialTitle ? (
+                <p>{text.source(sourceMaterialTitle, sourceMaterialSubject)}</p>
               ) : null}
               <span
                 className={

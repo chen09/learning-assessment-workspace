@@ -368,6 +368,9 @@ export type FamilyQuestionSet = {
     artifact_kind?: string;
     knowledge_points?: string[];
     reference_file_count?: number;
+    source_material_question_set_id?: string;
+    source_material_title?: string;
+    source_material_subject?: string;
   };
 };
 

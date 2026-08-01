@@ -62,6 +62,8 @@ describe("LibraryPage", () => {
         source_summary: {
           artifact_kind: "ai_generated_practice",
           reference_file_count: 27,
+          source_material_title: "Lesson 1 textbook",
+          source_material_subject: "English",
         },
       },
     ]);
@@ -80,6 +82,9 @@ describe("LibraryPage", () => {
     expect(screen.getByText("49 道题")).toBeInTheDocument();
     expect(screen.getByText("待家长确认")).toBeInTheDocument();
     expect(screen.getByText("来自 27 份原教材资料")).toBeInTheDocument();
+    expect(
+      screen.getByText("基于教材：Lesson 1 textbook · English"),
+    ).toBeInTheDocument();
     expect(mocks.getFamilyQuestionSets).toHaveBeenCalledWith(
       "family-1",
       "parent-token",
