@@ -1197,8 +1197,10 @@ test("parent creation reaches child grading and correction through the API", asy
   request,
 }, testInfo) => {
   test.skip(
-    !["desktop", "ipad-chrome"].includes(testInfo.project.name),
-    "The shared fixture API flow runs on desktop and the iPad touch simulation.",
+    !["desktop", "ipad-chrome", "ipad-webkit"].includes(
+      testInfo.project.name,
+    ),
+    "The shared fixture API flow runs on desktop and both iPad touch engines.",
   );
   test.setTimeout(120_000);
 
@@ -1314,7 +1316,7 @@ test("parent creation reaches child grading and correction through the API", asy
       response.url().includes("/responses/") &&
       response.request().method() === "PUT",
   );
-  if (testInfo.project.name === "ipad-chrome") {
+  if (testInfo.project.name.startsWith("ipad-")) {
     const clearButtonBox = await clearHandwriting.boundingBox();
     expect(clearButtonBox).not.toBeNull();
     await page.touchscreen.tap(
@@ -1328,17 +1330,15 @@ test("parent creation reaches child grading and correction through the API", asy
     name: "Clear handwriting",
   });
   await expect(clearDialog).toBeVisible();
-  await expect(
-    clearDialog.getByRole("button", { name: "Clear now" }),
-  ).toHaveCSS("min-height", "41.6px");
   const clearNow = clearDialog.getByRole("button", {
     name: "Clear now",
   });
-  if (testInfo.project.name === "ipad-chrome") {
+  const clearNowBox = await clearNow.boundingBox();
+  expect(clearNowBox).not.toBeNull();
+  expect(clearNowBox!.height).toBeGreaterThanOrEqual(41);
+  if (testInfo.project.name.startsWith("ipad-")) {
     await expect(clearDialog).toBeInViewport();
     await expect(clearNow).toBeInViewport();
-    const clearNowBox = await clearNow.boundingBox();
-    expect(clearNowBox).not.toBeNull();
     await page.touchscreen.tap(
       clearNowBox!.x + clearNowBox!.width / 2,
       clearNowBox!.y + clearNowBox!.height / 2,

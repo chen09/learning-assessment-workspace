@@ -17,17 +17,22 @@ export default defineConfig({
   reporter: process.env.CI ? "github" : "list",
   use: {
     baseURL: webBaseUrl,
-    channel: process.env.CI ? undefined : "chrome",
     trace: "retain-on-failure",
   },
   projects: [
     {
       name: "desktop",
-      use: { ...devices["Desktop Chrome"] },
+      use: {
+        ...devices["Desktop Chrome"],
+        channel: process.env.CI ? undefined : "chrome",
+      },
     },
     {
       name: "mobile",
-      use: { ...devices["Pixel 7"] },
+      use: {
+        ...devices["Pixel 7"],
+        channel: process.env.CI ? undefined : "chrome",
+      },
     },
     {
       // Chrome on iPad uses WebKit, which cannot run through local Chrome.
@@ -35,7 +40,19 @@ export default defineConfig({
       // input and scale in our Chromium E2E environment.
       name: "ipad-chrome",
       testMatch: "core-flow.spec.ts",
-      use: { ...devices["iPad (gen 7)"], browserName: "chromium" },
+      use: {
+        ...devices["iPad (gen 7)"],
+        browserName: "chromium",
+        channel: process.env.CI ? undefined : "chrome",
+      },
+    },
+    {
+      // iPad Chrome is required by Apple to use WebKit. Keep this separate
+      // from the Chromium touch simulation so a WebKit regression cannot hide
+      // behind the desktop browser engine.
+      name: "ipad-webkit",
+      testMatch: "core-flow.spec.ts",
+      use: { ...devices["iPad (gen 7)"], browserName: "webkit" },
     },
   ],
   webServer: [
