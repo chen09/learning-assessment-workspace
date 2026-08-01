@@ -1700,7 +1700,7 @@ class PostgresRepository:
             attempt_result = await connection.execute(
                 text(
                     """
-                    select at.family_id, at.assignment_id, c.nickname,
+                    select at.family_id, at.assignment_id, at.child_id, c.nickname,
                            qs.title
                     from public.attempts at
                     join public.assignments a on a.id = at.assignment_id
