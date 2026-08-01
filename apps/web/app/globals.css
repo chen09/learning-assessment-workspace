@@ -3945,8 +3945,6 @@ button {
 
 .library-assignment-controls > .library-assignment-actions {
   align-self: end;
-  position: relative;
-  z-index: 1;
 }
 
 .print-preview {
@@ -4186,16 +4184,24 @@ button {
   }
 
   .library-assignment-controls {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    align-items: start;
     grid-column: auto;
+    gap: 1rem;
     width: 100%;
   }
 
-  .library-assignment-controls > .library-assignment-fields,
+  .library-assignment-controls > .library-assignment-fields {
+    grid-row: 1;
+    min-width: 0;
+  }
+
   .library-assignment-controls > .library-assignment-actions {
-    align-self: stretch;
-    flex: 0 0 auto;
+    grid-row: 2;
+    min-width: 0;
+    width: 100%;
   }
 
   .draft-question-list article {
