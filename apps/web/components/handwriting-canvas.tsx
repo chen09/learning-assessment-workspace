@@ -77,6 +77,7 @@ export function HandwritingCanvas({
   const [width, setWidth] = useState(2.5);
   const [eraser, setEraser] = useState(false);
   const [clearConfirmationOpen, setClearConfirmationOpen] = useState(false);
+  const lastTouchActionAtRef = useRef(0);
   const [canvasSize, setCanvasSize] = useState<CanvasSize>(() =>
     normalizeCanvasSize(initialSize),
   );
@@ -230,6 +231,16 @@ export function HandwritingCanvas({
     // On iPad Chrome, a toolbar tap can dispatch touch events without the
     // synthetic click that desktop browsers normally follow with.
     event.preventDefault();
+    lastTouchActionAtRef.current = Date.now();
+    action();
+  };
+
+  const handleClickAction = (action: () => void) => {
+    // A touchend on iPad can be followed by a synthetic click. Do not run a
+    // destructive canvas action twice for one physical tap.
+    if (Date.now() - lastTouchActionAtRef.current < 700) {
+      return;
+    }
     action();
   };
 
@@ -335,7 +346,7 @@ export function HandwritingCanvas({
           <button
             aria-label={t("handwriting.clear")}
             disabled={readOnly}
-            onClick={requestClear}
+            onClick={() => handleClickAction(requestClear)}
             onTouchEnd={(event) =>
               handleTouchAction(event, requestClear)
             }
@@ -354,7 +365,7 @@ export function HandwritingCanvas({
           <p>{t("handwriting.clearConfirm")}</p>
           <div>
             <button
-              onClick={keepHandwriting}
+              onClick={() => handleClickAction(keepHandwriting)}
               onTouchEnd={(event) =>
                 handleTouchAction(event, keepHandwriting)
               }
@@ -364,7 +375,7 @@ export function HandwritingCanvas({
             </button>
             <button
               className="danger"
-              onClick={clearImmediately}
+              onClick={() => handleClickAction(clearImmediately)}
               onTouchEnd={(event) =>
                 handleTouchAction(event, clearImmediately)
               }

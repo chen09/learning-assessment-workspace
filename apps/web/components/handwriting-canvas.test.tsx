@@ -138,6 +138,34 @@ describe("HandwritingCanvas", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it("clears exactly once when iPad emits touch and click for one confirmation", () => {
+    const onChange = vi.fn();
+
+    render(
+      <HandwritingCanvas
+        initialStrokes={initialStrokes}
+        onChange={onChange}
+      />,
+    );
+
+    const clearButton = screen.getByRole("button", {
+      name: "Clear handwriting",
+    });
+    fireEvent.touchEnd(clearButton);
+    fireEvent.click(clearButton);
+
+    const confirmButton = screen.getByRole("button", { name: "Clear now" });
+    fireEvent.touchEnd(confirmButton);
+    fireEvent.click(confirmButton);
+
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenLastCalledWith([], {
+      width: 900,
+      height: 420,
+    });
+  });
+
   it("confirms and clears an in-progress touch stroke before it is saved", () => {
     const onChange = vi.fn();
 
