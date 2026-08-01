@@ -802,6 +802,26 @@ class MemoryRepository:
             if str(item.child_id) == child_id and item.due_on <= today
         ][:10]
 
+    async def skip_today_reviews(self, child_id: str) -> list[ReviewCompletion]:
+        today = datetime.now(UTC).date()
+        next_due = today + timedelta(days=1)
+        skipped: list[ReviewCompletion] = []
+        for item_id, item in self.review_items.items():
+            if str(item.child_id) != child_id or item.due_on > today:
+                continue
+            self.review_items[item_id] = item.model_copy(
+                update={"due_on": next_due}
+            )
+            skipped.append(
+                ReviewCompletion(
+                    item_id=item.id,
+                    old_interval_days=item.interval_days,
+                    new_interval_days=item.interval_days,
+                    next_due_on=next_due,
+                )
+            )
+        return skipped
+
     async def list_child_history(self, child_id: str) -> list[HistoryItem]:
         child = self.children.get(child_id)
         if child is None:

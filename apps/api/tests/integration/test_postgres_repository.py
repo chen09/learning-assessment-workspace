@@ -467,6 +467,35 @@ async def test_postgres_vertical_flow_and_family_isolation() -> None:
         )
         assert completion.old_interval_days == 1
         assert completion.new_interval_days == 3
+        skipped = await repository.skip_today_reviews(str(child_a))
+        assert len(skipped) == len(reviews) - 1
+        assert all(
+            completion.old_interval_days == completion.new_interval_days == 1
+            for completion in skipped
+        )
+        assert await repository.list_due_reviews(str(child_a)) == []
+        review_connection = await asyncpg.connect(asyncpg_url)
+        try:
+            skipped_rows = await review_connection.fetch(
+                """
+                select due_on = current_date + 1 as postponed,
+                       skipped_on = current_date as recorded,
+                       failure_count,
+                       consecutive_standard_successes
+                from public.review_items
+                where id = any($1::uuid[])
+                """,
+                [completion.item_id for completion in skipped],
+            )
+        finally:
+            await review_connection.close()
+        assert len(skipped_rows) == len(skipped)
+        assert all(row["postponed"] and row["recorded"] for row in skipped_rows)
+        assert all(
+            row["failure_count"] == 0
+            and row["consecutive_standard_successes"] == 0
+            for row in skipped_rows
+        )
         correction = await repository.create_correction(
             str(work.attempt.id),
             str(child_a),

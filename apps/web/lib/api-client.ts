@@ -892,17 +892,27 @@ export async function getTodayReviews(childToken: string) {
   );
 }
 
+export type ReviewCompletion = {
+  item_id: string;
+  old_interval_days: number;
+  new_interval_days: number;
+  next_due_on: string;
+};
+
+export async function skipTodayReviews(childToken: string) {
+  return apiRequest<ReviewCompletion[]>(
+    "/v1/reviews/today/skip",
+    { method: "POST" },
+    childToken,
+  );
+}
+
 export async function completeReview(
   itemId: string,
   outcome: "correct" | "incorrect",
   childToken: string,
 ) {
-  return apiRequest<{
-    item_id: string;
-    old_interval_days: number;
-    new_interval_days: number;
-    next_due_on: string;
-  }>(
+  return apiRequest<ReviewCompletion>(
     `/v1/reviews/${encodeURIComponent(itemId)}/complete`,
     {
       method: "POST",

@@ -1,6 +1,9 @@
+from datetime import date, timedelta
+from uuid import UUID, uuid4
+
 from fastapi.testclient import TestClient
 
-from app.domain.models import JobStatus
+from app.domain.models import JobStatus, ReviewItemView
 from app.main import create_app
 from app.repositories.memory import MemoryRepository
 
@@ -47,6 +50,41 @@ def test_parent_can_bootstrap_the_fixture_assignment() -> None:
     assert printable.json()["template_version"] == "a4-v1"
     assert printable.json()["title"] == "Algebra and English warm-up"
     assert len(printable.json()["questions"]) == 3
+
+
+def test_child_can_skip_todays_reviews_without_resetting_their_interval() -> None:
+    client = TestClient(create_app())
+    fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+    session = client.post(
+        f"/v1/children/{fixture['child']['id']}/sessions",
+        json={"pin": "123456"},
+    ).json()
+    child_headers = {"Authorization": f"Bearer {session['access_token']}"}
+    repository = client.app.state.repository
+    review = ReviewItemView(
+        id=uuid4(),
+        child_id=UUID(fixture["child"]["id"]),
+        source_question_id=UUID(fixture["questions"][0]["id"]),
+        prompt="Choose the correct expansion.",
+        due_on=date.today(),
+        interval_days=7,
+        level="standard",
+    )
+    repository.review_items[str(review.id)] = review
+
+    skipped = client.post("/v1/reviews/today/skip", headers=child_headers)
+    today = client.get("/v1/reviews/today", headers=child_headers)
+
+    assert skipped.status_code == 200
+    assert skipped.json() == [
+        {
+            "item_id": str(review.id),
+            "old_interval_days": 7,
+            "new_interval_days": 7,
+            "next_due_on": str(date.today() + timedelta(days=1)),
+        }
+    ]
+    assert today.json() == []
 
 
 def test_child_pin_opens_a_scoped_assignment_session() -> None:

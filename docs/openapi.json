@@ -6236,6 +6236,60 @@
         ]
       }
     },
+    "/v1/reviews/today/skip": {
+      "post": {
+        "description": "Postpone every currently due review once without changing mastery.",
+        "operationId": "skip_today_reviews_v1_reviews_today_skip_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReviewCompletion"
+                  },
+                  "title": "Response Skip Today Reviews V1 Reviews Today Skip Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Skip Today Reviews",
+        "tags": [
+          "reviews"
+        ]
+      }
+    },
     "/v1/reviews/{item_id}/complete": {
       "post": {
         "operationId": "complete_review_v1_reviews__item_id__complete_post",

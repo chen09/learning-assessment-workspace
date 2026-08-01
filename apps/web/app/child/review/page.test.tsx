@@ -3,13 +3,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import ChildReviewPage from "./page";
 
-const { completeReview } = vi.hoisted(() => ({
+const { completeReview, skipTodayReviews } = vi.hoisted(() => ({
   completeReview: vi.fn(async () => ({
     item_id: "review-1",
     old_interval_days: 1,
     new_interval_days: 3,
     next_due_on: "2026-08-01",
   })),
+  skipTodayReviews: vi.fn(async () => [
+    {
+      item_id: "review-1",
+      old_interval_days: 1,
+      new_interval_days: 1,
+      next_due_on: "2026-08-02",
+    },
+  ]),
 }));
 
 vi.mock("@/lib/api-client", async (importOriginal) => {
@@ -18,6 +26,7 @@ vi.mock("@/lib/api-client", async (importOriginal) => {
   return {
     ...original,
     completeReview,
+    skipTodayReviews,
     getChildAccessToken: vi.fn(() => "child-token"),
     getTodayReviews: vi.fn(async () => [
       {
@@ -35,6 +44,7 @@ vi.mock("@/lib/api-client", async (importOriginal) => {
 describe("ChildReviewPage", () => {
   beforeEach(() => {
     completeReview.mockClear();
+    skipTodayReviews.mockClear();
     window.localStorage.clear();
     window.localStorage.setItem("luma-language:demo-child", "ja");
   });
@@ -60,5 +70,15 @@ describe("ChildReviewPage", () => {
     expect(
       screen.getByRole("button", { name: "今日はスキップ" }),
     ).toBeInTheDocument();
+  });
+
+  it("postpones every visible review for today without changing its interval", async () => {
+    render(<ChildReviewPage />);
+
+    await screen.findByText("What is 7 × 8?");
+    fireEvent.click(screen.getByRole("button", { name: "今日はスキップ" }));
+
+    expect(await screen.findByText(/次の復習/)).toBeInTheDocument();
+    expect(skipTodayReviews).toHaveBeenCalledWith("child-token");
   });
 });

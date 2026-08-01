@@ -23,6 +23,15 @@ async def list_today_reviews(
     return await repository.list_due_reviews(str(child.child_id))
 
 
+@router.post("/today/skip", response_model=list[ReviewCompletion])
+async def skip_today_reviews(
+    repository: Annotated[Repository, Depends(get_repository)],
+    child: Annotated[ChildSessionClaims, Depends(require_child)],
+) -> list[ReviewCompletion]:
+    """Postpone every currently due review once without changing mastery."""
+    return await repository.skip_today_reviews(str(child.child_id))
+
+
 @router.post("/{item_id}/complete", response_model=ReviewCompletion)
 async def complete_review(
     item_id: UUID,

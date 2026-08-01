@@ -10,6 +10,7 @@ import {
   completeReview,
   getChildAccessToken,
   getTodayReviews,
+  skipTodayReviews,
   type ReviewItem,
 } from "@/lib/api-client";
 
@@ -26,6 +27,7 @@ function ChildReviewContent() {
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [completed, setCompleted] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [skipping, setSkipping] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -70,6 +72,25 @@ function ChildReviewContent() {
       ...current,
       [review.id]: result.next_due_on,
     }));
+  };
+
+  const skipToday = async () => {
+    const childToken = getChildAccessToken();
+    if (!childToken || skipping) {
+      return;
+    }
+    setSkipping(true);
+    try {
+      const skipped = await skipTodayReviews(childToken);
+      setCompleted((current) => ({
+        ...current,
+        ...Object.fromEntries(
+          skipped.map((item) => [item.item_id, item.next_due_on]),
+        ),
+      }));
+    } finally {
+      setSkipping(false);
+    }
   };
 
   const countKey =
@@ -144,7 +165,17 @@ function ChildReviewContent() {
         </section>
       ) : null}
 
-      <button className="skip-button" type="button">
+      <button
+        className="skip-button"
+        disabled={
+          loading ||
+          reviews.length === 0 ||
+          skipping ||
+          reviews.every((review) => Boolean(completed[review.id]))
+        }
+        onClick={() => void skipToday()}
+        type="button"
+      >
         <CalendarDays size={16} /> {t("review.skip")}
       </button>
     </>

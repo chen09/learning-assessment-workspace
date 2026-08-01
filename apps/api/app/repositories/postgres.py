@@ -2375,6 +2375,72 @@ class PostgresRepository:
             for row in rows
         ]
 
+    async def skip_today_reviews(self, child_id: str) -> list[ReviewCompletion]:
+        async with self._engine.begin() as connection:
+            rows = (
+                await connection.execute(
+                    text(
+                        """
+                        select id, family_id, interval_days
+                        from public.review_items
+                        where child_id = :child_id
+                          and due_on <= current_date
+                          and completed_at is null
+                        order by due_on, created_at
+                        for update
+                        """
+                    ),
+                    {"child_id": _uuid(child_id)},
+                )
+            ).mappings().all()
+            if not rows:
+                return []
+
+            completions: list[ReviewCompletion] = []
+            for row in rows:
+                due_result = await connection.execute(
+                    text(
+                        """
+                        update public.review_items
+                        set due_on = current_date + 1,
+                            skipped_on = current_date,
+                            updated_at = now()
+                        where id = :item_id
+                        returning due_on
+                        """
+                    ),
+                    {"item_id": row["id"]},
+                )
+                next_due = due_result.scalar_one()
+                interval_days = int(row["interval_days"])
+                await connection.execute(
+                    text(
+                        """
+                        insert into public.review_events (
+                          family_id, review_item_id, result,
+                          old_interval_days, new_interval_days
+                        ) values (
+                          :family_id, :item_id, null,
+                          :interval_days, :interval_days
+                        )
+                        """
+                    ),
+                    {
+                        "family_id": row["family_id"],
+                        "item_id": row["id"],
+                        "interval_days": interval_days,
+                    },
+                )
+                completions.append(
+                    ReviewCompletion(
+                        item_id=row["id"],
+                        old_interval_days=interval_days,
+                        new_interval_days=interval_days,
+                        next_due_on=next_due,
+                    )
+                )
+        return completions
+
     async def _history_rows(
         self,
         connection: AsyncConnection,
