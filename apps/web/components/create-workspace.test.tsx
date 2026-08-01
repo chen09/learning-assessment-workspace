@@ -217,6 +217,15 @@ describe("CreateWorkspace", () => {
         "No questions were fabricated from this material. Prepare a structured question JSON with your approved AI workflow, then review it here before assigning it.",
       ),
     ).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Language"), {
+      target: { value: "zh" },
+    });
+    expect(
+      await screen.findByRole("heading", { name: "教材已私密保存" }),
+    ).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("语言"), {
+      target: { value: "en" },
+    });
     fireEvent.click(
       screen.getByRole("button", { name: "Import AI question JSON" }),
     );

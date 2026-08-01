@@ -1938,13 +1938,14 @@ function CreateWorkspaceContent() {
               onClick={() => setStage("compose")}
               type="button"
             >
-              <ArrowLeft size={16} /> Back to source
+              <ArrowLeft size={16} /> {t("sourceMaterial.back")}
             </button>
-            <p className="eyebrow">Private source material</p>
-            <h1>Source material saved privately</h1>
+            <p className="eyebrow">{t("sourceMaterial.eyebrow")}</p>
+            <h1>{t("sourceMaterial.savedTitle")}</h1>
             <p className="lede">
-              {sourceMaterialName} is stored only for this family. It is not
-              assigned to a child or shared with the public library.
+              {t("sourceMaterial.savedDescription", {
+                name: sourceMaterialName,
+              })}
             </p>
           </div>
           <LanguageSwitcher />
@@ -1953,18 +1954,14 @@ function CreateWorkspaceContent() {
           <div className="creation-heading">
             <span><FileJson2 /></span>
             <div>
-              <h2>Prepare a reviewable question draft</h2>
-              <p>
-                No questions were fabricated from this material. Prepare a
-                structured question JSON with your approved AI workflow, then
-                review it here before assigning it.
-              </p>
+              <h2>{t("sourceMaterial.prepareTitle")}</h2>
+              <p>{t("sourceMaterial.prepareDescription")}</p>
             </div>
           </div>
           <ol className="source-ready-steps">
-            <li>Copy the guarded JSON prompt.</li>
-            <li>Use it with the private source material in your approved AI workflow.</li>
-            <li>Save the JSON response and import it for parent review.</li>
+            <li>{t("sourceMaterial.stepCopy")}</li>
+            <li>{t("sourceMaterial.stepUse")}</li>
+            <li>{t("sourceMaterial.stepImport")}</li>
           </ol>
           <div className="draft-actions">
             <button
@@ -1972,7 +1969,9 @@ function CreateWorkspaceContent() {
               onClick={() => void copyStructuredQuestionSetPrompt()}
               type="button"
             >
-              {sourcePromptCopied ? "Prompt copied" : "Copy JSON generation prompt"}
+              {sourcePromptCopied
+                ? t("sourceMaterial.promptCopied")
+                : t("sourceMaterial.copyPrompt")}
             </button>
             <button
               className="button primary"
@@ -1982,7 +1981,7 @@ function CreateWorkspaceContent() {
               }}
               type="button"
             >
-              <FileJson2 /> Import AI question JSON
+              <FileJson2 /> {t("sourceMaterial.importJson")}
             </button>
           </div>
         </section>

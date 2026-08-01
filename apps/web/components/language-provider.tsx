@@ -29,6 +29,22 @@ const messages = {
     "role.child": "Child mode",
     "action.exitChild": "Exit child mode",
     "language.label": "Language",
+    "sourceMaterial.back": "Back to source",
+    "sourceMaterial.eyebrow": "Private source material",
+    "sourceMaterial.savedTitle": "Source material saved privately",
+    "sourceMaterial.savedDescription":
+      "{name} is stored only for this family. It is not assigned to a child or shared with the public library.",
+    "sourceMaterial.prepareTitle": "Prepare a reviewable question draft",
+    "sourceMaterial.prepareDescription":
+      "No questions were fabricated from this material. Prepare a structured question JSON with your approved AI workflow, then review it here before assigning it.",
+    "sourceMaterial.stepCopy": "Copy the guarded JSON prompt.",
+    "sourceMaterial.stepUse":
+      "Use it with the private source material in your approved AI workflow.",
+    "sourceMaterial.stepImport":
+      "Save the JSON response and import it for parent review.",
+    "sourceMaterial.copyPrompt": "Copy JSON generation prompt",
+    "sourceMaterial.promptCopied": "Prompt copied",
+    "sourceMaterial.importJson": "Import AI question JSON",
     "parentDashboard.eyebrow": "Parent workspace",
     "parentDashboard.title": "Set up your family workspace",
     "parentDashboard.description":
@@ -491,6 +507,22 @@ const messages = {
     "role.child": "子どもモード",
     "action.exitChild": "子どもモードを終了",
     "language.label": "言語",
+    "sourceMaterial.back": "教材に戻る",
+    "sourceMaterial.eyebrow": "非公開の教材素材",
+    "sourceMaterial.savedTitle": "教材素材を非公開で保存しました",
+    "sourceMaterial.savedDescription":
+      "{name} はこの家族だけに保存されています。子どもには割り当てられず、公開ライブラリにも共有されません。",
+    "sourceMaterial.prepareTitle": "確認できる問題案を準備する",
+    "sourceMaterial.prepareDescription":
+      "この素材から問題を自動で作ることはありません。承認済みの AI ワークフローで構造化問題 JSON を準備し、ここで確認してから割り当ててください。",
+    "sourceMaterial.stepCopy": "保護された JSON プロンプトをコピーします。",
+    "sourceMaterial.stepUse":
+      "承認済みの AI ワークフローで、非公開の教材素材と一緒に使用します。",
+    "sourceMaterial.stepImport":
+      "JSON の回答を保存し、保護者レビュー用に読み込みます。",
+    "sourceMaterial.copyPrompt": "JSON 生成プロンプトをコピー",
+    "sourceMaterial.promptCopied": "プロンプトをコピーしました",
+    "sourceMaterial.importJson": "AI 問題 JSON を読み込む",
     "parentDashboard.eyebrow": "保護者ワークスペース",
     "parentDashboard.title": "家族の学習スペースを設定",
     "parentDashboard.description":
@@ -950,6 +982,22 @@ const messages = {
     "role.child": "孩子模式",
     "action.exitChild": "退出孩子模式",
     "language.label": "语言",
+    "sourceMaterial.back": "返回教材",
+    "sourceMaterial.eyebrow": "私有教材素材",
+    "sourceMaterial.savedTitle": "教材已私密保存",
+    "sourceMaterial.savedDescription":
+      "{name} 仅保存给这个家庭。不会分配给孩子，也不会共享到公共题库。",
+    "sourceMaterial.prepareTitle": "准备可审核的题目草稿",
+    "sourceMaterial.prepareDescription":
+      "系统不会凭这份素材编造题目。请在获准的 AI 工作流中准备结构化题目 JSON，再在这里审核后分配。",
+    "sourceMaterial.stepCopy": "复制受控的 JSON 提示词。",
+    "sourceMaterial.stepUse":
+      "在获准的 AI 工作流中，连同私有教材素材一起使用。",
+    "sourceMaterial.stepImport":
+      "保存 JSON 结果，并导入以供家长审核。",
+    "sourceMaterial.copyPrompt": "复制 JSON 生成提示词",
+    "sourceMaterial.promptCopied": "已复制提示词",
+    "sourceMaterial.importJson": "导入 AI 题目 JSON",
     "parentDashboard.eyebrow": "家长空间",
     "parentDashboard.title": "设置家庭学习空间",
     "parentDashboard.description":
