@@ -1024,12 +1024,24 @@ button {
   padding: 0.55rem 0.7rem;
 }
 
-.photo-file-name {
+.photo-file-detail {
   flex: 1;
   min-width: 0;
+  display: grid;
+  gap: 0.16rem;
+}
+
+.photo-file-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.photo-file-list .photo-clarity-warning {
+  color: #9a4c16;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.35;
 }
 
 .photo-file-preview {

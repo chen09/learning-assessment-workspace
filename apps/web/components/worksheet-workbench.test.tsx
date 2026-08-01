@@ -435,9 +435,11 @@ describe("WorksheetWorkbench", () => {
     const uploadedImages = await screen.findByRole("list", {
       name: "Uploaded answer images",
     });
-    expect(uploadedImages).toHaveTextContent(
-      "1. answer-page.jpg2. draft-page.jpg",
-    );
+    expect(
+      within(uploadedImages)
+        .getAllByRole("listitem")
+        .map((item) => item.querySelector(".photo-file-name")?.textContent),
+    ).toEqual(["1. answer-page.jpg", "2. draft-page.jpg"]);
     expect(
       screen.getByRole("img", { name: "Preview: answer-page.jpg" }),
     ).toBeInTheDocument();
@@ -448,9 +450,11 @@ describe("WorksheetWorkbench", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Move answer-page.jpg later" }),
     );
-    expect(uploadedImages).toHaveTextContent(
-      "1. draft-page.jpg2. answer-page.jpg",
-    );
+    expect(
+      within(uploadedImages)
+        .getAllByRole("listitem")
+        .map((item) => item.querySelector(".photo-file-name")?.textContent),
+    ).toEqual(["1. draft-page.jpg", "2. answer-page.jpg"]);
     expect(
       within(uploadedImages)
         .getAllByRole("img")
@@ -460,13 +464,37 @@ describe("WorksheetWorkbench", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Remove draft-page.jpg" }),
     );
-    expect(uploadedImages).toHaveTextContent("1. answer-page.jpg");
+    expect(
+      within(uploadedImages).getByRole("listitem"),
+    ).toHaveTextContent("1. answer-page.jpg");
     expect(URL.revokeObjectURL).toHaveBeenCalledWith(
       "blob:preview/draft-page.jpg",
     );
     expect(
       screen.queryByRole("button", { name: "Remove draft-page.jpg" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("warns before submission when a response photo is probably too small to grade", async () => {
+    render(<WorksheetWorkbench />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Go to question 4" }),
+    );
+    fireEvent.change(screen.getByLabelText(/Take a photo or choose images/), {
+      target: {
+        files: [
+          new File(["x"], "tiny-answer.jpg", { type: "image/jpeg" }),
+        ],
+      },
+    });
+
+    expect(
+      await screen.findByText(
+        "This image may be too small to read clearly. Retake it if the preview is blurry.",
+      ),
+    ).toBeInTheDocument();
+    expect(mocks.uploadToSignedUrl).toHaveBeenCalled();
   });
 
   it("persists removing the final response photo as an empty photo answer", async () => {

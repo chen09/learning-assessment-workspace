@@ -81,6 +81,8 @@ type Answer = {
   photoPaths?: string[];
 };
 
+const MINIMUM_PHOTO_FILE_BYTES = 100 * 1024;
+
 function hasMeaningfulAnswer(answer: Answer | undefined) {
   return Boolean(
     answer &&
@@ -198,6 +200,9 @@ function WorksheetWorkbenchContent() {
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [photoPreviewUrls, setPhotoPreviewUrls] = useState<
     Record<string, string[]>
+  >({});
+  const [photoClarityWarnings, setPhotoClarityWarnings] = useState<
+    Record<string, boolean[]>
   >({});
   const [saveStatus, setSaveStatus] = useState<
     "idle" | "saving" | "saved" | "offline"
@@ -964,6 +969,7 @@ function WorksheetWorkbenchContent() {
       const photoNames = answer.photoNames ?? [];
       const photoPaths = answer.photoPaths ?? [];
       const photoPreviews = photoPreviewUrls[question.id] ?? [];
+      const clarityWarnings = photoClarityWarnings[question.id] ?? [];
       const canManagePhotoOrder = photoNames.length === photoPaths.length;
       const updatePhotos = (names: string[], paths: string[]) => {
         updateAnswer(question.id, { photoNames: names, photoPaths: paths });
@@ -972,6 +978,12 @@ function WorksheetWorkbenchContent() {
         setPhotoPreviewUrls((current) => ({
           ...current,
           [question.id]: previews,
+        }));
+      };
+      const updateClarityWarnings = (warnings: boolean[]) => {
+        setPhotoClarityWarnings((current) => ({
+          ...current,
+          [question.id]: warnings,
         }));
       };
       const movePhoto = (from: number, to: number) => {
@@ -994,6 +1006,10 @@ function WorksheetWorkbenchContent() {
           previews.splice(to, 0, preview);
         }
         updatePhotoPreviews(previews);
+        const warnings = [...clarityWarnings];
+        const [warning] = warnings.splice(from, 1);
+        warnings.splice(to, 0, warning ?? false);
+        updateClarityWarnings(warnings);
       };
       const removePhoto = (index: number) => {
         if (!canManagePhotoOrder) {
@@ -1009,6 +1025,9 @@ function WorksheetWorkbenchContent() {
         );
         updatePhotoPreviews(
           photoPreviews.filter((_, photoIndex) => photoIndex !== index),
+        );
+        updateClarityWarnings(
+          clarityWarnings.filter((_, photoIndex) => photoIndex !== index),
         );
       };
       return (
@@ -1031,6 +1050,12 @@ function WorksheetWorkbenchContent() {
                   return previewUrl;
                 });
                 updatePhotoPreviews([...photoPreviews, ...newPreviews]);
+                updateClarityWarnings([
+                  ...photoNames.map((_, index) => clarityWarnings[index] ?? false),
+                  ...selectedFiles.map(
+                    (file) => file.size < MINIMUM_PHOTO_FILE_BYTES,
+                  ),
+                ]);
 
                 if (!attemptId || !familyId || !childToken) {
                   updateAnswer(question.id, {
@@ -1111,8 +1136,15 @@ function WorksheetWorkbenchContent() {
                       src={photoPreviews[index]}
                     />
                   ) : null}
-                  <span className="photo-file-name">
-                    {index + 1}. {name}
+                  <span className="photo-file-detail">
+                    <span className="photo-file-name">
+                      {index + 1}. {name}
+                    </span>
+                    {clarityWarnings[index] ? (
+                      <span className="photo-clarity-warning" role="status">
+                        {t("worksheet.photoClarityWarning")}
+                      </span>
+                    ) : null}
                   </span>
                   {canManagePhotoOrder ? (
                     <span className="photo-file-actions">
