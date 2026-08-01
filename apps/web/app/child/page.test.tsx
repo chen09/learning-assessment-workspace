@@ -14,6 +14,17 @@ const assignment = {
   latest_attempt_id: null,
 };
 
+const inProgressAssignment = {
+  id: "assignment-2",
+  title: "Lesson 2 sentence writing",
+  status: "in_progress",
+  mode: "exam",
+  time_limit_seconds: 900,
+  parent_note: null,
+  question_count: 8,
+  latest_attempt_id: "attempt-2",
+};
+
 const mocks = vi.hoisted(() => ({
   getChildAssignments: vi.fn(),
   getTodayReviews: vi.fn(),
@@ -77,5 +88,31 @@ describe("ChildHomePage", () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByText("0 份练习，0 道复习题。")).not.toBeInTheDocument();
     expect(screen.getByText("正在读取今天的学习安排…")).toBeInTheDocument();
+  });
+
+  it("keeps every pending assignment reachable from the child home", async () => {
+    mocks.getChildAssignments.mockResolvedValue([
+      assignment,
+      inProgressAssignment,
+    ]);
+
+    render(<ChildHomePage />);
+
+    expect(await screen.findByText("2 份练习，0 道复习题。")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "更多待完成练习" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Lesson 2 sentence writing" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("考试模式 · 8 道题 · 15 分钟")).toBeInTheDocument();
+
+    const continueLink = screen.getByRole("link", {
+      name: /继续练习：Lesson 2 sentence writing/,
+    });
+    expect(continueLink).toHaveAttribute(
+      "href",
+      "/child/work?attemptId=attempt-2",
+    );
   });
 });

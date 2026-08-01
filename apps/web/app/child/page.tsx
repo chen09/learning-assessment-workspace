@@ -75,6 +75,7 @@ function ChildHomeContent() {
   }, []);
 
   const current = assignments[0];
+  const additionalAssignments = assignments.slice(1);
   const assignmentSummary = t(
     assignments.length === 1
       ? "childHome.assignmentOne"
@@ -85,18 +86,31 @@ function ChildHomeContent() {
     reviewCount === 1 ? "childHome.reviewOne" : "childHome.reviewMany",
     { count: reviewCount },
   );
-  const currentStatusLabel =
-    current?.status === "assigned"
+  const assignmentStatusLabel = (assignment: ChildAssignmentSummary) =>
+    assignment.status === "assigned"
       ? t("childHome.start")
-      : current?.status === "submitted"
+      : assignment.status === "submitted"
         ? t("childHome.status.submitted")
-        : current?.status === "grading"
+        : assignment.status === "grading"
           ? t("childHome.status.grading")
-          : current?.status === "results_ready"
+          : assignment.status === "results_ready"
             ? t("childHome.status.resultsReady")
-            : current?.status === "completed"
+            : assignment.status === "completed"
               ? t("childHome.status.completed")
               : t("childHome.status.inProgress");
+  const assignmentAction = (assignment: ChildAssignmentSummary) => {
+    if (
+      ["grading", "results_ready", "submitted", "completed"].includes(
+        assignment.status,
+      )
+    ) {
+      return t("childHome.viewStatus");
+    }
+    if (assignment.latest_attempt_id) {
+      return t("childHome.resumeWork");
+    }
+    return t("childHome.openWork");
+  };
 
   return (
     <>
@@ -132,7 +146,7 @@ function ChildHomeContent() {
         <section className="continue-card">
           <div className="continue-copy">
             <span className="status-pill warm">
-              {currentStatusLabel}
+              {assignmentStatusLabel(current)}
             </span>
             <p>
               {current.mode === "exam"
@@ -162,11 +176,7 @@ function ChildHomeContent() {
               </span>
             </div>
             <Link className="button primary large" href={assignmentHref(current)}>
-              {["grading", "results_ready", "submitted", "completed"].includes(
-                current.status,
-              )
-                ? t("childHome.viewStatus")
-                : t("childHome.openWork")}{" "}
+              {assignmentAction(current)}{" "}
               <ArrowRight size={17} />
             </Link>
           </div>
@@ -199,6 +209,66 @@ function ChildHomeContent() {
           </div>
         </section>
       )}
+
+      {loadState === "ready" && additionalAssignments.length > 0 ? (
+        <section
+          className="more-assignments"
+          aria-labelledby="more-assignment-heading"
+        >
+          <header>
+            <p className="eyebrow">{t("childHome.moreAssignedEyebrow")}</p>
+            <h2 id="more-assignment-heading">{t("childHome.moreAssigned")}</h2>
+          </header>
+          <div className="assignment-list">
+            {additionalAssignments.map((assignment) => {
+              const action = assignmentAction(assignment);
+              const mode =
+                assignment.mode === "exam"
+                  ? t("childHome.examMode")
+                  : t("childHome.practiceMode");
+              const duration = assignment.time_limit_seconds
+                ? t("childHome.minutes", {
+                    count: Math.ceil(assignment.time_limit_seconds / 60),
+                  })
+                : t("childHome.noTimer");
+              return (
+                <article className="assignment-row" key={assignment.id}>
+                  <div>
+                    <span className="status-pill subtle">
+                      {assignmentStatusLabel(assignment)}
+                    </span>
+                    <h3>{assignment.title}</h3>
+                    <p>
+                      {t("childHome.pendingMeta", {
+                        mode,
+                        questions: t("childHome.questions", {
+                          count: assignment.question_count,
+                        }),
+                        duration,
+                      })}
+                    </p>
+                    {assignment.parent_note ? (
+                      <p className="assignment-parent-note">
+                        {assignment.parent_note}
+                      </p>
+                    ) : null}
+                  </div>
+                  <Link
+                    aria-label={t("childHome.assignmentAction", {
+                      action,
+                      title: assignment.title,
+                    })}
+                    className="button ghost"
+                    href={assignmentHref(assignment)}
+                  >
+                    {action} <ArrowRight size={16} />
+                  </Link>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
 
       <section className="today-review">
         <div className="review-orb">

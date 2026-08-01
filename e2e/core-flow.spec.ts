@@ -1051,6 +1051,26 @@ test("child screens stay responsive across Chinese, Japanese, and English", asyn
     },
   );
   expect(importResponse.ok()).toBeTruthy();
+  const imported = (await importResponse.json()) as { question_set_id: string };
+  const queuedAssignmentResponse = await request.post(
+    `${apiBaseUrl}/v1/question-sets/${imported.question_set_id}/assignments`,
+    {
+      headers: {
+        Authorization: "Bearer parent-fixture",
+        "Idempotency-Key": `${fixtureKey}-queued-assignment`,
+      },
+      data: {
+        child_id: child.id,
+        mode: "practice",
+        time_limit_seconds: null,
+        parent_note: "Open this after the first practice.",
+      },
+    },
+  );
+  expect(queuedAssignmentResponse.ok()).toBeTruthy();
+  const queuedAssignment = (await queuedAssignmentResponse.json()) as {
+    id: string;
+  };
 
   const expectNoHorizontalOverflow = async () => {
     await expect
@@ -1070,7 +1090,6 @@ test("child screens stay responsive across Chinese, Japanese, and English", asyn
     }),
   ).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "zh");
-
   if (testInfo.project.name === "mobile") {
     await expect(page.locator(".side-rail")).toBeHidden();
     await expect(page.locator(".bottom-nav")).toBeVisible();
@@ -1092,6 +1111,21 @@ test("child screens stay responsive across Chinese, Japanese, and English", asyn
   }
   await page.getByRole("button", { name: "打开我的练习" }).click();
   await expect(page).toHaveURL(/\/child\/$/);
+  await expect(
+    page.getByRole("heading", { name: "更多待完成练习" }),
+  ).toBeVisible();
+  const queuedPractice = page.locator(".more-assignments");
+  await expect(
+    queuedPractice.getByText("Open this after the first practice."),
+  ).toBeVisible();
+  await expect(
+    queuedPractice.getByRole("link", {
+      name: "打开练习：Responsive assigned practice",
+    }),
+  ).toHaveAttribute(
+    "href",
+    new RegExp(`assignmentId=${queuedAssignment.id}`),
+  );
 
   await page.goto("/child/work/");
   await expect(page).toHaveURL(/\/child\/work\/\?attemptId=/);
@@ -1168,7 +1202,10 @@ test("child screens stay responsive across Chinese, Japanese, and English", asyn
   ).toHaveCount(0);
   releaseHistory?.();
   await expect(
-    page.getByRole("heading", { name: "Responsive assigned practice" }),
+    page
+      .locator(".history-list article")
+      .first()
+      .getByRole("heading", { name: "Responsive assigned practice" }),
   ).toBeVisible();
   await expect(
     page.getByRole("link", {
