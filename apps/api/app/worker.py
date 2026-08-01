@@ -34,6 +34,7 @@ async def run() -> None:
             minimum_confidence=settings.ai_minimum_confidence,
             supabase_url=settings.supabase_url,
             supabase_service_role_key=settings.supabase_service_role_key.get_secret_value(),
+            allow_fixture_source_generation=settings.app_env != "production",
         ),
     )
     stop = asyncio.Event()

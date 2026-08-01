@@ -154,9 +154,19 @@ describe("CreateWorkspace", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create review draft" }));
 
     expect(
-      await screen.findByRole("heading", { name: "Review before assigning" }),
+      await screen.findByRole("heading", { name: "Source material saved privately" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Draft · not visible to children")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "No questions were fabricated from this material. Prepare a structured question JSON with your approved AI workflow, then review it here before assigning it.",
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Import AI question JSON" }),
+    );
+    expect(
+      screen.getByRole("heading", { name: "Import an AI-structured question set" }),
+    ).toBeInTheDocument();
   });
 
   it("previews an AI JSON file before the confirmed data is imported and assigned", async () => {

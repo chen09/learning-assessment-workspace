@@ -110,6 +110,7 @@ async def fixture_job_handler(
     minimum_confidence: float = 0.75,
     supabase_url: str = "",
     supabase_service_role_key: str = "",
+    allow_fixture_source_generation: bool = True,
 ) -> dict[str, Any]:
     if job["type"] == "purge_deleted_data":
         deletion = await connection.fetchrow(
@@ -279,7 +280,9 @@ async def fixture_job_handler(
             list(_json_value(imported["filenames"])),
             list(_json_value(imported["answer_filenames"])),
         )
-        if is_lesson_one:
+        if not allow_fixture_source_generation:
+            fixture_rows: list[tuple[Any, ...]] = []
+        elif is_lesson_one:
             fixture_rows = [
                 (
                     spec.type.value,
@@ -395,11 +398,27 @@ async def fixture_job_handler(
                 lesson_one_source_summary(
                     len(list(_json_value(imported["reference_filenames"])))
                 )
-                if is_lesson_one
+                if allow_fixture_source_generation and is_lesson_one
                 else {
                     "schema_version": "1.0",
-                    "artifact_kind": "fixture_generated_practice",
-                    "knowledge_points": [f"{subject} foundations"],
+                    "artifact_kind": (
+                        "fixture_generated_practice"
+                        if allow_fixture_source_generation
+                        else "private_source_material"
+                    ),
+                    **(
+                        {"knowledge_points": [f"{subject} foundations"]}
+                        if allow_fixture_source_generation
+                        else {
+                            "generation_status": "awaiting_structured_draft",
+                            "source_file_count": len(
+                                list(_json_value(imported["filenames"]))
+                            ),
+                            "answer_key_file_count": len(
+                                list(_json_value(imported["answer_filenames"]))
+                            ),
+                        }
+                    ),
                     "reference_file_count": len(
                         list(_json_value(imported["reference_filenames"]))
                     ),
@@ -421,6 +440,11 @@ async def fixture_job_handler(
             "question_count": len(fixture_rows),
             "source_material_count": len(
                 list(_json_value(imported["reference_filenames"]))
+            ),
+            "generation_status": (
+                "fixture_generated"
+                if allow_fixture_source_generation
+                else "awaiting_structured_draft"
             ),
             "status": "needs_review",
         }

@@ -41,7 +41,7 @@ import {
 
 type CreateMode = "generate" | "import" | "completed" | "structured" | "manual";
 type ImportPurpose = "generate_similar" | "use_as_questions";
-type Stage = "compose" | "review";
+type Stage = "compose" | "review" | "source_ready";
 type AssignmentMode = "practice" | "exam";
 type ManualQuestionType = "single_choice" | "typed_text" | "handwriting";
 type ManualDraftQuestion = StructuredQuestionSetDocument["questions"][number] & {
@@ -107,6 +107,42 @@ Return this JSON shape exactly:
     "legibility": "clear"
   }]
 }`;
+
+const STRUCTURED_QUESTION_SET_PROMPT = `You are preparing a family learning question set from private textbook or worksheet material. Return JSON only, with no Markdown and no explanation. Do not copy student names, storage paths, URLs, tokens, or image data.
+
+The parent will verify every question and answer before assigning it to a child. Use only content you can read from the supplied material. If source text is unclear, omit it rather than inventing it.
+
+Return this strict JSON shape:
+{
+  "schema_version": "1.0",
+  "question_set": {
+    "title": "Short descriptive title",
+    "subject": "English or Mathematics",
+    "locale": "ja",
+    "difficulty": "standard",
+    "source_mode": "similar",
+    "instructions": "Answer every question.",
+    "estimated_minutes": 20,
+    "source_summary": { "unit": "brief source description" }
+  },
+  "knowledge_tags": [{ "code": "short-topic-code", "label": "Topic label" }],
+  "questions": [{
+    "position": 1,
+    "type": "typed_text",
+    "prompt": "Question text for the child",
+    "options": [],
+    "answer_key": { "text": "exact accepted answer" },
+    "rubric": { "grading_mode": "exact_match" },
+    "points": 1,
+    "knowledge_code": "short-topic-code"
+  }]
+}
+
+Rules:
+1. Positions must be continuous from 1. Every question must use one listed knowledge_code.
+2. Use single_choice only with options and answer_key.choice as a zero-based number. Use typed_text with answer_key.text. Use handwriting for work that must be handwritten; then use answer_key.reference and rubric.grading_mode "parent_review".
+3. Keep answers and rubrics private in the JSON. Never include answer keys inside the child-facing prompt.
+4. Make the requested difficulty genuinely easier, similar, harder, or competition-level by changing reasoning demands, not merely calculation length.`;
 
 type ReviewDraftQuestion = ApiQuestion & {
   answer_key: Record<string, unknown>;
@@ -337,6 +373,8 @@ function CreateWorkspaceContent() {
   const [importPurpose, setImportPurpose] =
     useState<ImportPurpose>("generate_similar");
   const [stage, setStage] = useState<Stage>("compose");
+  const [sourceMaterialName, setSourceMaterialName] = useState("");
+  const [sourcePromptCopied, setSourcePromptCopied] = useState(false);
   const [fileName, setFileName] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [completedDocumentLanguage, setCompletedDocumentLanguage] = useState<
@@ -905,12 +943,30 @@ function CreateWorkspaceContent() {
         }
       }
       setDraftQuestions(draft.questions);
+      if (mode === "import" && draft.questions.length === 0) {
+        setSourceMaterialName(
+          files.map((file) => file.name).join(", ") || "Source material",
+        );
+        setSourcePromptCopied(false);
+        setStage("source_ready");
+        setRequestStatus("idle");
+        return;
+      }
       if (isLessonOneImport) {
         setAssignmentMode("exam");
         setAssignmentDurationMinutes("45");
       }
       setStage("review");
       setRequestStatus("idle");
+    } catch {
+      setRequestStatus("error");
+    }
+  };
+
+  const copyStructuredQuestionSetPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(STRUCTURED_QUESTION_SET_PROMPT);
+      setSourcePromptCopied(true);
     } catch {
       setRequestStatus("error");
     }
@@ -1836,6 +1892,68 @@ function CreateWorkspaceContent() {
             {t("completedPaper.error")}
           </p>
         ) : null}
+      </>
+    );
+  }
+
+  if (stage === "source_ready") {
+    return (
+      <>
+        <header className="page-header">
+          <div>
+            <button
+              className="back-button"
+              onClick={() => setStage("compose")}
+              type="button"
+            >
+              <ArrowLeft size={16} /> Back to source
+            </button>
+            <p className="eyebrow">Private source material</p>
+            <h1>Source material saved privately</h1>
+            <p className="lede">
+              {sourceMaterialName} is stored only for this family. It is not
+              assigned to a child or shared with the public library.
+            </p>
+          </div>
+          <LanguageSwitcher />
+        </header>
+        <section className="creation-card source-ready-card">
+          <div className="creation-heading">
+            <span><FileJson2 /></span>
+            <div>
+              <h2>Prepare a reviewable question draft</h2>
+              <p>
+                No questions were fabricated from this material. Prepare a
+                structured question JSON with your approved AI workflow, then
+                review it here before assigning it.
+              </p>
+            </div>
+          </div>
+          <ol className="source-ready-steps">
+            <li>Copy the guarded JSON prompt.</li>
+            <li>Use it with the private source material in your approved AI workflow.</li>
+            <li>Save the JSON response and import it for parent review.</li>
+          </ol>
+          <div className="draft-actions">
+            <button
+              className="button secondary"
+              onClick={() => void copyStructuredQuestionSetPrompt()}
+              type="button"
+            >
+              {sourcePromptCopied ? "Prompt copied" : "Copy JSON generation prompt"}
+            </button>
+            <button
+              className="button primary"
+              onClick={() => {
+                setMode("structured");
+                setStage("compose");
+              }}
+              type="button"
+            >
+              <FileJson2 /> Import AI question JSON
+            </button>
+          </div>
+        </section>
       </>
     );
   }
