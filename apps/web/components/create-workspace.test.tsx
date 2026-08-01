@@ -644,7 +644,10 @@ describe("CreateWorkspace", () => {
         estimated_minutes: 10,
         source_summary: { unit: "factorisation" },
       },
-      knowledge_tags: [{ code: "factorisation", label: "Factorisation" }],
+      knowledge_tags: [
+        { code: "factorisation", label: "Factorisation" },
+        { code: "present-simple", label: "Present simple" },
+      ],
       questions: [
         {
           position: 1,
@@ -655,6 +658,26 @@ describe("CreateWorkspace", () => {
           rubric: { grading_mode: "parent_review" },
           points: 1,
           knowledge_code: "factorisation",
+        },
+        {
+          position: 2,
+          type: "typed_text",
+          prompt: "Complete: She ___ to school every day.",
+          options: [],
+          answer_key: { text: "goes" },
+          rubric: { grading_mode: "exact" },
+          points: 1,
+          knowledge_code: "present-simple",
+        },
+        {
+          position: 3,
+          type: "single_choice",
+          prompt: "Choose the correct sentence.",
+          options: ["She walk to school.", "She walks to school."],
+          answer_key: { choice: 1 },
+          rubric: { grading_mode: "exact" },
+          points: 1,
+          knowledge_code: "present-simple",
         },
       ],
     };
@@ -683,6 +706,18 @@ describe("CreateWorkspace", () => {
             page_numbers: [1],
             regions: [{ x: 0.12, y: 0.45, width: 0.7, height: 0.2 }],
             transcription: "(x - 4)(x + 4)",
+            legibility: "clear",
+          },
+          {
+            question_position: 2,
+            page_numbers: [1],
+            transcription: "goes",
+            legibility: "clear",
+          },
+          {
+            question_position: 3,
+            page_numbers: [1],
+            transcription: "She walks to school.",
             legibility: "clear",
           },
         ],
@@ -767,7 +802,7 @@ describe("CreateWorkspace", () => {
       ),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Review ready · questions: 1 · answer regions: 1"),
+      screen.getByText("Review ready · questions: 3 · answer regions: 3"),
     ).toBeInTheDocument();
     fireEvent.change(
       screen.getByLabelText("Question 1 wording"),
@@ -775,6 +810,12 @@ describe("CreateWorkspace", () => {
     );
     fireEvent.change(screen.getByLabelText("Reference answer for question 1"), {
       target: { value: "(x - 5)(x + 5)" },
+    });
+    fireEvent.change(screen.getByLabelText("Accepted answer for question 2"), {
+      target: { value: "walks" },
+    });
+    fireEvent.change(screen.getByLabelText("Correct choice for question 3"), {
+      target: { value: "0" },
     });
     fireEvent.change(screen.getByLabelText("Answer page numbers for question 1"), {
       target: { value: "not a page" },
@@ -809,6 +850,12 @@ describe("CreateWorkspace", () => {
                 prompt: "Factorise x² − 25.",
                 answer_key: { reference: "(x - 5)(x + 5)" },
               }),
+              expect.objectContaining({
+                answer_key: { text: "walks" },
+              }),
+              expect.objectContaining({
+                answer_key: { choice: 0 },
+              }),
             ],
           }),
           responses: [
@@ -822,6 +869,30 @@ describe("CreateWorkspace", () => {
                 page_numbers: [2],
                 regions: [{ x: 0.12, y: 0.45, width: 0.7, height: 0.2 }],
                 transcription: "(x - 5)(x + 5)",
+                legibility: "clear",
+              },
+            },
+            {
+              question_position: 2,
+              kind: "photo",
+              answer: {
+                source_paths: [
+                  "family-1/completed-paper/responses-completed-paper.jpg",
+                ],
+                page_numbers: [1],
+                transcription: "goes",
+                legibility: "clear",
+              },
+            },
+            {
+              question_position: 3,
+              kind: "photo",
+              answer: {
+                source_paths: [
+                  "family-1/completed-paper/responses-completed-paper.jpg",
+                ],
+                page_numbers: [1],
+                transcription: "She walks to school.",
                 legibility: "clear",
               },
             },

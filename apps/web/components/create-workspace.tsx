@@ -1413,6 +1413,69 @@ function CreateWorkspaceContent() {
                               />
                             </label>
                           ) : null}
+                          {question.type === "typed_text" ? (
+                            <label>
+                              <span>{t("completedPaper.acceptedAnswer")}</span>
+                              <input
+                                aria-label={t("completedPaper.acceptedAnswerFor", {
+                                  position: question.position,
+                                })}
+                                onChange={(event) =>
+                                  updateCompletedPaperQuestion(question.position, (current) => {
+                                    const answerKey = { ...current.answer_key };
+                                    delete answerKey.texts;
+                                    return {
+                                      ...current,
+                                      answer_key: {
+                                        ...answerKey,
+                                        text: event.target.value,
+                                      },
+                                    };
+                                  })
+                                }
+                                value={
+                                  typeof question.answer_key.text === "string"
+                                    ? question.answer_key.text
+                                    : Array.isArray(question.answer_key.texts)
+                                      ? question.answer_key.texts.find(
+                                          (answer): answer is string =>
+                                            typeof answer === "string",
+                                        ) ?? ""
+                                      : ""
+                                }
+                              />
+                            </label>
+                          ) : null}
+                          {question.type === "single_choice" ? (
+                            <label>
+                              <span>{t("completedPaper.correctChoice")}</span>
+                              <select
+                                aria-label={t("completedPaper.correctChoiceFor", {
+                                  position: question.position,
+                                })}
+                                onChange={(event) =>
+                                  updateCompletedPaperQuestion(question.position, (current) => ({
+                                    ...current,
+                                    answer_key: {
+                                      ...current.answer_key,
+                                      choice: Number(event.target.value),
+                                    },
+                                  }))
+                                }
+                                value={
+                                  typeof question.answer_key.choice === "number"
+                                    ? String(question.answer_key.choice)
+                                    : ""
+                                }
+                              >
+                                {question.options.map((option, optionIndex) => (
+                                  <option key={`${optionIndex}-${option}`} value={optionIndex}>
+                                    {option}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          ) : null}
                           {completedReview.answer_regions[index] ? (
                             <div className="completed-paper-region-fields">
                               <label>

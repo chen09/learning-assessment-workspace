@@ -667,7 +667,10 @@ test("parent validates a local-AI completed-paper review before submitting it", 
       estimated_minutes: 5,
       source_summary: { fixture: true },
     },
-    knowledge_tags: [{ code: "factorisation", label: "Factorisation" }],
+    knowledge_tags: [
+      { code: "factorisation", label: "Factorisation" },
+      { code: "present-simple", label: "Present simple" },
+    ],
     questions: [
       {
         position: 1,
@@ -679,6 +682,26 @@ test("parent validates a local-AI completed-paper review before submitting it", 
         points: 1,
         knowledge_code: "factorisation",
       },
+      {
+        position: 2,
+        type: "typed_text",
+        prompt: "Complete: She ___ to school every day.",
+        options: [],
+        answer_key: { text: "goes" },
+        rubric: { grading_mode: "exact" },
+        points: 1,
+        knowledge_code: "present-simple",
+      },
+      {
+        position: 3,
+        type: "single_choice",
+        prompt: "Choose the correct sentence.",
+        options: ["She walk to school.", "She walks to school."],
+        answer_key: { choice: 1 },
+        rubric: { grading_mode: "exact" },
+        points: 1,
+        knowledge_code: "present-simple",
+      },
     ],
   };
   const review = {
@@ -689,6 +712,18 @@ test("parent validates a local-AI completed-paper review before submitting it", 
         page_numbers: [1],
         regions: [{ x: 0.1, y: 0.2, width: 0.7, height: 0.12 }],
         transcription: "(x - 4)(x + 4)",
+        legibility: "clear",
+      },
+      {
+        question_position: 2,
+        page_numbers: [1],
+        transcription: "goes",
+        legibility: "clear",
+      },
+      {
+        question_position: 3,
+        page_numbers: [1],
+        transcription: "She walks to school.",
         legibility: "clear",
       },
     ],
@@ -725,7 +760,7 @@ test("parent validates a local-AI completed-paper review before submitting it", 
     buffer: Buffer.from(JSON.stringify(review)),
   });
   await expect(
-    page.getByText("Review ready · questions: 1 · answer regions: 1"),
+    page.getByText("Review ready · questions: 3 · answer regions: 3"),
   ).toBeVisible();
   await page
     .getByLabel("Question 1 wording")
@@ -733,6 +768,8 @@ test("parent validates a local-AI completed-paper review before submitting it", 
   await page
     .getByLabel("Reference answer for question 1")
     .fill("(x - 5)(x + 5)");
+  await page.getByLabel("Accepted answer for question 2").fill("walks");
+  await page.getByLabel("Correct choice for question 3").selectOption("0");
   await page.getByLabel("Answer page numbers for question 1").fill("2");
   await page
     .getByLabel("Answer transcription for question 1")
@@ -752,7 +789,12 @@ test("parent validates a local-AI completed-paper review before submitting it", 
   );
   await page.getByRole("button", { name: "Confirm and start grading" }).click();
   const confirmationBody = JSON.parse((await confirmRequest).postData() ?? "{}") as {
-    document: { questions: Array<{ prompt: string; answer_key: { reference: string } }> };
+    document: {
+      questions: Array<{
+        prompt: string;
+        answer_key: { reference?: string; text?: string; choice?: number };
+      }>;
+    };
     responses: Array<{
       answer: { source_paths: string[]; page_numbers: number[]; transcription: string };
     }>;
@@ -760,6 +802,12 @@ test("parent validates a local-AI completed-paper review before submitting it", 
   expect(confirmationBody.document.questions[0]).toMatchObject({
     prompt: "Factorise x² - 25.",
     answer_key: { reference: "(x - 5)(x + 5)" },
+  });
+  expect(confirmationBody.document.questions[1]).toMatchObject({
+    answer_key: { text: "walks" },
+  });
+  expect(confirmationBody.document.questions[2]).toMatchObject({
+    answer_key: { choice: 0 },
   });
   expect(confirmationBody.responses[0]?.answer.source_paths).toEqual(
     imported.response_paths,
