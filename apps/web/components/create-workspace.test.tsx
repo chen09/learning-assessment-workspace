@@ -84,6 +84,31 @@ describe("CreateWorkspace", () => {
   });
 
   it("keeps question material and its private answer key separate", async () => {
+    const structuredDocument = {
+      schema_version: "1.0" as const,
+      question_set: {
+        title: "Lesson 3 practice",
+        subject: "English",
+        locale: "en" as const,
+        difficulty: "standard" as const,
+        source_mode: "similar" as const,
+        estimated_minutes: 10,
+        source_summary: { unit: "Lesson 3 grammar" },
+      },
+      knowledge_tags: [{ code: "present-simple", label: "Present simple" }],
+      questions: [
+        {
+          position: 1,
+          type: "typed_text" as const,
+          prompt: "She ___ to school every day.",
+          options: [],
+          answer_key: { text: "walks" },
+          rubric: { grading_mode: "exact" },
+          points: 1,
+          knowledge_code: "present-simple",
+        },
+      ],
+    };
     mocks.createUploadIntent.mockResolvedValue({
       bucket: "sources",
       path: "family-1/import-1/english-lesson.pdf",
@@ -99,6 +124,19 @@ describe("CreateWorkspace", () => {
     mocks.getQuestionSetDraft.mockResolvedValue({
       question_set: { status: "needs_review" },
       questions: [],
+    });
+    mocks.previewStructuredQuestionSet.mockResolvedValue({
+      title: "Lesson 3 practice",
+      subject: "English",
+      locale: "en",
+      question_count: 1,
+      total_points: 1,
+      estimated_minutes: 10,
+      knowledge_tag_count: 1,
+      answer_keys_present: true,
+      checksum: "source-material-checksum",
+      source_summary: { unit: "Lesson 3 grammar" },
+      questions: structuredDocument.questions,
     });
 
     render(<CreateWorkspace />);
@@ -185,6 +223,33 @@ describe("CreateWorkspace", () => {
     expect(
       screen.getByRole("heading", { name: "Import an AI-structured question set" }),
     ).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("AI question JSON"), {
+      target: {
+        files: [
+          new File([JSON.stringify(structuredDocument)], "lesson-3.json", {
+            type: "application/json",
+          }),
+        ],
+      },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Preview questions" }));
+
+    await waitFor(() => {
+      expect(mocks.previewStructuredQuestionSet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          question_set: expect.objectContaining({
+            source_summary: expect.objectContaining({
+              unit: "Lesson 3 grammar",
+              source_material_question_set_id: "question-set-1",
+              source_material_title: "Lesson 3 grammar reference",
+              source_material_subject: "English",
+            }),
+          }),
+        }),
+        "parent-token",
+      );
+    });
   });
 
   it("previews an AI JSON file before the confirmed data is imported and assigned", async () => {

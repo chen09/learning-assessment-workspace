@@ -374,6 +374,10 @@ function CreateWorkspaceContent() {
     useState<ImportPurpose>("generate_similar");
   const [stage, setStage] = useState<Stage>("compose");
   const [sourceMaterialName, setSourceMaterialName] = useState("");
+  const [sourceMaterialQuestionSetId, setSourceMaterialQuestionSetId] =
+    useState<string | null>(null);
+  const [sourceMaterialTitle, setSourceMaterialTitle] = useState("");
+  const [sourceMaterialSubject, setSourceMaterialSubject] = useState("");
   const [sourcePromptCopied, setSourcePromptCopied] = useState(false);
   const [importTitle, setImportTitle] = useState("Imported learning material");
   const [importSubject, setImportSubject] = useState("Mixed practice");
@@ -756,9 +760,23 @@ function CreateWorkspaceContent() {
       }
       setRequestStatus("working");
       try {
-        const document = JSON.parse(
+        const parsedDocument = JSON.parse(
           await readTextFile(structuredFile),
         ) as StructuredQuestionSetDocument;
+        const document: StructuredQuestionSetDocument = sourceMaterialQuestionSetId
+          ? {
+              ...parsedDocument,
+              question_set: {
+                ...parsedDocument.question_set,
+                source_summary: {
+                  ...parsedDocument.question_set.source_summary,
+                  source_material_question_set_id: sourceMaterialQuestionSetId,
+                  source_material_title: sourceMaterialTitle,
+                  source_material_subject: sourceMaterialSubject,
+                },
+              },
+            }
+          : parsedDocument;
         const preview = await previewStructuredQuestionSet(
           document,
           parentToken,
@@ -956,6 +974,11 @@ function CreateWorkspaceContent() {
         setSourceMaterialName(
           files.map((file) => file.name).join(", ") || "Source material",
         );
+        setSourceMaterialQuestionSetId(imported.question_set_id);
+        setSourceMaterialTitle(
+          importTitle.trim() || "Imported learning material",
+        );
+        setSourceMaterialSubject(importSubject.trim() || "Mixed practice");
         setSourcePromptCopied(false);
         setStage("source_ready");
         setRequestStatus("idle");
