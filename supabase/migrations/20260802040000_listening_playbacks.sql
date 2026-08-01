@@ -30,3 +30,7 @@ create policy attempt_audio_playbacks_family_access
 
 grant select, insert, update on public.attempt_audio_playbacks
   to authenticated, learning_api, learning_worker;
+
+-- The API reads a linked audio asset while assembling child work. `assets`
+-- was already granted to the runtime role; the link table is added here.
+grant select on public.question_assets to learning_api;
