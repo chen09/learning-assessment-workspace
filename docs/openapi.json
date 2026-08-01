@@ -5772,6 +5772,68 @@
         ]
       }
     },
+    "/v1/library/families/{family_id}/submissions": {
+      "get": {
+        "operationId": "list_family_library_submissions_v1_library_families__family_id__submissions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "family_id",
+            "required": true,
+            "schema": {
+              "title": "Family Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LibrarySubmission"
+                  },
+                  "title": "Response List Family Library Submissions V1 Library Families  Family Id  Submissions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Family Library Submissions",
+        "tags": [
+          "library"
+        ]
+      }
+    },
     "/v1/library/submissions": {
       "post": {
         "operationId": "create_library_submission_v1_library_submissions_post",
