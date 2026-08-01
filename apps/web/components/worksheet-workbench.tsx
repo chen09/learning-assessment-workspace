@@ -193,6 +193,9 @@ function WorksheetWorkbenchContent() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [mode, setMode] = useState<"focus" | "sheet">("focus");
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
+  const [photoPreviewUrls, setPhotoPreviewUrls] = useState<
+    Record<string, string[]>
+  >({});
   const [saveStatus, setSaveStatus] = useState<
     "idle" | "saving" | "saved" | "offline"
   >("idle");
@@ -224,7 +227,18 @@ function WorksheetWorkbenchContent() {
     null,
   );
   const automaticSubmissionAttemptId = useRef<string | null>(null);
+  const photoObjectUrls = useRef(new Set<string>());
   const currentQuestion = questions[currentIndex];
+
+  useEffect(
+    () => () => {
+      for (const previewUrl of photoObjectUrls.current) {
+        URL.revokeObjectURL(previewUrl);
+      }
+      photoObjectUrls.current.clear();
+    },
+    [],
+  );
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -852,9 +866,16 @@ function WorksheetWorkbenchContent() {
     if (question.type === "photo") {
       const photoNames = answer.photoNames ?? [];
       const photoPaths = answer.photoPaths ?? [];
+      const photoPreviews = photoPreviewUrls[question.id] ?? [];
       const canManagePhotoOrder = photoNames.length === photoPaths.length;
       const updatePhotos = (names: string[], paths: string[]) => {
         updateAnswer(question.id, { photoNames: names, photoPaths: paths });
+      };
+      const updatePhotoPreviews = (previews: string[]) => {
+        setPhotoPreviewUrls((current) => ({
+          ...current,
+          [question.id]: previews,
+        }));
       };
       const movePhoto = (from: number, to: number) => {
         if (!canManagePhotoOrder || to < 0 || to >= photoNames.length) {
@@ -870,14 +891,28 @@ function WorksheetWorkbenchContent() {
         names.splice(to, 0, name);
         paths.splice(to, 0, path);
         updatePhotos(names, paths);
+        const previews = [...photoPreviews];
+        const [preview] = previews.splice(from, 1);
+        if (preview !== undefined) {
+          previews.splice(to, 0, preview);
+        }
+        updatePhotoPreviews(previews);
       };
       const removePhoto = (index: number) => {
         if (!canManagePhotoOrder) {
           return;
         }
+        const preview = photoPreviews[index];
+        if (preview) {
+          URL.revokeObjectURL(preview);
+          photoObjectUrls.current.delete(preview);
+        }
         updatePhotos(
           photoNames.filter((_, photoIndex) => photoIndex !== index),
           photoPaths.filter((_, photoIndex) => photoIndex !== index),
+        );
+        updatePhotoPreviews(
+          photoPreviews.filter((_, photoIndex) => photoIndex !== index),
         );
       };
       return (
@@ -888,51 +923,20 @@ function WorksheetWorkbenchContent() {
               aria-label={t("worksheet.photoInput")}
               capture="environment"
               onChange={(event) => {
-              const selectedFiles = Array.from(event.target.files ?? []);
-              event.target.value = "";
-              if (selectedFiles.length > 0) {
-                if (attemptId && familyId && childToken) {
-                  setSaveStatus("saving");
-                  void (async () => {
-                    const uploadedNames: string[] = [];
-                    const uploadedPaths: string[] = [];
-                    try {
-                      for (const [index, file] of selectedFiles.entries()) {
-                        const uploadKey = `response-${attemptId}-${question.id}-${file.lastModified}-${index}`;
-                        const intent = await createChildUploadIntent(
-                          {
-                            family_id: familyId,
-                            bucket: "responses",
-                            object_id: attemptId,
-                            filename: file.name,
-                            content_type:
-                              file.type === "image/png"
-                                ? "image/png"
-                                : "image/jpeg",
-                          },
-                          childToken,
-                          uploadKey,
-                        );
-                        await uploadToSignedUrl(intent, file);
-                        uploadedNames.push(file.name);
-                        uploadedPaths.push(intent.path);
-                      }
-                      updateAnswer(question.id, {
-                        photoNames: [...photoNames, ...uploadedNames],
-                        photoPaths: [...photoPaths, ...uploadedPaths],
-                      });
-                    } catch {
-                      updateAnswer(question.id, {
-                        photoNames: [
-                          ...photoNames,
-                          ...selectedFiles.map((file) => file.name),
-                        ],
-                        photoPaths: [...photoPaths, ...uploadedPaths],
-                      });
-                      setSaveStatus("offline");
-                    }
-                  })();
-                } else {
+                const selectedFiles = Array.from(event.target.files ?? []);
+                event.target.value = "";
+                if (selectedFiles.length === 0) {
+                  return;
+                }
+
+                const newPreviews = selectedFiles.map((file) => {
+                  const previewUrl = URL.createObjectURL(file);
+                  photoObjectUrls.current.add(previewUrl);
+                  return previewUrl;
+                });
+                updatePhotoPreviews([...photoPreviews, ...newPreviews]);
+
+                if (!attemptId || !familyId || !childToken) {
                   updateAnswer(question.id, {
                     photoNames: [
                       ...photoNames,
@@ -940,8 +944,49 @@ function WorksheetWorkbenchContent() {
                     ],
                     photoPaths,
                   });
+                  return;
                 }
-              }
+
+                setSaveStatus("saving");
+                void (async () => {
+                  const uploadedNames: string[] = [];
+                  const uploadedPaths: string[] = [];
+                  try {
+                    for (const [index, file] of selectedFiles.entries()) {
+                      const uploadKey = `response-${attemptId}-${question.id}-${file.lastModified}-${index}`;
+                      const intent = await createChildUploadIntent(
+                        {
+                          family_id: familyId,
+                          bucket: "responses",
+                          object_id: attemptId,
+                          filename: file.name,
+                          content_type:
+                            file.type === "image/png"
+                              ? "image/png"
+                              : "image/jpeg",
+                        },
+                        childToken,
+                        uploadKey,
+                      );
+                      await uploadToSignedUrl(intent, file);
+                      uploadedNames.push(file.name);
+                      uploadedPaths.push(intent.path);
+                    }
+                    updateAnswer(question.id, {
+                      photoNames: [...photoNames, ...uploadedNames],
+                      photoPaths: [...photoPaths, ...uploadedPaths],
+                    });
+                  } catch {
+                    updateAnswer(question.id, {
+                      photoNames: [
+                        ...photoNames,
+                        ...selectedFiles.map((file) => file.name),
+                      ],
+                      photoPaths: [...photoPaths, ...uploadedPaths],
+                    });
+                    setSaveStatus("offline");
+                  }
+                })();
               }}
               multiple
               type="file"
@@ -961,6 +1006,15 @@ function WorksheetWorkbenchContent() {
             >
               {photoNames.map((name, index) => (
                 <li key={`${name}-${index}`}>
+                  {photoPreviews[index] ? (
+                    // Preview URLs are local blobs, so Next's remote image optimizer cannot serve them.
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      alt={t("worksheet.photoPreview", { name })}
+                      className="photo-file-preview"
+                      src={photoPreviews[index]}
+                    />
+                  ) : null}
                   <span className="photo-file-name">
                     {index + 1}. {name}
                   </span>

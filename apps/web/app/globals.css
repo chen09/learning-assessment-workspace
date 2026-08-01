@@ -1025,10 +1025,22 @@ button {
 }
 
 .photo-file-name {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.photo-file-preview {
+  display: block;
+  width: 2.6rem;
+  height: 2.6rem;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+  background: white;
+  object-fit: cover;
 }
 
 .photo-file-actions {

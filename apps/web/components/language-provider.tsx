@@ -153,6 +153,7 @@ const messages = {
     "worksheet.photoHelp":
       "Upload one question at a time. Images stay in shooting order.",
     "worksheet.uploadedImages": "Uploaded answer images",
+    "worksheet.photoPreview": "Preview: {name}",
     "worksheet.movePhotoEarlier": "Move {name} earlier",
     "worksheet.movePhotoLater": "Move {name} later",
     "worksheet.removePhoto": "Remove {name}",
@@ -593,6 +594,7 @@ const messages = {
     "worksheet.photoHelp":
       "一問ずつアップロードしてください。画像は撮影順に保存されます。",
     "worksheet.uploadedImages": "アップロード済みの解答画像",
+    "worksheet.photoPreview": "{name} のプレビュー",
     "worksheet.movePhotoEarlier": "{name} を前へ移動",
     "worksheet.movePhotoLater": "{name} を後ろへ移動",
     "worksheet.removePhoto": "{name} を削除",
@@ -1025,6 +1027,7 @@ const messages = {
     "worksheet.addMoreImages": "继续添加答案图片",
     "worksheet.photoHelp": "请逐题上传。图片会按照拍摄顺序保存。",
     "worksheet.uploadedImages": "已上传的答案图片",
+    "worksheet.photoPreview": "{name} 的预览",
     "worksheet.movePhotoEarlier": "将 {name} 前移",
     "worksheet.movePhotoLater": "将 {name} 后移",
     "worksheet.removePhoto": "移除 {name}",

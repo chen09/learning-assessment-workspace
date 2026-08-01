@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { WorksheetWorkbench } from "@/components/worksheet-workbench";
@@ -93,6 +99,14 @@ const assignmentWork = {
 
 describe("WorksheetWorkbench", () => {
   beforeEach(() => {
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: vi.fn((file: File) => `blob:preview/${file.name}`),
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: vi.fn(),
+    });
     vi.spyOn(
       HTMLCanvasElement.prototype,
       "getContext",
@@ -364,6 +378,12 @@ describe("WorksheetWorkbench", () => {
     expect(uploadedImages).toHaveTextContent(
       "1. answer-page.jpg2. draft-page.jpg",
     );
+    expect(
+      screen.getByRole("img", { name: "Preview: answer-page.jpg" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: "Preview: draft-page.jpg" }),
+    ).toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole("button", { name: "Move answer-page.jpg later" }),
@@ -371,11 +391,19 @@ describe("WorksheetWorkbench", () => {
     expect(uploadedImages).toHaveTextContent(
       "1. draft-page.jpg2. answer-page.jpg",
     );
+    expect(
+      within(uploadedImages)
+        .getAllByRole("img")
+        .map((image) => image.getAttribute("alt")),
+    ).toEqual(["Preview: draft-page.jpg", "Preview: answer-page.jpg"]);
 
     fireEvent.click(
       screen.getByRole("button", { name: "Remove draft-page.jpg" }),
     );
     expect(uploadedImages).toHaveTextContent("1. answer-page.jpg");
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(
+      "blob:preview/draft-page.jpg",
+    );
     expect(
       screen.queryByRole("button", { name: "Remove draft-page.jpg" }),
     ).not.toBeInTheDocument();
