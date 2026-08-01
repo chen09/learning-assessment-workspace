@@ -152,39 +152,6 @@ type ReviewDraftQuestion = Omit<ApiQuestion, "listening"> & {
   listening?: StructuredQuestionSetDocument["questions"][number]["listening"];
 };
 
-const sampleQuestions: ReviewDraftQuestion[] = [
-  {
-    id: "sample-choice",
-    position: 1,
-    type: "single_choice",
-    prompt: "Choose the sentence that uses the present simple correctly.",
-    options: [],
-    points: 1,
-    answer_key: { answer: "B · She walks to school every day." },
-    answer: "B · She walks to school every day.",
-  },
-  {
-    id: "sample-type",
-    position: 2,
-    type: "typed_text",
-    prompt: "Complete: My brother ___ tennis on Sundays.",
-    options: [],
-    points: 1,
-    answer_key: { answer: "plays" },
-    answer: "plays",
-  },
-  {
-    id: "sample-handwrite",
-    position: 3,
-    type: "handwriting",
-    prompt: "Explain why (a + b)(a − b) = a² − b².",
-    options: [],
-    points: 1,
-    answer_key: { answer: "Expand and combine the middle terms." },
-    answer: "Expand and combine the middle terms.",
-  },
-];
-
 function readTextFile(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -2132,7 +2099,7 @@ function CreateWorkspaceContent() {
             Draft · not visible to children
           </span>
           <span>
-            {draftQuestions.length || sampleQuestions.length} questions ·{" "}
+            {draftQuestions.length} questions ·{" "}
             {mode === "structured"
               ? "validated JSON · answers stay private"
               : assignmentMode === "exam"
@@ -2141,8 +2108,17 @@ function CreateWorkspaceContent() {
           </span>
         </div>
         <section className="draft-question-list">
-          {(draftQuestions.length > 0 ? draftQuestions : sampleQuestions).map(
-            (question, index) => (
+          {draftQuestions.length === 0 ? (
+            <div className="empty-state" role="status">
+              <h2>No confirmed questions yet</h2>
+              <p>
+                Return to the source and import valid question JSON or create a
+                question manually. Nothing can be assigned until real questions
+                are present in this draft.
+              </p>
+            </div>
+          ) : (
+            draftQuestions.map((question, index) => (
             <article key={question.prompt}>
               <div className="draft-question-number">{index + 1}</div>
               <div>
@@ -2301,11 +2277,7 @@ function CreateWorkspaceContent() {
                     aria-label={`Move question ${index + 1} down`}
                     className="quiet-link"
                     disabled={
-                      index ===
-                      (draftQuestions.length > 0
-                        ? draftQuestions.length
-                        : sampleQuestions.length) -
-                        1
+                      index === draftQuestions.length - 1
                     }
                     onClick={() => moveStructuredQuestion(question.id, 1)}
                     type="button"
@@ -2345,7 +2317,7 @@ function CreateWorkspaceContent() {
                 </div>
               ) : null}
             </article>
-            ),
+            ))
           )}
         </section>
         <section className="assignment-panel">
@@ -2430,7 +2402,7 @@ function CreateWorkspaceContent() {
           ) : (
             <button
               className="button primary large"
-              disabled={requestStatus === "working"}
+              disabled={requestStatus === "working" || draftQuestions.length === 0}
               onClick={() => void confirmAndAssign()}
               type="button"
             >

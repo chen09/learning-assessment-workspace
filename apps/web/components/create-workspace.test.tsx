@@ -55,6 +55,69 @@ describe("CreateWorkspace", () => {
     expect(screen.getByText("Fixture child")).toBeInTheDocument();
   });
 
+  it("never substitutes sample questions when a structured preview unexpectedly returns an empty draft", async () => {
+    const document = {
+      schema_version: "1.0" as const,
+      question_set: {
+        title: "Empty preview safety check",
+        subject: "English",
+        locale: "en" as const,
+        difficulty: "standard" as const,
+        source_mode: "convert" as const,
+        estimated_minutes: 5,
+      },
+      knowledge_tags: [{ code: "grammar", label: "Grammar" }],
+      questions: [
+        {
+          position: 1,
+          type: "typed_text" as const,
+          prompt: "This real question must not be replaced.",
+          options: [],
+          answer_key: { text: "answer" },
+          rubric: { grading_mode: "exact" },
+          points: 1,
+          knowledge_code: "grammar",
+        },
+      ],
+    };
+    mocks.previewStructuredQuestionSet.mockResolvedValue({
+      title: document.question_set.title,
+      subject: document.question_set.subject,
+      locale: document.question_set.locale,
+      question_count: 0,
+      total_points: 0,
+      estimated_minutes: 0,
+      knowledge_tag_count: 0,
+      answer_keys_present: false,
+      checksum: "empty-preview",
+      source_summary: {},
+      questions: [],
+    });
+
+    render(<CreateWorkspace />);
+    await screen.findByRole("combobox", { name: "Child" });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Import AI question JSON" }),
+    );
+    fireEvent.change(screen.getByLabelText("AI question JSON"), {
+      target: {
+        files: [new File([JSON.stringify(document)], "empty-preview.json")],
+      },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Preview questions" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "No confirmed questions yet" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Nothing can be assigned until real questions are present in this draft.",
+    );
+    expect(
+      screen.queryByText("Choose the sentence that uses the present simple correctly."),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Confirm and assign" })).toBeDisabled();
+  });
+
   it("keeps draft creation disabled until a real family and child are loaded", async () => {
     let releaseFamilies:
       | ((families: Array<{ id: string; name: string }>) => void)
