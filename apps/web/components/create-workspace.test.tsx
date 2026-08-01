@@ -679,6 +679,26 @@ describe("CreateWorkspace", () => {
           points: 1,
           knowledge_code: "present-simple",
         },
+        {
+          position: 4,
+          type: "multiple_choice",
+          prompt: "Select both correct present-simple forms.",
+          options: ["She walks to school.", "They walk to school.", "He walk to school."],
+          answer_key: { choices: [0, 1] },
+          rubric: { grading_mode: "exact" },
+          points: 1,
+          knowledge_code: "present-simple",
+        },
+        {
+          position: 5,
+          type: "word_order",
+          prompt: "Put the words in order.",
+          options: ["She", "walks", "to", "school."],
+          answer_key: { tokens: ["walks", "She", "school.", "to"] },
+          rubric: { grading_mode: "exact" },
+          points: 1,
+          knowledge_code: "present-simple",
+        },
       ],
     };
     mocks.createUploadIntent.mockImplementation((payload) =>
@@ -716,6 +736,18 @@ describe("CreateWorkspace", () => {
           },
           {
             question_position: 3,
+            page_numbers: [1],
+            transcription: "She walks to school.",
+            legibility: "clear",
+          },
+          {
+            question_position: 4,
+            page_numbers: [1],
+            transcription: "She walks to school. They walk to school.",
+            legibility: "clear",
+          },
+          {
+            question_position: 5,
             page_numbers: [1],
             transcription: "She walks to school.",
             legibility: "clear",
@@ -802,7 +834,7 @@ describe("CreateWorkspace", () => {
       ),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Review ready · questions: 3 · answer regions: 3"),
+      screen.getByText("Review ready · questions: 5 · answer regions: 5"),
     ).toBeInTheDocument();
     fireEvent.change(
       screen.getByLabelText("Question 1 wording"),
@@ -816,6 +848,11 @@ describe("CreateWorkspace", () => {
     });
     fireEvent.change(screen.getByLabelText("Correct choice for question 3"), {
       target: { value: "0" },
+    });
+    fireEvent.click(screen.getByLabelText("Correct choice 1 for question 4"));
+    fireEvent.click(screen.getByLabelText("Correct choice 3 for question 4"));
+    fireEvent.change(screen.getByLabelText("Correct word order for question 5"), {
+      target: { value: "She\nwalks\nto\nschool." },
     });
     fireEvent.change(screen.getByLabelText("Answer page numbers for question 1"), {
       target: { value: "not a page" },
@@ -856,6 +893,12 @@ describe("CreateWorkspace", () => {
               expect.objectContaining({
                 answer_key: { choice: 0 },
               }),
+              expect.objectContaining({
+                answer_key: { choices: [1, 2] },
+              }),
+              expect.objectContaining({
+                answer_key: { tokens: ["She", "walks", "to", "school."] },
+              }),
             ],
           }),
           responses: [
@@ -886,6 +929,30 @@ describe("CreateWorkspace", () => {
             },
             {
               question_position: 3,
+              kind: "photo",
+              answer: {
+                source_paths: [
+                  "family-1/completed-paper/responses-completed-paper.jpg",
+                ],
+                page_numbers: [1],
+                transcription: "She walks to school.",
+                legibility: "clear",
+              },
+            },
+            {
+              question_position: 4,
+              kind: "photo",
+              answer: {
+                source_paths: [
+                  "family-1/completed-paper/responses-completed-paper.jpg",
+                ],
+                page_numbers: [1],
+                transcription: "She walks to school. They walk to school.",
+                legibility: "clear",
+              },
+            },
+            {
+              question_position: 5,
               kind: "photo",
               answer: {
                 source_paths: [

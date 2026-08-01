@@ -76,6 +76,41 @@ def test_rejects_single_choice_answer_outside_options() -> None:
         parse_import_document(json.dumps(payload))
 
 
+def test_rejects_multiple_choice_answer_outside_options() -> None:
+    payload = _valid_payload()
+    questions = payload["questions"]
+    assert isinstance(questions, list)
+    questions[0].update(
+        {
+            "type": "multiple_choice",
+            "options": ["If", "Because"],
+            "answer_key": {"choices": [0, 2]},
+        }
+    )
+
+    with pytest.raises(ValidationError, match="Multiple-choice answers must index options"):
+        parse_import_document(json.dumps(payload))
+
+
+@pytest.mark.parametrize("choices", [[], [0, 0]])
+def test_rejects_empty_or_duplicate_multiple_choice_answers(
+    choices: list[int],
+) -> None:
+    payload = _valid_payload()
+    questions = payload["questions"]
+    assert isinstance(questions, list)
+    questions[0].update(
+        {
+            "type": "multiple_choice",
+            "options": ["If", "Because"],
+            "answer_key": {"choices": choices},
+        }
+    )
+
+    with pytest.raises(ValidationError, match="Multiple-choice answers must index options"):
+        parse_import_document(json.dumps(payload))
+
+
 def test_rejects_word_order_answer_with_different_token_inventory() -> None:
     payload = _valid_payload()
     questions = payload["questions"]

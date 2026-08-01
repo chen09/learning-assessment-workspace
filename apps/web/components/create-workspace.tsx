@@ -1476,6 +1476,107 @@ function CreateWorkspaceContent() {
                               </select>
                             </label>
                           ) : null}
+                          {question.type === "multiple_choice" ? (
+                            <fieldset className="completed-paper-choice-list">
+                              <legend>{t("completedPaper.correctChoices")}</legend>
+                              {question.options.map((option, optionIndex) => {
+                                const selectedChoices = Array.isArray(
+                                  question.answer_key.choices,
+                                )
+                                  ? question.answer_key.choices.filter(
+                                      (choice): choice is number =>
+                                        typeof choice === "number" &&
+                                        Number.isInteger(choice) &&
+                                        choice >= 0 &&
+                                        choice < question.options.length,
+                                    )
+                                  : [];
+                                const isSelected = selectedChoices.includes(optionIndex);
+                                return (
+                                  <label key={`${optionIndex}-${option}`}>
+                                    <input
+                                      aria-label={t(
+                                        "completedPaper.correctChoiceOptionFor",
+                                        {
+                                          choice: optionIndex + 1,
+                                          position: question.position,
+                                        },
+                                      )}
+                                      checked={isSelected}
+                                      onChange={() =>
+                                        updateCompletedPaperQuestion(
+                                          question.position,
+                                          (current) => {
+                                            const choices = Array.isArray(
+                                              current.answer_key.choices,
+                                            )
+                                              ? current.answer_key.choices.filter(
+                                                  (choice): choice is number =>
+                                                    typeof choice === "number" &&
+                                                    Number.isInteger(choice) &&
+                                                    choice >= 0 &&
+                                                    choice < current.options.length,
+                                                )
+                                              : [];
+                                            const nextChoices = choices.includes(optionIndex)
+                                              ? choices.length === 1
+                                                ? choices
+                                                : choices.filter(
+                                                    (choice) => choice !== optionIndex,
+                                                  )
+                                              : [...choices, optionIndex].sort(
+                                                  (left, right) => left - right,
+                                                );
+                                            return {
+                                              ...current,
+                                              answer_key: {
+                                                ...current.answer_key,
+                                                choices: nextChoices,
+                                              },
+                                            };
+                                          },
+                                        )
+                                      }
+                                      type="checkbox"
+                                    />
+                                    <span>{option}</span>
+                                  </label>
+                                );
+                              })}
+                            </fieldset>
+                          ) : null}
+                          {question.type === "word_order" ? (
+                            <label>
+                              <span>{t("completedPaper.correctWordOrder")}</span>
+                              <textarea
+                                aria-label={t("completedPaper.correctWordOrderFor", {
+                                  position: question.position,
+                                })}
+                                onChange={(event) =>
+                                  updateCompletedPaperQuestion(question.position, (current) => ({
+                                    ...current,
+                                    answer_key: {
+                                      ...current.answer_key,
+                                      tokens: event.target.value
+                                        .split("\n")
+                                        .map((token) => token.trim())
+                                        .filter(Boolean),
+                                    },
+                                  }))
+                                }
+                                value={
+                                  Array.isArray(question.answer_key.tokens)
+                                    ? question.answer_key.tokens
+                                        .filter(
+                                          (token): token is string =>
+                                            typeof token === "string",
+                                        )
+                                        .join("\n")
+                                    : ""
+                                }
+                              />
+                            </label>
+                          ) : null}
                           {completedReview.answer_regions[index] ? (
                             <div className="completed-paper-region-fields">
                               <label>

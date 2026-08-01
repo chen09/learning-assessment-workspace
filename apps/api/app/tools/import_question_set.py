@@ -59,6 +59,21 @@ class QuestionInput(StrictModel):
                 or choice >= len(self.options)
             ):
                 raise ValueError("Single-choice answer must index an option.")
+        if self.type == QuestionType.MULTIPLE_CHOICE:
+            choices = self.answer_key.get("choices")
+            if (
+                not isinstance(choices, list)
+                or not choices
+                or any(
+                    not isinstance(choice, int)
+                    or isinstance(choice, bool)
+                    or choice < 0
+                    or choice >= len(self.options)
+                    for choice in choices
+                )
+                or len(set(choices)) != len(choices)
+            ):
+                raise ValueError("Multiple-choice answers must index options uniquely.")
         if self.type == QuestionType.WORD_ORDER:
             tokens = self.answer_key.get("tokens")
             if not isinstance(tokens, list) or Counter(tokens) != Counter(self.options):
