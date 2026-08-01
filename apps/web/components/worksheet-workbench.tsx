@@ -204,6 +204,9 @@ function WorksheetWorkbenchContent() {
   const [photoClarityWarnings, setPhotoClarityWarnings] = useState<
     Record<string, boolean[]>
   >({});
+  const [photoUploadQuestionId, setPhotoUploadQuestionId] = useState<
+    string | null
+  >(null);
   const [saveStatus, setSaveStatus] = useState<
     "idle" | "saving" | "saved" | "offline"
   >("idle");
@@ -970,6 +973,7 @@ function WorksheetWorkbenchContent() {
       const photoPaths = answer.photoPaths ?? [];
       const photoPreviews = photoPreviewUrls[question.id] ?? [];
       const clarityWarnings = photoClarityWarnings[question.id] ?? [];
+      const isUploadingPhotos = photoUploadQuestionId === question.id;
       const canManagePhotoOrder = photoNames.length === photoPaths.length;
       const updatePhotos = (names: string[], paths: string[]) => {
         updateAnswer(question.id, { photoNames: names, photoPaths: paths });
@@ -1038,6 +1042,9 @@ function WorksheetWorkbenchContent() {
               aria-label={t("worksheet.photoInput")}
               capture="environment"
               onChange={(event) => {
+                if (isUploadingPhotos) {
+                  return;
+                }
                 const selectedFiles = Array.from(event.target.files ?? []);
                 event.target.value = "";
                 if (selectedFiles.length === 0) {
@@ -1069,6 +1076,7 @@ function WorksheetWorkbenchContent() {
                 }
 
                 setSaveStatus("saving");
+                setPhotoUploadQuestionId(question.id);
                 void (async () => {
                   const uploadedNames: string[] = [];
                   const uploadedPaths: string[] = [];
@@ -1106,9 +1114,14 @@ function WorksheetWorkbenchContent() {
                       photoPaths: [...photoPaths, ...uploadedPaths],
                     });
                     setSaveStatus("offline");
+                  } finally {
+                    setPhotoUploadQuestionId((current) =>
+                      current === question.id ? null : current,
+                    );
                   }
                 })();
               }}
+              disabled={isUploadingPhotos}
               multiple
               type="file"
             />
@@ -1119,6 +1132,9 @@ function WorksheetWorkbenchContent() {
                 : t("worksheet.photoInput")}
             </strong>
             <span>{t("worksheet.photoHelp")}</span>
+            {isUploadingPhotos ? (
+              <span role="status">{t("worksheet.uploadingImages")}</span>
+            ) : null}
           </label>
           {photoNames.length > 0 ? (
             <ol

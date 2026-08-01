@@ -497,6 +497,37 @@ describe("WorksheetWorkbench", () => {
     expect(mocks.uploadToSignedUrl).toHaveBeenCalled();
   });
 
+  it("locks additional photo selection until the current ordered upload finishes", async () => {
+    let finishUpload: (() => void) | undefined;
+    mocks.uploadToSignedUrl.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishUpload = resolve;
+        }),
+    );
+    render(<WorksheetWorkbench />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Go to question 4" }),
+    );
+    const answerInput = screen.getByLabelText(/Take a photo or choose images/);
+    fireEvent.change(answerInput, {
+      target: {
+        files: [
+          new File(["first"], "first-answer.jpg", { type: "image/jpeg" }),
+        ],
+      },
+    });
+
+    await waitFor(() => expect(mocks.uploadToSignedUrl).toHaveBeenCalled());
+    expect(answerInput).toBeDisabled();
+    expect(screen.getByText("Uploading answer images…")).toBeInTheDocument();
+
+    finishUpload?.();
+
+    await waitFor(() => expect(answerInput).not.toBeDisabled());
+  });
+
   it("persists removing the final response photo as an empty photo answer", async () => {
     render(<WorksheetWorkbench />);
 
