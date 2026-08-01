@@ -22,6 +22,7 @@ import {
   type ApiQuestion,
   type ChildProfile,
   type Family,
+  type FamilyQuestionSet,
   type StructuredQuestionSetDocument,
   assignQuestionSet,
   confirmCompletedWorksheetImport,
@@ -31,6 +32,7 @@ import {
   createUploadIntent,
   getCompletedWorksheetImport,
   getChildren,
+  getFamilyQuestionSets,
   getFamilies,
   getParentAccessToken,
   getQuestionSetDraft,
@@ -379,6 +381,9 @@ function CreateWorkspaceContent() {
     useState<string | null>(null);
   const [sourceMaterialTitle, setSourceMaterialTitle] = useState("");
   const [sourceMaterialSubject, setSourceMaterialSubject] = useState("");
+  const [availableSourceMaterials, setAvailableSourceMaterials] = useState<
+    FamilyQuestionSet[]
+  >([]);
   const [sourcePromptCopied, setSourcePromptCopied] = useState(false);
   const [importTitle, setImportTitle] = useState("Imported learning material");
   const [importSubject, setImportSubject] = useState("Mixed practice");
@@ -513,6 +518,51 @@ function CreateWorkspaceContent() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (mode !== "structured" || !selectedFamilyId) {
+      return;
+    }
+
+    let active = true;
+    void getParentAccessToken().then(async (parentToken) => {
+      if (!parentToken) {
+        return;
+      }
+      try {
+        const questionSets = await getFamilyQuestionSets(
+          selectedFamilyId,
+          parentToken,
+        );
+        if (!active) {
+          return;
+        }
+        const privateMaterials = questionSets.filter(
+          (questionSet) =>
+            questionSet.source_summary.artifact_kind ===
+            "private_source_material",
+        );
+        setAvailableSourceMaterials(privateMaterials);
+        if (
+          sourceMaterialQuestionSetId &&
+          !privateMaterials.some(
+            (material) => material.id === sourceMaterialQuestionSetId,
+          )
+        ) {
+          setSourceMaterialQuestionSetId(null);
+          setSourceMaterialTitle("");
+          setSourceMaterialSubject("");
+        }
+      } catch {
+        if (active) {
+          setAvailableSourceMaterials([]);
+        }
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [mode, selectedFamilyId, sourceMaterialQuestionSetId]);
 
   useEffect(() => {
     if (
@@ -2778,6 +2828,32 @@ function CreateWorkspaceContent() {
                   </p>
                 </div>
               </div>
+              <label className="field-label">
+                Private source material (optional)
+                <select
+                  aria-label="Private source material"
+                  onChange={(event) => {
+                    const material = availableSourceMaterials.find(
+                      (candidate) => candidate.id === event.target.value,
+                    );
+                    setSourceMaterialQuestionSetId(material?.id ?? null);
+                    setSourceMaterialTitle(material?.title ?? "");
+                    setSourceMaterialSubject(material?.subject ?? "");
+                  }}
+                  value={sourceMaterialQuestionSetId ?? ""}
+                >
+                  <option value="">No linked source material</option>
+                  {availableSourceMaterials.map((material) => (
+                    <option key={material.id} value={material.id}>
+                      {material.title} · {material.subject}
+                    </option>
+                  ))}
+                </select>
+                <span>
+                  Links this JSON draft to a private textbook or reference without
+                  exposing its files to the child.
+                </span>
+              </label>
               <label className="drop-zone">
                 <input
                   accept=".json,application/json"

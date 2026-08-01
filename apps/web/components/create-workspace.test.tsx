@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   createUploadIntent: vi.fn(),
   getChildren: vi.fn(),
   getCompletedWorksheetImport: vi.fn(),
+  getFamilyQuestionSets: vi.fn(),
   getFamilies: vi.fn(),
   getParentAccessToken: vi.fn(),
   getQuestionSetDraft: vi.fn(),
@@ -405,6 +406,109 @@ describe("CreateWorkspace", () => {
     expect(
       await screen.findByText("Confirmed and assigned"),
     ).toBeInTheDocument();
+  });
+
+  it("links a later AI JSON import back to an existing private source material", async () => {
+    const document = {
+      schema_version: "1.0",
+      question_set: {
+        title: "Lesson 2 follow-up",
+        subject: "English",
+        locale: "ja",
+        difficulty: "standard",
+        source_mode: "similar",
+        estimated_minutes: 15,
+        source_summary: { unit: "Lesson 2" },
+      },
+      knowledge_tags: [{ code: "lesson-2", label: "Lesson 2" }],
+      questions: [
+        {
+          position: 1,
+          type: "typed_text",
+          prompt: "Complete the sentence.",
+          options: [],
+          answer_key: { text: "walks" },
+          rubric: { grading_mode: "exact" },
+          points: 1,
+          knowledge_code: "lesson-2",
+        },
+      ],
+    };
+    mocks.getFamilyQuestionSets.mockResolvedValue([
+      {
+        id: "source-set-1",
+        family_id: "family-1",
+        title: "Lesson 2 textbook photos",
+        subject: "English",
+        status: "needs_review",
+        question_count: 0,
+        source_summary: {
+          artifact_kind: "private_source_material",
+          reference_file_count: 27,
+        },
+      },
+      {
+        id: "practice-set-1",
+        family_id: "family-1",
+        title: "Earlier practice",
+        subject: "English",
+        status: "confirmed",
+        question_count: 10,
+        source_summary: { artifact_kind: "ai_generated_practice" },
+      },
+    ]);
+    mocks.previewStructuredQuestionSet.mockResolvedValue({
+      title: "Lesson 2 follow-up",
+      subject: "English",
+      locale: "ja",
+      question_count: 1,
+      total_points: 1,
+      estimated_minutes: 15,
+      knowledge_tag_count: 1,
+      answer_keys_present: true,
+      checksum: "source-link-checksum",
+      source_summary: { unit: "Lesson 2" },
+      questions: document.questions,
+    });
+
+    render(<CreateWorkspace />);
+
+    await screen.findByRole("combobox", { name: "Child" });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Import AI question JSON" }),
+    );
+
+    const sourceSelector = await screen.findByRole("combobox", {
+      name: "Private source material",
+    });
+    expect(sourceSelector).toHaveTextContent("Lesson 2 textbook photos");
+    expect(sourceSelector).not.toHaveTextContent("Earlier practice");
+    fireEvent.change(sourceSelector, { target: { value: "source-set-1" } });
+    fireEvent.change(screen.getByLabelText("AI question JSON"), {
+      target: {
+        files: [
+          new File([JSON.stringify(document)], "lesson-2-follow-up.json", {
+            type: "application/json",
+          }),
+        ],
+      },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Preview questions" }));
+
+    await waitFor(() => {
+      expect(mocks.previewStructuredQuestionSet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          question_set: expect.objectContaining({
+            source_summary: expect.objectContaining({
+              source_material_question_set_id: "source-set-1",
+              source_material_title: "Lesson 2 textbook photos",
+              source_material_subject: "English",
+            }),
+          }),
+        }),
+        "parent-token",
+      );
+    });
   });
 
   it("turns one parent-authored question into a reviewed and assigned set", async () => {
