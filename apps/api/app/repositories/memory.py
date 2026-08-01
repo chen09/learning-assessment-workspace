@@ -1682,7 +1682,10 @@ class MemoryRepository:
         family_id: str,
         parent_id: str,
     ) -> list[FamilyLibraryQuestionSet]:
-        if family_id not in self.families:
+        if (
+            family_id not in self.families
+            or parent_id not in self.family_parents.get(family_id, set())
+        ):
             raise NotFoundError
         return [
             FamilyLibraryQuestionSet(
@@ -1700,6 +1703,27 @@ class MemoryRepository:
             for question_set in reversed(list(self.question_sets.values()))
             if str(question_set.family_id) == family_id
         ]
+
+    async def list_family_library_submissions(
+        self,
+        family_id: str,
+        parent_id: str,
+    ) -> list[LibrarySubmission]:
+        if (
+            family_id not in self.families
+            or parent_id not in self.family_parents.get(family_id, set())
+        ):
+            raise NotFoundError
+        return sorted(
+            (
+                submission
+                for submission in self.library_submissions.values()
+                if str(submission.family_id) == family_id
+                and submission.status == "pending_review"
+            ),
+            key=lambda submission: submission.created_at,
+            reverse=True,
+        )
 
     async def confirm_question_set(
         self,
@@ -1814,6 +1838,19 @@ class MemoryRepository:
         existing_id = self.library_idempotency.get(record_key)
         if existing_id is not None:
             return self.library_submissions[existing_id]
+        existing_submission = next(
+            (
+                submission
+                for submission in self.library_submissions.values()
+                if submission.family_id == request.family_id
+                and submission.question_set_id == request.question_set_id
+                and submission.status == "pending_review"
+            ),
+            None,
+        )
+        if existing_submission is not None:
+            self.library_idempotency[record_key] = str(existing_submission.id)
+            return existing_submission
         submission = LibrarySubmission(
             family_id=request.family_id,
             question_set_id=request.question_set_id,

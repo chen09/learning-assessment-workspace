@@ -598,6 +598,28 @@ def test_library_submission_enters_review_instead_of_becoming_public() -> None:
     assert response.json()["status"] == "pending_review"
     assert response.json()["published_at"] is None
 
+    repeated_submission = client.post(
+        "/v1/library/submissions",
+        headers={**PARENT_HEADERS, "Idempotency-Key": "publish-demo-set-again"},
+        json={
+            "family_id": fixture["family"]["id"],
+            "question_set_id": fixture["question_set"]["id"],
+            "rights_confirmed": True,
+            "privacy_confirmed": True,
+        },
+    )
+    pending_submissions = client.get(
+        f"/v1/library/families/{fixture['family']['id']}/submissions",
+        headers=PARENT_HEADERS,
+    )
+
+    assert repeated_submission.status_code == 202
+    assert repeated_submission.json()["id"] == response.json()["id"]
+    assert pending_submissions.status_code == 200
+    assert [submission["id"] for submission in pending_submissions.json()] == [
+        response.json()["id"]
+    ]
+
     unrelated_parent = client.post(
         "/v1/library/submissions",
         headers={

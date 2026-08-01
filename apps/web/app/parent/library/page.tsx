@@ -15,6 +15,7 @@ import {
   type FamilyQuestionSet,
   getChildren,
   getFamilies,
+  getFamilyLibrarySubmissions,
   getFamilyQuestionSets,
   getParentAccessToken,
 } from "@/lib/api-client";
@@ -144,6 +145,9 @@ function LibraryContent() {
   const [families, setFamilies] = useState<Family[]>([]);
   const [familyId, setFamilyId] = useState("");
   const [sets, setSets] = useState<FamilyQuestionSet[]>([]);
+  const [pendingSubmissionSetIds, setPendingSubmissionSetIds] = useState<
+    string[]
+  >([]);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"loading" | "ready" | "error">(
     "loading",
@@ -192,7 +196,14 @@ function LibraryContent() {
           return;
         }
         setFamilyId(selectedFamily.id);
-        setSets(await getFamilyQuestionSets(selectedFamily.id, token));
+        const [questionSets, pendingSubmissions] = await Promise.all([
+          getFamilyQuestionSets(selectedFamily.id, token),
+          getFamilyLibrarySubmissions(selectedFamily.id, token),
+        ]);
+        setSets(questionSets);
+        setPendingSubmissionSetIds(
+          pendingSubmissions.map((submission) => submission.question_set_id),
+        );
         setStatus("ready");
       } catch {
         setStatus("error");
@@ -219,7 +230,14 @@ function LibraryContent() {
       return;
     }
     try {
-      setSets(await getFamilyQuestionSets(nextFamilyId, token));
+      const [questionSets, pendingSubmissions] = await Promise.all([
+        getFamilyQuestionSets(nextFamilyId, token),
+        getFamilyLibrarySubmissions(nextFamilyId, token),
+      ]);
+      setSets(questionSets);
+      setPendingSubmissionSetIds(
+        pendingSubmissions.map((submission) => submission.question_set_id),
+      );
       setStatus("ready");
     } catch {
       setStatus("error");
@@ -306,7 +324,7 @@ function LibraryContent() {
       return;
     }
     try {
-      await createLibrarySubmission(
+      const submission = await createLibrarySubmission(
         {
           family_id: submissionSet.family_id,
           question_set_id: submissionSet.id,
@@ -315,6 +333,11 @@ function LibraryContent() {
         },
         token,
         crypto.randomUUID(),
+      );
+      setPendingSubmissionSetIds((current) =>
+        current.includes(submission.question_set_id)
+          ? current
+          : [...current, submission.question_set_id],
       );
       setSubmissionStatus("success");
     } catch {
@@ -399,13 +422,19 @@ function LibraryContent() {
                   >
                     {text.assign}
                   </button>
-                  <button
-                    className="text-button"
-                    onClick={() => openSubmission(set)}
-                    type="button"
-                  >
-                    {t("librarySubmission.open")}
-                  </button>
+                  {pendingSubmissionSetIds.includes(set.id) ? (
+                    <span className="status-pill warm">
+                      {t("librarySubmission.pending")}
+                    </span>
+                  ) : (
+                    <button
+                      className="text-button"
+                      onClick={() => openSubmission(set)}
+                      type="button"
+                    >
+                      {t("librarySubmission.open")}
+                    </button>
+                  )}
                 </div>
               ) : null}
             </article>

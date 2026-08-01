@@ -3614,6 +3614,37 @@ class PostgresRepository:
             for row in rows
         ]
 
+    async def list_family_library_submissions(
+        self,
+        family_id: str,
+        parent_id: str,
+    ) -> list[LibrarySubmission]:
+        async with self._engine.connect() as connection:
+            family_uuid = _uuid(family_id)
+            await self._require_parent(connection, parent_id, family_uuid)
+            rows = (
+                await connection.execute(
+                    text(
+                        """
+                        select id, family_id, question_set_id, created_at
+                        from public.library_submissions
+                        where family_id = :family_id and status = 'pending'
+                        order by created_at desc
+                        """
+                    ),
+                    {"family_id": family_uuid},
+                )
+            ).mappings().all()
+        return [
+            LibrarySubmission(
+                id=row["id"],
+                family_id=row["family_id"],
+                question_set_id=row["question_set_id"],
+                created_at=row["created_at"],
+            )
+            for row in rows
+        ]
+
     async def confirm_question_set(
         self,
         question_set_id: str,
@@ -3900,26 +3931,44 @@ class PostgresRepository:
                 )
                 if set_result.scalar_one_or_none() is None:
                     raise NotFoundError
-                result = await connection.execute(
+                existing_pending = await connection.execute(
                     text(
                         """
-                        insert into public.library_submissions (
-                          family_id, question_set_id, submitted_by,
-                          rights_confirmed_at, privacy_confirmed_at
-                        ) values (
-                          :family_id, :question_set_id, :parent_id, now(), now()
-                        )
-                        returning id, family_id, question_set_id, created_at
+                        select id from public.library_submissions
+                        where family_id = :family_id
+                          and question_set_id = :question_set_id
+                          and status = 'pending'
+                        order by created_at desc
+                        limit 1
                         """
                     ),
                     {
                         "family_id": request.family_id,
                         "question_set_id": request.question_set_id,
-                        "parent_id": _uuid(parent_id),
                     },
                 )
-                row = result.mappings().one()
-                existing_id = cast(UUID, row["id"])
+                existing_id = existing_pending.scalar_one_or_none()
+                if existing_id is None:
+                    insert_result = await connection.execute(
+                        text(
+                            """
+                            insert into public.library_submissions (
+                              family_id, question_set_id, submitted_by,
+                              rights_confirmed_at, privacy_confirmed_at
+                            ) values (
+                              :family_id, :question_set_id, :parent_id, now(), now()
+                            )
+                            returning id, family_id, question_set_id, created_at
+                            """
+                        ),
+                        {
+                            "family_id": request.family_id,
+                            "question_set_id": request.question_set_id,
+                            "parent_id": _uuid(parent_id),
+                        },
+                    )
+                    inserted_row = insert_result.mappings().one()
+                    existing_id = cast(UUID, inserted_row["id"])
                 await self._remember_idempotency(
                     connection,
                     family_id=request.family_id,
@@ -3928,17 +3977,16 @@ class PostgresRepository:
                     idempotency_key=idempotency_key,
                     resource_id=existing_id,
                 )
-            else:
-                result = await connection.execute(
-                    text(
-                        """
-                        select id, family_id, question_set_id, created_at
-                        from public.library_submissions where id = :id
-                        """
-                    ),
-                    {"id": existing_id},
-                )
-                row = result.mappings().one()
+            result = await connection.execute(
+                text(
+                    """
+                    select id, family_id, question_set_id, created_at
+                    from public.library_submissions where id = :id
+                    """
+                ),
+                {"id": existing_id},
+            )
+            row = result.mappings().one()
         return LibrarySubmission(
             id=row["id"],
             family_id=row["family_id"],

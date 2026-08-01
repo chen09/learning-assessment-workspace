@@ -34,6 +34,27 @@ async def list_family_question_sets(
         ) from error
 
 
+@router.get(
+    "/families/{family_id}/submissions",
+    response_model=list[LibrarySubmission],
+)
+async def list_family_library_submissions(
+    family_id: str,
+    repository: Annotated[Repository, Depends(get_repository)],
+    parent_id: Annotated[str, Depends(require_parent)],
+) -> list[LibrarySubmission]:
+    try:
+        return await repository.list_family_library_submissions(
+            family_id,
+            parent_id,
+        )
+    except (NotFoundError, ValueError) as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The family is not available.",
+        ) from error
+
+
 @router.post(
     "/submissions",
     response_model=LibrarySubmission,
