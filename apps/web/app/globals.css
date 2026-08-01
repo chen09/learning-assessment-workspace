@@ -3425,6 +3425,11 @@ button {
   margin: 1.2rem 0;
 }
 
+.red-pencil-toggle {
+  margin-bottom: 0.75rem;
+  color: #a62222;
+}
+
 .photo-answer-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr));
@@ -3433,6 +3438,10 @@ button {
 
 .photo-answer-grid figure {
   margin: 0;
+}
+
+.photo-answer-image-frame {
+  position: relative;
 }
 
 .photo-answer-grid img {
@@ -3451,6 +3460,14 @@ button {
   color: var(--muted);
   font-size: 0.68rem;
   overflow-wrap: anywhere;
+}
+
+.photo-grading-annotation-layer {
+  border-radius: 1rem;
+}
+
+.photo-grading-annotation-list {
+  margin-top: 0.75rem;
 }
 
 .ai-observation {

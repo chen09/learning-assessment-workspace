@@ -23,6 +23,7 @@ import {
   decideParentReview,
   getParentAccessToken,
   getParentAttemptReview,
+  type GradingAnnotation,
   type ParentAttemptReview,
   type ParentReviewItem,
   type ResponseRevision,
@@ -113,29 +114,123 @@ function PhotoPreview({
   item: ParentReviewItem;
   label: string;
 }) {
+  const { t } = useLanguage();
+  const [showAnnotations, setShowAnnotations] = useState(false);
   const rawPaths = item.response_answer.paths;
   const paths = Array.isArray(rawPaths)
     ? rawPaths.filter((path): path is string => typeof path === "string")
     : [];
   const photoUrls = item.photo_urls ?? [];
+  const annotations = (item.automated_feedback.annotations ?? []).filter(
+    (annotation): annotation is GradingAnnotation =>
+      Number.isFinite(annotation.x) &&
+      Number.isFinite(annotation.y) &&
+      Number.isFinite(annotation.width) &&
+      Number.isFinite(annotation.height) &&
+      typeof annotation.label === "string",
+  );
+  const annotationsForPage = (pageIndex: number) =>
+    annotations.filter(
+      (annotation) => (annotation.page_index ?? 0) === pageIndex,
+    );
   return (
     <div aria-label={label} className="photo-answer-preview">
+      {annotations.length ? (
+        <button
+          aria-pressed={showAnnotations}
+          className="button ghost red-pencil-toggle"
+          onClick={() => setShowAnnotations((current) => !current)}
+          type="button"
+        >
+          {showAnnotations
+            ? t("parentResults.hideRedMarks")
+            : t("parentResults.showRedMarks")}
+        </button>
+      ) : null}
       {photoUrls.length ? (
         <div className="photo-answer-grid">
-          {photoUrls.map((url, index) => (
-            <figure key={url}>
-              <Image
-                alt={`${label} ${index + 1}`}
-                height={1_600}
-                src={url}
-                unoptimized
-                width={1_200}
-              />
-              <figcaption>
-                {paths[index]?.split("/").at(-1) ?? `${index + 1}`}
-              </figcaption>
-            </figure>
-          ))}
+          {photoUrls.map((url, index) => {
+            const pageAnnotations = annotationsForPage(index);
+            return (
+              <figure className="annotated-photo" key={url}>
+                <div className="photo-answer-image-frame">
+                  <Image
+                    alt={`${label} ${index + 1}`}
+                    height={1_600}
+                    src={url}
+                    unoptimized
+                    width={1_200}
+                  />
+                  {showAnnotations && pageAnnotations.length ? (
+                    <svg
+                      aria-hidden="true"
+                      className="grading-annotation-layer photo-grading-annotation-layer"
+                      preserveAspectRatio="none"
+                      viewBox="0 0 1 1"
+                    >
+                      {pageAnnotations.map((annotation, annotationIndex) => {
+                        const commonProps = {
+                          "data-grading-annotation": annotation.kind,
+                          "data-testid": "red-pencil-mark",
+                          vectorEffect: "non-scaling-stroke" as const,
+                        };
+                        if (annotation.kind === "underline") {
+                          return (
+                            <line
+                              {...commonProps}
+                              key={`${annotation.kind}-${annotationIndex}`}
+                              x1={annotation.x}
+                              x2={annotation.x + annotation.width}
+                              y1={annotation.y + annotation.height}
+                              y2={annotation.y + annotation.height}
+                            />
+                          );
+                        }
+                        if (annotation.kind === "cross") {
+                          return (
+                            <g
+                              data-grading-annotation={annotation.kind}
+                              data-testid="red-pencil-mark"
+                              key={`${annotation.kind}-${annotationIndex}`}
+                            >
+                              <line
+                                vectorEffect="non-scaling-stroke"
+                                x1={annotation.x}
+                                x2={annotation.x + annotation.width}
+                                y1={annotation.y}
+                                y2={annotation.y + annotation.height}
+                              />
+                              <line
+                                vectorEffect="non-scaling-stroke"
+                                x1={annotation.x + annotation.width}
+                                x2={annotation.x}
+                                y1={annotation.y}
+                                y2={annotation.y + annotation.height}
+                              />
+                            </g>
+                          );
+                        }
+                        return (
+                          <rect
+                            {...commonProps}
+                            height={annotation.height}
+                            key={`${annotation.kind}-${annotationIndex}`}
+                            rx={0.01}
+                            width={annotation.width}
+                            x={annotation.x}
+                            y={annotation.y}
+                          />
+                        );
+                      })}
+                    </svg>
+                  ) : null}
+                </div>
+                <figcaption>
+                  {paths[index]?.split("/").at(-1) ?? `${index + 1}`}
+                </figcaption>
+              </figure>
+            );
+          })}
         </div>
       ) : (
         <div className="handwriting-preview">
@@ -151,6 +246,16 @@ function PhotoPreview({
           )}
         </div>
       )}
+      {showAnnotations && annotations.length ? (
+        <ol className="grading-annotation-list photo-grading-annotation-list">
+          {annotations.map((annotation, index) => (
+            <li key={`${annotation.page_index ?? 0}-${annotation.kind}-${index}`}>
+              <span>{index + 1}</span>
+              {annotation.label}
+            </li>
+          ))}
+        </ol>
+      ) : null}
     </div>
   );
 }

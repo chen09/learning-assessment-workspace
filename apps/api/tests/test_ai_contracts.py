@@ -391,6 +391,7 @@ def test_low_confidence_visual_grade_is_routed_to_human_review() -> None:
     assert result.feedback["annotations"] == [
         {
             "kind": "underline",
+            "page_index": 0,
             "x": 0.68,
             "y": 0.54,
             "width": 0.21,

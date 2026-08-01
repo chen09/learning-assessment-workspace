@@ -885,6 +885,7 @@ export async function getQuestionGradingJob(
 
 export type GradingAnnotation = {
   kind: "box" | "underline" | "cross";
+  page_index?: number;
   x: number;
   y: number;
   width: number;
@@ -949,6 +950,8 @@ export type ParentReviewItem = {
   automated_feedback: {
     summary?: string;
     action?: string;
+    evidence?: string[];
+    annotations?: GradingAnnotation[];
   };
 };
 

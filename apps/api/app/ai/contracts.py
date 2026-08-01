@@ -107,6 +107,10 @@ class GradeResponseInput(StrictContract):
 
 class GradeAnnotation(StrictContract):
     kind: Literal["box", "underline", "cross"]
+    # When a response contains several paper photos, this selects the zero-based
+    # response page to annotate. Existing single-image grades safely remain on
+    # the first page.
+    page_index: int = Field(default=0, ge=0, le=99)
     x: float = Field(ge=0, le=1)
     y: float = Field(ge=0, le=1)
     width: float = Field(gt=0, le=1)

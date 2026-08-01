@@ -205,6 +205,64 @@ describe("ParentResultsPage", () => {
     );
   });
 
+  it("keeps a paper photo unchanged until a parent chooses to reveal AI red-pencil marks", async () => {
+    const completeReview = await mocks.getParentAttemptReview();
+    mocks.getParentAttemptReview.mockReset().mockResolvedValue({
+      ...completeReview,
+      reviews: [
+        {
+          ...completeReview.reviews[0],
+          question_type: "photo",
+          response_kind: "photo",
+          response_answer: {
+            paths: ["family-id/attempt-id/factorisation-page.png"],
+          },
+          photo_urls: [
+            "https://storage.example.test/signed/factorisation-page.png?token=short-lived",
+          ],
+          automated_feedback: {
+            summary: "平方のかかる範囲を確認",
+            action: "保護者が確認してください。",
+            annotations: [
+              {
+                kind: "underline",
+                page_index: 0,
+                x: 0.22,
+                y: 0.61,
+                width: 0.31,
+                height: 0.04,
+                label: "平方のかかる範囲を確認",
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    render(<ParentResultsPage />);
+
+    await screen.findByRole("img", { name: "已上传的答案照片 1" });
+    expect(
+      screen.getByRole("button", { name: "显示 AI 红笔标注" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("red-pencil-mark")).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "显示 AI 红笔标注" }),
+    );
+
+    expect(screen.getAllByTestId("red-pencil-mark")).toHaveLength(1);
+    expect(screen.getByText("平方のかかる範囲を確認")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "隐藏 AI 红笔标注" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "隐藏 AI 红笔标注" }),
+    );
+    expect(screen.queryByTestId("red-pencil-mark")).not.toBeInTheDocument();
+  });
+
   it("shows a path-free photo revision timeline to the parent", async () => {
     const completeReview = await mocks.getParentAttemptReview();
     mocks.getParentAttemptReview.mockReset().mockResolvedValue({
