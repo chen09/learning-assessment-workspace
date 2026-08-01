@@ -341,6 +341,36 @@ export function HandwritingCanvas({
           </button>
         </div>
       </div>
+      {clearConfirmationOpen ? (
+        <div
+          aria-label={t("handwriting.clear")}
+          className="canvas-clear-confirmation"
+          role="alertdialog"
+        >
+          <p>{t("handwriting.clearConfirm")}</p>
+          <div>
+            <button
+              onClick={keepHandwriting}
+              onTouchEnd={(event) =>
+                handleTouchAction(event, keepHandwriting)
+              }
+              type="button"
+            >
+              {t("handwriting.keep")}
+            </button>
+            <button
+              className="danger"
+              onClick={clearImmediately}
+              onTouchEnd={(event) =>
+                handleTouchAction(event, clearImmediately)
+              }
+              type="button"
+            >
+              {t("handwriting.clearNow")}
+            </button>
+          </div>
+        </div>
+      ) : null}
       <div className="canvas-scroll">
         <div
           className="canvas-stage"
@@ -360,34 +390,6 @@ export function HandwritingCanvas({
             ref={canvasRef}
             width={canvasSize.width}
           />
-          {clearConfirmationOpen ? (
-            <div
-              aria-label={t("handwriting.clear")}
-              className="canvas-clear-confirmation"
-              role="alertdialog"
-            >
-              <p>{t("handwriting.clearConfirm")}</p>
-              <div>
-                <button
-                  onClick={keepHandwriting}
-                  onTouchEnd={(event) => handleTouchAction(event, keepHandwriting)}
-                  type="button"
-                >
-                  {t("handwriting.keep")}
-                </button>
-                <button
-                  className="danger"
-                  onClick={clearImmediately}
-                  onTouchEnd={(event) =>
-                    handleTouchAction(event, clearImmediately)
-                  }
-                  type="button"
-                >
-                  {t("handwriting.clearNow")}
-                </button>
-              </div>
-            </div>
-          ) : null}
           {annotations.length > 0 ? (
             <svg
               aria-hidden="true"

@@ -1223,7 +1223,8 @@ test("parent creation reaches child grading and correction through the API", asy
     name: "Clear now",
   });
   if (testInfo.project.name === "ipad-chrome") {
-    await clearNow.scrollIntoViewIfNeeded();
+    await expect(clearDialog).toBeInViewport();
+    await expect(clearNow).toBeInViewport();
     const clearNowBox = await clearNow.boundingBox();
     expect(clearNowBox).not.toBeNull();
     await page.touchscreen.tap(
