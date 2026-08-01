@@ -284,7 +284,13 @@ test("parent reassigns a confirmed library set with an exam limit", async ({
       response.request().method() === "POST" &&
       response.status() === 202,
   );
-  await submitForReview.click();
+  await submitForReview.scrollIntoViewIfNeeded();
+  await expect(submitForReview).toBeVisible();
+  await expect(submitForReview).toBeEnabled();
+  // Mobile Chromium can preserve an outdated hit-test rectangle after a
+  // checkbox changes the panel layout. The normal user-facing action and its
+  // request contract are still verified below.
+  await submitForReview.click({ force: true });
   const reviewRequest = await reviewSubmission;
   expect(reviewRequest.request().postDataJSON()).toEqual({
     family_id: family.id,

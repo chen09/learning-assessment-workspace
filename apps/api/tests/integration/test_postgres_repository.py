@@ -482,22 +482,34 @@ async def test_postgres_vertical_flow_and_family_isolation() -> None:
             for question in work.questions
             if question.id == deterministic_review.source_question_id
         )
+        # Child-facing question views deliberately omit the answer key. The
+        # integration fixture can read it from the trusted database directly
+        # in order to submit a correct answer without weakening that boundary.
+        review_connection = await asyncpg.connect(asyncpg_url)
+        try:
+            answer_key_json = await review_connection.fetchval(
+                "select answer_key from public.questions where id = $1",
+                review_question.id,
+            )
+        finally:
+            await review_connection.close()
+        answer_key = json.loads(answer_key_json)
         if review_question.type.value in {"single_choice", "multiple_choice"}:
-            choices = review_question.answer_key.get("choices")
+            choices = answer_key.get("choices")
             review_answer = CompleteReviewRequest(
                 choices=(
                     choices
                     if isinstance(choices, list)
-                    else [review_question.answer_key["choice"]]
+                    else [answer_key["choice"]]
                 )
             )
         elif review_question.type.value == "typed_text":
             review_answer = CompleteReviewRequest(
-                text=review_question.answer_key.get("text", "")
+                text=answer_key.get("text", "")
             )
         else:
             review_answer = CompleteReviewRequest(
-                tokens=review_question.answer_key.get("tokens", [])
+                tokens=answer_key.get("tokens", [])
             )
         completion = await repository.complete_review(
             str(deterministic_review.id),
