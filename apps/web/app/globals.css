@@ -4031,12 +4031,16 @@ button {
   }
 
   .library-assignment-controls {
+    display: flex;
+    flex-direction: column;
     grid-column: auto;
     width: 100%;
   }
 
+  .library-assignment-controls > .library-assignment-fields,
   .library-assignment-controls > .library-assignment-actions {
     align-self: stretch;
+    flex: 0 0 auto;
   }
 
   .draft-question-list article {
