@@ -969,16 +969,22 @@ button {
 .photo-answer {
   display: grid;
   min-height: 15rem;
-  place-items: center;
+  place-items: stretch center;
   align-content: center;
   gap: 0.6rem;
   border: 1px dashed #aeb9e3;
   border-radius: 1rem;
   background: #f7f8fe;
   color: var(--blue-dark);
-  cursor: pointer;
   padding: 1.5rem;
   text-align: center;
+}
+
+.photo-input-trigger {
+  display: grid;
+  justify-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
 }
 
 .photo-answer input {
@@ -1006,13 +1012,44 @@ button {
 }
 
 .photo-file-list li {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 0.65rem;
   background: var(--surface);
   padding: 0.55rem 0.7rem;
+}
+
+.photo-file-name {
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.photo-file-actions {
+  display: flex;
+  flex: none;
+  gap: 0.2rem;
+}
+
+.photo-file-actions button {
+  display: grid;
+  width: 1.85rem;
+  height: 1.85rem;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+  background: white;
+  color: var(--ink);
+}
+
+.photo-file-actions button:disabled {
+  opacity: 0.35;
 }
 
 .listening-player {

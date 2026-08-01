@@ -201,6 +201,10 @@ export function HandwritingCanvas({
 
   const clearImmediately = () => {
     drawingRef.current = null;
+    // A touch can leave its current stroke in the ref until pointerup. Clear
+    // the bitmap explicitly as well: setting an already-empty React state
+    // alone would not trigger a redraw on iPad Chrome.
+    draw([]);
     setClearConfirmationOpen(false);
     setStrokes([]);
     setRedoStack([]);
@@ -208,7 +212,7 @@ export function HandwritingCanvas({
   };
 
   const requestClear = () => {
-    if (strokes.length > 0) {
+    if (strokes.length > 0 || drawingRef.current) {
       setClearConfirmationOpen(true);
       return;
     }

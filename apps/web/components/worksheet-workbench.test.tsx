@@ -364,6 +364,21 @@ describe("WorksheetWorkbench", () => {
     expect(uploadedImages).toHaveTextContent(
       "1. answer-page.jpg2. draft-page.jpg",
     );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Move answer-page.jpg later" }),
+    );
+    expect(uploadedImages).toHaveTextContent(
+      "1. draft-page.jpg2. answer-page.jpg",
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove draft-page.jpg" }),
+    );
+    expect(uploadedImages).toHaveTextContent("1. answer-page.jpg");
+    expect(
+      screen.queryByRole("button", { name: "Remove draft-page.jpg" }),
+    ).not.toBeInTheDocument();
   });
 
   it("restores and resaves an expanded handwriting canvas", async () => {

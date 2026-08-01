@@ -1,8 +1,10 @@
 "use client";
 
 import {
+  ArrowDown,
   ArrowLeft,
   ArrowRight,
+  ArrowUp,
   Camera,
   Check,
   Clock3,
@@ -10,6 +12,7 @@ import {
   Focus,
   Grid2X2,
   Send,
+  Trash2,
   Volume2,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -849,13 +852,42 @@ function WorksheetWorkbenchContent() {
     if (question.type === "photo") {
       const photoNames = answer.photoNames ?? [];
       const photoPaths = answer.photoPaths ?? [];
+      const canManagePhotoOrder = photoNames.length === photoPaths.length;
+      const updatePhotos = (names: string[], paths: string[]) => {
+        updateAnswer(question.id, { photoNames: names, photoPaths: paths });
+      };
+      const movePhoto = (from: number, to: number) => {
+        if (!canManagePhotoOrder || to < 0 || to >= photoNames.length) {
+          return;
+        }
+        const names = [...photoNames];
+        const [name] = names.splice(from, 1);
+        const paths = [...photoPaths];
+        const [path] = paths.splice(from, 1);
+        if (name === undefined || path === undefined) {
+          return;
+        }
+        names.splice(to, 0, name);
+        paths.splice(to, 0, path);
+        updatePhotos(names, paths);
+      };
+      const removePhoto = (index: number) => {
+        if (!canManagePhotoOrder) {
+          return;
+        }
+        updatePhotos(
+          photoNames.filter((_, photoIndex) => photoIndex !== index),
+          photoPaths.filter((_, photoIndex) => photoIndex !== index),
+        );
+      };
       return (
-        <label className="photo-answer">
-          <input
-            accept="image/jpeg,image/png"
-            aria-label={t("worksheet.photoInput")}
-            capture="environment"
-            onChange={(event) => {
+        <div className="photo-answer">
+          <label className="photo-input-trigger">
+            <input
+              accept="image/jpeg,image/png"
+              aria-label={t("worksheet.photoInput")}
+              capture="environment"
+              onChange={(event) => {
               const selectedFiles = Array.from(event.target.files ?? []);
               event.target.value = "";
               if (selectedFiles.length > 0) {
@@ -910,17 +942,18 @@ function WorksheetWorkbenchContent() {
                   });
                 }
               }
-            }}
-            multiple
-            type="file"
-          />
-          <Camera size={26} />
-          <strong>
-            {photoNames.length > 0
-              ? t("worksheet.addMoreImages")
-              : t("worksheet.photoInput")}
-          </strong>
-          <span>{t("worksheet.photoHelp")}</span>
+              }}
+              multiple
+              type="file"
+            />
+            <Camera size={26} />
+            <strong>
+              {photoNames.length > 0
+                ? t("worksheet.addMoreImages")
+                : t("worksheet.photoInput")}
+            </strong>
+            <span>{t("worksheet.photoHelp")}</span>
+          </label>
           {photoNames.length > 0 ? (
             <ol
               aria-label={t("worksheet.uploadedImages")}
@@ -928,12 +961,43 @@ function WorksheetWorkbenchContent() {
             >
               {photoNames.map((name, index) => (
                 <li key={`${name}-${index}`}>
-                  {index + 1}. {name}
+                  <span className="photo-file-name">
+                    {index + 1}. {name}
+                  </span>
+                  {canManagePhotoOrder ? (
+                    <span className="photo-file-actions">
+                      <button
+                        aria-label={t("worksheet.movePhotoEarlier", {
+                          name,
+                        })}
+                        disabled={index === 0}
+                        onClick={() => movePhoto(index, index - 1)}
+                        type="button"
+                      >
+                        <ArrowUp size={15} />
+                      </button>
+                      <button
+                        aria-label={t("worksheet.movePhotoLater", { name })}
+                        disabled={index === photoNames.length - 1}
+                        onClick={() => movePhoto(index, index + 1)}
+                        type="button"
+                      >
+                        <ArrowDown size={15} />
+                      </button>
+                      <button
+                        aria-label={t("worksheet.removePhoto", { name })}
+                        onClick={() => removePhoto(index)}
+                        type="button"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </span>
+                  ) : null}
                 </li>
               ))}
             </ol>
           ) : null}
-        </label>
+        </div>
       );
     }
     if (question.type === "text") {

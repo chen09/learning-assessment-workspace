@@ -1394,6 +1394,51 @@ test("parent creation reaches child grading and correction through the API", asy
 
   const clearedCanvasBox = await canvas.boundingBox();
   expect(clearedCanvasBox).not.toBeNull();
+  // A finger or stylus can still be mid-stroke when the child reaches for
+  // the clear button. That temporary stroke must also ask for confirmation
+  // and disappear instead of being restored on pointerup.
+  await canvas.dispatchEvent("pointerdown", {
+    clientX: clearedCanvasBox!.x + 50,
+    clientY: clearedCanvasBox!.y + 60,
+    pointerId: 41,
+    pointerType: "touch",
+    pressure: 0.5,
+  });
+  await canvas.dispatchEvent("pointermove", {
+    clientX: clearedCanvasBox!.x + 140,
+    clientY: clearedCanvasBox!.y + 100,
+    pointerId: 41,
+    pointerType: "touch",
+    pressure: 0.5,
+  });
+  if (testInfo.project.name.startsWith("ipad-")) {
+    const clearButtonBox = await clearHandwriting.boundingBox();
+    expect(clearButtonBox).not.toBeNull();
+    await page.touchscreen.tap(
+      clearButtonBox!.x + clearButtonBox!.width / 2,
+      clearButtonBox!.y + clearButtonBox!.height / 2,
+    );
+  } else {
+    await clearHandwriting.click();
+  }
+  await expect(clearDialog).toBeVisible();
+  const midStrokeClearNow = clearDialog.getByRole("button", {
+    name: "Clear now",
+  });
+  if (testInfo.project.name.startsWith("ipad-")) {
+    const clearNowBox = await midStrokeClearNow.boundingBox();
+    expect(clearNowBox).not.toBeNull();
+    await page.touchscreen.tap(
+      clearNowBox!.x + clearNowBox!.width / 2,
+      clearNowBox!.y + clearNowBox!.height / 2,
+    );
+  } else {
+    await midStrokeClearNow.click();
+  }
+  await canvas.dispatchEvent("pointerup", { pointerId: 41 });
+  await expect(clearDialog).toBeHidden();
+  await expect(undoHandwriting).toBeDisabled();
+
   const redrawnResponseSave = page.waitForResponse(
     (response) =>
       response.url().includes("/responses/") &&

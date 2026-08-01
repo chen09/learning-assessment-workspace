@@ -138,7 +138,7 @@ describe("HandwritingCanvas", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it("does not restore an in-progress touch stroke after clearing", () => {
+  it("confirms and clears an in-progress touch stroke before it is saved", () => {
     const onChange = vi.fn();
 
     render(<HandwritingCanvas onChange={onChange} />);
@@ -157,6 +157,8 @@ describe("HandwritingCanvas", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Clear handwriting" }),
     );
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Clear now" }));
     fireEvent.pointerUp(canvas, { pointerId: 1 });
 
     expect(onChange).toHaveBeenCalledTimes(1);
