@@ -873,6 +873,20 @@ describe("CreateWorkspace", () => {
     fireEvent.change(screen.getByLabelText("Answer page numbers for question 1"), {
       target: { value: "2" },
     });
+    fireEvent.change(screen.getByLabelText("Correct word order for question 5"), {
+      target: { value: "She\nwalks\nto" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirm and start grading" }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Nothing was assigned",
+    );
+    expect(mocks.confirmCompletedWorksheetImport).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText("Correct word order for question 5"), {
+      target: { value: "She\nwalks\nto\nschool." },
+    });
     fireEvent.click(
       screen.getByRole("button", { name: "Confirm and start grading" }),
     );

@@ -165,6 +165,24 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function hasSameTokenInventory(left: string[], right: string[]) {
+  if (left.length !== right.length) {
+    return false;
+  }
+  const counts = new Map<string, number>();
+  for (const token of left) {
+    counts.set(token, (counts.get(token) ?? 0) + 1);
+  }
+  for (const token of right) {
+    const remaining = counts.get(token);
+    if (!remaining) {
+      return false;
+    }
+    counts.set(token, remaining - 1);
+  }
+  return [...counts.values()].every((count) => count === 0);
+}
+
 function parseCompletedPaperReview(value: string): CompletedPaperReview {
   const parsed: unknown = JSON.parse(value);
   if (!isRecord(parsed) || !isRecord(parsed.document)) {
@@ -184,17 +202,59 @@ function parseCompletedPaperReview(value: string): CompletedPaperReview {
     throw new Error("Question positions must be contiguous and ordered from 1.");
   }
   for (const question of questions) {
+    if (!isRecord(question.answer_key)) {
+      throw new Error("Each question needs an answer key.");
+    }
+    const isOptionIndex = (candidate: unknown) =>
+      typeof candidate === "number" &&
+      Number.isInteger(candidate) &&
+      candidate >= 0 &&
+      candidate < question.options.length;
+    if (question.type === "single_choice" && !isOptionIndex(question.answer_key.choice)) {
+      throw new Error("Single-choice answers must select one available option.");
+    }
+    if (question.type === "multiple_choice") {
+      const choices = question.answer_key.choices;
+      if (
+        !Array.isArray(choices) ||
+        choices.length === 0 ||
+        choices.some((choice) => !isOptionIndex(choice)) ||
+        new Set(choices).size !== choices.length
+      ) {
+        throw new Error("Multiple-choice answers must select available options.");
+      }
+    }
+    if (question.type === "typed_text") {
+      const text = question.answer_key.text;
+      const texts = question.answer_key.texts;
+      const hasSingleAnswer = typeof text === "string" && Boolean(text.trim());
+      const hasMultipleAnswers =
+        Array.isArray(texts) &&
+        texts.length > 0 &&
+        texts.every((answer) => typeof answer === "string" && Boolean(answer.trim()));
+      if (!hasSingleAnswer && !hasMultipleAnswers) {
+        throw new Error("Typed-text questions need at least one accepted answer.");
+      }
+    }
+    if (question.type === "word_order") {
+      const tokens = question.answer_key.tokens;
+      if (
+        !Array.isArray(tokens) ||
+        tokens.length === 0 ||
+        tokens.some((token) => typeof token !== "string" || !token.trim()) ||
+        !hasSameTokenInventory(question.options, tokens)
+      ) {
+        throw new Error("Word-order answers must use the available tokens exactly once.");
+      }
+    }
     if (
       question.type === "handwriting" &&
-      (!isRecord(question.answer_key) ||
-        typeof question.answer_key.reference !== "string" ||
+      (typeof question.answer_key.reference !== "string" ||
         !question.answer_key.reference.trim() ||
         !isRecord(question.rubric) ||
         question.rubric.grading_mode !== "parent_review")
     ) {
-      throw new Error(
-        "Handwriting questions need a private reference answer and parent review.",
-      );
+      throw new Error("Handwriting questions need a private reference answer and parent review.");
     }
   }
   const answerRegions = parsed.answer_regions.map((candidate) => {
