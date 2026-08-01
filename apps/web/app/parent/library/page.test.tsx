@@ -93,6 +93,13 @@ describe("LibraryPage", () => {
       "family-1",
       "parent-token",
     );
+
+    fireEvent.change(screen.getByLabelText("搜索家庭题库"), {
+      target: { value: "textbook" },
+    });
+    expect(
+      screen.getByRole("heading", { name: "Lesson 1 同レベル変形練習" }),
+    ).toBeInTheDocument();
   });
 
   it("lets a parent assign a confirmed library set to a child", async () => {

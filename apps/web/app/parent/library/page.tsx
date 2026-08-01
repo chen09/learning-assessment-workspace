@@ -223,7 +223,16 @@ function LibraryContent() {
       return sets;
     }
     return sets.filter((set) =>
-      `${set.title} ${set.subject}`.toLowerCase().includes(normalized),
+      [
+        set.title,
+        set.subject,
+        set.source_summary.source_material_title,
+        set.source_summary.source_material_subject,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLocaleLowerCase()
+        .includes(normalized),
     );
   }, [query, sets]);
 
