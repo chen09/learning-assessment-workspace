@@ -4184,22 +4184,18 @@ button {
   }
 
   .library-assignment-controls {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto auto;
-    align-items: start;
+    display: block;
     grid-column: auto;
-    gap: 1rem;
     width: 100%;
   }
 
   .library-assignment-controls > .library-assignment-fields {
-    grid-row: 1;
     min-width: 0;
   }
 
   .library-assignment-controls > .library-assignment-actions {
-    grid-row: 2;
+    display: flex;
+    margin-top: 1rem;
     min-width: 0;
     width: 100%;
   }
