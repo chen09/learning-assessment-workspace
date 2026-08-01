@@ -424,7 +424,7 @@ export type LibrarySubmission = {
   id: string;
   family_id: string;
   question_set_id: string;
-  status: "pending_review";
+  status: "pending_review" | "withdrawn";
   created_at: string;
   published_at: string | null;
 };
@@ -457,6 +457,17 @@ export async function createLibrarySubmission(
       headers: { "Idempotency-Key": idempotencyKey },
       body: JSON.stringify(payload),
     },
+    parentToken,
+  );
+}
+
+export async function withdrawLibrarySubmission(
+  submissionId: string,
+  parentToken: string,
+) {
+  return apiRequest<LibrarySubmission>(
+    `/v1/library/submissions/${encodeURIComponent(submissionId)}/withdraw`,
+    { method: "POST" },
     parentToken,
   );
 }

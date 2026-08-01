@@ -577,6 +577,6 @@ class LibrarySubmission(BaseModel):
     id: UUID = Field(default_factory=uuid4)
     family_id: UUID
     question_set_id: UUID
-    status: Literal["pending_review"] = "pending_review"
+    status: Literal["pending_review", "withdrawn"] = "pending_review"
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     published_at: datetime | None = None

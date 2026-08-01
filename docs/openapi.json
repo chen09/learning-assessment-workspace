@@ -1660,8 +1660,11 @@
             "type": "string"
           },
           "status": {
-            "const": "pending_review",
             "default": "pending_review",
+            "enum": [
+              "pending_review",
+              "withdrawn"
+            ],
             "title": "Status",
             "type": "string"
           }
@@ -6019,6 +6022,64 @@
           }
         },
         "summary": "Create Library Submission",
+        "tags": [
+          "library"
+        ]
+      }
+    },
+    "/v1/library/submissions/{submission_id}/withdraw": {
+      "post": {
+        "operationId": "withdraw_library_submission_v1_library_submissions__submission_id__withdraw_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "submission_id",
+            "required": true,
+            "schema": {
+              "title": "Submission Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibrarySubmission"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Withdraw Library Submission",
         "tags": [
           "library"
         ]

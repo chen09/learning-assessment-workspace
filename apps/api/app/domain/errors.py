@@ -30,3 +30,7 @@ class FamilyParentLimitReached(DomainError):
 
 class AssignmentStatusConflict(DomainError):
     pass
+
+
+class LibrarySubmissionStatusConflict(DomainError):
+    pass

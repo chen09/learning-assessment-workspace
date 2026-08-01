@@ -13,11 +13,13 @@ import {
   type ChildProfile,
   type Family,
   type FamilyQuestionSet,
+  type LibrarySubmission,
   getChildren,
   getFamilies,
   getFamilyLibrarySubmissions,
   getFamilyQuestionSets,
   getParentAccessToken,
+  withdrawLibrarySubmission,
 } from "@/lib/api-client";
 
 const copy = {
@@ -151,9 +153,13 @@ function LibraryContent() {
   const [families, setFamilies] = useState<Family[]>([]);
   const [familyId, setFamilyId] = useState("");
   const [sets, setSets] = useState<FamilyQuestionSet[]>([]);
-  const [pendingSubmissionSetIds, setPendingSubmissionSetIds] = useState<
-    string[]
+  const [pendingSubmissions, setPendingSubmissions] = useState<
+    LibrarySubmission[]
   >([]);
+  const [withdrawingSubmissionId, setWithdrawingSubmissionId] = useState<
+    string | null
+  >(null);
+  const [submissionMessage, setSubmissionMessage] = useState("");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"loading" | "ready" | "error">(
     "loading",
@@ -207,9 +213,7 @@ function LibraryContent() {
           getFamilyLibrarySubmissions(selectedFamily.id, token),
         ]);
         setSets(questionSets);
-        setPendingSubmissionSetIds(
-          pendingSubmissions.map((submission) => submission.question_set_id),
-        );
+        setPendingSubmissions(pendingSubmissions);
         setStatus("ready");
       } catch {
         setStatus("error");
@@ -236,6 +240,17 @@ function LibraryContent() {
     );
   }, [query, sets]);
 
+  const pendingSubmissionsBySetId = useMemo(
+    () =>
+      new Map(
+        pendingSubmissions.map((submission) => [
+          submission.question_set_id,
+          submission,
+        ]),
+      ),
+    [pendingSubmissions],
+  );
+
   const switchFamily = async (nextFamilyId: string) => {
     setFamilyId(nextFamilyId);
     setStatus("loading");
@@ -250,9 +265,7 @@ function LibraryContent() {
         getFamilyLibrarySubmissions(nextFamilyId, token),
       ]);
       setSets(questionSets);
-      setPendingSubmissionSetIds(
-        pendingSubmissions.map((submission) => submission.question_set_id),
-      );
+      setPendingSubmissions(pendingSubmissions);
       setStatus("ready");
     } catch {
       setStatus("error");
@@ -349,14 +362,36 @@ function LibraryContent() {
         token,
         crypto.randomUUID(),
       );
-      setPendingSubmissionSetIds((current) =>
-        current.includes(submission.question_set_id)
+      setPendingSubmissions((current) =>
+        current.some((item) => item.id === submission.id)
           ? current
-          : [...current, submission.question_set_id],
+          : [...current, submission],
       );
       setSubmissionStatus("success");
     } catch {
       setSubmissionStatus("error");
+    }
+  };
+
+  const withdrawSubmission = async (submission: LibrarySubmission) => {
+    setWithdrawingSubmissionId(submission.id);
+    setSubmissionMessage("");
+    const token = await getParentAccessToken();
+    if (!token) {
+      setWithdrawingSubmissionId(null);
+      setSubmissionMessage(t("librarySubmission.withdrawError"));
+      return;
+    }
+    try {
+      await withdrawLibrarySubmission(submission.id, token);
+      setPendingSubmissions((current) =>
+        current.filter((item) => item.id !== submission.id),
+      );
+      setSubmissionMessage(t("librarySubmission.withdrawSuccess"));
+    } catch {
+      setSubmissionMessage(t("librarySubmission.withdrawError"));
+    } finally {
+      setWithdrawingSubmissionId(null);
     }
   };
 
@@ -444,10 +479,30 @@ function LibraryContent() {
                   >
                     {text.assign}
                   </button>
-                  {pendingSubmissionSetIds.includes(set.id) ? (
-                    <span className="status-pill warm">
-                      {t("librarySubmission.pending")}
-                    </span>
+                  {pendingSubmissionsBySetId.get(set.id) ? (
+                    <div className="library-card-actions">
+                      <span className="status-pill warm">
+                        {t("librarySubmission.pending")}
+                      </span>
+                      <button
+                        className="text-button"
+                        disabled={
+                          withdrawingSubmissionId ===
+                          pendingSubmissionsBySetId.get(set.id)?.id
+                        }
+                        onClick={() =>
+                          void withdrawSubmission(
+                            pendingSubmissionsBySetId.get(set.id)!,
+                          )
+                        }
+                        type="button"
+                      >
+                        {withdrawingSubmissionId ===
+                        pendingSubmissionsBySetId.get(set.id)?.id
+                          ? t("librarySubmission.withdrawing")
+                          : t("librarySubmission.withdraw")}
+                      </button>
+                    </div>
                   ) : (
                     <button
                       className="text-button"
@@ -463,6 +518,11 @@ function LibraryContent() {
           );
         })}
       </section>
+      {submissionMessage ? (
+        <p className="confirmed-message" role="status">
+          {submissionMessage}
+        </p>
+      ) : null}
       {assignmentSet ? (
         <section
           aria-labelledby="library-assignment-title"

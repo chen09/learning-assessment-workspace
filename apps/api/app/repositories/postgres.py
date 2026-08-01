@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_en
 from app.domain.errors import (
     AssignmentStatusConflict,
     FamilyParentLimitReached,
+    LibrarySubmissionStatusConflict,
     NotFoundError,
     QuestionAnswerRequired,
     ResponseVersionConflict,
@@ -4009,6 +4010,49 @@ class PostgresRepository:
             id=row["id"],
             family_id=row["family_id"],
             question_set_id=row["question_set_id"],
+            created_at=row["created_at"],
+        )
+
+    async def withdraw_library_submission(
+        self,
+        submission_id: str,
+        parent_id: str,
+    ) -> LibrarySubmission:
+        async with self._engine.begin() as connection:
+            result = await connection.execute(
+                text(
+                    """
+                    select id, family_id, status
+                    from public.library_submissions
+                    where id = :submission_id
+                    for update
+                    """
+                ),
+                {"submission_id": _uuid(submission_id)},
+            )
+            existing = result.mappings().one_or_none()
+            if existing is None:
+                raise NotFoundError
+            await self._require_parent(connection, parent_id, existing["family_id"])
+            if existing["status"] != "pending":
+                raise LibrarySubmissionStatusConflict
+            updated = await connection.execute(
+                text(
+                    """
+                    update public.library_submissions
+                    set status = 'withdrawn'
+                    where id = :submission_id
+                    returning id, family_id, question_set_id, status, created_at
+                    """
+                ),
+                {"submission_id": _uuid(submission_id)},
+            )
+            row = updated.mappings().one()
+        return LibrarySubmission(
+            id=row["id"],
+            family_id=row["family_id"],
+            question_set_id=row["question_set_id"],
+            status="withdrawn",
             created_at=row["created_at"],
         )
 

@@ -8,6 +8,7 @@ from argon2 import PasswordHasher
 from app.domain.errors import (
     AssignmentStatusConflict,
     FamilyParentLimitReached,
+    LibrarySubmissionStatusConflict,
     NotFoundError,
     QuestionAnswerRequired,
     ResponseVersionConflict,
@@ -1877,6 +1878,23 @@ class MemoryRepository:
         )
         self.library_submissions[str(submission.id)] = submission
         self.library_idempotency[record_key] = str(submission.id)
+        return submission
+
+    async def withdraw_library_submission(
+        self,
+        submission_id: str,
+        parent_id: str,
+    ) -> LibrarySubmission:
+        submission = self.library_submissions.get(submission_id)
+        if (
+            submission is None
+            or parent_id not in self.family_parents.get(str(submission.family_id), set())
+        ):
+            raise NotFoundError
+        if submission.status != "pending_review":
+            raise LibrarySubmissionStatusConflict
+        submission.status = "withdrawn"
+        self.library_submissions[submission_id] = submission
         return submission
 
     async def decide_grading_result(

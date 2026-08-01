@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 
 from app.api.dependencies import Repository, get_repository, require_parent
-from app.domain.errors import NotFoundError
+from app.domain.errors import LibrarySubmissionStatusConflict, NotFoundError
 from app.domain.models import (
     CreateLibrarySubmissionRequest,
     FamilyLibraryQuestionSet,
@@ -79,4 +79,24 @@ async def create_library_submission(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="The family or question set is not available.",
+        ) from error
+
+
+@router.post("/submissions/{submission_id}/withdraw", response_model=LibrarySubmission)
+async def withdraw_library_submission(
+    submission_id: str,
+    repository: Annotated[Repository, Depends(get_repository)],
+    parent_id: Annotated[str, Depends(require_parent)],
+) -> LibrarySubmission:
+    try:
+        return await repository.withdraw_library_submission(submission_id, parent_id)
+    except LibrarySubmissionStatusConflict as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "library_submission_cannot_be_withdrawn"},
+        ) from error
+    except (NotFoundError, ValueError) as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The library submission is not available.",
         ) from error

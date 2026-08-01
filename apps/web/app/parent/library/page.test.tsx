@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   getFamilies: vi.fn(),
   getFamilyLibrarySubmissions: vi.fn(),
   getFamilyQuestionSets: vi.fn(),
+  withdrawLibrarySubmission: vi.fn(),
 }));
 
 vi.mock("@/lib/api-client", () => ({
@@ -19,6 +20,7 @@ vi.mock("@/lib/api-client", () => ({
   getFamilies: mocks.getFamilies,
   getFamilyLibrarySubmissions: mocks.getFamilyLibrarySubmissions,
   getFamilyQuestionSets: mocks.getFamilyQuestionSets,
+  withdrawLibrarySubmission: mocks.withdrawLibrarySubmission,
   getParentAccessToken: vi.fn().mockResolvedValue("parent-token"),
 }));
 
@@ -49,6 +51,15 @@ describe("LibraryPage", () => {
     mocks.getFamilyLibrarySubmissions.mockReset();
     mocks.getFamilyLibrarySubmissions.mockResolvedValue([]);
     mocks.getFamilyQuestionSets.mockReset();
+    mocks.withdrawLibrarySubmission.mockReset();
+    mocks.withdrawLibrarySubmission.mockResolvedValue({
+      id: "submission-1",
+      family_id: "family-1",
+      question_set_id: "set-ready",
+      status: "withdrawn",
+      created_at: "2026-08-02T00:00:00Z",
+      published_at: null,
+    });
     mocks.getFamilies.mockResolvedValue([
       { id: "family-1", name: "肉肉如意" },
     ]);
@@ -270,6 +281,45 @@ describe("LibraryPage", () => {
     expect(
       screen.queryByRole("button", { name: "提交到公共题库审核" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("lets a parent withdraw their own pending public-library submission", async () => {
+    mocks.getFamilyQuestionSets.mockResolvedValueOnce([
+      {
+        id: "set-ready",
+        family_id: "family-1",
+        title: "Generated Lesson 2 practice",
+        subject: "English",
+        status: "confirmed",
+        question_count: 4,
+        source_summary: {},
+      },
+    ]);
+    mocks.getFamilyLibrarySubmissions.mockResolvedValueOnce([
+      {
+        id: "submission-1",
+        family_id: "family-1",
+        question_set_id: "set-ready",
+        status: "pending_review",
+        created_at: "2026-08-02T00:00:00Z",
+        published_at: null,
+      },
+    ]);
+
+    render(<LibraryPage />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "撤回投稿" }));
+    await waitFor(() => {
+      expect(mocks.withdrawLibrarySubmission).toHaveBeenCalledWith(
+        "submission-1",
+        "parent-token",
+      );
+    });
+    expect(await screen.findByText("已撤回投稿。题单仍保持私有。"))
+      .toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "提交到公共题库审核" }),
+    ).toBeInTheDocument();
   });
 
   it("explains why a ready set cannot be assigned when the family has no children", async () => {

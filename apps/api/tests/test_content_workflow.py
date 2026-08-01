@@ -634,3 +634,39 @@ def test_library_submission_enters_review_instead_of_becoming_public() -> None:
         },
     )
     assert unrelated_parent.status_code == 401
+
+
+def test_parent_can_withdraw_a_pending_library_submission_without_publishing() -> None:
+    client = TestClient(create_app())
+    fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+    created = client.post(
+        "/v1/library/submissions",
+        headers={**PARENT_HEADERS, "Idempotency-Key": "publish-then-withdraw"},
+        json={
+            "family_id": fixture["family"]["id"],
+            "question_set_id": fixture["question_set"]["id"],
+            "rights_confirmed": True,
+            "privacy_confirmed": True,
+        },
+    )
+
+    withdrawn = client.post(
+        f"/v1/library/submissions/{created.json()['id']}/withdraw",
+        headers=PARENT_HEADERS,
+    )
+    repeated_withdrawal = client.post(
+        f"/v1/library/submissions/{created.json()['id']}/withdraw",
+        headers=PARENT_HEADERS,
+    )
+    pending = client.get(
+        f"/v1/library/families/{fixture['family']['id']}/submissions",
+        headers=PARENT_HEADERS,
+    )
+
+    assert created.status_code == 202
+    assert withdrawn.status_code == 200
+    assert withdrawn.json()["status"] == "withdrawn"
+    assert withdrawn.json()["published_at"] is None
+    assert repeated_withdrawal.status_code == 409
+    assert pending.status_code == 200
+    assert pending.json() == []
