@@ -765,6 +765,7 @@ async def test_public_library_copy_keeps_answers_private_and_creates_a_standalon
         assert public_items[0].title == "Published algebra"
         assert "answer_key" not in json.dumps(public_snapshot)
         assert "Private algebra book" not in json.dumps(public_snapshot)
+        private_snapshot = json.loads(private_snapshot)
         assert private_snapshot["questions"][0]["answer_key"] == {
             "text": "(x - 3)(x + 3)"
         }
@@ -772,8 +773,12 @@ async def test_public_library_copy_keeps_answers_private_and_creates_a_standalon
         assert copied.reused_existing is False
         assert repeated.question_set_id == copied.question_set_id
         assert repeated.reused_existing is True
-        assert copied_question["answer_key"] == {"text": "(x - 3)(x + 3)"}
-        assert copied_question["prompt"] == {"ja": "x² - 9 を因数分解しなさい。"}
+        assert json.loads(copied_question["answer_key"]) == {
+            "text": "(x - 3)(x + 3)"
+        }
+        assert json.loads(copied_question["prompt"]) == {
+            "ja": "x² - 9 を因数分解しなさい。"
+        }
     finally:
         await repository.close()
         await connection.execute(
