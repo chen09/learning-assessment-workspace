@@ -112,6 +112,29 @@ def test_child_pin_opens_a_scoped_assignment_session() -> None:
     ]
 
 
+def test_child_history_returns_the_unfinished_attempt_for_resuming() -> None:
+    client = TestClient(create_app())
+    _fixture, child_headers, work = start_fixture_assignment(client)
+
+    history = client.get("/v1/history/child", headers=child_headers)
+
+    assert history.status_code == 200
+    assert history.json() == [
+        {
+            "assignment_id": work["assignment"]["id"],
+            "attempt_id": work["attempt"]["id"],
+            "child_id": work["assignment"]["child_id"],
+            "child_nickname": "Alex",
+            "title": "Algebra and English warm-up",
+            "status": "in_progress",
+            "submitted_at": None,
+            "awarded_points": 0.0,
+            "available_points": 4.0,
+            "correction_count": 0,
+        }
+    ]
+
+
 def test_parent_can_withdraw_unstarted_assignment_before_child_can_open_it() -> None:
     client = TestClient(create_app())
     fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()

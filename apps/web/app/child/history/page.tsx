@@ -31,6 +31,15 @@ const historyStatusKeys = {
   completed: "history.status.completed",
 } as const;
 
+const resultStatuses = new Set([
+  "submitted",
+  "grading",
+  "results_ready",
+  "completed",
+]);
+
+const resumableStatuses = new Set(["assigned", "in_progress", "correcting"]);
+
 function ChildHistoryContent() {
   const { language, t } = useLanguage();
   const [items, setItems] = useState<HistoryItem[]>([]);
@@ -90,54 +99,78 @@ function ChildHistoryContent() {
           <p className="form-error">{t("history.error")}</p>
         ) : null}
         {loadState === "ready"
-          ? items.map((item) => (
-              <article key={item.assignment_id}>
-                <span>
-                  {item.submitted_at
-                    ? new Intl.DateTimeFormat(dateLocale, {
-                        month: "short",
-                        day: "numeric",
-                      }).format(new Date(item.submitted_at))
-                    : t("history.assigned")}
-                </span>
-                <div>
-                  <h2>{item.title}</h2>
-                  <p>
-                    {item.correction_count > 0
-                      ? t(
-                          item.correction_count === 1
-                            ? "history.correctionOne"
-                            : "history.correctionMany",
-                          { count: item.correction_count },
-                        )
-                      : t(
-                          historyStatusKeys[
-                            item.status as keyof typeof historyStatusKeys
-                          ] ?? "history.status.other",
-                        )}
-                  </p>
-                </div>
-                {["results_ready", "correcting", "completed"].includes(
-                  item.status,
-                ) ? (
-                  <strong>
-                    {item.awarded_points} / {item.available_points}
-                  </strong>
-                ) : null}
-                {item.attempt_id ? (
-                  <Link
-                    aria-label={t("history.openResults", {
-                      title: item.title,
-                    })}
-                    href={`/child/results/?attemptId=${encodeURIComponent(
-                      item.attempt_id,
-                    )}`}
-                  >
-                    {t("history.results")}
-                  </Link>
-                ) : null}
-              </article>
-            ))
+          ? items.map((item) => {
+              const canResume = resumableStatuses.has(item.status);
+              const canOpenResults =
+                resultStatuses.has(item.status) && Boolean(item.attempt_id);
+              const href =
+                item.status === "assigned"
+                  ? `/child/work/?assignmentId=${encodeURIComponent(
+                      item.assignment_id,
+                    )}`
+                  : canResume && item.attempt_id
+                    ? `/child/work/?attemptId=${encodeURIComponent(item.attempt_id)}`
+                    : canOpenResults && item.attempt_id
+                      ? `/child/results/?attemptId=${encodeURIComponent(
+                          item.attempt_id,
+                        )}`
+                      : null;
+              return (
+                <article key={item.assignment_id}>
+                  <span>
+                    {item.submitted_at
+                      ? new Intl.DateTimeFormat(dateLocale, {
+                          month: "short",
+                          day: "numeric",
+                        }).format(new Date(item.submitted_at))
+                      : t("history.assigned")}
+                  </span>
+                  <div>
+                    <h2>{item.title}</h2>
+                    <p>
+                      {item.correction_count > 0
+                        ? t(
+                            item.correction_count === 1
+                              ? "history.correctionOne"
+                              : "history.correctionMany",
+                            { count: item.correction_count },
+                          )
+                        : t(
+                            historyStatusKeys[
+                              item.status as keyof typeof historyStatusKeys
+                            ] ?? "history.status.other",
+                          )}
+                    </p>
+                  </div>
+                  {resultStatuses.has(item.status) ? (
+                    <strong>
+                      {item.awarded_points} / {item.available_points}
+                    </strong>
+                  ) : null}
+                  {href ? (
+                    <Link
+                      aria-label={t(
+                        canResume
+                          ? item.status === "assigned"
+                            ? "history.startTitle"
+                            : "history.resumeTitle"
+                          : "history.openResults",
+                        { title: item.title },
+                      )}
+                      href={href}
+                    >
+                      {t(
+                        canResume
+                          ? item.status === "assigned"
+                            ? "history.start"
+                            : "history.resume"
+                          : "history.results",
+                      )}
+                    </Link>
+                  ) : null}
+                </article>
+              );
+            })
           : null}
       </section>
     </>

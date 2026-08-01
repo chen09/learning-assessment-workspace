@@ -1170,6 +1170,11 @@ test("child screens stay responsive across Chinese, Japanese, and English", asyn
   await expect(
     page.getByRole("heading", { name: "Responsive assigned practice" }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("link", {
+      name: "Responsive assigned practice を続ける",
+    }),
+  ).toHaveAttribute("href", /\/child\/work\/?\?attemptId=/);
   await page.unroute(`${apiBaseUrl}/v1/history/child`);
 
   await page.goto("/child/results/");

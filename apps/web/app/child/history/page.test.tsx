@@ -72,4 +72,31 @@ describe("ChildHistoryPage", () => {
       screen.queryByRole("heading", { name: "Past tense practice" }),
     ).not.toBeInTheDocument();
   });
+
+  it("lets a child resume an unfinished attempt instead of opening results", async () => {
+    mocks.getChildHistory.mockResolvedValue([
+      {
+        assignment_id: "assignment-in-progress",
+        attempt_id: "attempt-in-progress",
+        child_id: "child-1",
+        child_nickname: "肉肉",
+        title: "代数订正练习",
+        status: "in_progress",
+        submitted_at: null,
+        awarded_points: 0,
+        available_points: 20,
+        correction_count: 0,
+      },
+    ]);
+
+    render(<ChildHistoryPage />);
+
+    expect(
+      await screen.findByRole("link", { name: "继续 代数订正练习" }),
+    ).toHaveAttribute(
+      "href",
+      "/child/work?attemptId=attempt-in-progress",
+    );
+    expect(screen.queryByText("0 / 20")).not.toBeInTheDocument();
+  });
 });

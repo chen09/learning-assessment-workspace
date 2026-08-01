@@ -834,7 +834,6 @@ class MemoryRepository:
                 attempt
                 for attempt in self.attempts.values()
                 if attempt.assignment_id == assignment.id
-                and attempt.submitted_at is not None
             ]
             attempt = max(attempts, key=lambda item: item.sequence, default=None)
             question_set = self.question_sets[str(assignment.question_set_id)]

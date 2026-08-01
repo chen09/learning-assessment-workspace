@@ -2476,7 +2476,6 @@ class PostgresRepository:
                       select at.id, at.submitted_at
                       from public.attempts at
                       where at.assignment_id = a.id
-                        and at.submitted_at is not null
                       order by at.sequence desc
                       limit 1
                     ) latest_attempt on true
