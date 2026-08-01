@@ -409,6 +409,40 @@ describe("WorksheetWorkbench", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("persists removing the final response photo as an empty photo answer", async () => {
+    render(<WorksheetWorkbench />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Go to question 4" }),
+    );
+
+    const answerPage = new File(["answer"], "answer-page.jpg", {
+      type: "image/jpeg",
+    });
+    fireEvent.change(
+      screen.getByLabelText(/Take a photo or choose images/),
+      { target: { files: [answerPage] } },
+    );
+    await screen.findByRole("button", { name: "Remove answer-page.jpg" });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove answer-page.jpg" }),
+    );
+
+    await waitFor(() => {
+      expect(mocks.saveAttemptResponse).toHaveBeenLastCalledWith(
+        "attempt-1",
+        "math-photo",
+        {
+          kind: "photo",
+          answer: { paths: [] },
+          expected_version: 0,
+        },
+        "child-token",
+      );
+    });
+  });
+
   it("restores signed private response-photo previews after reopening work", async () => {
     const reopenedWork = {
       ...assignmentWork,

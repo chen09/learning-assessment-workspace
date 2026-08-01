@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
@@ -66,7 +66,7 @@ def test_child_can_skip_todays_reviews_without_resetting_their_interval() -> Non
         child_id=UUID(fixture["child"]["id"]),
         source_question_id=UUID(fixture["questions"][0]["id"]),
         prompt="Choose the correct expansion.",
-        due_on=date.today(),
+        due_on=datetime.now(UTC).date(),
         interval_days=7,
         level="standard",
     )
@@ -81,7 +81,7 @@ def test_child_can_skip_todays_reviews_without_resetting_their_interval() -> Non
             "item_id": str(review.id),
             "old_interval_days": 7,
             "new_interval_days": 7,
-            "next_due_on": str(date.today() + timedelta(days=1)),
+            "next_due_on": str(datetime.now(UTC).date() + timedelta(days=1)),
         }
     ]
     assert today.json() == []

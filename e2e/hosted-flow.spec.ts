@@ -558,6 +558,76 @@ test("temporary parent completes the hosted family learning flow", async ({
       )
       .toBeGreaterThan(0);
 
+    const removedPhotoSave = page.waitForResponse(
+      (response) =>
+        response.url().includes("/v1/attempts/") &&
+        response.url().includes("/responses/") &&
+        response.request().method() === "PUT" &&
+        (response.request().postDataJSON() as {
+          kind?: string;
+          answer?: { paths?: unknown };
+        }).kind === "photo" &&
+        Array.isArray(
+          (response.request().postDataJSON() as {
+            answer?: { paths?: unknown };
+          }).answer?.paths,
+        ) &&
+        (
+          (response.request().postDataJSON() as {
+            answer?: { paths?: unknown[] };
+          }).answer?.paths ?? []
+        ).length === 0,
+    );
+    await page
+      .getByRole("button", { name: `Remove ${restoredPhotoName}` })
+      .click();
+    expect((await removedPhotoSave).ok()).toBeTruthy();
+
+    const reopenedWithoutPhoto = page.waitForResponse(
+      (response) =>
+        /\/v1\/attempts\/[^/]+\/work$/.test(response.url()) &&
+        response.request().method() === "GET" &&
+        response.status() === 200,
+      { timeout: 15_000 },
+    );
+    await page.reload();
+    await reopenedWithoutPhoto;
+    await page.getByRole("button", { name: "Go to question 4" }).click();
+    await expect(
+      page.getByRole("list", { name: "Uploaded answer images" }),
+    ).toHaveCount(0);
+
+    const replacementUploadIntentResponse = page.waitForResponse(
+      (response) =>
+        response.url() === `${apiBaseUrl}/v1/uploads/child-intents` &&
+        response.request().method() === "POST",
+    );
+    const replacementPhotoSave = page.waitForResponse(
+      (response) =>
+        response.url().includes("/v1/attempts/") &&
+        response.url().includes("/responses/") &&
+        response.request().method() === "PUT" &&
+        (response.request().postDataJSON() as { kind?: string }).kind ===
+          "photo" &&
+        (
+          (response.request().postDataJSON() as {
+            answer?: { paths?: unknown[] };
+          }).answer?.paths ?? []
+        ).length === 1,
+    );
+    await page
+      .getByLabel("Take a photo or choose images")
+      .setInputFiles({
+        name: "replacement-answer.png",
+        mimeType: "image/png",
+        buffer: nonPersonalAnswerPng,
+      });
+    const replacementUploadIntent = (await (
+      await replacementUploadIntentResponse
+    ).json()) as { path: string };
+    uploadedResponsePaths.push(replacementUploadIntent.path);
+    expect((await replacementPhotoSave).ok()).toBeTruthy();
+
     await page.getByRole("button", { name: "Submit all answers" }).click();
     await page
       .getByRole("button", { name: "Confirm full submission" })

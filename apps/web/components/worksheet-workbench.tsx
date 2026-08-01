@@ -393,8 +393,11 @@ function WorksheetWorkbenchContent() {
     const timer = window.setTimeout(() => {
       const answer = answers[dirtyQuestionId];
       const queueKey = `${attemptId ?? "demo-attempt"}:${dirtyQuestionId}`;
+      const question = questions.find(
+        (candidate) => candidate.id === dirtyQuestionId,
+      );
       const kind: DraftSyncRequest["payload"]["kind"] =
-        answer?.photoPaths?.length
+        question?.type === "photo"
           ? "photo"
           : answer?.tokens !== undefined
             ? "tokens"
@@ -467,6 +470,7 @@ function WorksheetWorkbenchContent() {
     attemptId,
     childToken,
     dirtyQuestionId,
+    questions,
     responseVersions,
   ]);
 
