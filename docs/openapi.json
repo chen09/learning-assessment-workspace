@@ -1625,6 +1625,48 @@
         "title": "KnowledgeTagInput",
         "type": "object"
       },
+      "LibraryReviewSubmission": {
+        "description": "Reviewer-safe metadata; never includes sources, answers, or child work.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "question_count": {
+            "title": "Question Count",
+            "type": "integer"
+          },
+          "question_set_id": {
+            "format": "uuid",
+            "title": "Question Set Id",
+            "type": "string"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "question_set_id",
+          "title",
+          "subject",
+          "question_count",
+          "created_at"
+        ],
+        "title": "LibraryReviewSubmission",
+        "type": "object"
+      },
       "LibrarySubmission": {
         "properties": {
           "created_at": {
@@ -5952,6 +5994,60 @@
           }
         },
         "summary": "List Family Library Submissions",
+        "tags": [
+          "library"
+        ]
+      }
+    },
+    "/v1/library/review/submissions": {
+      "get": {
+        "description": "Reviewer metadata excludes source files, answer keys, and child work.",
+        "operationId": "list_pending_library_review_submissions_v1_library_review_submissions_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LibraryReviewSubmission"
+                  },
+                  "title": "Response List Pending Library Review Submissions V1 Library Review Submissions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Pending Library Review Submissions",
         "tags": [
           "library"
         ]

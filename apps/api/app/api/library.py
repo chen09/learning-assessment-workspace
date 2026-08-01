@@ -3,14 +3,24 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 
 from app.api.dependencies import Repository, get_repository, require_parent
+from app.config import get_settings
 from app.domain.errors import LibrarySubmissionStatusConflict, NotFoundError
 from app.domain.models import (
     CreateLibrarySubmissionRequest,
     FamilyLibraryQuestionSet,
+    LibraryReviewSubmission,
     LibrarySubmission,
 )
 
 router = APIRouter(prefix="/v1/library", tags=["library"])
+
+
+def _require_library_reviewer(parent_id: str) -> None:
+    if parent_id not in get_settings().library_reviewer_parent_ids:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "library_reviewer_required"},
+        )
 
 
 @router.get(
@@ -32,6 +42,16 @@ async def list_family_question_sets(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="The family is not available.",
         ) from error
+
+
+@router.get("/review/submissions", response_model=list[LibraryReviewSubmission])
+async def list_pending_library_review_submissions(
+    repository: Annotated[Repository, Depends(get_repository)],
+    parent_id: Annotated[str, Depends(require_parent)],
+) -> list[LibraryReviewSubmission]:
+    """Reviewer metadata excludes source files, answer keys, and child work."""
+    _require_library_reviewer(parent_id)
+    return await repository.list_pending_library_review_submissions()
 
 
 @router.get(

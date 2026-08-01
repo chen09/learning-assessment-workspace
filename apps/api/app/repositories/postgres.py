@@ -53,6 +53,7 @@ from app.domain.models import (
     FamilyLibraryQuestionSet,
     HistoryItem,
     Job,
+    LibraryReviewSubmission,
     LibrarySubmission,
     ParentAttemptReview,
     ParentDecision,
@@ -3663,6 +3664,28 @@ class PostgresRepository:
             )
             for row in rows
         ]
+
+    async def list_pending_library_review_submissions(
+        self,
+    ) -> list[LibraryReviewSubmission]:
+        async with self._engine.connect() as connection:
+            rows = (
+                await connection.execute(
+                    text(
+                        """
+                        select ls.id, ls.question_set_id, ls.created_at,
+                               qs.title, qs.subject, count(q.id) as question_count
+                        from public.library_submissions ls
+                        join public.question_sets qs on qs.id = ls.question_set_id
+                        left join public.questions q on q.question_set_id = qs.id
+                        where ls.status = 'pending'
+                        group by ls.id, ls.question_set_id, ls.created_at, qs.title, qs.subject
+                        order by ls.created_at asc
+                        """
+                    )
+                )
+            ).mappings().all()
+        return [LibraryReviewSubmission(**dict(row)) for row in rows]
 
     async def confirm_question_set(
         self,

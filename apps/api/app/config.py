@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     codex_model: str | None = None
     codex_timeout_seconds: int = 180
     codex_family_ids: tuple[str, ...] = ()
+    library_reviewer_parent_ids: tuple[str, ...] = ()
     ai_minimum_confidence: float = 0.75
     repository_backend: Literal["memory", "postgres"] = "memory"
     client_log_path: str = "/tmp/learning-assessment/client-errors.jsonl"

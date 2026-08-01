@@ -1,5 +1,7 @@
+import pytest
 from fastapi.testclient import TestClient
 
+from app.config import Settings, get_settings
 from app.main import create_app
 
 PARENT_HEADERS = {"Authorization": "Bearer parent-fixture"}
@@ -670,3 +672,61 @@ def test_parent_can_withdraw_a_pending_library_submission_without_publishing() -
     assert repeated_withdrawal.status_code == 409
     assert pending.status_code == 200
     assert pending.json() == []
+
+
+def test_library_review_api_is_closed_without_an_explicit_reviewer() -> None:
+    client = TestClient(create_app())
+
+    response = client.get(
+        "/v1/library/review/submissions",
+        headers=PARENT_HEADERS,
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "library_reviewer_required"
+
+
+def test_config_can_load_an_explicit_library_reviewer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Kept close to the behavior test: an empty production setting grants nobody.
+    monkeypatch.setenv("LIBRARY_REVIEWER_PARENT_IDS", '["parent-fixture"]')
+
+    settings = Settings(_env_file=None)
+
+    assert settings.library_reviewer_parent_ids == ("parent-fixture",)
+
+
+def test_explicit_reviewer_only_sees_safe_pending_submission_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("LIBRARY_REVIEWER_PARENT_IDS", '["parent-fixture"]')
+    get_settings.cache_clear()
+    try:
+        client = TestClient(create_app())
+        fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+        client.post(
+            "/v1/library/submissions",
+            headers={**PARENT_HEADERS, "Idempotency-Key": "safe-review-list"},
+            json={
+                "family_id": fixture["family"]["id"],
+                "question_set_id": fixture["question_set"]["id"],
+                "rights_confirmed": True,
+                "privacy_confirmed": True,
+            },
+        )
+
+        response = client.get("/v1/library/review/submissions", headers=PARENT_HEADERS)
+
+        assert response.status_code == 200
+        assert response.json()[0]["title"] == fixture["question_set"]["title"]
+        assert set(response.json()[0]) == {
+            "id",
+            "question_set_id",
+            "title",
+            "subject",
+            "question_count",
+            "created_at",
+        }
+    finally:
+        get_settings.cache_clear()

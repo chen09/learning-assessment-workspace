@@ -580,3 +580,14 @@ class LibrarySubmission(BaseModel):
     status: Literal["pending_review", "withdrawn"] = "pending_review"
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     published_at: datetime | None = None
+
+
+class LibraryReviewSubmission(BaseModel):
+    """Reviewer-safe metadata; never includes sources, answers, or child work."""
+
+    id: UUID
+    question_set_id: UUID
+    title: str
+    subject: str
+    question_count: int
+    created_at: datetime

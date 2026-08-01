@@ -45,6 +45,7 @@ from app.domain.models import (
     HistoryItem,
     Job,
     JobStatus,
+    LibraryReviewSubmission,
     LibrarySubmission,
     ParentAttemptReview,
     ParentDecision,
@@ -1741,6 +1742,29 @@ class MemoryRepository:
                 for submission in self.library_submissions.values()
                 if str(submission.family_id) == family_id
                 and submission.status == "pending_review"
+            ),
+            key=lambda submission: submission.created_at,
+            reverse=True,
+        )
+
+    async def list_pending_library_review_submissions(
+        self,
+    ) -> list[LibraryReviewSubmission]:
+        return sorted(
+            (
+                LibraryReviewSubmission(
+                    id=submission.id,
+                    question_set_id=submission.question_set_id,
+                    title=self.question_sets[str(submission.question_set_id)].title,
+                    subject=self.question_sets[str(submission.question_set_id)].subject,
+                    question_count=sum(
+                        question.question_set_id == submission.question_set_id
+                        for question in self.questions.values()
+                    ),
+                    created_at=submission.created_at,
+                )
+                for submission in self.library_submissions.values()
+                if submission.status == "pending_review"
             ),
             key=lambda submission: submission.created_at,
             reverse=True,
