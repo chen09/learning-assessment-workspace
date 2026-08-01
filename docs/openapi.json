@@ -1770,6 +1770,179 @@
         "title": "LibrarySubmission",
         "type": "object"
       },
+      "ListeningConfig": {
+        "description": "Private configuration saved with a listening question.\n\nThe storage path and transcript never travel in the default child question\nshape. Repositories explicitly create a signed, short-lived view for an\nactive attempt instead.",
+        "properties": {
+          "audio_path": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Audio Path",
+            "type": "string"
+          },
+          "replay_limit": {
+            "default": 2,
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Replay Limit",
+            "type": "integer"
+          },
+          "transcript": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transcript"
+          },
+          "transcript_policy": {
+            "default": "never",
+            "enum": [
+              "never",
+              "after_submission",
+              "always"
+            ],
+            "title": "Transcript Policy",
+            "type": "string"
+          }
+        },
+        "required": [
+          "audio_path"
+        ],
+        "title": "ListeningConfig",
+        "type": "object"
+      },
+      "ListeningInput": {
+        "additionalProperties": false,
+        "description": "Audio details added by the parent browser after JSON preview.\n\nAI-produced JSON intentionally has no private storage paths. The parent\nselects an audio file during review, and the browser inserts its private\npath before final import.",
+        "properties": {
+          "audio_path": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Path"
+          },
+          "replay_limit": {
+            "default": 2,
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Replay Limit",
+            "type": "integer"
+          },
+          "transcript": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transcript"
+          },
+          "transcript_policy": {
+            "default": "never",
+            "enum": [
+              "never",
+              "after_submission",
+              "always"
+            ],
+            "title": "Transcript Policy",
+            "type": "string"
+          }
+        },
+        "title": "ListeningInput",
+        "type": "object"
+      },
+      "ListeningPlaybackReceipt": {
+        "properties": {
+          "audio_url": {
+            "title": "Audio Url",
+            "type": "string"
+          },
+          "play_count": {
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Play Count",
+            "type": "integer"
+          },
+          "question_id": {
+            "format": "uuid",
+            "title": "Question Id",
+            "type": "string"
+          },
+          "replay_limit": {
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Replay Limit",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "question_id",
+          "play_count",
+          "replay_limit",
+          "audio_url"
+        ],
+        "title": "ListeningPlaybackReceipt",
+        "type": "object"
+      },
+      "ListeningQuestionView": {
+        "description": "The safe, child-facing subset of a listening question.\n\nAudio URLs are absent until the child deliberately starts a permitted\nplayback. This prevents a work payload from becoming a reusable media URL.",
+        "properties": {
+          "audio_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Url"
+          },
+          "play_count": {
+            "default": 0,
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Play Count",
+            "type": "integer"
+          },
+          "replay_limit": {
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Replay Limit",
+            "type": "integer"
+          },
+          "transcript": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transcript"
+          }
+        },
+        "required": [
+          "replay_limit"
+        ],
+        "title": "ListeningQuestionView",
+        "type": "object"
+      },
       "ManagementPinRequest": {
         "properties": {
           "pin": {
@@ -2358,6 +2531,16 @@
             "title": "Knowledge Code",
             "type": "string"
           },
+          "listening": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ListeningInput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "options": {
             "items": {
               "type": "string"
@@ -2420,6 +2603,16 @@
             "minLength": 1,
             "title": "Knowledge Code",
             "type": "string"
+          },
+          "listening": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ListeningInput"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "options": {
             "items": {
@@ -2512,6 +2705,17 @@
             "format": "uuid",
             "title": "Question Id",
             "type": "string"
+          },
+          "transcript": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transcript"
           }
         },
         "required": [
@@ -2794,6 +2998,16 @@
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "listening": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ListeningQuestionView"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "options": {
             "anyOf": [
@@ -3734,6 +3948,75 @@
           }
         },
         "summary": "Create Correction",
+        "tags": [
+          "attempts"
+        ]
+      }
+    },
+    "/v1/attempts/{attempt_id}/questions/{question_id}/audio-playbacks": {
+      "post": {
+        "operationId": "record_listening_playback_v1_attempts__attempt_id__questions__question_id__audio_playbacks_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attempt_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Attempt Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "question_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Question Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListeningPlaybackReceipt"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Listening Playback",
         "tags": [
           "attempts"
         ]
