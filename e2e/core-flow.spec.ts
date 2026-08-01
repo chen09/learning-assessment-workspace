@@ -287,6 +287,23 @@ test("parent reassigns a confirmed library set with an exam limit", async ({
   await expect(
     page.getByText("Submitted for public-library review."),
   ).toBeVisible();
+
+  const submission = (await reviewRequest.json()) as { id: string };
+  const withdrawal = page.waitForResponse(
+    (response) =>
+      response.url() ===
+        `${apiBaseUrl}/v1/library/submissions/${submission.id}/withdraw` &&
+      response.request().method() === "POST" &&
+      response.status() === 200,
+  );
+  await page.getByRole("button", { name: "Withdraw submission" }).click();
+  await withdrawal;
+  await expect(
+    page.getByText("Submission withdrawn. Your question set remains private."),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Submit to public review" }),
+  ).toBeVisible();
 });
 
 test("parent previews an AI JSON file before assigning its structured questions", async ({
