@@ -11,6 +11,7 @@ import {
   Cloud,
   Focus,
   Grid2X2,
+  RefreshCw,
   Send,
   Trash2,
   Volume2,
@@ -974,6 +975,9 @@ function WorksheetWorkbenchContent() {
       const photoPreviews = photoPreviewUrls[question.id] ?? [];
       const clarityWarnings = photoClarityWarnings[question.id] ?? [];
       const isUploadingPhotos = photoUploadQuestionId === question.id;
+      const isSavingPhotoAnswer =
+        isUploadingPhotos ||
+        (dirtyQuestionId === question.id && saveStatus === "saving");
       const canManagePhotoOrder = photoNames.length === photoPaths.length;
       const updatePhotos = (names: string[], paths: string[]) => {
         updateAnswer(question.id, { photoNames: names, photoPaths: paths });
@@ -1034,6 +1038,72 @@ function WorksheetWorkbenchContent() {
           clarityWarnings.filter((_, photoIndex) => photoIndex !== index),
         );
       };
+      const replacePhoto = (index: number, file: File) => {
+        if (isSavingPhotoAnswer || !canManagePhotoOrder) {
+          return;
+        }
+
+        const replaceStoredPhoto = (path?: string) => {
+          const names = [...photoNames];
+          names[index] = file.name;
+          const paths = [...photoPaths];
+          if (path !== undefined) {
+            paths[index] = path;
+          }
+          updatePhotos(names, paths);
+
+          const previews = [...photoPreviews];
+          const previousPreview = previews[index];
+          if (
+            previousPreview &&
+            photoObjectUrls.current.delete(previousPreview)
+          ) {
+            URL.revokeObjectURL(previousPreview);
+          }
+          const previewUrl = URL.createObjectURL(file);
+          photoObjectUrls.current.add(previewUrl);
+          previews[index] = previewUrl;
+          updatePhotoPreviews(previews);
+
+          const warnings = [...clarityWarnings];
+          warnings[index] = file.size < MINIMUM_PHOTO_FILE_BYTES;
+          updateClarityWarnings(warnings);
+        };
+
+        if (!attemptId || !familyId || !childToken) {
+          replaceStoredPhoto();
+          return;
+        }
+
+        setSaveStatus("saving");
+        setPhotoUploadQuestionId(question.id);
+        void (async () => {
+          try {
+            const uploadKey = `response-replace-${attemptId}-${question.id}-${index}-${file.lastModified}`;
+            const intent = await createChildUploadIntent(
+              {
+                family_id: familyId,
+                bucket: "responses",
+                object_id: attemptId,
+                filename: file.name,
+                content_type:
+                  file.type === "image/png" ? "image/png" : "image/jpeg",
+              },
+              childToken,
+              uploadKey,
+            );
+            await uploadToSignedUrl(intent, file);
+            // The original response file remains private and untouched; only this answer reference changes.
+            replaceStoredPhoto(intent.path);
+          } catch {
+            setSaveStatus("offline");
+          } finally {
+            setPhotoUploadQuestionId((current) =>
+              current === question.id ? null : current,
+            );
+          }
+        })();
+      };
       return (
         <div className="photo-answer">
           <label className="photo-input-trigger">
@@ -1042,7 +1112,7 @@ function WorksheetWorkbenchContent() {
               aria-label={t("worksheet.photoInput")}
               capture="environment"
               onChange={(event) => {
-                if (isUploadingPhotos) {
+                if (isSavingPhotoAnswer) {
                   return;
                 }
                 const selectedFiles = Array.from(event.target.files ?? []);
@@ -1121,7 +1191,7 @@ function WorksheetWorkbenchContent() {
                   }
                 })();
               }}
-              disabled={isUploadingPhotos}
+              disabled={isSavingPhotoAnswer}
               multiple
               type="file"
             />
@@ -1164,11 +1234,28 @@ function WorksheetWorkbenchContent() {
                   </span>
                   {canManagePhotoOrder ? (
                     <span className="photo-file-actions">
+                      <label className="photo-file-replace">
+                        <input
+                          accept="image/jpeg,image/png"
+                          aria-label={t("worksheet.replacePhoto", { name })}
+                          capture="environment"
+                          disabled={isSavingPhotoAnswer}
+                          onChange={(event) => {
+                            const replacement = event.target.files?.[0];
+                            event.target.value = "";
+                            if (replacement) {
+                              replacePhoto(index, replacement);
+                            }
+                          }}
+                          type="file"
+                        />
+                        <RefreshCw aria-hidden="true" size={15} />
+                      </label>
                       <button
                         aria-label={t("worksheet.movePhotoEarlier", {
                           name,
                         })}
-                        disabled={index === 0}
+                        disabled={isSavingPhotoAnswer || index === 0}
                         onClick={() => movePhoto(index, index - 1)}
                         type="button"
                       >
@@ -1176,7 +1263,9 @@ function WorksheetWorkbenchContent() {
                       </button>
                       <button
                         aria-label={t("worksheet.movePhotoLater", { name })}
-                        disabled={index === photoNames.length - 1}
+                        disabled={
+                          isSavingPhotoAnswer || index === photoNames.length - 1
+                        }
                         onClick={() => movePhoto(index, index + 1)}
                         type="button"
                       >
@@ -1184,6 +1273,7 @@ function WorksheetWorkbenchContent() {
                       </button>
                       <button
                         aria-label={t("worksheet.removePhoto", { name })}
+                        disabled={isSavingPhotoAnswer}
                         onClick={() => removePhoto(index)}
                         type="button"
                       >

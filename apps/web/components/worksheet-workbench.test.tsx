@@ -446,6 +446,7 @@ describe("WorksheetWorkbench", () => {
     expect(
       screen.getByRole("img", { name: "Preview: draft-page.jpg" }),
     ).toBeInTheDocument();
+    await screen.findByText("Saved");
 
     fireEvent.click(
       screen.getByRole("button", { name: "Move answer-page.jpg later" }),
@@ -460,6 +461,7 @@ describe("WorksheetWorkbench", () => {
         .getAllByRole("img")
         .map((image) => image.getAttribute("alt")),
     ).toEqual(["Preview: draft-page.jpg", "Preview: answer-page.jpg"]);
+    await screen.findByText("Saved");
 
     fireEvent.click(
       screen.getByRole("button", { name: "Remove draft-page.jpg" }),
@@ -528,6 +530,75 @@ describe("WorksheetWorkbench", () => {
     await waitFor(() => expect(answerInput).not.toBeDisabled());
   });
 
+  it("replaces one uploaded response photo without overwriting the original object", async () => {
+    mocks.createChildUploadIntent
+      .mockResolvedValueOnce({
+        bucket: "responses",
+        path: "family-1/attempt-1/original-answer.jpg",
+        upload_url: "https://storage.example.test/upload/original",
+        expires_in: 300,
+      })
+      .mockResolvedValueOnce({
+        bucket: "responses",
+        path: "family-1/attempt-1/replacement-answer.jpg",
+        upload_url: "https://storage.example.test/upload/replacement",
+        expires_in: 300,
+      });
+    render(<WorksheetWorkbench />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Go to question 4" }),
+    );
+    fireEvent.change(screen.getByLabelText(/Take a photo or choose images/), {
+      target: {
+        files: [
+          new File(["original"], "original-answer.jpg", {
+            type: "image/jpeg",
+          }),
+        ],
+      },
+    });
+    await screen.findByLabelText("Replace original-answer.jpg");
+    await screen.findByText("Saved");
+
+    fireEvent.change(
+      screen.getByLabelText("Replace original-answer.jpg"),
+      {
+        target: {
+          files: [
+            new File(["replacement"], "replacement-answer.jpg", {
+              type: "image/jpeg",
+            }),
+          ],
+        },
+      },
+    );
+
+    await waitFor(() => {
+      expect(mocks.saveAttemptResponse).toHaveBeenLastCalledWith(
+        "attempt-1",
+        "math-photo",
+        {
+          kind: "photo",
+          answer: {
+            paths: ["family-1/attempt-1/replacement-answer.jpg"],
+          },
+          expected_version: 1,
+        },
+        "child-token",
+      );
+    });
+    expect(mocks.uploadToSignedUrl).toHaveBeenLastCalledWith(
+      {
+        bucket: "responses",
+        path: "family-1/attempt-1/replacement-answer.jpg",
+        upload_url: "https://storage.example.test/upload/replacement",
+        expires_in: 300,
+      },
+      expect.objectContaining({ name: "replacement-answer.jpg" }),
+    );
+  });
+
   it("persists removing the final response photo as an empty photo answer", async () => {
     render(<WorksheetWorkbench />);
 
@@ -543,6 +614,7 @@ describe("WorksheetWorkbench", () => {
       { target: { files: [answerPage] } },
     );
     await screen.findByRole("button", { name: "Remove answer-page.jpg" });
+    await screen.findByText("Saved");
 
     fireEvent.click(
       screen.getByRole("button", { name: "Remove answer-page.jpg" }),
@@ -555,7 +627,7 @@ describe("WorksheetWorkbench", () => {
         {
           kind: "photo",
           answer: { paths: [] },
-          expected_version: 0,
+          expected_version: 1,
         },
         "child-token",
       );
