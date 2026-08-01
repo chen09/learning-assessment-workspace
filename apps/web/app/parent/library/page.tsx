@@ -9,6 +9,7 @@ import { LanguageSwitcher } from "@/components/language-switcher";
 import { useLanguage } from "@/components/language-provider";
 import {
   assignQuestionSet,
+  createLibrarySubmission,
   type ChildProfile,
   type Family,
   type FamilyQuestionSet,
@@ -138,7 +139,7 @@ export default function LibraryPage() {
 }
 
 function LibraryContent() {
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const text = copy[language];
   const [families, setFamilies] = useState<Family[]>([]);
   const [familyId, setFamilyId] = useState("");
@@ -161,6 +162,13 @@ function LibraryContent() {
   >("idle");
   const [assignmentMessage, setAssignmentMessage] = useState("");
   const [newAssignmentId, setNewAssignmentId] = useState<string | null>(null);
+  const [submissionSet, setSubmissionSet] =
+    useState<FamilyQuestionSet | null>(null);
+  const [rightsConfirmed, setRightsConfirmed] = useState(false);
+  const [privacyConfirmed, setPrivacyConfirmed] = useState(false);
+  const [submissionStatus, setSubmissionStatus] = useState<
+    "idle" | "submitting" | "success" | "error"
+  >("idle");
 
   useEffect(() => {
     void (async () => {
@@ -280,6 +288,40 @@ function LibraryContent() {
     }
   };
 
+  const openSubmission = (questionSet: FamilyQuestionSet) => {
+    setSubmissionSet(questionSet);
+    setRightsConfirmed(false);
+    setPrivacyConfirmed(false);
+    setSubmissionStatus("idle");
+  };
+
+  const submitForReview = async () => {
+    if (!submissionSet || !rightsConfirmed || !privacyConfirmed) {
+      return;
+    }
+    setSubmissionStatus("submitting");
+    const token = await getParentAccessToken();
+    if (!token) {
+      setSubmissionStatus("error");
+      return;
+    }
+    try {
+      await createLibrarySubmission(
+        {
+          family_id: submissionSet.family_id,
+          question_set_id: submissionSet.id,
+          rights_confirmed: true,
+          privacy_confirmed: true,
+        },
+        token,
+        crypto.randomUUID(),
+      );
+      setSubmissionStatus("success");
+    } catch {
+      setSubmissionStatus("error");
+    }
+  };
+
   return (
     <>
       <header className="page-header">
@@ -349,13 +391,22 @@ function LibraryContent() {
                 {text.status[set.status]}
               </span>
               {set.status === "confirmed" ? (
-                <button
-                  className="button secondary library-assign-button"
-                  onClick={() => void openAssignment(set)}
-                  type="button"
-                >
-                  {text.assign}
-                </button>
+                <div className="library-card-actions">
+                  <button
+                    className="button secondary library-assign-button"
+                    onClick={() => void openAssignment(set)}
+                    type="button"
+                  >
+                    {text.assign}
+                  </button>
+                  <button
+                    className="text-button"
+                    onClick={() => openSubmission(set)}
+                    type="button"
+                  >
+                    {t("librarySubmission.open")}
+                  </button>
+                </div>
               ) : null}
             </article>
           );
@@ -485,6 +536,72 @@ function LibraryContent() {
               </div>
             </div>
           )}
+        </section>
+      ) : null}
+      {submissionSet ? (
+        <section
+          aria-labelledby="library-submission-title"
+          className="assignment-panel library-submission-panel"
+        >
+          <div>
+            <p className="eyebrow">{t("librarySubmission.eyebrow")}</p>
+            <h2 id="library-submission-title">
+              {t("librarySubmission.title", { title: submissionSet.title })}
+            </h2>
+            <p>{t("librarySubmission.description")}</p>
+          </div>
+          <div className="library-submission-fields">
+            <label>
+              <input
+                checked={rightsConfirmed}
+                disabled={submissionStatus === "success"}
+                onChange={(event) => setRightsConfirmed(event.target.checked)}
+                type="checkbox"
+              />
+              {t("librarySubmission.rights")}
+            </label>
+            <label>
+              <input
+                checked={privacyConfirmed}
+                disabled={submissionStatus === "success"}
+                onChange={(event) => setPrivacyConfirmed(event.target.checked)}
+                type="checkbox"
+              />
+              {t("librarySubmission.privacy")}
+            </label>
+            {submissionStatus === "success" ? (
+              <p className="confirmed-message" role="status">
+                {t("librarySubmission.success")}
+              </p>
+            ) : null}
+            {submissionStatus === "error" ? (
+              <p role="alert">{t("librarySubmission.error")}</p>
+            ) : null}
+            <div className="library-assignment-actions">
+              <button
+                className="button secondary"
+                onClick={() => setSubmissionSet(null)}
+                type="button"
+              >
+                {text.cancel}
+              </button>
+              <button
+                className="button primary"
+                disabled={
+                  !rightsConfirmed ||
+                  !privacyConfirmed ||
+                  submissionStatus === "submitting" ||
+                  submissionStatus === "success"
+                }
+                onClick={() => void submitForReview()}
+                type="button"
+              >
+                {submissionStatus === "submitting"
+                  ? t("librarySubmission.submitting")
+                  : t("librarySubmission.confirm")}
+              </button>
+            </div>
+          </div>
         </section>
       ) : null}
     </>

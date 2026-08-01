@@ -417,6 +417,34 @@ export async function getFamilyQuestionSets(
   );
 }
 
+export async function createLibrarySubmission(
+  payload: {
+    family_id: string;
+    question_set_id: string;
+    rights_confirmed: true;
+    privacy_confirmed: true;
+  },
+  parentToken: string,
+  idempotencyKey: string,
+) {
+  return apiRequest<{
+    id: string;
+    family_id: string;
+    question_set_id: string;
+    status: "pending_review";
+    created_at: string;
+    published_at: string | null;
+  }>(
+    "/v1/library/submissions",
+    {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify(payload),
+    },
+    parentToken,
+  );
+}
+
 export async function createChild(
   familyId: string,
   payload: {

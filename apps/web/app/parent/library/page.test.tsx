@@ -5,6 +5,7 @@ import LibraryPage from "@/app/parent/library/page";
 
 const mocks = vi.hoisted(() => ({
   assignQuestionSet: vi.fn(),
+  createLibrarySubmission: vi.fn(),
   getChildren: vi.fn(),
   getFamilies: vi.fn(),
   getFamilyQuestionSets: vi.fn(),
@@ -12,6 +13,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/api-client", () => ({
   assignQuestionSet: mocks.assignQuestionSet,
+  createLibrarySubmission: mocks.createLibrarySubmission,
   getChildren: mocks.getChildren,
   getFamilies: mocks.getFamilies,
   getFamilyQuestionSets: mocks.getFamilyQuestionSets,
@@ -22,6 +24,15 @@ describe("LibraryPage", () => {
   beforeEach(() => {
     mocks.assignQuestionSet.mockReset();
     mocks.assignQuestionSet.mockResolvedValue({ id: "assignment-1", status: "assigned" });
+    mocks.createLibrarySubmission.mockReset();
+    mocks.createLibrarySubmission.mockResolvedValue({
+      id: "submission-1",
+      family_id: "family-1",
+      question_set_id: "set-ready",
+      status: "pending_review",
+      created_at: "2026-08-02T00:00:00Z",
+      published_at: null,
+    });
     mocks.getChildren.mockReset();
     mocks.getChildren.mockResolvedValue([
       {
@@ -160,6 +171,55 @@ describe("LibraryPage", () => {
         },
       );
     });
+  });
+
+  it("requires rights and privacy confirmations before submitting a set for public review", async () => {
+    mocks.getFamilyQuestionSets.mockResolvedValueOnce([
+      {
+        id: "set-ready",
+        family_id: "family-1",
+        title: "Generated Lesson 2 practice",
+        subject: "English",
+        status: "confirmed",
+        question_count: 10,
+        source_summary: {},
+      },
+    ]);
+
+    render(<LibraryPage />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "提交到公共题库审核" }),
+    );
+    expect(
+      await screen.findByRole("heading", { name: "提交「Generated Lesson 2 practice」" }),
+    ).toBeInTheDocument();
+    const submit = screen.getByRole("button", { name: "提交审核" });
+    expect(submit).toBeDisabled();
+
+    fireEvent.click(
+      screen.getByLabelText("我确认拥有分享这份生成题单的权利。"),
+    );
+    fireEvent.click(
+      screen.getByLabelText("我确认题单不包含孩子作答、个人信息或私有原始资料。"),
+    );
+    fireEvent.click(submit);
+
+    await waitFor(() => {
+      expect(mocks.createLibrarySubmission).toHaveBeenCalledWith(
+        {
+          family_id: "family-1",
+          question_set_id: "set-ready",
+          rights_confirmed: true,
+          privacy_confirmed: true,
+        },
+        "parent-token",
+        expect.any(String),
+      );
+    });
+    expect(await screen.findByText("已提交到公共题库，等待审核。"))
+      .toBeInTheDocument();
+    expect(submit).toBeDisabled();
   });
 
   it("explains why a ready set cannot be assigned when the family has no children", async () => {

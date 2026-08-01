@@ -3887,7 +3887,10 @@ class PostgresRepository:
                     text(
                         """
                         select id from public.question_sets
-                        where id = :question_set_id and family_id = :family_id
+                        where id = :question_set_id
+                          and family_id = :family_id
+                          and status = 'confirmed'
+                          and deleted_at is null
                         """
                     ),
                     {

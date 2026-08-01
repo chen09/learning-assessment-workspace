@@ -200,7 +200,7 @@ test("parent reassigns a confirmed library set with an exam limit", async ({
             subject: "Mathematics",
             locale: "en",
             difficulty: "standard",
-            source_mode: "manual",
+            source_mode: "generate",
             estimated_minutes: 5,
             source_summary: { fixture: true },
           },
@@ -253,6 +253,40 @@ test("parent reassigns a confirmed library set with an exam limit", async ({
   await expect(
     page.getByRole("link", { name: "Print A4 worksheet" }),
   ).toHaveAttribute("href", /\/parent\/print\/?\?assignmentId=/);
+
+  await page.getByRole("button", { name: "Submit to public review" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Submit “Reusable algebra check”" }),
+  ).toBeVisible();
+  const submitForReview = page.getByRole("button", {
+    name: "Submit for review",
+  });
+  await expect(submitForReview).toBeDisabled();
+  await page
+    .getByLabel("I have the right to share this generated question set.")
+    .check();
+  await page
+    .getByLabel(
+      "I confirm this set contains no child work, personal data, or private source files.",
+    )
+    .check();
+  const reviewSubmission = page.waitForResponse(
+    (response) =>
+      response.url() === `${apiBaseUrl}/v1/library/submissions` &&
+      response.request().method() === "POST" &&
+      response.status() === 202,
+  );
+  await submitForReview.click();
+  const reviewRequest = await reviewSubmission;
+  expect(reviewRequest.request().postDataJSON()).toEqual({
+    family_id: family.id,
+    question_set_id: imported.question_set_id,
+    rights_confirmed: true,
+    privacy_confirmed: true,
+  });
+  await expect(
+    page.getByText("Submitted for public-library review."),
+  ).toBeVisible();
 });
 
 test("parent previews an AI JSON file before assigning its structured questions", async ({

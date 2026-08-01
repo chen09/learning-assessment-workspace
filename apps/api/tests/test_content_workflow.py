@@ -597,3 +597,18 @@ def test_library_submission_enters_review_instead_of_becoming_public() -> None:
     assert response.status_code == 202
     assert response.json()["status"] == "pending_review"
     assert response.json()["published_at"] is None
+
+    unrelated_parent = client.post(
+        "/v1/library/submissions",
+        headers={
+            "Authorization": "Bearer another-parent",
+            "Idempotency-Key": "publish-from-another-family",
+        },
+        json={
+            "family_id": fixture["family"]["id"],
+            "question_set_id": fixture["question_set"]["id"],
+            "rights_confirmed": True,
+            "privacy_confirmed": True,
+        },
+    )
+    assert unrelated_parent.status_code == 401

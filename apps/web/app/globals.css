@@ -3672,6 +3672,18 @@ button {
   margin-top: 0.3rem;
 }
 
+.library-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.8rem;
+  align-items: center;
+  margin-top: 0.3rem;
+}
+
+.library-card-actions .library-assign-button {
+  margin-top: 0;
+}
+
 .library-assignment-panel {
   display: grid;
   grid-template-columns: minmax(0, 0.8fr) minmax(20rem, 1.2fr);
@@ -3679,6 +3691,34 @@ button {
   margin-top: 1.2rem;
   padding: 1.25rem;
   border-radius: 1.1rem;
+}
+
+.library-submission-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(20rem, 1.2fr);
+  gap: 1.25rem 2rem;
+  margin-top: 1.2rem;
+  padding: 1.25rem;
+  border-radius: 1.1rem;
+}
+
+.library-submission-fields {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.library-submission-fields > label {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  color: #f7f8fa;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.library-submission-fields input {
+  flex: 0 0 auto;
+  margin-top: 0.18rem;
 }
 
 .library-assignment-fields {
@@ -3951,7 +3991,8 @@ button {
     display: grid;
   }
 
-  .library-assignment-panel {
+  .library-assignment-panel,
+  .library-submission-panel {
     grid-template-columns: 1fr;
   }
 

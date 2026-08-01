@@ -359,6 +359,19 @@ const messages = {
     "parentHistory.status.stopped": "Stopped",
     "parentHistory.actionError":
       "The assignment status could not be updated. Please retry.",
+    "librarySubmission.open": "Submit to public review",
+    "librarySubmission.eyebrow": "Share a reviewed question set",
+    "librarySubmission.title": "Submit “{title}”",
+    "librarySubmission.description":
+      "The original material, answer keys, child work, and family details stay private. This only creates a pending review request.",
+    "librarySubmission.rights":
+      "I have the right to share this generated question set.",
+    "librarySubmission.privacy":
+      "I confirm this set contains no child work, personal data, or private source files.",
+    "librarySubmission.confirm": "Submit for review",
+    "librarySubmission.submitting": "Submitting…",
+    "librarySubmission.success": "Submitted for public-library review.",
+    "librarySubmission.error": "The review request could not be submitted. Please retry.",
     "completedPaper.eyebrow": "Completed worksheet received",
     "completedPaper.mode": "Grade completed paper",
     "completedPaper.readingTitle": "Reading the paper",
@@ -804,6 +817,19 @@ const messages = {
     "parentHistory.status.withdrawn": "取り消し済み",
     "parentHistory.status.stopped": "終了済み",
     "parentHistory.actionError": "課題の状態を更新できませんでした。もう一度お試しください。",
+    "librarySubmission.open": "公開レビューに提出する",
+    "librarySubmission.eyebrow": "確認済み問題セットを共有",
+    "librarySubmission.title": "「{title}」を提出",
+    "librarySubmission.description":
+      "元教材、解答、子どもの作答、家族情報は非公開のままです。公開されるのではなく、まずレビュー待ちになります。",
+    "librarySubmission.rights":
+      "この生成済み問題セットを共有する権利があることを確認します。",
+    "librarySubmission.privacy":
+      "子どもの作答、個人情報、非公開の元ファイルが含まれていないことを確認します。",
+    "librarySubmission.confirm": "レビューに提出する",
+    "librarySubmission.submitting": "提出中…",
+    "librarySubmission.success": "公開問題ライブラリのレビューに提出しました。",
+    "librarySubmission.error": "レビュー申請を提出できませんでした。もう一度お試しください。",
     "completedPaper.eyebrow": "解答済みのプリントを受け取りました",
     "completedPaper.mode": "解答済みのプリントを採点",
     "completedPaper.readingTitle": "プリントを読み込んでいます",
@@ -1232,6 +1258,17 @@ const messages = {
     "parentHistory.status.withdrawn": "已撤回",
     "parentHistory.status.stopped": "已结束",
     "parentHistory.actionError": "无法更新练习状态，请重试。",
+    "librarySubmission.open": "提交到公共题库审核",
+    "librarySubmission.eyebrow": "分享已确认题单",
+    "librarySubmission.title": "提交「{title}」",
+    "librarySubmission.description":
+      "原教材、答案、孩子作答和家庭信息仍保持私有；此操作只会创建一条待审核申请，不会立即公开。",
+    "librarySubmission.rights": "我确认拥有分享这份生成题单的权利。",
+    "librarySubmission.privacy": "我确认题单不包含孩子作答、个人信息或私有原始资料。",
+    "librarySubmission.confirm": "提交审核",
+    "librarySubmission.submitting": "正在提交…",
+    "librarySubmission.success": "已提交到公共题库，等待审核。",
+    "librarySubmission.error": "无法提交审核申请，请重试。",
     "completedPaper.eyebrow": "已收到已完成的试卷",
     "completedPaper.mode": "批改已完成的试卷",
     "completedPaper.readingTitle": "正在读取试卷",

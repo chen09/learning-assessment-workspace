@@ -1805,6 +1805,9 @@ class MemoryRepository:
             question_set is None
             or question_set.family_id != request.family_id
             or str(request.family_id) not in self.families
+            or parent_id
+            not in self.family_parents.get(str(request.family_id), set())
+            or question_set.status != QuestionSetStatus.CONFIRMED
         ):
             raise NotFoundError
         record_key = (str(request.family_id), idempotency_key)
