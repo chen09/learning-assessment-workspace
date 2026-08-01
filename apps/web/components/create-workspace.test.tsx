@@ -769,35 +769,32 @@ describe("CreateWorkspace", () => {
     expect(
       screen.getByText("Review ready · questions: 1 · answer regions: 1"),
     ).toBeInTheDocument();
-
-    const review = {
-      document,
-      answer_regions: [
-        {
-          question_position: 1,
-          page_numbers: [1],
-          regions: [{ x: 0.12, y: 0.45, width: 0.7, height: 0.2 }],
-          transcription: "(x - 4)(x + 4)",
-          legibility: "clear",
-        },
-      ],
-    };
     fireEvent.change(
-      screen.getByLabelText("Reviewed completed worksheet JSON"),
-      {
-        target: {
-          files: [
-            new File([JSON.stringify(review)], "reviewed-paper.json", {
-              type: "application/json",
-            }),
-          ],
-        },
-      },
+      screen.getByLabelText("Question 1 wording"),
+      { target: { value: "Factorise x² − 25." } },
     );
-    expect(
-      await screen.findByText("Review ready · questions: 1 · answer regions: 1"),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Factorise x² − 16.")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Reference answer for question 1"), {
+      target: { value: "(x - 5)(x + 5)" },
+    });
+    fireEvent.change(screen.getByLabelText("Answer page numbers for question 1"), {
+      target: { value: "not a page" },
+    });
+    fireEvent.change(screen.getByLabelText("Answer transcription for question 1"), {
+      target: { value: "(x - 5)(x + 5)" },
+    });
+    expect(screen.getByDisplayValue("Factorise x² − 25.")).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirm and start grading" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Nothing was assigned",
+    );
+    expect(mocks.confirmCompletedWorksheetImport).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText("Answer page numbers for question 1"), {
+      target: { value: "2" },
+    });
     fireEvent.click(
       screen.getByRole("button", { name: "Confirm and start grading" }),
     );
@@ -806,7 +803,14 @@ describe("CreateWorkspace", () => {
       expect(mocks.confirmCompletedWorksheetImport).toHaveBeenCalledWith(
         "completed-worksheet-1",
         {
-          document,
+          document: expect.objectContaining({
+            questions: [
+              expect.objectContaining({
+                prompt: "Factorise x² − 25.",
+                answer_key: { reference: "(x - 5)(x + 5)" },
+              }),
+            ],
+          }),
           responses: [
             {
               question_position: 1,
@@ -815,9 +819,9 @@ describe("CreateWorkspace", () => {
                 source_paths: [
                   "family-1/completed-paper/responses-completed-paper.jpg",
                 ],
-                page_numbers: [1],
+                page_numbers: [2],
                 regions: [{ x: 0.12, y: 0.45, width: 0.7, height: 0.2 }],
-                transcription: "(x - 4)(x + 4)",
+                transcription: "(x - 5)(x + 5)",
                 legibility: "clear",
               },
             },

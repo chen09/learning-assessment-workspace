@@ -2691,6 +2691,67 @@ button {
   padding: 1.1rem;
 }
 
+.completed-paper-review-list {
+  display: grid;
+  gap: 0.9rem;
+  margin: 0.9rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.completed-paper-review-list li {
+  display: grid;
+  gap: 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  background: #fafbff;
+  padding: 0.9rem;
+}
+
+.completed-paper-review-list label,
+.completed-paper-region-fields label {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
+.completed-paper-review-list input,
+.completed-paper-review-list textarea,
+.completed-paper-review-list select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  padding: 0.65rem 0.75rem;
+}
+
+.completed-paper-review-list textarea {
+  min-height: 4.8rem;
+  resize: vertical;
+}
+
+.completed-paper-region-fields {
+  display: grid;
+  grid-template-columns: minmax(8rem, 0.7fr) minmax(12rem, 1.5fr) minmax(9rem, 0.8fr);
+  gap: 0.65rem;
+}
+
+.completed-paper-region-fields .text-button {
+  justify-self: start;
+  color: var(--blue-dark);
+  font-size: 0.72rem;
+}
+
+@media (max-width: 48rem) {
+  .completed-paper-region-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
 .creation-options {
   display: grid;
   grid-template-columns: 1.2fr 1fr 0.7fr;

@@ -727,7 +727,16 @@ test("parent validates a local-AI completed-paper review before submitting it", 
   await expect(
     page.getByText("Review ready · questions: 1 · answer regions: 1"),
   ).toBeVisible();
-  await expect(page.getByText("Factorise x² - 16.")).toBeVisible();
+  await page
+    .getByLabel("Question 1 wording")
+    .fill("Factorise x² - 25.");
+  await page
+    .getByLabel("Reference answer for question 1")
+    .fill("(x - 5)(x + 5)");
+  await page.getByLabel("Answer page numbers for question 1").fill("2");
+  await page
+    .getByLabel("Answer transcription for question 1")
+    .fill("(x - 5)(x + 5)");
 
   const confirmRequest = page.waitForRequest(
     (request) =>
@@ -743,10 +752,21 @@ test("parent validates a local-AI completed-paper review before submitting it", 
   );
   await page.getByRole("button", { name: "Confirm and start grading" }).click();
   const confirmationBody = JSON.parse((await confirmRequest).postData() ?? "{}") as {
-    responses: Array<{ answer: { source_paths: string[] } }>;
+    document: { questions: Array<{ prompt: string; answer_key: { reference: string } }> };
+    responses: Array<{
+      answer: { source_paths: string[]; page_numbers: number[]; transcription: string };
+    }>;
   };
+  expect(confirmationBody.document.questions[0]).toMatchObject({
+    prompt: "Factorise x² - 25.",
+    answer_key: { reference: "(x - 5)(x + 5)" },
+  });
   expect(confirmationBody.responses[0]?.answer.source_paths).toEqual(
     imported.response_paths,
+  );
+  expect(confirmationBody.responses[0]?.answer.page_numbers).toEqual([2]);
+  expect(confirmationBody.responses[0]?.answer.transcription).toBe(
+    "(x - 5)(x + 5)",
   );
   const confirmationResponse = await confirmResponse;
   expect(

@@ -1166,6 +1166,15 @@ function CreateWorkspaceContent() {
       setRequestStatus("error");
       return;
     }
+    let validatedReview: CompletedPaperReview;
+    try {
+      validatedReview = parseCompletedPaperReview(
+        JSON.stringify(completedReview),
+      );
+    } catch {
+      setRequestStatus("error");
+      return;
+    }
     const parentToken = await getParentAccessToken();
     if (!parentToken) {
       setRequestStatus("error");
@@ -1176,8 +1185,8 @@ function CreateWorkspaceContent() {
       const confirmed = await confirmCompletedWorksheetImport(
         completedWorksheetId,
         {
-          document: completedReview.document,
-          responses: completedReview.answer_regions.map((region) => ({
+          document: validatedReview.document,
+          responses: validatedReview.answer_regions.map((region) => ({
             question_position: region.question_position,
             kind: "photo" as const,
             answer: {
@@ -1219,6 +1228,49 @@ function CreateWorkspaceContent() {
       setRequestStatus("error");
     }
   };
+
+  const updateCompletedPaperQuestion = (
+    position: number,
+    update: (question: StructuredQuestionSetDocument["questions"][number]) => StructuredQuestionSetDocument["questions"][number],
+  ) => {
+    setCompletedReview((current) =>
+      current
+        ? {
+            ...current,
+            document: {
+              ...current.document,
+              questions: current.document.questions.map((question) =>
+                question.position === position ? update(question) : question,
+              ),
+            },
+          }
+        : current,
+    );
+  };
+
+  const updateCompletedPaperAnswerRegion = (
+    position: number,
+    update: (region: CompletedPaperAnswerRegion) => CompletedPaperAnswerRegion,
+  ) => {
+    setCompletedReview((current) =>
+      current
+        ? {
+            ...current,
+            answer_regions: current.answer_regions.map((region) =>
+              region.question_position === position ? update(region) : region,
+            ),
+          }
+        : current,
+    );
+  };
+
+  const parseCompletedPaperPageNumbers = (value: string) =>
+    value
+      .split(",")
+      .map((candidate) => Number(candidate.trim()))
+      .filter(
+        (candidate) => Number.isInteger(candidate) && candidate >= 1,
+      );
 
   const copyCompletedPaperPrompt = async () => {
     try {
@@ -1319,18 +1371,130 @@ function CreateWorkspaceContent() {
                   </p>
                   <details open>
                     <summary>{t("completedPaper.previewQuestions")}</summary>
-                    <ol>
+                    <ol className="completed-paper-review-list">
                       {completedReview.document.questions.map((question, index) => (
                         <li key={question.position}>
-                          <strong>{question.prompt}</strong>
-                          <span>
-                            {t("completedPaper.page", {
-                              pages: completedReview.answer_regions[index]?.page_numbers.join(", ") ?? "",
-                            })}
-                            {completedReview.answer_regions[index]?.legibility
-                              ? ` · ${completedReview.answer_regions[index].legibility}`
-                              : ""}
-                          </span>
+                          <label>
+                            <span>{t("completedPaper.questionWording")}</span>
+                            <textarea
+                              aria-label={t("completedPaper.questionWordingFor", {
+                                position: question.position,
+                              })}
+                              onChange={(event) =>
+                                updateCompletedPaperQuestion(question.position, (current) => ({
+                                  ...current,
+                                  prompt: event.target.value,
+                                }))
+                              }
+                              value={question.prompt}
+                            />
+                          </label>
+                          {question.type === "handwriting" ? (
+                            <label>
+                              <span>{t("completedPaper.referenceAnswer")}</span>
+                              <input
+                                aria-label={t("completedPaper.referenceAnswerFor", {
+                                  position: question.position,
+                                })}
+                                onChange={(event) =>
+                                  updateCompletedPaperQuestion(question.position, (current) => ({
+                                    ...current,
+                                    answer_key: {
+                                      ...current.answer_key,
+                                      reference: event.target.value,
+                                    },
+                                  }))
+                                }
+                                value={
+                                  typeof question.answer_key.reference === "string"
+                                    ? question.answer_key.reference
+                                    : ""
+                                }
+                              />
+                            </label>
+                          ) : null}
+                          {completedReview.answer_regions[index] ? (
+                            <div className="completed-paper-region-fields">
+                              <label>
+                                <span>{t("completedPaper.answerPages")}</span>
+                                <input
+                                  aria-label={t("completedPaper.answerPagesFor", {
+                                    position: question.position,
+                                  })}
+                                  onChange={(event) =>
+                                    updateCompletedPaperAnswerRegion(
+                                      question.position,
+                                      (region) => ({
+                                        ...region,
+                                        page_numbers: parseCompletedPaperPageNumbers(
+                                          event.target.value,
+                                        ),
+                                      }),
+                                    )
+                                  }
+                                  value={completedReview.answer_regions[index].page_numbers.join(", ")}
+                                />
+                              </label>
+                              <label>
+                                <span>{t("completedPaper.answerTranscription")}</span>
+                                <textarea
+                                  aria-label={t("completedPaper.answerTranscriptionFor", {
+                                    position: question.position,
+                                  })}
+                                  onChange={(event) =>
+                                    updateCompletedPaperAnswerRegion(
+                                      question.position,
+                                      (region) => ({
+                                        ...region,
+                                        transcription: event.target.value || undefined,
+                                      }),
+                                    )
+                                  }
+                                  value={
+                                    completedReview.answer_regions[index].transcription ?? ""
+                                  }
+                                />
+                              </label>
+                              <label>
+                                <span>{t("completedPaper.legibility")}</span>
+                                <select
+                                  aria-label={t("completedPaper.legibilityFor", {
+                                    position: question.position,
+                                  })}
+                                  onChange={(event) =>
+                                    updateCompletedPaperAnswerRegion(
+                                      question.position,
+                                      (region) => ({
+                                        ...region,
+                                        legibility: event.target.value as CompletedPaperAnswerRegion["legibility"],
+                                      }),
+                                    )
+                                  }
+                                  value={
+                                    completedReview.answer_regions[index].legibility ?? "clear"
+                                  }
+                                >
+                                  <option value="clear">{t("completedPaper.legibility.clear")}</option>
+                                  <option value="uncertain">{t("completedPaper.legibility.uncertain")}</option>
+                                  <option value="unreadable">{t("completedPaper.legibility.unreadable")}</option>
+                                </select>
+                              </label>
+                              {completedReview.answer_regions[index].regions?.length ? (
+                                <button
+                                  className="text-button"
+                                  onClick={() =>
+                                    updateCompletedPaperAnswerRegion(
+                                      question.position,
+                                      (region) => ({ ...region, regions: undefined }),
+                                    )
+                                  }
+                                  type="button"
+                                >
+                                  {t("completedPaper.useWholePage")}
+                                </button>
+                              ) : null}
+                            </div>
+                          ) : null}
                         </li>
                       ))}
                     </ol>
