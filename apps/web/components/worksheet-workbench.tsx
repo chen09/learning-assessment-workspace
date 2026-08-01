@@ -9,6 +9,7 @@ import {
   Check,
   Clock3,
   Cloud,
+  Crop,
   Focus,
   Grid2X2,
   RefreshCw,
@@ -53,6 +54,7 @@ import {
   uploadToSignedUrl,
 } from "@/lib/api-client";
 import { getAvailableWordOrderTokens } from "@/lib/word-order";
+import { type CropBounds, cropAnswerImage } from "@/lib/photo-crop";
 import { rotateAnswerImage } from "@/lib/photo-rotation";
 
 type Question = {
@@ -82,6 +84,14 @@ type Answer = {
   canvasSize?: CanvasSize;
   photoNames?: string[];
   photoPaths?: string[];
+};
+
+type CropTarget = {
+  questionId: string;
+  index: number;
+  name: string;
+  previewUrl: string;
+  bounds: CropBounds;
 };
 
 const MINIMUM_PHOTO_FILE_BYTES = 100 * 1024;
@@ -210,6 +220,7 @@ function WorksheetWorkbenchContent() {
   const [photoUploadQuestionId, setPhotoUploadQuestionId] = useState<
     string | null
   >(null);
+  const [cropTarget, setCropTarget] = useState<CropTarget | null>(null);
   const [saveStatus, setSaveStatus] = useState<
     "idle" | "saving" | "saved" | "offline"
   >("idle");
@@ -1129,6 +1140,58 @@ function WorksheetWorkbenchContent() {
           }
         })();
       };
+      const cropPhoto = () => {
+        if (!cropTarget || cropTarget.questionId !== question.id) {
+          return;
+        }
+        const { bounds, index, name, previewUrl } = cropTarget;
+        if (isSavingPhotoAnswer || !canManagePhotoOrder) {
+          return;
+        }
+        setSaveStatus("saving");
+        setPhotoUploadQuestionId(question.id);
+        void (async () => {
+          try {
+            const croppedFile = await cropAnswerImage(previewUrl, name, bounds);
+            await uploadReplacementPhoto(index, croppedFile);
+            setCropTarget(null);
+          } catch {
+            setSaveStatus("offline");
+          } finally {
+            setPhotoUploadQuestionId((current) =>
+              current === question.id ? null : current,
+            );
+          }
+        })();
+      };
+      const updateCropBound = (key: keyof CropBounds, value: number) => {
+        setCropTarget((current) => {
+          if (!current || current.questionId !== question.id) {
+            return current;
+          }
+          const bounds = { ...current.bounds, [key]: value / 100 };
+          if (
+            bounds.top + bounds.bottom >= 0.8 ||
+            bounds.left + bounds.right >= 0.8
+          ) {
+            return current;
+          }
+          return { ...current, bounds };
+        });
+      };
+      const cropControls: Array<{
+        key: keyof CropBounds;
+        label:
+          | "worksheet.cropTop"
+          | "worksheet.cropBottom"
+          | "worksheet.cropLeft"
+          | "worksheet.cropRight";
+      }> = [
+        { key: "top", label: "worksheet.cropTop" },
+        { key: "bottom", label: "worksheet.cropBottom" },
+        { key: "left", label: "worksheet.cropLeft" },
+        { key: "right", label: "worksheet.cropRight" },
+      ];
       return (
         <div className="photo-answer">
           <label className="photo-input-trigger">
@@ -1285,6 +1348,22 @@ function WorksheetWorkbenchContent() {
                         <RotateCw size={15} />
                       </button>
                       <button
+                        aria-label={t("worksheet.cropPhoto", { name })}
+                        disabled={isSavingPhotoAnswer || !photoPreviews[index]}
+                        onClick={() =>
+                          setCropTarget({
+                            questionId: question.id,
+                            index,
+                            name,
+                            previewUrl: photoPreviews[index] ?? "",
+                            bounds: { top: 0, right: 0, bottom: 0, left: 0 },
+                          })
+                        }
+                        type="button"
+                      >
+                        <Crop size={15} />
+                      </button>
+                      <button
                         aria-label={t("worksheet.movePhotoEarlier", {
                           name,
                         })}
@@ -1317,6 +1396,75 @@ function WorksheetWorkbenchContent() {
                 </li>
               ))}
             </ol>
+          ) : null}
+          {cropTarget?.questionId === question.id ? (
+            <section
+              aria-label={t("worksheet.cropDialogTitle")}
+              aria-modal="true"
+              className="photo-crop-dialog"
+              role="dialog"
+            >
+              <div className="photo-crop-heading">
+                <div>
+                  <p className="eyebrow">{t("worksheet.cropEyebrow")}</p>
+                  <h3>{t("worksheet.cropDialogTitle")}</h3>
+                  <p>{t("worksheet.cropDialogBody")}</p>
+                </div>
+              </div>
+              <div className="photo-crop-preview">
+                {/* This local/signed image is preview-only; the crop helper creates a new uploaded file. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img alt="" src={cropTarget.previewUrl} />
+                <span
+                  aria-hidden="true"
+                  className="photo-crop-frame"
+                  style={{
+                    bottom: `${cropTarget.bounds.bottom * 100}%`,
+                    left: `${cropTarget.bounds.left * 100}%`,
+                    right: `${cropTarget.bounds.right * 100}%`,
+                    top: `${cropTarget.bounds.top * 100}%`,
+                  }}
+                />
+              </div>
+              <div className="photo-crop-controls">
+                {cropControls.map(({ key, label }) => (
+                  <label key={key}>
+                    <span>{t(label)}</span>
+                    <input
+                      aria-label={t(label)}
+                      max="35"
+                      min="0"
+                      onChange={(event) =>
+                        updateCropBound(key, Number(event.target.value))
+                      }
+                      step="1"
+                      type="range"
+                      value={Math.round(cropTarget.bounds[key] * 100)}
+                    />
+                    <output>{Math.round(cropTarget.bounds[key] * 100)}%</output>
+                  </label>
+                ))}
+              </div>
+              <div className="photo-crop-actions">
+                <button
+                  className="button ghost"
+                  disabled={isSavingPhotoAnswer}
+                  onClick={() => setCropTarget(null)}
+                  type="button"
+                >
+                  {t("worksheet.cancel")}
+                </button>
+                <button
+                  className="button primary"
+                  disabled={isSavingPhotoAnswer}
+                  onClick={cropPhoto}
+                  type="button"
+                >
+                  <Crop size={16} />
+                  {t("worksheet.saveCrop")}
+                </button>
+              </div>
+            </section>
           ) : null}
         </div>
       );

@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   submitAttempt: vi.fn(),
   submitQuestion: vi.fn(),
   uploadToSignedUrl: vi.fn(),
+  cropAnswerImage: vi.fn(),
   rotateAnswerImage: vi.fn(),
 }));
 
@@ -46,6 +47,10 @@ vi.mock("@/lib/api-client", async (importOriginal) => ({
 
 vi.mock("@/lib/photo-rotation", () => ({
   rotateAnswerImage: mocks.rotateAnswerImage,
+}));
+
+vi.mock("@/lib/photo-crop", () => ({
+  cropAnswerImage: mocks.cropAnswerImage,
 }));
 
 const assignmentWork = {
@@ -204,6 +209,12 @@ describe("WorksheetWorkbench", () => {
     mocks.rotateAnswerImage.mockReset();
     mocks.rotateAnswerImage.mockResolvedValue(
       new File(["rotated"], "answer-page-rotated-90.jpg", {
+        type: "image/jpeg",
+      }),
+    );
+    mocks.cropAnswerImage.mockReset();
+    mocks.cropAnswerImage.mockResolvedValue(
+      new File(["cropped"], "answer-page-cropped.jpg", {
         type: "image/jpeg",
       }),
     );
@@ -676,6 +687,74 @@ describe("WorksheetWorkbench", () => {
         upload_url: "https://storage.example.test/upload/rotated",
       }),
       expect.objectContaining({ name: "answer-page-rotated-90.jpg" }),
+    );
+  });
+
+  it("crops an uploaded response photo into a new private answer object", async () => {
+    mocks.createChildUploadIntent
+      .mockResolvedValueOnce({
+        bucket: "responses",
+        path: "family-1/attempt-1/original-answer.jpg",
+        upload_url: "https://storage.example.test/upload/original",
+        expires_in: 300,
+      })
+      .mockResolvedValueOnce({
+        bucket: "responses",
+        path: "family-1/attempt-1/answer-page-cropped.jpg",
+        upload_url: "https://storage.example.test/upload/cropped",
+        expires_in: 300,
+      });
+
+    render(<WorksheetWorkbench />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Go to question 4" }),
+    );
+    fireEvent.change(screen.getByLabelText(/Take a photo or choose images/), {
+      target: {
+        files: [
+          new File(["original"], "original-answer.jpg", {
+            type: "image/jpeg",
+          }),
+        ],
+      },
+    });
+    await screen.findByRole("button", { name: "Crop original-answer.jpg" });
+    await screen.findByText("Saved");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Crop original-answer.jpg" }),
+    );
+    const dialog = await screen.findByRole("dialog", { name: "Crop answer image" });
+    fireEvent.change(within(dialog).getByLabelText("Trim top"), {
+      target: { value: "10" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save crop" }));
+
+    await waitFor(() => {
+      expect(mocks.cropAnswerImage).toHaveBeenCalledWith(
+        "blob:preview/original-answer.jpg",
+        "original-answer.jpg",
+        { bottom: 0, left: 0, right: 0, top: 0.1 },
+      );
+      expect(mocks.saveAttemptResponse).toHaveBeenLastCalledWith(
+        "attempt-1",
+        "math-photo",
+        {
+          kind: "photo",
+          answer: {
+            paths: ["family-1/attempt-1/answer-page-cropped.jpg"],
+          },
+          expected_version: 1,
+        },
+        "child-token",
+      );
+    });
+
+    expect(mocks.uploadToSignedUrl).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        upload_url: "https://storage.example.test/upload/cropped",
+      }),
+      expect.objectContaining({ name: "answer-page-cropped.jpg" }),
     );
   });
 
