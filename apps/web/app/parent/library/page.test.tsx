@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   getFamilies: vi.fn(),
   getFamilyLibrarySubmissions: vi.fn(),
   getFamilyQuestionSets: vi.fn(),
+  getLibraryReviewerAccess: vi.fn(),
   withdrawLibrarySubmission: vi.fn(),
 }));
 
@@ -20,6 +21,7 @@ vi.mock("@/lib/api-client", () => ({
   getFamilies: mocks.getFamilies,
   getFamilyLibrarySubmissions: mocks.getFamilyLibrarySubmissions,
   getFamilyQuestionSets: mocks.getFamilyQuestionSets,
+  getLibraryReviewerAccess: mocks.getLibraryReviewerAccess,
   withdrawLibrarySubmission: mocks.withdrawLibrarySubmission,
   getParentAccessToken: vi.fn().mockResolvedValue("parent-token"),
 }));
@@ -50,6 +52,8 @@ describe("LibraryPage", () => {
     mocks.getFamilies.mockReset();
     mocks.getFamilyLibrarySubmissions.mockReset();
     mocks.getFamilyLibrarySubmissions.mockResolvedValue([]);
+    mocks.getLibraryReviewerAccess.mockReset();
+    mocks.getLibraryReviewerAccess.mockResolvedValue({ is_reviewer: false });
     mocks.getFamilyQuestionSets.mockReset();
     mocks.withdrawLibrarySubmission.mockReset();
     mocks.withdrawLibrarySubmission.mockResolvedValue({

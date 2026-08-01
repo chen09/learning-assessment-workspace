@@ -66,6 +66,7 @@ from app.domain.models import (
     ResponseRevision,
     ReviewCompletion,
     ReviewItemView,
+    ReviewLibrarySubmissionRequest,
     SavedResponse,
     SaveResponseRequest,
     SubmissionReceipt,
@@ -131,6 +132,8 @@ class MemoryRepository:
         self.upload_intents: dict[tuple[str, str], UploadIntent] = {}
         self.library_submissions: dict[str, LibrarySubmission] = {}
         self.library_idempotency: dict[tuple[str, str], str] = {}
+        self.library_review_idempotency: dict[tuple[str, str], str] = {}
+        self.library_items: dict[str, dict[str, object]] = {}
         self.parent_decisions: dict[str, ParentDecision] = {}
         self.family_invitations: dict[str, FamilyInvitation] = {}
         self.invitation_idempotency: dict[tuple[str, str], str] = {}
@@ -1741,7 +1744,6 @@ class MemoryRepository:
                 submission
                 for submission in self.library_submissions.values()
                 if str(submission.family_id) == family_id
-                and submission.status == "pending_review"
             ),
             key=lambda submission: submission.created_at,
             reverse=True,
@@ -1919,6 +1921,70 @@ class MemoryRepository:
             raise LibrarySubmissionStatusConflict
         submission.status = "withdrawn"
         self.library_submissions[submission_id] = submission
+        return submission
+
+    async def review_library_submission(
+        self,
+        submission_id: str,
+        request: ReviewLibrarySubmissionRequest,
+        idempotency_key: str,
+        parent_id: str,
+    ) -> LibrarySubmission:
+        submission = self.library_submissions.get(submission_id)
+        if submission is None:
+            raise NotFoundError
+        record_key = (submission_id, idempotency_key)
+        existing_id = self.library_review_idempotency.get(record_key)
+        if existing_id is not None:
+            return self.library_submissions[existing_id]
+        if submission.status != "pending_review":
+            raise LibrarySubmissionStatusConflict
+
+        if request.decision == "approve":
+            question_set = self.question_sets.get(str(submission.question_set_id))
+            if question_set is None:
+                raise NotFoundError
+            questions = sorted(
+                (
+                    question
+                    for question in self.questions.values()
+                    if question.question_set_id == submission.question_set_id
+                ),
+                key=lambda question: question.position,
+            )
+            self.library_items[submission_id] = {
+                "snapshot": {
+                    "schema_version": "1.0",
+                    "question_set": {
+                        "title": question_set.title,
+                        "subject": question_set.subject,
+                    },
+                    "questions": [
+                        {
+                            "position": question.position,
+                            "type": question.type.value,
+                            "prompt": question.prompt,
+                            "options": question.options,
+                            "points": question.points,
+                        }
+                        for question in questions
+                    ],
+                },
+                "metadata": {
+                    "title": question_set.title,
+                    "subject": question_set.subject,
+                    "question_count": len(questions),
+                    "content_boundary": "no_answers_no_sources_no_family_data",
+                },
+            }
+            submission.status = "published"
+            submission.published_at = datetime.now(UTC)
+        else:
+            submission.status = "rejected"
+        submission.review_note = request.note.strip() if request.note else None
+        submission.reviewed_at = datetime.now(UTC)
+        self.library_submissions[submission_id] = submission
+        self.library_review_idempotency[record_key] = submission_id
         return submission
 
     async def decide_grading_result(

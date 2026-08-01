@@ -10,6 +10,7 @@ import { useLanguage } from "@/components/language-provider";
 import {
   assignQuestionSet,
   createLibrarySubmission,
+  getLibraryReviewerAccess,
   type ChildProfile,
   type Family,
   type FamilyQuestionSet,
@@ -38,6 +39,9 @@ const copy = {
       `Based on private material: ${title}${subject ? ` · ${subject}` : ""}`,
     empty: "No question sets yet.",
     error: "The family library could not be loaded.",
+    reviewLink: "Review submissions",
+    published: "Published to the public library",
+    rejected: "Review needs changes",
     assign: "Assign to child",
     assignTitle: (title: string) => `Assign “${title}”`,
     child: "Child",
@@ -76,6 +80,9 @@ const copy = {
       `元教材：${title}${subject ? ` · ${subject}` : ""}`,
     empty: "問題セットはまだありません。",
     error: "家族の問題ライブラリを読み込めませんでした。",
+    reviewLink: "投稿を確認する",
+    published: "公開問題ライブラリに掲載済み",
+    rejected: "レビューで修正が必要",
     assign: "子どもに割り当てる",
     assignTitle: (title: string) => `「${title}」を割り当てる`,
     child: "子ども",
@@ -113,6 +120,9 @@ const copy = {
       `基于教材：${title}${subject ? ` · ${subject}` : ""}`,
     empty: "还没有题单。",
     error: "无法加载家庭题库。",
+    reviewLink: "审核投稿",
+    published: "已发布到公共题库",
+    rejected: "审核需要修改",
     assign: "分配给孩子",
     assignTitle: (title: string) => `分配「${title}」`,
     child: "孩子",
@@ -156,6 +166,7 @@ function LibraryContent() {
   const [pendingSubmissions, setPendingSubmissions] = useState<
     LibrarySubmission[]
   >([]);
+  const [isLibraryReviewer, setIsLibraryReviewer] = useState(false);
   const [withdrawingSubmissionId, setWithdrawingSubmissionId] = useState<
     string | null
   >(null);
@@ -208,12 +219,14 @@ function LibraryContent() {
           return;
         }
         setFamilyId(selectedFamily.id);
-        const [questionSets, pendingSubmissions] = await Promise.all([
+        const [questionSets, pendingSubmissions, reviewerAccess] = await Promise.all([
           getFamilyQuestionSets(selectedFamily.id, token),
           getFamilyLibrarySubmissions(selectedFamily.id, token),
+          getLibraryReviewerAccess(token),
         ]);
         setSets(questionSets);
         setPendingSubmissions(pendingSubmissions);
+        setIsLibraryReviewer(reviewerAccess.is_reviewer);
         setStatus("ready");
       } catch {
         setStatus("error");
@@ -418,6 +431,11 @@ function LibraryContent() {
             </select>
           ) : null}
           <LanguageSwitcher />
+          {isLibraryReviewer ? (
+            <Link className="button secondary" href="/parent/library/review/">
+              {text.reviewLink}
+            </Link>
+          ) : null}
         </div>
       </header>
       <label className="library-search">
@@ -479,7 +497,7 @@ function LibraryContent() {
                   >
                     {text.assign}
                   </button>
-                  {pendingSubmissionsBySetId.get(set.id) ? (
+          {pendingSubmissionsBySetId.get(set.id)?.status === "pending_review" ? (
                     <div className="library-card-actions">
                       <span className="status-pill warm">
                         {t("librarySubmission.pending")}
@@ -501,6 +519,26 @@ function LibraryContent() {
                         pendingSubmissionsBySetId.get(set.id)?.id
                           ? t("librarySubmission.withdrawing")
                           : t("librarySubmission.withdraw")}
+                      </button>
+                    </div>
+                  ) : pendingSubmissionsBySetId.get(set.id)?.status ===
+                    "published" ? (
+                    <span className="status-pill">{text.published}</span>
+                  ) : pendingSubmissionsBySetId.get(set.id)?.status ===
+                    "rejected" ? (
+                    <div className="library-card-actions">
+                      <span className="status-pill warm">{text.rejected}</span>
+                      {pendingSubmissionsBySetId.get(set.id)?.review_note ? (
+                        <p className="record-source">
+                          {pendingSubmissionsBySetId.get(set.id)?.review_note}
+                        </p>
+                      ) : null}
+                      <button
+                        className="text-button"
+                        onClick={() => openSubmission(set)}
+                        type="button"
+                      >
+                        {t("librarySubmission.open")}
                       </button>
                     </div>
                   ) : (

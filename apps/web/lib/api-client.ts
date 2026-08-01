@@ -424,10 +424,54 @@ export type LibrarySubmission = {
   id: string;
   family_id: string;
   question_set_id: string;
-  status: "pending_review" | "withdrawn";
+  status: "pending_review" | "published" | "rejected" | "withdrawn";
   created_at: string;
   published_at: string | null;
+  review_note: string | null;
+  reviewed_at: string | null;
 };
+
+export type LibraryReviewSubmission = {
+  id: string;
+  question_set_id: string;
+  title: string;
+  subject: string;
+  question_count: number;
+  created_at: string;
+};
+
+export async function getLibraryReviewerAccess(parentToken: string) {
+  return apiRequest<{ is_reviewer: boolean }>(
+    "/v1/library/review/access",
+    { method: "GET" },
+    parentToken,
+  );
+}
+
+export async function getLibraryReviewSubmissions(parentToken: string) {
+  return apiRequest<LibraryReviewSubmission[]>(
+    "/v1/library/review/submissions",
+    { method: "GET" },
+    parentToken,
+  );
+}
+
+export async function reviewLibrarySubmission(
+  submissionId: string,
+  payload: { decision: "approve" | "reject"; note?: string | null },
+  parentToken: string,
+  idempotencyKey: string,
+) {
+  return apiRequest<LibrarySubmission>(
+    `/v1/library/review/submissions/${encodeURIComponent(submissionId)}/decision`,
+    {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify(payload),
+    },
+    parentToken,
+  );
+}
 
 export async function getFamilyLibrarySubmissions(
   familyId: string,

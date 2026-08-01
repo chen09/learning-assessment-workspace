@@ -577,9 +577,13 @@ class LibrarySubmission(BaseModel):
     id: UUID = Field(default_factory=uuid4)
     family_id: UUID
     question_set_id: UUID
-    status: Literal["pending_review", "withdrawn"] = "pending_review"
+    status: Literal["pending_review", "published", "rejected", "withdrawn"] = (
+        "pending_review"
+    )
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     published_at: datetime | None = None
+    review_note: str | None = None
+    reviewed_at: datetime | None = None
 
 
 class LibraryReviewSubmission(BaseModel):
@@ -591,3 +595,14 @@ class LibraryReviewSubmission(BaseModel):
     subject: str
     question_count: int
     created_at: datetime
+
+
+class ReviewLibrarySubmissionRequest(BaseModel):
+    """An explicit, auditable decision by a configured library reviewer."""
+
+    decision: Literal["approve", "reject"]
+    note: str | None = Field(default=None, max_length=600)
+
+
+class LibraryReviewerAccess(BaseModel):
+    is_reviewer: bool

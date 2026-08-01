@@ -660,7 +660,7 @@ def test_parent_can_withdraw_a_pending_library_submission_without_publishing() -
         f"/v1/library/submissions/{created.json()['id']}/withdraw",
         headers=PARENT_HEADERS,
     )
-    pending = client.get(
+    submissions = client.get(
         f"/v1/library/families/{fixture['family']['id']}/submissions",
         headers=PARENT_HEADERS,
     )
@@ -670,20 +670,27 @@ def test_parent_can_withdraw_a_pending_library_submission_without_publishing() -
     assert withdrawn.json()["status"] == "withdrawn"
     assert withdrawn.json()["published_at"] is None
     assert repeated_withdrawal.status_code == 409
-    assert pending.status_code == 200
-    assert pending.json() == []
+    assert submissions.status_code == 200
+    assert submissions.json()[0]["status"] == "withdrawn"
 
 
 def test_library_review_api_is_closed_without_an_explicit_reviewer() -> None:
     client = TestClient(create_app())
 
-    response = client.get(
+    list_response = client.get(
         "/v1/library/review/submissions",
         headers=PARENT_HEADERS,
     )
+    decision_response = client.post(
+        "/v1/library/review/submissions/00000000-0000-0000-0000-000000000000/decision",
+        headers={**PARENT_HEADERS, "Idempotency-Key": "blocked-review-decision"},
+        json={"decision": "approve"},
+    )
 
-    assert response.status_code == 403
-    assert response.json()["detail"]["code"] == "library_reviewer_required"
+    assert list_response.status_code == 403
+    assert list_response.json()["detail"]["code"] == "library_reviewer_required"
+    assert decision_response.status_code == 403
+    assert decision_response.json()["detail"]["code"] == "library_reviewer_required"
 
 
 def test_config_can_load_an_explicit_library_reviewer(
@@ -728,5 +735,98 @@ def test_explicit_reviewer_only_sees_safe_pending_submission_metadata(
             "question_count",
             "created_at",
         }
+    finally:
+        get_settings.cache_clear()
+
+
+def test_explicit_reviewer_can_publish_a_sanitized_library_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("LIBRARY_REVIEWER_PARENT_IDS", '["parent-fixture"]')
+    get_settings.cache_clear()
+    try:
+        application = create_app()
+        client = TestClient(application)
+        fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+        created = client.post(
+            "/v1/library/submissions",
+            headers={**PARENT_HEADERS, "Idempotency-Key": "approve-sanitized-set"},
+            json={
+                "family_id": fixture["family"]["id"],
+                "question_set_id": fixture["question_set"]["id"],
+                "rights_confirmed": True,
+                "privacy_confirmed": True,
+            },
+        )
+
+        approved = client.post(
+            f"/v1/library/review/submissions/{created.json()['id']}/decision",
+            headers={**PARENT_HEADERS, "Idempotency-Key": "approve-sanitized-set-v1"},
+            json={"decision": "approve", "note": "Safe to publish."},
+        )
+        repeated = client.post(
+            f"/v1/library/review/submissions/{created.json()['id']}/decision",
+            headers={**PARENT_HEADERS, "Idempotency-Key": "approve-sanitized-set-v1"},
+            json={"decision": "approve", "note": "Safe to publish."},
+        )
+        family_submissions = client.get(
+            f"/v1/library/families/{fixture['family']['id']}/submissions",
+            headers=PARENT_HEADERS,
+        )
+
+        assert approved.status_code == 200
+        assert approved.json()["status"] == "published"
+        assert approved.json()["published_at"] is not None
+        assert approved.json()["review_note"] == "Safe to publish."
+        assert repeated.status_code == 200
+        assert repeated.json()["id"] == approved.json()["id"]
+        assert family_submissions.json()[0]["status"] == "published"
+
+        repository = application.state.repository
+        snapshot = repository.library_items[created.json()["id"]]["snapshot"]
+        serialized_snapshot = str(snapshot)
+        assert "answer_key" not in serialized_snapshot
+        assert "source_summary" not in serialized_snapshot
+        assert "family_id" not in serialized_snapshot
+        assert snapshot["questions"]
+    finally:
+        get_settings.cache_clear()
+
+
+def test_explicit_reviewer_can_reject_once_but_not_change_a_final_decision(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("LIBRARY_REVIEWER_PARENT_IDS", '["parent-fixture"]')
+    get_settings.cache_clear()
+    try:
+        client = TestClient(create_app())
+        fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+        created = client.post(
+            "/v1/library/submissions",
+            headers={**PARENT_HEADERS, "Idempotency-Key": "reject-review-set"},
+            json={
+                "family_id": fixture["family"]["id"],
+                "question_set_id": fixture["question_set"]["id"],
+                "rights_confirmed": True,
+                "privacy_confirmed": True,
+            },
+        )
+
+        rejected = client.post(
+            f"/v1/library/review/submissions/{created.json()['id']}/decision",
+            headers={**PARENT_HEADERS, "Idempotency-Key": "reject-review-set-v1"},
+            json={"decision": "reject", "note": "Please remove copyrighted text."},
+        )
+        changed = client.post(
+            f"/v1/library/review/submissions/{created.json()['id']}/decision",
+            headers={**PARENT_HEADERS, "Idempotency-Key": "reject-review-set-v2"},
+            json={"decision": "approve"},
+        )
+
+        assert rejected.status_code == 200
+        assert rejected.json()["status"] == "rejected"
+        assert rejected.json()["published_at"] is None
+        assert changed.status_code == 409
+        assert changed.json()["detail"]["code"] == "library_submission_cannot_be_reviewed"
     finally:
         get_settings.cache_clear()

@@ -8,8 +8,10 @@ from app.domain.errors import LibrarySubmissionStatusConflict, NotFoundError
 from app.domain.models import (
     CreateLibrarySubmissionRequest,
     FamilyLibraryQuestionSet,
+    LibraryReviewerAccess,
     LibraryReviewSubmission,
     LibrarySubmission,
+    ReviewLibrarySubmissionRequest,
 )
 
 router = APIRouter(prefix="/v1/library", tags=["library"])
@@ -52,6 +54,49 @@ async def list_pending_library_review_submissions(
     """Reviewer metadata excludes source files, answer keys, and child work."""
     _require_library_reviewer(parent_id)
     return await repository.list_pending_library_review_submissions()
+
+
+@router.get("/review/access", response_model=LibraryReviewerAccess)
+async def get_library_reviewer_access(
+    parent_id: Annotated[str, Depends(require_parent)],
+) -> LibraryReviewerAccess:
+    return LibraryReviewerAccess(
+        is_reviewer=parent_id in get_settings().library_reviewer_parent_ids,
+    )
+
+
+@router.post(
+    "/review/submissions/{submission_id}/decision",
+    response_model=LibrarySubmission,
+)
+async def review_library_submission(
+    submission_id: str,
+    request: ReviewLibrarySubmissionRequest,
+    repository: Annotated[Repository, Depends(get_repository)],
+    parent_id: Annotated[str, Depends(require_parent)],
+    idempotency_key: Annotated[
+        str,
+        Header(alias="Idempotency-Key", min_length=8, max_length=120),
+    ],
+) -> LibrarySubmission:
+    _require_library_reviewer(parent_id)
+    try:
+        return await repository.review_library_submission(
+            submission_id,
+            request,
+            idempotency_key,
+            parent_id,
+        )
+    except LibrarySubmissionStatusConflict as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "library_submission_cannot_be_reviewed"},
+        ) from error
+    except (NotFoundError, ValueError) as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The library submission is not available.",
+        ) from error
 
 
 @router.get(

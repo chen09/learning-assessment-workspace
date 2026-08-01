@@ -1667,6 +1667,19 @@
         "title": "LibraryReviewSubmission",
         "type": "object"
       },
+      "LibraryReviewerAccess": {
+        "properties": {
+          "is_reviewer": {
+            "title": "Is Reviewer",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "is_reviewer"
+        ],
+        "title": "LibraryReviewerAccess",
+        "type": "object"
+      },
       "LibrarySubmission": {
         "properties": {
           "created_at": {
@@ -1701,10 +1714,35 @@
             "title": "Question Set Id",
             "type": "string"
           },
+          "review_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Note"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
           "status": {
             "default": "pending_review",
             "enum": [
               "pending_review",
+              "published",
+              "rejected",
               "withdrawn"
             ],
             "title": "Status",
@@ -2844,6 +2882,36 @@
           "level"
         ],
         "title": "ReviewItemView",
+        "type": "object"
+      },
+      "ReviewLibrarySubmissionRequest": {
+        "description": "An explicit, auditable decision by a configured library reviewer.",
+        "properties": {
+          "decision": {
+            "enum": [
+              "approve",
+              "reject"
+            ],
+            "title": "Decision",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 600,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "required": [
+          "decision"
+        ],
+        "title": "ReviewLibrarySubmissionRequest",
         "type": "object"
       },
       "SaveResponseRequest": {
@@ -5999,6 +6067,55 @@
         ]
       }
     },
+    "/v1/library/review/access": {
+      "get": {
+        "operationId": "get_library_reviewer_access_v1_library_review_access_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryReviewerAccess"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Library Reviewer Access",
+        "tags": [
+          "library"
+        ]
+      }
+    },
     "/v1/library/review/submissions": {
       "get": {
         "description": "Reviewer metadata excludes source files, answer keys, and child work.",
@@ -6048,6 +6165,85 @@
           }
         },
         "summary": "List Pending Library Review Submissions",
+        "tags": [
+          "library"
+        ]
+      }
+    },
+    "/v1/library/review/submissions/{submission_id}/decision": {
+      "post": {
+        "operationId": "review_library_submission_v1_library_review_submissions__submission_id__decision_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "submission_id",
+            "required": true,
+            "schema": {
+              "title": "Submission Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 120,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewLibrarySubmissionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibrarySubmission"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Review Library Submission",
         "tags": [
           "library"
         ]

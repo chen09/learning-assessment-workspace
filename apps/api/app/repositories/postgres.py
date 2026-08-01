@@ -72,6 +72,7 @@ from app.domain.models import (
     ResponseRevision,
     ReviewCompletion,
     ReviewItemView,
+    ReviewLibrarySubmissionRequest,
     SavedResponse,
     SaveResponseRequest,
     SubmissionReceipt,
@@ -3646,10 +3647,13 @@ class PostgresRepository:
                 await connection.execute(
                     text(
                         """
-                        select id, family_id, question_set_id, created_at
-                        from public.library_submissions
-                        where family_id = :family_id and status = 'pending'
-                        order by created_at desc
+                        select ls.id, ls.family_id, ls.question_set_id, ls.status,
+                               ls.review_note, ls.reviewed_at, ls.created_at,
+                               li.published_at
+                        from public.library_submissions ls
+                        left join public.library_items li on li.submission_id = ls.id
+                        where ls.family_id = :family_id
+                        order by ls.created_at desc
                         """
                     ),
                     {"family_id": family_uuid},
@@ -3660,7 +3664,15 @@ class PostgresRepository:
                 id=row["id"],
                 family_id=row["family_id"],
                 question_set_id=row["question_set_id"],
+                status=(
+                    "pending_review"
+                    if row["status"] == "pending"
+                    else row["status"]
+                ),
+                review_note=row["review_note"],
+                reviewed_at=row["reviewed_at"],
                 created_at=row["created_at"],
+                published_at=row["published_at"],
             )
             for row in rows
         ]
@@ -4077,6 +4089,150 @@ class PostgresRepository:
             question_set_id=row["question_set_id"],
             status="withdrawn",
             created_at=row["created_at"],
+        )
+
+    async def review_library_submission(
+        self,
+        submission_id: str,
+        request: ReviewLibrarySubmissionRequest,
+        idempotency_key: str,
+        parent_id: str,
+    ) -> LibrarySubmission:
+        async with self._engine.begin() as connection:
+            result = await connection.execute(
+                text(
+                    """
+                    select ls.id, ls.family_id, ls.question_set_id, ls.status,
+                           qs.title, qs.subject
+                    from public.library_submissions ls
+                    join public.question_sets qs on qs.id = ls.question_set_id
+                    where ls.id = :submission_id
+                    for update of ls
+                    """
+                ),
+                {"submission_id": _uuid(submission_id)},
+            )
+            submission = result.mappings().one_or_none()
+            if submission is None:
+                raise NotFoundError
+            family_id = cast(UUID, submission["family_id"])
+            existing_id = await self._idempotent_resource(
+                connection,
+                family_id=family_id,
+                actor_id=parent_id,
+                action="library_review_decision",
+                idempotency_key=idempotency_key,
+            )
+            if existing_id is None:
+                if submission["status"] != "pending":
+                    raise LibrarySubmissionStatusConflict
+                if request.decision == "approve":
+                    question_rows = (
+                        await connection.execute(
+                            text(
+                                """
+                                select position, type, prompt, options, points
+                                from public.questions
+                                where question_set_id = :question_set_id
+                                order by position
+                                """
+                            ),
+                            {"question_set_id": submission["question_set_id"]},
+                        )
+                    ).mappings().all()
+                    snapshot = {
+                        "schema_version": "1.0",
+                        "question_set": {
+                            "title": submission["title"],
+                            "subject": submission["subject"],
+                        },
+                        "questions": [
+                            {
+                                "position": row["position"],
+                                "type": row["type"],
+                                "prompt": row["prompt"],
+                                "options": row["options"],
+                                "points": float(row["points"]),
+                            }
+                            for row in question_rows
+                        ],
+                    }
+                    metadata = {
+                        "title": submission["title"],
+                        "subject": submission["subject"],
+                        "question_count": len(question_rows),
+                        "content_boundary": "no_answers_no_sources_no_family_data",
+                    }
+                    await connection.execute(
+                        text(
+                            """
+                            insert into public.library_items (
+                              submission_id, snapshot, metadata, published_at
+                            ) values (
+                              :submission_id, cast(:snapshot as jsonb),
+                              cast(:metadata as jsonb), now()
+                            )
+                            """
+                        ),
+                        {
+                            "submission_id": submission["id"],
+                            "snapshot": json.dumps(snapshot),
+                            "metadata": json.dumps(metadata),
+                        },
+                    )
+                review_status = (
+                    "published" if request.decision == "approve" else "rejected"
+                )
+                await connection.execute(
+                    text(
+                        """
+                        update public.library_submissions
+                        set status = cast(:status as public.library_status),
+                            reviewer_id = :reviewer_id,
+                            review_note = :review_note,
+                            reviewed_at = now()
+                        where id = :submission_id
+                        """
+                    ),
+                    {
+                        "submission_id": submission["id"],
+                        "status": review_status,
+                        "reviewer_id": _uuid(parent_id),
+                        "review_note": request.note.strip() if request.note else None,
+                    },
+                )
+                await self._remember_idempotency(
+                    connection,
+                    family_id=family_id,
+                    actor_id=parent_id,
+                    action="library_review_decision",
+                    idempotency_key=idempotency_key,
+                    resource_id=submission["id"],
+                )
+            row = (
+                await connection.execute(
+                    text(
+                        """
+                        select ls.id, ls.family_id, ls.question_set_id, ls.status,
+                               ls.review_note, ls.reviewed_at, ls.created_at,
+                               li.published_at
+                        from public.library_submissions ls
+                        left join public.library_items li on li.submission_id = ls.id
+                        where ls.id = :submission_id
+                        """
+                    ),
+                    {"submission_id": submission["id"]},
+                )
+            ).mappings().one()
+        return LibrarySubmission(
+            id=row["id"],
+            family_id=row["family_id"],
+            question_set_id=row["question_set_id"],
+            status=("pending_review" if row["status"] == "pending" else row["status"]),
+            review_note=row["review_note"],
+            reviewed_at=row["reviewed_at"],
+            created_at=row["created_at"],
+            published_at=row["published_at"],
         )
 
     async def decide_grading_result(
