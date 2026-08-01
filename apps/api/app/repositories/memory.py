@@ -48,6 +48,7 @@ from app.domain.models import (
     ParentAttemptReview,
     ParentDecision,
     ParentDecisionRequest,
+    ParentHistoryItem,
     ParentReviewItem,
     PrintableAssignment,
     Question,
@@ -914,13 +915,26 @@ class MemoryRepository:
         self,
         family_id: str,
         parent_id: str,
-    ) -> list[HistoryItem]:
+    ) -> list[ParentHistoryItem]:
         if parent_id not in self.family_parents.get(family_id, set()):
             raise NotFoundError
-        items: list[HistoryItem] = []
+        items: list[ParentHistoryItem] = []
         for child in self.children.values():
             if str(child.family_id) == family_id:
-                items.extend(await self.list_child_history(str(child.id)))
+                for item in await self.list_child_history(str(child.id)):
+                    assignment = self.assignments[str(item.assignment_id)]
+                    question_set = self.question_sets[str(assignment.question_set_id)]
+                    items.append(
+                        ParentHistoryItem(
+                            **item.model_dump(),
+                            source_material_title=question_set.source_summary.get(
+                                "source_material_title"
+                            ),
+                            source_material_subject=question_set.source_summary.get(
+                                "source_material_subject"
+                            ),
+                        )
+                    )
         return items
 
     async def create_deletion_request(

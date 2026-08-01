@@ -78,6 +78,8 @@ describe("ParentHistoryPage", () => {
         awarded_points: 0,
         available_points: 10,
         correction_count: 0,
+        source_material_title: "Lesson 1 textbook",
+        source_material_subject: "English",
       },
     ]);
     mocks.withdrawAssignment.mockResolvedValue({ status: "withdrawn" });
@@ -85,6 +87,11 @@ describe("ParentHistoryPage", () => {
     render(<ParentHistoryPage />);
 
     await screen.findByRole("heading", { name: "Unstarted worksheet" });
+    expect(
+      screen.getByText(
+        "Based on private material: Lesson 1 textbook · English",
+      ),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Withdraw assignment" }));
 
     await waitFor(() => {

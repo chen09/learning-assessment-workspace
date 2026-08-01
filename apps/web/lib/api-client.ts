@@ -991,6 +991,11 @@ export type HistoryItem = {
   correction_count: number;
 };
 
+export type ParentHistoryItem = HistoryItem & {
+  source_material_title: string | null;
+  source_material_subject: string | null;
+};
+
 export async function getChildHistory(childToken: string) {
   return apiRequest<HistoryItem[]>(
     "/v1/history/child",
@@ -1003,7 +1008,7 @@ export async function getFamilyHistory(
   familyId: string,
   parentToken: string,
 ) {
-  return apiRequest<HistoryItem[]>(
+  return apiRequest<ParentHistoryItem[]>(
     `/v1/history/families/${encodeURIComponent(familyId)}`,
     { method: "GET" },
     parentToken,

@@ -382,6 +382,13 @@ class HistoryItem(BaseModel):
     correction_count: int
 
 
+class ParentHistoryItem(HistoryItem):
+    """Parent-only history metadata; never returned by the child history route."""
+
+    source_material_title: str | None = None
+    source_material_subject: str | None = None
+
+
 class CreateDeletionRequest(BaseModel):
     family_id: UUID
     target_type: Literal["family", "child", "asset"]

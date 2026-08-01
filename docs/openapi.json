@@ -1884,6 +1884,104 @@
         "title": "ParentDecisionRequest",
         "type": "object"
       },
+      "ParentHistoryItem": {
+        "description": "Parent-only history metadata; never returned by the child history route.",
+        "properties": {
+          "assignment_id": {
+            "format": "uuid",
+            "title": "Assignment Id",
+            "type": "string"
+          },
+          "attempt_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
+          "available_points": {
+            "title": "Available Points",
+            "type": "number"
+          },
+          "awarded_points": {
+            "title": "Awarded Points",
+            "type": "number"
+          },
+          "child_id": {
+            "format": "uuid",
+            "title": "Child Id",
+            "type": "string"
+          },
+          "child_nickname": {
+            "title": "Child Nickname",
+            "type": "string"
+          },
+          "correction_count": {
+            "title": "Correction Count",
+            "type": "integer"
+          },
+          "source_material_subject": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Material Subject"
+          },
+          "source_material_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Material Title"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AssignmentStatus"
+          },
+          "submitted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted At"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assignment_id",
+          "attempt_id",
+          "child_id",
+          "child_nickname",
+          "title",
+          "status",
+          "submitted_at",
+          "awarded_points",
+          "available_points",
+          "correction_count"
+        ],
+        "title": "ParentHistoryItem",
+        "type": "object"
+      },
       "ParentReviewItem": {
         "properties": {
           "automated_feedback": {
@@ -5513,7 +5611,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/HistoryItem"
+                    "$ref": "#/components/schemas/ParentHistoryItem"
                   },
                   "title": "Response List Family History V1 History Families  Family Id  Get",
                   "type": "array"

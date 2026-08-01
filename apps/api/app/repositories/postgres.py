@@ -56,6 +56,7 @@ from app.domain.models import (
     ParentAttemptReview,
     ParentDecision,
     ParentDecisionRequest,
+    ParentHistoryItem,
     ParentReviewItem,
     PrintableAssignment,
     Question,
@@ -214,6 +215,16 @@ def _history_item(row: RowMapping) -> HistoryItem:
     data["awarded_points"] = float(row["awarded_points"])
     data["available_points"] = float(row["available_points"])
     return HistoryItem(**data)
+
+
+def _parent_history_item(row: RowMapping) -> ParentHistoryItem:
+    data = dict(row)
+    source_summary = cast(dict[str, Any], data.pop("source_summary") or {})
+    data["awarded_points"] = float(row["awarded_points"])
+    data["available_points"] = float(row["available_points"])
+    data["source_material_title"] = source_summary.get("source_material_title")
+    data["source_material_subject"] = source_summary.get("source_material_subject")
+    return ParentHistoryItem(**data)
 
 
 class PostgresRepository:
@@ -2643,6 +2654,7 @@ class PostgresRepository:
                       a.child_id,
                       c.nickname as child_nickname,
                       qs.title,
+                      qs.source_summary,
                       a.status,
                       latest_attempt.submitted_at,
                       coalesce(sum(qr.awarded_points), 0) as awarded_points,
@@ -2676,7 +2688,7 @@ class PostgresRepository:
                       )
                     group by
                       a.id, latest_attempt.id, latest_attempt.submitted_at,
-                      c.nickname, qs.title
+                      c.nickname, qs.title, qs.source_summary
                     order by coalesce(latest_attempt.submitted_at, a.assigned_at) desc
                     limit 100
                     """
@@ -2698,7 +2710,7 @@ class PostgresRepository:
         self,
         family_id: str,
         parent_id: str,
-    ) -> list[HistoryItem]:
+    ) -> list[ParentHistoryItem]:
         family_uuid = _uuid(family_id)
         async with self._engine.connect() as connection:
             await self._require_parent(connection, parent_id, family_uuid)
@@ -2706,7 +2718,7 @@ class PostgresRepository:
                 connection,
                 family_id=family_uuid,
             )
-        return [_history_item(row) for row in rows]
+        return [_parent_history_item(row) for row in rows]
 
     async def create_deletion_request(
         self,

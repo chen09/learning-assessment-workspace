@@ -9,7 +9,7 @@ import { LanguageSwitcher } from "@/components/language-switcher";
 import { useLanguage } from "@/components/language-provider";
 import {
   getFamilyHistory,
-  type HistoryItem,
+  type ParentHistoryItem,
   getParentAccessToken,
   stopAssignment,
   withdrawAssignment,
@@ -41,7 +41,7 @@ export default function ParentHistoryPage() {
 
 function ParentHistoryContent() {
   const { t } = useLanguage();
-  const [items, setItems] = useState<HistoryItem[]>([]);
+  const [items, setItems] = useState<ParentHistoryItem[]>([]);
   const [childFilter, setChildFilter] = useState("all");
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [actionAssignmentId, setActionAssignmentId] = useState<string | null>(
@@ -100,7 +100,7 @@ function ParentHistoryContent() {
       : items.filter((item) => item.child_id === childFilter);
 
   const updateAssignmentStatus = async (
-    item: HistoryItem,
+    item: ParentHistoryItem,
     action: "withdraw" | "stop",
   ) => {
     setActionAssignmentId(item.assignment_id);
@@ -193,6 +193,16 @@ function ParentHistoryContent() {
                       : t("history.assigned")}
                   </p>
                   <h2>{item.title}</h2>
+                  {item.source_material_title ? (
+                    <p className="record-source">
+                      {t("parentHistory.sourceMaterial", {
+                        title: item.source_material_title,
+                        subject: item.source_material_subject
+                          ? ` · ${item.source_material_subject}`
+                          : "",
+                      })}
+                    </p>
+                  ) : null}
                   <span>
                     {["results_ready", "correcting", "completed"].includes(
                       item.status,

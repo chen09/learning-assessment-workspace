@@ -10,7 +10,7 @@ from app.api.dependencies import (
     require_parent,
 )
 from app.domain.errors import NotFoundError
-from app.domain.models import ChildSessionClaims, HistoryItem
+from app.domain.models import ChildSessionClaims, HistoryItem, ParentHistoryItem
 
 router = APIRouter(prefix="/v1/history", tags=["history"])
 
@@ -29,12 +29,12 @@ async def list_child_history(
         ) from error
 
 
-@router.get("/families/{family_id}", response_model=list[HistoryItem])
+@router.get("/families/{family_id}", response_model=list[ParentHistoryItem])
 async def list_family_history(
     family_id: UUID,
     repository: Annotated[Repository, Depends(get_repository)],
     parent_id: Annotated[str, Depends(require_parent)],
-) -> list[HistoryItem]:
+) -> list[ParentHistoryItem]:
     try:
         return await repository.list_family_history(
             str(family_id),

@@ -135,6 +135,35 @@ def test_child_history_returns_the_unfinished_attempt_for_resuming() -> None:
     ]
 
 
+def test_parent_history_includes_safe_source_labels_but_child_history_does_not() -> None:
+    client = TestClient(create_app())
+    fixture, child_headers, _work = start_fixture_assignment(client)
+    repository: MemoryRepository = client.app.state.repository
+    question_set_id = fixture["question_set"]["id"]
+    question_set = repository.question_sets[question_set_id]
+    repository.question_sets[question_set_id] = question_set.model_copy(
+        update={
+            "source_summary": {
+                "source_material_title": "Lesson 1 textbook",
+                "source_material_subject": "English",
+            }
+        }
+    )
+
+    parent_history = client.get(
+        f"/v1/history/families/{fixture['family']['id']}",
+        headers=PARENT_HEADERS,
+    )
+    child_history = client.get("/v1/history/child", headers=child_headers)
+
+    assert parent_history.status_code == 200
+    assert parent_history.json()[0]["source_material_title"] == "Lesson 1 textbook"
+    assert parent_history.json()[0]["source_material_subject"] == "English"
+    assert child_history.status_code == 200
+    assert "source_material_title" not in child_history.json()[0]
+    assert "source_material_subject" not in child_history.json()[0]
+
+
 def test_parent_can_withdraw_unstarted_assignment_before_child_can_open_it() -> None:
     client = TestClient(create_app())
     fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
