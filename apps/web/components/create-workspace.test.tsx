@@ -887,6 +887,10 @@ describe("CreateWorkspace", () => {
     fireEvent.change(screen.getByLabelText("Correct word order for question 5"), {
       target: { value: "She\nwalks\nto\nschool." },
     });
+    fireEvent.click(screen.getByRole("button", { name: "Remove question 5" }));
+    expect(
+      screen.queryByLabelText("Correct word order for question 5"),
+    ).not.toBeInTheDocument();
     fireEvent.click(
       screen.getByRole("button", { name: "Confirm and start grading" }),
     );
@@ -909,9 +913,6 @@ describe("CreateWorkspace", () => {
               }),
               expect.objectContaining({
                 answer_key: { choices: [1, 2] },
-              }),
-              expect.objectContaining({
-                answer_key: { tokens: ["She", "walks", "to", "school."] },
               }),
             ],
           }),
@@ -962,18 +963,6 @@ describe("CreateWorkspace", () => {
                 ],
                 page_numbers: [1],
                 transcription: "She walks to school. They walk to school.",
-                legibility: "clear",
-              },
-            },
-            {
-              question_position: 5,
-              kind: "photo",
-              answer: {
-                source_paths: [
-                  "family-1/completed-paper/responses-completed-paper.jpg",
-                ],
-                page_numbers: [1],
-                transcription: "She walks to school.",
                 legibility: "clear",
               },
             },

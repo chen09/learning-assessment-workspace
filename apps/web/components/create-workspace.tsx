@@ -1308,6 +1308,41 @@ function CreateWorkspaceContent() {
     );
   };
 
+  const removeCompletedPaperQuestion = (position: number) => {
+    setCompletedReview((current) => {
+      if (!current || current.document.questions.length <= 1) {
+        return current;
+      }
+      const keptQuestions = current.document.questions.filter(
+        (question) => question.position !== position,
+      );
+      const nextPositionByCurrentPosition = new Map(
+        keptQuestions.map((question, index) => [question.position, index + 1]),
+      );
+      return {
+        ...current,
+        document: {
+          ...current.document,
+          questions: keptQuestions.map((question, index) => ({
+            ...question,
+            position: index + 1,
+          })),
+        },
+        answer_regions: current.answer_regions
+          .filter((region) => region.question_position !== position)
+          .flatMap((region) => {
+            const nextPosition = nextPositionByCurrentPosition.get(
+              region.question_position,
+            );
+            return nextPosition
+              ? [{ ...region, question_position: nextPosition }]
+              : [];
+          })
+          .sort((left, right) => left.question_position - right.question_position),
+      };
+    });
+  };
+
   const updateCompletedPaperAnswerRegion = (
     position: number,
     update: (region: CompletedPaperAnswerRegion) => CompletedPaperAnswerRegion,
@@ -1719,6 +1754,16 @@ function CreateWorkspaceContent() {
                               ) : null}
                             </div>
                           ) : null}
+                          <button
+                            className="text-button completed-paper-remove-question"
+                            disabled={completedReview.document.questions.length <= 1}
+                            onClick={() => removeCompletedPaperQuestion(question.position)}
+                            type="button"
+                          >
+                            {t("completedPaper.removeQuestion", {
+                              position: question.position,
+                            })}
+                          </button>
                         </li>
                       ))}
                     </ol>
