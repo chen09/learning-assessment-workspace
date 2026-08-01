@@ -409,6 +409,49 @@ describe("WorksheetWorkbench", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("restores signed private response-photo previews after reopening work", async () => {
+    const reopenedWork = {
+      ...assignmentWork,
+      responses: [
+        {
+          id: "response-photo-1",
+          question_id: "math-photo",
+          kind: "photo",
+          answer: {
+            paths: [
+              "family-1/attempt-1/first-page.jpg",
+              "family-1/attempt-1/second-page.jpg",
+            ],
+          },
+          photo_urls: [
+            "https://storage.example.test/signed/first-page",
+            "https://storage.example.test/signed/second-page",
+          ],
+          version: 2,
+        },
+      ],
+    };
+    mocks.getAttemptWork.mockResolvedValue(reopenedWork);
+    window.history.replaceState({}, "", "/child/work/?attemptId=attempt-1");
+
+    render(<WorksheetWorkbench />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Go to question 4" }),
+    );
+
+    const uploadedImages = await screen.findByRole("list", {
+      name: "Uploaded answer images",
+    });
+    expect(
+      within(uploadedImages).getAllByRole("img").map((image) => image.getAttribute("src")),
+    ).toEqual([
+      "https://storage.example.test/signed/first-page",
+      "https://storage.example.test/signed/second-page",
+    ]);
+    expect(mocks.getAttemptWork).toHaveBeenCalledWith("attempt-1", "child-token");
+  });
+
   it("restores and resaves an expanded handwriting canvas", async () => {
     mocks.startAssignment.mockResolvedValue({
       ...assignmentWork,

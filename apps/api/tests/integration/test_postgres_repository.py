@@ -297,6 +297,17 @@ async def test_postgres_vertical_flow_and_family_isolation() -> None:
         )
         assert restored_response.answer == {"choices": [0]}
         assert restored_response.version == 1
+        if uploaded_path:
+            restored_photo_response = next(
+                response
+                for response in reopened_work.responses
+                if response.question_id == work.questions[2].id
+            )
+            assert len(restored_photo_response.photo_urls) == 1
+            async with httpx.AsyncClient() as client:
+                preview = await client.get(restored_photo_response.photo_urls[0])
+            assert preview.is_success
+            assert preview.content == b"integration-image"
         with pytest.raises(ResponseVersionConflict):
             await repository.save_response(
                 str(work.attempt.id),

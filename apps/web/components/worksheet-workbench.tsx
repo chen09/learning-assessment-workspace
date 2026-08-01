@@ -322,6 +322,19 @@ function WorksheetWorkbenchContent() {
             ]),
           ),
         );
+        setPhotoPreviewUrls(
+          Object.fromEntries(
+            savedResponses
+              .filter(
+                (response) =>
+                  response.kind === "photo" && (response.photo_urls?.length ?? 0) > 0,
+              )
+              .map((response) => [
+                response.question_id,
+                response.photo_urls ?? [],
+              ]),
+          ),
+        );
         setResponseVersions(
           Object.fromEntries(
             savedResponses.map((response) => [
@@ -903,9 +916,8 @@ function WorksheetWorkbenchContent() {
           return;
         }
         const preview = photoPreviews[index];
-        if (preview) {
+        if (preview && photoObjectUrls.current.delete(preview)) {
           URL.revokeObjectURL(preview);
-          photoObjectUrls.current.delete(preview);
         }
         updatePhotos(
           photoNames.filter((_, photoIndex) => photoIndex !== index),

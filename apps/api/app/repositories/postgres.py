@@ -2200,6 +2200,44 @@ class PostgresRepository:
                     {"attempt_id": _uuid(attempt_id)},
                 )
             ).mappings().all()
+            response_photo_paths: list[str] = []
+            response_photo_prefix = f"{attempt_row['family_id']}/{attempt_row['id']}/"
+            for response_row in response_rows:
+                if response_row["kind"] != "photo":
+                    continue
+                answer = response_row["answer"]
+                raw_paths = answer.get("paths") if isinstance(answer, dict) else None
+                if not isinstance(raw_paths, list):
+                    continue
+                response_photo_paths.extend(
+                    path
+                    for path in raw_paths
+                    if isinstance(path, str) and path.startswith(response_photo_prefix)
+                )
+            valid_response_photo_paths: set[str] = set()
+            if response_photo_paths:
+                valid_response_photo_paths = set(
+                    (
+                        await connection.execute(
+                            text(
+                                """
+                                select object_path
+                                from public.assets
+                                where family_id = :family_id
+                                  and bucket_id = 'responses'
+                                  and deleted_at is null
+                                  and object_path = any(
+                                    cast(:object_paths as text[])
+                                  )
+                                """
+                            ),
+                            {
+                                "family_id": attempt_row["family_id"],
+                                "object_paths": response_photo_paths,
+                            },
+                        )
+                    ).scalars()
+                )
             submitted_question_ids = list(
                 (
                     await connection.execute(
@@ -2215,7 +2253,27 @@ class PostgresRepository:
                     )
                 ).scalars()
             )
+        signed_response_photo_urls = await self._sign_response_photo_urls(
+            sorted(valid_response_photo_paths)
+        )
         questions = [_question(row) for row in question_rows]
+        saved_responses: list[SavedResponse] = []
+        for response_row in response_rows:
+            answer = response_row["answer"]
+            raw_paths = answer.get("paths") if isinstance(answer, dict) else None
+            photo_urls = (
+                [
+                    signed_response_photo_urls[path]
+                    for path in raw_paths
+                    if isinstance(path, str) and path in valid_response_photo_paths
+                    and path in signed_response_photo_urls
+                ]
+                if response_row["kind"] == "photo" and isinstance(raw_paths, list)
+                else []
+            )
+            saved_responses.append(
+                SavedResponse(**dict(response_row), photo_urls=photo_urls)
+            )
         return AssignmentWork(
             title=str(assignment_row["title"]),
             assignment=_assignment(assignment_row),
@@ -2224,7 +2282,7 @@ class PostgresRepository:
                 QuestionView.model_validate(question.model_dump())
                 for question in questions
             ],
-            responses=[SavedResponse(**dict(row)) for row in response_rows],
+            responses=saved_responses,
             submitted_question_ids=submitted_question_ids,
         )
 

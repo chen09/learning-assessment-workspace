@@ -237,6 +237,10 @@ class SavedResponse(BaseModel):
     question_id: UUID
     kind: ResponseKind
     answer: dict[str, Any]
+    # Present only when this response contains private answer photos and the
+    # current viewer is entitled to see them. These short-lived URLs are never
+    # persisted as part of the answer payload.
+    photo_urls: list[str] = Field(default_factory=list)
     version: int = 1
     saved_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 

@@ -76,6 +76,7 @@ export type AssignmentWork = {
     question_id: string;
     kind: "choice" | "text" | "tokens" | "strokes" | "photo";
     answer: Record<string, unknown>;
+    photo_urls: string[];
     version: number;
   }>;
   submitted_question_ids: string[];
