@@ -1773,6 +1773,28 @@
             "title": "Reviews",
             "type": "array"
           },
+          "source_material_subject": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Material Subject"
+          },
+          "source_material_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Material Title"
+          },
           "title": {
             "title": "Title",
             "type": "string"

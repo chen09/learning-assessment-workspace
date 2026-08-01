@@ -1098,6 +1098,12 @@ class MemoryRepository:
             attempt_id=attempt.id,
             child_nickname=child.nickname,
             title=question_set.title,
+            source_material_title=question_set.source_summary.get(
+                "source_material_title"
+            ),
+            source_material_subject=question_set.source_summary.get(
+                "source_material_subject"
+            ),
             complete=len(results) == len(questions),
             awarded_points=awarded_points,
             available_points=sum(question.points for question in questions),

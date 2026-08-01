@@ -838,6 +838,8 @@ export type ParentAttemptReview = {
   attempt_id: string;
   child_nickname: string;
   title: string;
+  source_material_title: string | null;
+  source_material_subject: string | null;
   complete: boolean;
   awarded_points: number;
   available_points: number;

@@ -137,7 +137,7 @@ def test_child_history_returns_the_unfinished_attempt_for_resuming() -> None:
 
 def test_parent_history_includes_safe_source_labels_but_child_history_does_not() -> None:
     client = TestClient(create_app())
-    fixture, child_headers, _work = start_fixture_assignment(client)
+    fixture, child_headers, work = start_fixture_assignment(client)
     repository: MemoryRepository = client.app.state.repository
     question_set_id = fixture["question_set"]["id"]
     question_set = repository.question_sets[question_set_id]
@@ -155,6 +155,10 @@ def test_parent_history_includes_safe_source_labels_but_child_history_does_not()
         headers=PARENT_HEADERS,
     )
     child_history = client.get("/v1/history/child", headers=child_headers)
+    parent_review = client.get(
+        f"/v1/grading-results/attempts/{work['attempt']['id']}",
+        headers=PARENT_HEADERS,
+    )
 
     assert parent_history.status_code == 200
     assert parent_history.json()[0]["source_material_title"] == "Lesson 1 textbook"
@@ -162,6 +166,9 @@ def test_parent_history_includes_safe_source_labels_but_child_history_does_not()
     assert child_history.status_code == 200
     assert "source_material_title" not in child_history.json()[0]
     assert "source_material_subject" not in child_history.json()[0]
+    assert parent_review.status_code == 200
+    assert parent_review.json()["source_material_title"] == "Lesson 1 textbook"
+    assert parent_review.json()["source_material_subject"] == "English"
 
 
 def test_parent_can_withdraw_unstarted_assignment_before_child_can_open_it() -> None:

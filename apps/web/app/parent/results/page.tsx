@@ -310,6 +310,16 @@ function ParentResultsContent() {
           </p>
           <h1>{t("parentResults.title")}</h1>
           <p className="lede">{t("parentResults.description")}</p>
+          {review?.source_material_title ? (
+            <p className="record-source">
+              {t("parentHistory.sourceMaterial", {
+                title: review.source_material_title,
+                subject: review.source_material_subject
+                  ? ` · ${review.source_material_subject}`
+                  : "",
+              })}
+            </p>
+          ) : null}
         </div>
         <LanguageSwitcher />
       </header>

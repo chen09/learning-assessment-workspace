@@ -338,6 +338,8 @@ class ParentAttemptReview(BaseModel):
     attempt_id: UUID
     child_nickname: str
     title: str
+    source_material_title: str | None = None
+    source_material_subject: str | None = None
     complete: bool
     awarded_points: float
     available_points: float

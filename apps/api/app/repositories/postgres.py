@@ -1712,7 +1712,7 @@ class PostgresRepository:
                 text(
                     """
                     select at.family_id, at.assignment_id, at.child_id, c.nickname,
-                           qs.title
+                           qs.title, qs.source_summary
                     from public.attempts at
                     join public.assignments a on a.id = at.assignment_id
                     join public.children c on c.id = at.child_id
@@ -1926,6 +1926,12 @@ class PostgresRepository:
             attempt_id=attempt_uuid,
             child_nickname=attempt_row["nickname"],
             title=attempt_row["title"],
+            source_material_title=cast(
+                dict[str, Any], attempt_row["source_summary"] or {}
+            ).get("source_material_title"),
+            source_material_subject=cast(
+                dict[str, Any], attempt_row["source_summary"] or {}
+            ).get("source_material_subject"),
             complete=bool(result_rows) and graded_count == len(result_rows),
             awarded_points=awarded_points,
             available_points=sum(

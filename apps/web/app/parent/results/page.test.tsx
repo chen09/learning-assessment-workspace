@@ -44,6 +44,8 @@ describe("ParentResultsPage", () => {
       attempt_id: "attempt-1",
       child_nickname: "Alex",
       title: "代数练习",
+      source_material_title: "Lesson 1 textbook",
+      source_material_subject: "English",
       complete: true,
       awarded_points: 1,
       available_points: 4,
@@ -101,6 +103,9 @@ describe("ParentResultsPage", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText("请写出平方差公式的推导过程。"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("基于教材：Lesson 1 textbook · English"),
     ).toBeInTheDocument();
     const handwritingPreview =
       screen.getByLabelText("孩子的手写答案");
