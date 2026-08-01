@@ -65,6 +65,7 @@ export default defineConfig({
         APP_ENV: "test",
         CHILD_SESSION_SECRET: "playwright-local-session-secret-only",
         CORS_ORIGINS: JSON.stringify([webBaseUrl]),
+        LIBRARY_REVIEWER_PARENT_IDS: JSON.stringify(["parent-fixture"]),
         REPOSITORY_BACKEND: "memory",
       },
       reuseExistingServer: false,

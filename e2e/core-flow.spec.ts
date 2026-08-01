@@ -306,6 +306,128 @@ test("parent reassigns a confirmed library set with an exam limit", async ({
   ).toBeVisible();
 });
 
+test("a reviewed public item can be copied without exposing its private answer data", async ({
+  page,
+  request,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "The public-library workflow runs once; its responsive UI has component coverage.",
+  );
+  const apiBaseUrl = "http://127.0.0.1:8017";
+  const parentHeaders = { Authorization: "Bearer parent-fixture" };
+  const fixtureKey = `e2e-public-library-${testInfo.workerIndex}`;
+  const sourceFamily = (await (
+    await request.post(`${apiBaseUrl}/v1/families`, {
+      headers: { ...parentHeaders, "Idempotency-Key": `${fixtureKey}-source-family` },
+      data: { name: "Source family" },
+    })
+  ).json()) as { id: string };
+  const sourceChild = (await (
+    await request.post(`${apiBaseUrl}/v1/families/${sourceFamily.id}/children`, {
+      headers: { ...parentHeaders, "Idempotency-Key": `${fixtureKey}-source-child` },
+      data: {
+        nickname: "Source child",
+        grade_stage: "Junior high 1",
+        ui_language: "en",
+        pin: "123456",
+      },
+    })
+  ).json()) as { id: string };
+  const imported = (await (
+    await request.post(`${apiBaseUrl}/v1/question-sets/imports/structured`, {
+      headers: { ...parentHeaders, "Idempotency-Key": `${fixtureKey}-import` },
+      data: {
+        family_id: sourceFamily.id,
+        child_id: sourceChild.id,
+        source_name: "Public library fixture",
+        assignment_mode: "practice",
+        time_limit_seconds: null,
+        parent_note: null,
+        document: {
+          schema_version: "1.0",
+          question_set: {
+            title: "Anonymous algebra practice",
+            subject: "Mathematics",
+            locale: "en",
+            difficulty: "standard",
+            source_mode: "generate",
+            estimated_minutes: 5,
+            source_summary: { fixture: true },
+          },
+          knowledge_tags: [{ code: "addition", label: "Addition" }],
+          questions: [
+            {
+              position: 1,
+              type: "typed_text",
+              prompt: "What is 2 + 2?",
+              options: [],
+              answer_key: { text: "4" },
+              rubric: { grading_mode: "exact" },
+              points: 1,
+              knowledge_code: "addition",
+            },
+          ],
+        },
+      },
+    })
+  ).json()) as { question_set_id: string };
+  const submission = (await (
+    await request.post(`${apiBaseUrl}/v1/library/submissions`, {
+      headers: { ...parentHeaders, "Idempotency-Key": `${fixtureKey}-submission` },
+      data: {
+        family_id: sourceFamily.id,
+        question_set_id: imported.question_set_id,
+        rights_confirmed: true,
+        privacy_confirmed: true,
+      },
+    })
+  ).json()) as { id: string };
+
+  const approval = await request.post(
+    `${apiBaseUrl}/v1/library/review/submissions/${submission.id}/decision`,
+    {
+      headers: { ...parentHeaders, "Idempotency-Key": `${fixtureKey}-approve` },
+      data: { decision: "approve", note: "Fixture approved." },
+    },
+  );
+  expect(approval.status()).toBe(200);
+
+  const destinationFamily = (await (
+    await request.post(`${apiBaseUrl}/v1/families`, {
+      headers: { ...parentHeaders, "Idempotency-Key": `${fixtureKey}-destination-family` },
+      data: { name: "Destination family" },
+    })
+  ).json()) as { id: string };
+
+  await page.goto("/parent/library/public/");
+  await expect(
+    page.getByRole("heading", { name: "Anonymous algebra practice" }),
+  ).toBeVisible();
+  await expect(page.getByText("Mathematics")).toBeVisible();
+  await expect(page.getByText("1 questions · revision 1")).toBeVisible();
+  await expect(page.getByText("What is 2 + 2?")).toHaveCount(0);
+  await expect(page.getByText("4", { exact: true })).toHaveCount(0);
+
+  await page.getByRole("combobox", { name: "Target family" }).selectOption(destinationFamily.id);
+  const copyResponse = page.waitForResponse(
+    (response) =>
+      /\/v1\/library\/items\/[^/]+\/copies$/.test(response.url()) &&
+      response.request().method() === "POST" &&
+      response.status() === 201,
+  );
+  await page.getByRole("button", { name: "Copy to my family" }).click();
+  await copyResponse;
+  await expect(
+    page.getByText("Copied to Destination family's family library."),
+  ).toBeVisible();
+
+  await page.goto(`/parent/library/?familyId=${encodeURIComponent(destinationFamily.id)}`);
+  await expect(
+    page.getByRole("heading", { name: "Anonymous algebra practice" }),
+  ).toBeVisible();
+});
+
 test("parent previews an AI JSON file before assigning its structured questions", async ({
   page,
   request,
