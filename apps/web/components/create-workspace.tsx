@@ -375,6 +375,8 @@ function CreateWorkspaceContent() {
   const [stage, setStage] = useState<Stage>("compose");
   const [sourceMaterialName, setSourceMaterialName] = useState("");
   const [sourcePromptCopied, setSourcePromptCopied] = useState(false);
+  const [importTitle, setImportTitle] = useState("Imported learning material");
+  const [importSubject, setImportSubject] = useState("Mixed practice");
   const [fileName, setFileName] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [completedDocumentLanguage, setCompletedDocumentLanguage] = useState<
@@ -914,10 +916,17 @@ function CreateWorkspaceContent() {
           title:
             mode === "generate"
               ? prompt.slice(0, 160)
+              : mode === "import"
+                ? importTitle.trim() || "Imported learning material"
+                : isLessonOneImport
+                  ? "Lesson 1 同レベル変形練習"
+                  : "Imported learning material",
+          subject:
+            mode === "import"
+              ? importSubject.trim() || "Mixed practice"
               : isLessonOneImport
-                ? "Lesson 1 同レベル変形練習"
-                : "Imported learning material",
-          subject: isLessonOneImport ? "English" : "Mixed practice",
+                ? "English"
+                : "Mixed practice",
         },
         parentToken,
         `import-${importObjectId}`,
@@ -2457,6 +2466,24 @@ function CreateWorkspaceContent() {
                   </span>
                 </label>
               </fieldset>
+              <div className="assignment-target-fields source-material-metadata">
+                <label>
+                  Source title
+                  <input
+                    aria-label="Source title"
+                    onChange={(event) => setImportTitle(event.target.value)}
+                    value={importTitle}
+                  />
+                </label>
+                <label>
+                  Source subject
+                  <input
+                    aria-label="Source subject"
+                    onChange={(event) => setImportSubject(event.target.value)}
+                    value={importSubject}
+                  />
+                </label>
+              </div>
               <label className="drop-zone">
                 <input
                   accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"

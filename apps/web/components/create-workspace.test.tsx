@@ -151,7 +151,25 @@ describe("CreateWorkspace", () => {
       screen.getByRole("button", { name: "Create review draft" }),
     ).toBeEnabled();
 
+    fireEvent.change(screen.getByLabelText("Source title"), {
+      target: { value: "Lesson 3 grammar reference" },
+    });
+    fireEvent.change(screen.getByLabelText("Source subject"), {
+      target: { value: "English" },
+    });
+
     fireEvent.click(screen.getByRole("button", { name: "Create review draft" }));
+
+    await waitFor(() => {
+      expect(mocks.createQuestionSetImport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Lesson 3 grammar reference",
+          subject: "English",
+        }),
+        "parent-token",
+        expect.any(String),
+      );
+    });
 
     expect(
       await screen.findByRole("heading", { name: "Source material saved privately" }),
