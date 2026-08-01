@@ -262,7 +262,9 @@ test("temporary parent completes the hosted family learning flow", async ({
     expect(completedPaper.attempt_id).toBeNull();
     expect(["processing", "needs_review"]).toContain(completedPaper.status);
     await expect(
-      page.getByText("Paper upload is safe and not yet assigned"),
+      page
+        .getByText("Paper upload is safe and not yet assigned")
+        .or(page.getByText("Your paper is being prepared")),
     ).toBeVisible();
     const { data: preConfirmationAssignments, error: preConfirmationError } =
       await supabaseAdmin
@@ -530,6 +532,31 @@ test("temporary parent completes the hosted family learning flow", async ({
       `${supabaseUrl}/storage/v1/object/responses/${uploadIntent.path}`,
     );
     expect(anonymousPhotoResponse.ok()).toBeFalsy();
+
+    const restoredPhotoWork = page.waitForResponse(
+      (response) =>
+        /\/v1\/attempts\/[^/]+\/work$/.test(response.url()) &&
+        response.request().method() === "GET" &&
+        response.status() === 200,
+      { timeout: 15_000 },
+    );
+    await page.reload();
+    await restoredPhotoWork;
+    await page.getByRole("button", { name: "Go to question 4" }).click();
+    const restoredPhotoName = uploadIntent.path.split("/").at(-1)!;
+    const restoredChildPhoto = page.getByRole("img", {
+      name: `Preview: ${restoredPhotoName}`,
+    });
+    await expect(restoredChildPhoto).toBeVisible();
+    await expect
+      .poll(
+        () =>
+          restoredChildPhoto.evaluate(
+            (image) => (image as HTMLImageElement).naturalWidth,
+          ),
+        { message: "The child should see their private answer photo after reopening work." },
+      )
+      .toBeGreaterThan(0);
 
     await page.getByRole("button", { name: "Submit all answers" }).click();
     await page
