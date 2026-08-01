@@ -777,6 +777,16 @@ async def test_public_library_copy_keeps_answers_private_and_creates_a_standalon
     finally:
         await repository.close()
         await connection.execute(
+            """
+            delete from public.library_items
+            where submission_id in (
+              select id from public.library_submissions
+              where family_id = any($1::uuid[])
+            )
+            """,
+            [source_family_id, destination_family_id],
+        )
+        await connection.execute(
             "delete from public.families where id = any($1::uuid[])",
             [source_family_id, destination_family_id],
         )

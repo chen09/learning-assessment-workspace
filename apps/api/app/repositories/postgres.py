@@ -3743,7 +3743,6 @@ class PostgresRepository:
                         where li.id = :library_item_id
                           and li.published_at is not null
                           and li.unpublished_at is null
-                        for update of li
                         """
                     ),
                     {"library_item_id": item_id},
