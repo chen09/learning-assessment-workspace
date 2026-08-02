@@ -83,9 +83,7 @@ test("authenticated parent legacy link is cleaned and remains responsive in all 
   await expect(
     page.getByRole("heading", { name: "Set up your family workspace" }),
   ).toBeVisible();
-  // The accessible label follows the persisted UI language, so it may already
-  // be Japanese or Chinese when this shared browser context reaches history.
-  await page.locator(".language-picker select").selectOption("zh");
+  await page.getByLabel("Language").selectOption("zh");
 
   await page.getByRole("link", { name: "进入家庭设置" }).click();
   await expect(page.getByText("家庭学习空间", { exact: true })).toBeVisible();
@@ -931,7 +929,9 @@ test("parent collects several manual questions into one assigned practice", asyn
   await expect(
     page.getByRole("heading", { name: "Two question check" }),
   ).toBeVisible();
-  await page.getByLabel("Language").selectOption("zh");
+  // The accessible label follows the persisted UI language, so it may already
+  // be Japanese or Chinese when this shared browser context reaches history.
+  await page.locator(".language-picker select").selectOption("zh");
   await expect(page.getByRole("heading", { name: "学习记录" })).toBeVisible();
   await page.getByRole("button", { name: "结束练习" }).click();
   await expect(page.getByText("已结束", { exact: true })).toBeVisible();
