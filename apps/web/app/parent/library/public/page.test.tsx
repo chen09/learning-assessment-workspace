@@ -68,4 +68,31 @@ describe("PublicLibraryPage", () => {
     expect(await screen.findByText("Copied to 肉肉如意's family library."))
       .toBeInTheDocument();
   });
+
+  it("retries loading the public library without retaining stale items", async () => {
+    mocks.getPublicLibraryItems
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce([
+        {
+          id: "library-retry",
+          title: "Retryable practice",
+          subject: "English",
+          question_count: 8,
+          revision: 2,
+          published_at: "2026-08-02T00:00:00Z",
+        },
+      ]);
+
+    render(<PublicLibraryPage />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The public library could not be loaded.",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Retryable practice" }),
+    ).toBeInTheDocument();
+  });
 });

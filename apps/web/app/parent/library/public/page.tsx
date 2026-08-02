@@ -2,7 +2,7 @@
 
 import { BookOpenCheck, Copy, Search } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { LanguageSwitcher } from "@/components/language-switcher";
@@ -26,6 +26,7 @@ const copy = {
     search: "Topic or subject…",
     empty: "No published question sets yet.",
     error: "The public library could not be loaded.",
+    retry: "Try again",
     questions: (count: number, revision: number) =>
       `${count} questions · revision ${revision}`,
     copy: "Copy to my family",
@@ -45,6 +46,7 @@ const copy = {
     search: "単元・教科…",
     empty: "公開済みの問題セットはまだありません。",
     error: "公開問題ライブラリを読み込めませんでした。",
+    retry: "もう一度試す",
     questions: (count: number, revision: number) => `${count}問 · 版 ${revision}`,
     copy: "自分の家族にコピー",
     copying: "コピー中…",
@@ -62,6 +64,7 @@ const copy = {
     search: "知识点或学科…",
     empty: "还没有已发布的题单。",
     error: "无法加载公共题库。",
+    retry: "重试",
     questions: (count: number, revision: number) => `${count} 道题 · 版本 ${revision}`,
     copy: "复制到我的家庭",
     copying: "正在复制…",
@@ -91,31 +94,43 @@ export default function PublicLibraryPage() {
   const [copyingId, setCopyingId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const latestLoadRequest = useRef(0);
+
+  const loadPublicLibrary = useCallback(async () => {
+    const request = latestLoadRequest.current + 1;
+    latestLoadRequest.current = request;
+    setLoadError(false);
+    setFamilies([]);
+    setItems([]);
+    setSelectedFamilyId("");
+    try {
+      const token = await getParentAccessToken();
+      if (!token) {
+        throw new Error("missing parent session");
+      }
+      const [nextFamilies, nextItems] = await Promise.all([
+        getFamilies(token),
+        getPublicLibraryItems(token),
+      ]);
+      if (latestLoadRequest.current !== request) return;
+      setFamilies(nextFamilies);
+      setSelectedFamilyId(nextFamilies[0]?.id ?? "");
+      setItems(nextItems);
+    } catch {
+      if (latestLoadRequest.current !== request) return;
+      setLoadError(true);
+    }
+  }, []);
 
   useEffect(() => {
-    let active = true;
-    void (async () => {
-      try {
-        const token = await getParentAccessToken();
-        if (!token) {
-          throw new Error("missing parent session");
-        }
-        const [nextFamilies, nextItems] = await Promise.all([
-          getFamilies(token),
-          getPublicLibraryItems(token),
-        ]);
-        if (!active) return;
-        setFamilies(nextFamilies);
-        setSelectedFamilyId(nextFamilies[0]?.id ?? "");
-        setItems(nextItems);
-      } catch {
-        if (active) setLoadError(true);
-      }
-    })();
+    const initialLoad = window.setTimeout(() => {
+      void loadPublicLibrary();
+    }, 0);
     return () => {
-      active = false;
+      latestLoadRequest.current += 1;
+      window.clearTimeout(initialLoad);
     };
-  }, []);
+  }, [loadPublicLibrary]);
 
   const visibleItems = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();
@@ -193,9 +208,20 @@ export default function PublicLibraryPage() {
             aria-label={text.searchLabel}
           />
         </label>
-        {loadError ? <p role="alert">{text.error}</p> : null}
+        {loadError ? (
+          <div className="form-error" role="alert">
+            <p>{text.error}</p>
+            <button
+              className="button ghost"
+              onClick={() => void loadPublicLibrary()}
+              type="button"
+            >
+              {text.retry}
+            </button>
+          </div>
+        ) : null}
         {message ? <p role="status">{message}</p> : null}
-        {families.length === 0 ? <p>{text.noFamilies}</p> : null}
+        {!loadError && families.length === 0 ? <p>{text.noFamilies}</p> : null}
         <section className="library-grid" aria-label={text.title}>
           {visibleItems.map((item) => (
             <article className="library-card" key={item.id}>
