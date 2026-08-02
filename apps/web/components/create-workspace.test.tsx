@@ -1383,6 +1383,28 @@ describe("CreateWorkspace", () => {
     ).toHaveAttribute("href", "/parent/results?attemptId=attempt-1");
   });
 
+  it("shows the complete manual authoring flow in the parent's selected language", async () => {
+    window.localStorage.setItem("luma-language:demo-parent", "zh");
+
+    render(<CreateWorkspace />);
+
+    await screen.findByRole("combobox", { name: "孩子" });
+    fireEvent.click(screen.getByRole("button", { name: "手工创建题单" }));
+
+    expect(
+      screen.getByRole("heading", { name: "创建结构化题单" }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("练习名称")).toBeInTheDocument();
+    expect(screen.getByLabelText("题目语言")).toBeInTheDocument();
+    expect(screen.getByLabelText("作答方式")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "添加题目" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "创建审核草稿" }),
+    ).toBeInTheDocument();
+  });
+
   it("translates the completed-paper entry in the parent's selected language", async () => {
     window.localStorage.setItem("luma-language:demo-parent", "zh");
 

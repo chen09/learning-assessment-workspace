@@ -2503,20 +2503,20 @@ function CreateWorkspaceContent() {
       </section>
 
       <div className="create-layout">
-        <nav className="creation-tabs" aria-label="Question set source">
+        <nav className="creation-tabs" aria-label={t("creation.source")}>
           <button
             className={mode === "generate" ? "active" : ""}
             onClick={() => setMode("generate")}
             type="button"
           >
-            <Sparkles /> Generate with AI
+            <Sparkles /> {t("creation.tab.generate")}
           </button>
           <button
             className={mode === "import" ? "active" : ""}
             onClick={() => setMode("import")}
             type="button"
           >
-            <Camera /> Import material
+            <Camera /> {t("creation.tab.import")}
           </button>
           <button
             className={mode === "completed" ? "active" : ""}
@@ -2530,14 +2530,14 @@ function CreateWorkspaceContent() {
             onClick={() => setMode("structured")}
             type="button"
           >
-            <FileJson2 /> Import AI question JSON
+            <FileJson2 /> {t("creation.tab.structured")}
           </button>
           <button
             className={mode === "manual" ? "active" : ""}
             onClick={() => setMode("manual")}
             type="button"
           >
-            <BookOpenText /> Start simple
+            <BookOpenText /> {t("creation.tab.manual")}
           </button>
         </nav>
 
@@ -2861,48 +2861,45 @@ function CreateWorkspaceContent() {
               <div className="creation-heading">
                 <span><BookOpenText /></span>
                 <div>
-                  <h2>Build a structured question set</h2>
-                  <p>
-                    Add one or more questions, review them privately, then
-                    assign the whole set to your child.
-                  </p>
+                  <h2>{t("manual.heading")}</h2>
+                  <p>{t("manual.description")}</p>
                 </div>
               </div>
               <label className="field-label">
-                Practice title
+                {t("manual.title")}
                 <input
-                  aria-label="Practice title"
+                  aria-label={t("manual.title")}
                   onChange={(event) => setManualTitle(event.target.value)}
                   value={manualTitle}
                 />
               </label>
               <div className="creation-options">
                 <label>
-                  Subject
+                  {t("manual.subject")}
                   <input
-                    aria-label="Manual subject"
+                    aria-label={t("manual.subject")}
                     onChange={(event) => setManualSubject(event.target.value)}
                     value={manualSubject}
                   />
                 </label>
                 <label>
-                  Language
+                  {t("manual.language")}
                   <select
-                    aria-label="Question language"
+                    aria-label={t("manual.language")}
                     onChange={(event) =>
                       setManualLocale(event.target.value as "zh" | "ja" | "en")
                     }
                     value={manualLocale}
                   >
-                    <option value="en">English</option>
-                    <option value="ja">日本語</option>
-                    <option value="zh">中文</option>
+                    <option value="en">{t("language.option.en")}</option>
+                    <option value="ja">{t("language.option.ja")}</option>
+                    <option value="zh">{t("language.option.zh")}</option>
                   </select>
                 </label>
                 <label>
-                  Response type
+                  {t("manual.responseType")}
                   <select
-                    aria-label="Response type"
+                    aria-label={t("manual.responseType")}
                     onChange={(event) =>
                       setManualQuestionType(
                         event.target.value as ManualQuestionType,
@@ -2910,54 +2907,54 @@ function CreateWorkspaceContent() {
                     }
                     value={manualQuestionType}
                   >
-                    <option value="typed_text">Text answer</option>
-                    <option value="single_choice">Choose one answer</option>
-                    <option value="handwriting">Handwritten answer</option>
+                    <option value="typed_text">{t("manual.type.typed")}</option>
+                    <option value="single_choice">{t("manual.type.choice")}</option>
+                    <option value="handwriting">{t("manual.type.handwriting")}</option>
                   </select>
                 </label>
               </div>
               <label className="field-label">
-                Question
+                {t("manual.question")}
                 <textarea
-                  aria-label="Question"
+                  aria-label={t("manual.question")}
                   onChange={(event) => setManualQuestionPrompt(event.target.value)}
-                  placeholder="Write the question children will see…"
+                  placeholder={t("manual.questionPlaceholder")}
                   rows={4}
                   value={manualQuestionPrompt}
                 />
               </label>
               {manualQuestionType === "single_choice" ? (
                 <label className="field-label">
-                  Choices, one per line
+                  {t("manual.choices")}
                   <textarea
-                    aria-label="Choices, one per line"
+                    aria-label={t("manual.choices")}
                     onChange={(event) => setManualOptions(event.target.value)}
-                    placeholder={"Option A\nOption B\nOption C"}
+                    placeholder={t("manual.choicesPlaceholder")}
                     rows={4}
                     value={manualOptions}
                   />
                 </label>
               ) : null}
               <label className="field-label">
-                Answer or grading guide
+                {t("manual.answerGuide")}
                 <textarea
-                  aria-label="Answer or grading guide"
+                  aria-label={t("manual.answerGuide")}
                   onChange={(event) => setManualAnswer(event.target.value)}
                   placeholder={
                     manualQuestionType === "handwriting"
-                      ? "A private reference answer for parent review…"
+                      ? t("manual.handwritingPlaceholder")
                       : manualQuestionType === "single_choice"
-                        ? "Paste one option exactly as written above…"
-                        : "The exact answer children should enter…"
+                        ? t("manual.choicePlaceholder")
+                        : t("manual.typedPlaceholder")
                   }
                   rows={3}
                   value={manualAnswer}
                 />
               </label>
               <label className="field-label manual-points-field">
-                Points
+                {t("manual.points")}
                 <input
-                  aria-label="Points"
+                  aria-label={t("manual.points")}
                   min="0.5"
                   onChange={(event) => setManualPoints(event.target.value)}
                   step="0.5"
@@ -2972,29 +2969,34 @@ function CreateWorkspaceContent() {
                   onClick={addManualQuestion}
                   type="button"
                 >
-                  Add question
+                  {t("manual.addQuestion")}
                 </button>
                 <p>
-                  Add each question to this set, then open one review draft for
-                  all of them.
+                  {t("manual.queueHelp")}
                 </p>
               </div>
               {manualDraftQuestions.length > 0 ? (
-                <ol className="manual-question-queue" aria-label="Questions ready for review">
+                <ol className="manual-question-queue" aria-label={t("manual.queueLabel")}>
                   {manualDraftQuestions.map((question, index) => (
                     <li key={question.id}>
                       <div>
-                        <strong>Question {index + 1} ready</strong>
-                        <span>{question.type.replaceAll("_", " ")} · {question.points} point{question.points === 1 ? "" : "s"}</span>
+                        <strong>{t("manual.questionReady", { number: index + 1 })}</strong>
+                        <span>
+                          {question.type === "typed_text"
+                            ? t("manual.type.typed")
+                            : question.type === "single_choice"
+                              ? t("manual.type.choice")
+                              : t("manual.type.handwriting")} · {t("manual.pointsSummary", { count: question.points })}
+                        </span>
                         <p>{question.prompt}</p>
                       </div>
                       <button
-                        aria-label={`Remove queued question ${index + 1}`}
+                        aria-label={t("manual.removeQueuedQuestion", { number: index + 1 })}
                         className="quiet-link draft-question-remove"
                         onClick={() => removeManualDraftQuestion(question.id)}
                         type="button"
                       >
-                        Remove
+                        {t("manual.remove")}
                       </button>
                     </li>
                   ))}
@@ -3006,24 +3008,24 @@ function CreateWorkspaceContent() {
           {mode !== "structured" && mode !== "completed" ? (
             <div className="creation-options">
               <label>
-                Subject
+                {t("creation.options.subject")}
                 <select defaultValue="mixed">
-                  <option value="mixed">English + mathematics</option>
-                  <option value="english">English</option>
-                  <option value="math">Mathematics</option>
+                  <option value="mixed">{t("creation.options.mixed")}</option>
+                  <option value="english">{t("creation.options.english")}</option>
+                  <option value="math">{t("creation.options.mathematics")}</option>
                 </select>
               </label>
               <label>
-                Difficulty
+                {t("creation.options.difficulty")}
                 <select defaultValue="adaptive">
-                  <option value="adaptive">Match Alex</option>
-                  <option value="foundation">Foundation</option>
-                  <option value="standard">Standard</option>
-                  <option value="challenge">Challenge</option>
+                  <option value="adaptive">{t("creation.options.adaptive")}</option>
+                  <option value="foundation">{t("creation.options.foundation")}</option>
+                  <option value="standard">{t("creation.options.standard")}</option>
+                  <option value="challenge">{t("creation.options.challenge")}</option>
                 </select>
               </label>
               <label>
-                Questions
+                {t("creation.options.questions")}
                 <select defaultValue="8">
                   <option>5</option>
                   <option>8</option>
@@ -3036,7 +3038,7 @@ function CreateWorkspaceContent() {
             <label className="toggle-row">
               <input type="checkbox" />
               <Headphones size={18} />
-              Include listening when the source calls for it
+              {t("creation.options.listening")}
             </label>
           ) : null}
           <button
@@ -3046,12 +3048,12 @@ function CreateWorkspaceContent() {
             type="button"
           >
             {requestStatus === "working"
-              ? "Preparing draft…"
+              ? t("creation.preparingDraft")
               : mode === "structured"
                 ? t("structuredImport.preview")
                 : mode === "completed"
                   ? "Upload for review"
-                  : "Create review draft"}
+                  : t("creation.createReviewDraft")}
           </button>
           {requestStatus === "error" ? (
             <p className="form-error" role="alert">
