@@ -1157,6 +1157,68 @@ describe("CreateWorkspace", () => {
     );
   });
 
+  it("typesets a mathematical prompt while a parent reviews an AI JSON draft", async () => {
+    const structuredDocument = {
+      schema_version: "1.0",
+      question_set: {
+        title: "Algebra practice",
+        subject: "Mathematics",
+        locale: "en",
+        difficulty: "standard",
+        source_mode: "similar",
+        estimated_minutes: 10,
+        source_summary: { unit: "Factorisation" },
+      },
+      knowledge_tags: [{ code: "difference-of-squares", label: "Difference of squares" }],
+      questions: [
+        {
+          position: 1,
+          type: "typed_text",
+          prompt: "Factorise \\(x^2 - 25\\).",
+          options: [],
+          answer_key: { text: "(x - 5)(x + 5)" },
+          rubric: { grading_mode: "exact" },
+          points: 1,
+          knowledge_code: "difference-of-squares",
+        },
+      ],
+    };
+    mocks.previewStructuredQuestionSet.mockResolvedValue({
+      title: "Algebra practice",
+      subject: "Mathematics",
+      locale: "en",
+      question_count: 1,
+      total_points: 1,
+      estimated_minutes: 10,
+      knowledge_tag_count: 1,
+      answer_keys_present: true,
+      checksum: "formula-preview-checksum",
+      source_summary: { unit: "Factorisation" },
+      questions: structuredDocument.questions,
+    });
+
+    render(<CreateWorkspace />);
+
+    await screen.findByRole("combobox", { name: "Child" });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Import AI question JSON" }),
+    );
+    fireEvent.change(screen.getByLabelText("AI question JSON"), {
+      target: {
+        files: [
+          new File([JSON.stringify(structuredDocument)], "algebra.json", {
+            type: "application/json",
+          }),
+        ],
+      },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Preview questions" }));
+
+    await waitFor(() => {
+      expect(document.querySelector(".draft-question-list .katex")).toBeInTheDocument();
+    });
+  });
+
   it("links a later AI JSON import back to an existing private source material", async () => {
     const document = {
       schema_version: "1.0",

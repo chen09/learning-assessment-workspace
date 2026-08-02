@@ -1043,7 +1043,10 @@ test("parent previews an AI JSON file before assigning its structured questions"
     page.getByRole("heading", { name: "Review before assigning" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Factorise \\(x^2 - 16\\)." }),
+    page.locator(".draft-question-list h2").first(),
+  ).toBeVisible();
+  await expect(
+    page.locator(".draft-question-list h2").first().locator(".katex"),
   ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Remove this extra extraction." }),
@@ -1051,7 +1054,7 @@ test("parent previews an AI JSON file before assigning its structured questions"
 
   await page.getByRole("button", { name: "Duplicate question 1" }).click();
   await expect(
-    page.getByRole("heading", { name: "Factorise \\(x^2 - 16\\). (copy)" }),
+    page.locator(".draft-question-list h2").filter({ hasText: "(copy)" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Move question 3 up" }).click();
   await page.getByRole("button", { name: "Remove question 2" }).click();

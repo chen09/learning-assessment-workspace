@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { useLanguage } from "@/components/language-provider";
+import { MathText } from "@/components/math-text";
 import {
   completeReview,
   getChildAccessToken,
@@ -310,7 +311,9 @@ function ChildReviewContent() {
                 <span className="question-type">
                   {t(`review.level.${review.level}`)}
                 </span>
-                <h2>{review.prompt}</h2>
+                <h2>
+                  <MathText>{review.prompt}</MathText>
+                </h2>
                 {completed[review.id] ? (
                   <p className="form-notice">
                     {completed[review.id].outcome === "correct"

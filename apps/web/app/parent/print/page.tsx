@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { LanguageProvider, useLanguage } from "@/components/language-provider";
+import { MathText } from "@/components/math-text";
 import {
   type ApiQuestion,
   getParentAccessToken,
@@ -232,7 +233,9 @@ function PrintWorksheetContent() {
               >
                 <span>{question.position}</span>
                 <div>
-                  <h2>{question.prompt}</h2>
+                  <h2>
+                    <MathText>{question.prompt}</MathText>
+                  </h2>
                   {question.options?.map((option, index) => (
                     <p key={option}>
                       ○ {String.fromCharCode(65 + index)} &nbsp; {option}

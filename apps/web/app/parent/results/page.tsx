@@ -21,6 +21,7 @@ import {
 import { AppShell } from "@/components/app-shell";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { useLanguage } from "@/components/language-provider";
+import { MathText } from "@/components/math-text";
 import {
   decideParentReview,
   getParentAccessToken,
@@ -601,7 +602,9 @@ function ParentResultsContent() {
                             type: typeLabel,
                           })}
                         </p>
-                        <h2>{item.question_prompt}</h2>
+                        <h2>
+                          <MathText>{item.question_prompt}</MathText>
+                        </h2>
                       </div>
                     </header>
                     {item.response_kind === "photo" ? (

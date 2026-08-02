@@ -107,6 +107,29 @@ describe("ChildReviewPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("typesets an imported LaTeX review prompt", async () => {
+    getTodayReviews.mockResolvedValue([
+      {
+        id: "review-formula",
+        source_question_id: "question-formula",
+        prompt: "Factorise \\(x^2 - 25\\).",
+        type: "typed_text",
+        options: null,
+        answer_mode: "text",
+        due_on: "2026-07-29",
+        interval_days: 1,
+        level: "standard",
+      },
+    ]);
+
+    render(<ChildReviewPage />);
+
+    await screen.findByText("今日の復習");
+    await waitFor(() => {
+      expect(document.querySelector(".draft-question-list .katex")).toBeInTheDocument();
+    });
+  });
+
   it("postpones every visible review for today without changing its interval", async () => {
     render(<ChildReviewPage />);
 

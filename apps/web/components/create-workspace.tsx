@@ -19,6 +19,7 @@ import { AppShell } from "@/components/app-shell";
 import { CopyChildSignInLink } from "@/components/copy-child-sign-in-link";
 import { useLanguage } from "@/components/language-provider";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { MathText } from "@/components/math-text";
 import {
   type ApiQuestion,
   type ChildProfile,
@@ -3152,7 +3153,9 @@ function CreateWorkspaceContent() {
                     <span className="question-type">
                       {question.type.replaceAll("_", " ")}
                     </span>
-                    <h2>{question.prompt}</h2>
+                    <h2>
+                      <MathText>{question.prompt}</MathText>
+                    </h2>
                     <details>
                       <summary>{t("draftReview.answerGuide")}</summary>
                       <p>
@@ -3972,7 +3975,9 @@ function CreateWorkspaceContent() {
                                 ? t("manual.type.handwriting")
                                 : t("manual.type.photo")} · {t("manual.pointsSummary", { count: question.points })}
                         </span>
-                        <p>{question.prompt}</p>
+                        <p>
+                          <MathText>{question.prompt}</MathText>
+                        </p>
                       </div>
                       <button
                         aria-label={t("manual.removeQueuedQuestion", { number: index + 1 })}

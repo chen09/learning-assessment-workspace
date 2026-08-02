@@ -134,6 +134,23 @@ describe("ParentResultsPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("typesets imported LaTeX prompts in a parent review", async () => {
+    mocks.getParentAttemptReview.mockResolvedValue({
+      ...(await mocks.getParentAttemptReview()),
+      reviews: [
+        {
+          ...(await mocks.getParentAttemptReview()).reviews[0],
+          question_prompt: "Factorise \\(x^2 - 25\\).",
+        },
+      ],
+    });
+
+    render(<ParentResultsPage />);
+
+    await screen.findByRole("heading", { name: "确认作答结果" });
+    expect(document.querySelector(".parent-review-card .katex")).toBeInTheDocument();
+  });
+
   it("sends an optional child-visible note with a parent correction decision", async () => {
     render(<ParentResultsPage />);
 

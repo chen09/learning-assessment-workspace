@@ -62,7 +62,7 @@ describe("ChildHomePage", () => {
     expect(await screen.findByText("1 份练习，0 道复习题。")).toBeInTheDocument();
     expect(screen.getByText("练习模式")).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Algebra & English warm-up" }),
+      await screen.findByRole("heading", { name: "Algebra & English warm-up" }),
     ).toBeInTheDocument();
     expect(screen.getByText("3 道题")).toBeInTheDocument();
     expect(screen.getByText("不限时")).toBeInTheDocument();
@@ -133,7 +133,7 @@ describe("ChildHomePage", () => {
       expect(mocks.getChildAssignments).toHaveBeenCalledTimes(2);
     });
     expect(
-      screen.getByRole("heading", { name: "Algebra & English warm-up" }),
+      await screen.findByRole("heading", { name: "Algebra & English warm-up" }),
     ).toBeInTheDocument();
   });
 
@@ -174,7 +174,7 @@ describe("ChildHomePage", () => {
       expect(mocks.getChildAssignments).toHaveBeenCalledTimes(2);
     });
     expect(
-      screen.getByRole("heading", { name: "Algebra & English warm-up" }),
+      await screen.findByRole("heading", { name: "Algebra & English warm-up" }),
     ).toBeInTheDocument();
   });
 

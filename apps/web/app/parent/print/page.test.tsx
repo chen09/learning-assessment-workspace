@@ -183,4 +183,33 @@ describe("PrintWorksheetPage", () => {
     expect(screen.getByText(/题单 assignment-1 · 第 1 \/ 1 页/)).toBeInTheDocument();
     expect(screen.getByText("姓名: ____________________")).toBeInTheDocument();
   });
+
+  it("typesets imported LaTeX prompts on the printable worksheet", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/parent/print/?assignmentId=assignment-1",
+    );
+    mocks.getPrintableAssignment.mockResolvedValue({
+      assignment: { id: "assignment-1" },
+      title: "Algebra practice",
+      template_version: "a4-v1",
+      questions: [
+        {
+          id: "question-1",
+          position: 1,
+          type: "typed_text" as const,
+          prompt: "Factorise \\(x^2 - 25\\).",
+          options: null,
+          points: 1,
+        },
+      ],
+    });
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(document.querySelector(".paper-question .katex")).toBeInTheDocument();
+    });
+  });
 });
