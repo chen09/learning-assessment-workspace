@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowRight, CalendarDays, Sparkles } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { useLanguage } from "@/components/language-provider";
@@ -53,36 +53,52 @@ function ChildReviewContent() {
   const [loading, setLoading] = useState(true);
   const [skipping, setSkipping] = useState(false);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const latestReviewRequest = useRef(0);
 
-  useEffect(() => {
-    let active = true;
+  const refreshReviews = useCallback(async () => {
+    const request = latestReviewRequest.current + 1;
+    latestReviewRequest.current = request;
     const childToken = getChildAccessToken();
     if (!childToken) {
-      queueMicrotask(() => {
-        if (active) {
-          setLoading(false);
-        }
-      });
-      return () => {
-        active = false;
-      };
+      if (latestReviewRequest.current !== request) {
+        return;
+      }
+      setReviews([]);
+      setLoading(false);
+      return;
     }
-    void getTodayReviews(childToken)
-      .then((nextReviews) => {
-        if (active) {
-          setReviews(nextReviews);
-        }
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        if (active) {
-          setLoading(false);
-        }
-      });
-    return () => {
-      active = false;
-    };
+    try {
+      const nextReviews = await getTodayReviews(childToken);
+      if (latestReviewRequest.current !== request) {
+        return;
+      }
+      setReviews(nextReviews);
+    } catch {
+      if (latestReviewRequest.current !== request) {
+        return;
+      }
+      setReviews([]);
+    } finally {
+      if (latestReviewRequest.current === request) {
+        setLoading(false);
+      }
+    }
   }, []);
+
+  useEffect(() => {
+    const initialRefresh = window.setTimeout(() => {
+      void refreshReviews();
+    }, 0);
+    const refreshWhenReturning = () => {
+      void refreshReviews();
+    };
+    window.addEventListener("focus", refreshWhenReturning);
+    return () => {
+      latestReviewRequest.current += 1;
+      window.clearTimeout(initialRefresh);
+      window.removeEventListener("focus", refreshWhenReturning);
+    };
+  }, [refreshReviews]);
 
   const updateAnswer = (reviewId: string, answer: ReviewAnswer) => {
     setAnswers((current) => ({ ...current, [reviewId]: answer }));
