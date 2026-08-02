@@ -503,6 +503,11 @@ function CreateWorkspaceContent() {
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(
     null,
   );
+  const [assignmentTargetLoadState, setAssignmentTargetLoadState] = useState<
+    "loading" | "ready" | "error"
+  >("loading");
+  const [assignmentTargetLoadRequest, setAssignmentTargetLoadRequest] =
+    useState(0);
   const [editedQuestionPrompt, setEditedQuestionPrompt] = useState("");
   const [editedQuestionPoints, setEditedQuestionPoints] = useState("1");
   const [editedQuestionType, setEditedQuestionType] =
@@ -576,17 +581,31 @@ function CreateWorkspaceContent() {
           setSelectedFamilyId(selectedFamily?.id ?? "");
           setChildren(loadedChildren);
           setSelectedChildId(selectedChild?.id ?? "");
+          setAssignmentTargetLoadState("ready");
         }
       } catch {
         if (active) {
-          setRequestStatus("error");
+          setFamilies([]);
+          setSelectedFamilyId("");
+          setChildren([]);
+          setSelectedChildId("");
+          setAssignmentTargetLoadState("error");
         }
       }
     });
     return () => {
       active = false;
     };
-  }, []);
+  }, [assignmentTargetLoadRequest]);
+
+  const retryAssignmentTargetLoad = () => {
+    setFamilies([]);
+    setSelectedFamilyId("");
+    setChildren([]);
+    setSelectedChildId("");
+    setAssignmentTargetLoadState("loading");
+    setAssignmentTargetLoadRequest((current) => current + 1);
+  };
 
   useEffect(() => {
     const worksheetId = new URLSearchParams(window.location.search).get(
@@ -3145,7 +3164,18 @@ function CreateWorkspaceContent() {
           <p className="eyebrow">{t("creation.assignTo")}</p>
           <h2>{t("creation.chooseChild")}</h2>
         </div>
-        {families.length > 0 ? (
+        {assignmentTargetLoadState === "error" ? (
+          <div className="assignment-target-error" role="alert">
+            <p>{t("creation.error")}</p>
+            <button
+              className="button primary"
+              onClick={retryAssignmentTargetLoad}
+              type="button"
+            >
+              {t("history.retry")}
+            </button>
+          </div>
+        ) : families.length > 0 ? (
           <div className="assignment-target-fields">
             <label>
               {t("creation.family")}

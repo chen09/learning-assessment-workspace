@@ -56,6 +56,29 @@ describe("CreateWorkspace", () => {
     expect(screen.getByText("Fixture child")).toBeInTheDocument();
   });
 
+  it("retries loading the family and child assignment target in place", async () => {
+    mocks.getFamilies
+      .mockRejectedValueOnce(new Error("temporary network failure"))
+      .mockResolvedValueOnce([{ id: "family-1", name: "Fixture family" }]);
+
+    render(<CreateWorkspace />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The request could not be completed",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(
+      await screen.findByRole("combobox", { name: "Family" }),
+    ).toHaveValue("family-1");
+    expect(screen.getByRole("combobox", { name: "Child" })).toHaveValue(
+      "child-1",
+    );
+    await waitFor(() => {
+      expect(mocks.getFamilies).toHaveBeenCalledTimes(2);
+    });
+  });
+
   it("resumes a completed-paper review from its private recovery link", async () => {
     window.history.replaceState(
       {},
