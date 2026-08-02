@@ -152,6 +152,29 @@ describe("LibraryPage", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("starts a separate variant request from a confirmed question set", async () => {
+    mocks.getFamilyQuestionSets.mockResolvedValueOnce([
+      {
+        id: "set-confirmed",
+        family_id: "family-1",
+        title: "Lesson 2 grammar practice",
+        subject: "English",
+        status: "confirmed",
+        question_count: 10,
+        source_summary: {},
+      },
+    ]);
+
+    render(<LibraryPage />);
+
+    expect(
+      await screen.findByRole("link", { name: "创建变式题单" }),
+    ).toHaveAttribute(
+      "href",
+      "/parent/create?variantOfQuestionSetId=set-confirmed",
+    );
+  });
+
   it("lets a parent resume a source import that is still processing", async () => {
     mocks.getFamilyQuestionSets.mockResolvedValueOnce([
       {

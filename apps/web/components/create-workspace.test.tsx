@@ -180,6 +180,203 @@ describe("CreateWorkspace", () => {
     ).toBeInTheDocument();
   });
 
+  it("opens a confirmed question set as a new variant request without changing the original", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/parent/create/?variantOfQuestionSetId=confirmed-set-1",
+    );
+    mocks.getQuestionSetDraft.mockResolvedValue({
+      question_set: {
+        id: "confirmed-set-1",
+        title: "Lesson 2 grammar practice",
+        subject: "English",
+        status: "confirmed",
+        source_summary: {},
+      },
+      questions: [
+        {
+          id: "question-1",
+          position: 1,
+          type: "typed_text",
+          prompt: "Complete: She ___ to school.",
+          options: null,
+          answer_key: { text: "goes" },
+          points: 1,
+          listening: null,
+        },
+      ],
+    });
+
+    render(<CreateWorkspace />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Create a new variant" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Lesson 2 grammar practice stays unchanged/),
+    ).toBeInTheDocument();
+    expect(mocks.getQuestionSetDraft).toHaveBeenCalledWith(
+      "confirmed-set-1",
+      "parent-token",
+    );
+  });
+
+  it("copies a privacy-safe variant prompt with the chosen difficulty", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/parent/create/?variantOfQuestionSetId=confirmed-set-1",
+    );
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    mocks.getQuestionSetDraft.mockResolvedValue({
+      question_set: {
+        id: "confirmed-set-1",
+        title: "Lesson 2 grammar practice",
+        subject: "English",
+        status: "confirmed",
+        source_summary: {},
+      },
+      questions: [
+        {
+          id: "question-1",
+          position: 1,
+          type: "typed_text",
+          prompt: "Complete: She ___ to school.",
+          options: null,
+          answer_key: { text: "goes" },
+          points: 1,
+          listening: null,
+        },
+      ],
+    });
+
+    render(<CreateWorkspace />);
+
+    await screen.findByRole("heading", { name: "Create a new variant" });
+    fireEvent.change(screen.getByLabelText("Target difficulty"), {
+      target: { value: "challenge" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Copy variant JSON prompt" }),
+    );
+
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith(
+        expect.stringContaining("Target difficulty: challenge"),
+      );
+    });
+    expect(writeText.mock.calls[0]?.[0]).toContain(
+      "Complete: She ___ to school.",
+    );
+    expect(writeText.mock.calls[0]?.[0]).not.toContain("Fixture child");
+  });
+
+  it("links imported variant JSON to the confirmed source set and selected difficulty", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/parent/create/?variantOfQuestionSetId=confirmed-set-1",
+    );
+    const document = {
+      schema_version: "1.0",
+      question_set: {
+        title: "Lesson 2 challenge practice",
+        subject: "English",
+        locale: "en",
+        difficulty: "challenge",
+        source_mode: "similar",
+        estimated_minutes: 15,
+        source_summary: { unit: "Lesson 2 grammar" },
+      },
+      knowledge_tags: [{ code: "lesson-2", label: "Lesson 2" }],
+      questions: [
+        {
+          position: 1,
+          type: "typed_text",
+          prompt: "Complete: If it ___ tomorrow, we will stay home.",
+          options: [],
+          answer_key: { text: "rains" },
+          rubric: { grading_mode: "exact_match" },
+          points: 1,
+          knowledge_code: "lesson-2",
+        },
+      ],
+    };
+    mocks.getQuestionSetDraft.mockResolvedValue({
+      question_set: {
+        id: "confirmed-set-1",
+        title: "Lesson 2 grammar practice",
+        subject: "English",
+        status: "confirmed",
+        source_summary: {},
+      },
+      questions: [
+        {
+          id: "question-1",
+          position: 1,
+          type: "typed_text",
+          prompt: "Complete: She ___ to school.",
+          options: null,
+          answer_key: { text: "goes" },
+          points: 1,
+          listening: null,
+        },
+      ],
+    });
+    mocks.previewStructuredQuestionSet.mockResolvedValue({
+      title: document.question_set.title,
+      subject: document.question_set.subject,
+      locale: document.question_set.locale,
+      question_count: 1,
+      total_points: 1,
+      estimated_minutes: 15,
+      knowledge_tag_count: 1,
+      answer_keys_present: true,
+      checksum: "variant-checksum",
+      source_summary: document.question_set.source_summary,
+      questions: document.questions,
+    });
+
+    render(<CreateWorkspace />);
+
+    await screen.findByRole("heading", { name: "Create a new variant" });
+    fireEvent.change(screen.getByLabelText("Target difficulty"), {
+      target: { value: "challenge" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Import variant JSON" }));
+    fireEvent.change(screen.getByLabelText("AI question JSON"), {
+      target: {
+        files: [
+          new File([JSON.stringify(document)], "lesson-2-variant.json", {
+            type: "application/json",
+          }),
+        ],
+      },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Preview questions" }));
+
+    await waitFor(() => {
+      expect(mocks.previewStructuredQuestionSet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          question_set: expect.objectContaining({
+            source_summary: expect.objectContaining({
+              variant_of_question_set_id: "confirmed-set-1",
+              variant_of_title: "Lesson 2 grammar practice",
+              variant_of_subject: "English",
+              variant_difficulty: "challenge",
+            }),
+          }),
+        }),
+        "parent-token",
+      );
+    });
+  });
+
   it("shows a failed source import and retries without exposing the source", async () => {
     window.history.replaceState(
       {},

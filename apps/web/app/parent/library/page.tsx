@@ -46,6 +46,7 @@ const copy = {
     rejected: "Review needs changes",
     resumeReview: "Continue question-set review",
     useSourceMaterial: "Create questions from this material",
+    createVariant: "Create a variant",
     resumeImport: "Check import progress",
     importFailed: "Import needs to be retried",
     retryImport: "Retry import",
@@ -93,6 +94,7 @@ const copy = {
     rejected: "レビューで修正が必要",
     resumeReview: "問題セットの確認を続ける",
     useSourceMaterial: "この教材をもとに問題を作る",
+    createVariant: "変式問題を作る",
     resumeImport: "取込状況を確認する",
     importFailed: "取込の再実行が必要です",
     retryImport: "取込をやり直す",
@@ -139,6 +141,7 @@ const copy = {
     rejected: "审核需要修改",
     resumeReview: "继续审核题单",
     useSourceMaterial: "基于这份教材出题",
+    createVariant: "创建变式题单",
     resumeImport: "查看导入进度",
     importFailed: "导入失败，可重新处理",
     retryImport: "重新处理导入",
@@ -518,6 +521,14 @@ function LibraryContent() {
               </span>
               {set.status === "confirmed" ? (
                 <div className="library-card-actions">
+                  <Link
+                    className="button secondary"
+                    href={`/parent/create/?variantOfQuestionSetId=${encodeURIComponent(
+                      set.id,
+                    )}`}
+                  >
+                    {text.createVariant}
+                  </Link>
                   <button
                     className="button secondary library-assign-button"
                     onClick={() => void openAssignment(set)}

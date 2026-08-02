@@ -45,9 +45,15 @@ import {
 
 type CreateMode = "generate" | "import" | "completed" | "structured" | "manual";
 type ImportPurpose = "generate_similar" | "use_as_questions";
-type Stage = "compose" | "review" | "source_ready" | "source_processing";
+type Stage =
+  | "compose"
+  | "review"
+  | "source_ready"
+  | "source_processing"
+  | "variant_ready";
 type AssignmentMode = "practice" | "exam";
 type ManualQuestionType = "single_choice" | "typed_text" | "handwriting";
+type VariantDifficulty = StructuredQuestionSetDocument["question_set"]["difficulty"];
 type ManualDraftQuestion = StructuredQuestionSetDocument["questions"][number] & {
   id: string;
 };
@@ -149,6 +155,40 @@ Rules:
 2. Use single_choice only with options and answer_key.choice as a zero-based number. Use typed_text with answer_key.text. Use handwriting for work that must be handwritten; then use answer_key.reference and rubric.grading_mode "parent_review". A listening question uses type listening, options, answer_key.choice, and a listening object with replay_limit (0–10), transcript, and transcript_policy (never, after_submission, or always). Do not provide audio_path: the parent attaches the private audio file during review.
 3. Keep answers and rubrics private in the JSON. Never include answer keys inside the child-facing prompt.
 4. Make the requested difficulty genuinely easier, similar, harder, or competition-level by changing reasoning demands, not merely calculation length.`;
+
+function buildVariantQuestionSetPrompt(
+  source: {
+    title: string;
+    subject: string;
+    questions: QuestionSetDraft["questions"];
+  },
+  difficulty: VariantDifficulty,
+) {
+  const blueprint = source.questions.map((question) => ({
+    position: question.position,
+    type: question.type,
+    prompt: question.prompt,
+    options: question.options,
+    answer_key: question.answer_key,
+    points: question.points,
+  }));
+  return `${STRUCTURED_QUESTION_SET_PROMPT}
+
+This is a variant request. The confirmed source set remains immutable; create a genuinely new question set with the same learning goals, not a copy or a superficial rewording. Target difficulty: ${difficulty}.
+
+Private source blueprint for the parent only:
+${JSON.stringify(
+  {
+    title: source.title,
+    subject: source.subject,
+    questions: blueprint,
+  },
+  null,
+  2,
+)}
+
+Use source_mode "similar". Preserve only the learning goals, not the original wording. Return the strict JSON object defined above.`;
+}
 
 type ReviewDraftQuestion = Omit<ApiQuestion, "listening"> & {
   answer_key: Record<string, unknown>;
@@ -352,6 +392,14 @@ function CreateWorkspaceContent() {
     useState<string | null>(null);
   const [sourceMaterialTitle, setSourceMaterialTitle] = useState("");
   const [sourceMaterialSubject, setSourceMaterialSubject] = useState("");
+  const [variantSource, setVariantSource] = useState<{
+    id: string;
+    title: string;
+    subject: string;
+    questions: QuestionSetDraft["questions"];
+  } | null>(null);
+  const [variantDifficulty, setVariantDifficulty] =
+    useState<VariantDifficulty>("standard");
   const [sourceImportJob, setSourceImportJob] =
     useState<SourceImportJob | null>(null);
   const [availableSourceMaterials, setAvailableSourceMaterials] = useState<
@@ -594,6 +642,51 @@ function CreateWorkspaceContent() {
           return;
         }
         setStage("review");
+        setRequestStatus("idle");
+      } catch {
+        if (active) {
+          setRequestStatus("error");
+        }
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const variantSetId = new URLSearchParams(window.location.search).get(
+      "variantOfQuestionSetId",
+    );
+    if (!variantSetId) {
+      return;
+    }
+
+    let active = true;
+    void getParentAccessToken().then(async (parentToken) => {
+      if (!parentToken) {
+        return;
+      }
+      try {
+        const draft = await getQuestionSetDraft(variantSetId, parentToken);
+        if (!active) {
+          return;
+        }
+        if (
+          draft.question_set.status !== "confirmed" ||
+          draft.questions.length === 0
+        ) {
+          setRequestStatus("error");
+          return;
+        }
+        setVariantSource({
+          id: draft.question_set.id,
+          title: draft.question_set.title,
+          subject: draft.question_set.subject,
+          questions: draft.questions,
+        });
+        setSourcePromptCopied(false);
+        setStage("variant_ready");
         setRequestStatus("idle");
       } catch {
         if (active) {
@@ -961,20 +1054,31 @@ function CreateWorkspaceContent() {
         const parsedDocument = JSON.parse(
           await readTextFile(structuredFile),
         ) as StructuredQuestionSetDocument;
-        const document: StructuredQuestionSetDocument = sourceMaterialQuestionSetId
-          ? {
-              ...parsedDocument,
-              question_set: {
-                ...parsedDocument.question_set,
-                source_summary: {
-                  ...parsedDocument.question_set.source_summary,
-                  source_material_question_set_id: sourceMaterialQuestionSetId,
-                  source_material_title: sourceMaterialTitle,
-                  source_material_subject: sourceMaterialSubject,
-                },
-              },
-            }
-          : parsedDocument;
+        const sourceSummary = {
+          ...parsedDocument.question_set.source_summary,
+          ...(sourceMaterialQuestionSetId
+            ? {
+                source_material_question_set_id: sourceMaterialQuestionSetId,
+                source_material_title: sourceMaterialTitle,
+                source_material_subject: sourceMaterialSubject,
+              }
+            : {}),
+          ...(variantSource
+            ? {
+                variant_of_question_set_id: variantSource.id,
+                variant_of_title: variantSource.title,
+                variant_of_subject: variantSource.subject,
+                variant_difficulty: variantDifficulty,
+              }
+            : {}),
+        };
+        const document: StructuredQuestionSetDocument = {
+          ...parsedDocument,
+          question_set: {
+            ...parsedDocument.question_set,
+            source_summary: sourceSummary,
+          },
+        };
         const preview = await previewStructuredQuestionSet(
           document,
           parentToken,
@@ -1209,7 +1313,11 @@ function CreateWorkspaceContent() {
 
   const copyStructuredQuestionSetPrompt = async () => {
     try {
-      await navigator.clipboard.writeText(STRUCTURED_QUESTION_SET_PROMPT);
+      await navigator.clipboard.writeText(
+        variantSource
+          ? buildVariantQuestionSetPrompt(variantSource, variantDifficulty)
+          : STRUCTURED_QUESTION_SET_PROMPT,
+      );
       setSourcePromptCopied(true);
     } catch {
       setRequestStatus("error");
@@ -2387,6 +2495,79 @@ function CreateWorkspaceContent() {
               type="button"
             >
               <FileJson2 /> {t("sourceMaterial.importJson")}
+            </button>
+          </div>
+        </section>
+      </>
+    );
+  }
+
+  if (stage === "variant_ready" && variantSource) {
+    return (
+      <>
+        <header className="page-header">
+          <div>
+            <Link className="back-button" href="/parent/library/">
+              <ArrowLeft size={16} /> {t("variant.back")}
+            </Link>
+            <p className="eyebrow">{t("variant.eyebrow")}</p>
+            <h1>{t("variant.title")}</h1>
+            <p className="lede">
+              {t("variant.description", { name: variantSource.title })}
+            </p>
+          </div>
+          <LanguageSwitcher />
+        </header>
+        <section className="creation-card source-ready-card">
+          <div className="creation-heading">
+            <span><Sparkles /></span>
+            <div>
+              <h2>{t("variant.prepareTitle")}</h2>
+              <p>{t("variant.prepareDescription")}</p>
+            </div>
+          </div>
+          <label className="field-label">
+            {t("variant.difficulty")}
+            <select
+              aria-label={t("variant.difficulty")}
+              onChange={(event) =>
+                setVariantDifficulty(event.target.value as VariantDifficulty)
+              }
+              value={variantDifficulty}
+            >
+              {(
+                [
+                  "reinforcement",
+                  "standard",
+                  "challenge",
+                  "adaptive",
+                ] as const
+              ).map((difficulty) => (
+                <option key={difficulty} value={difficulty}>
+                  {t(`variant.difficulty.${difficulty}`)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="draft-actions">
+            <button
+              className="button secondary"
+              onClick={() => void copyStructuredQuestionSetPrompt()}
+              type="button"
+            >
+              {sourcePromptCopied
+                ? t("sourceMaterial.promptCopied")
+                : t("variant.copyPrompt")}
+            </button>
+            <button
+              className="button primary"
+              onClick={() => {
+                setMode("structured");
+                setStage("compose");
+              }}
+              type="button"
+            >
+              <FileJson2 /> {t("variant.importJson")}
             </button>
           </div>
         </section>
