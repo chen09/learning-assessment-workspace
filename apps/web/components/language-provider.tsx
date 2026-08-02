@@ -539,11 +539,21 @@ const messages = {
       "The system did not score this visual answer. Please decide from the child's work.",
     "parentResults.markCorrect": "Mark correct",
     "parentResults.markIncorrect": "Needs correction",
+    "parentResults.markPartial": "Award partial credit",
+    "parentResults.partialPoints": "Points earned (out of {points})",
+    "parentResults.partialHint":
+      "This answer will still be included in correction and review.",
+    "parentResults.savePartial": "Save partial credit",
+    "parentResults.cancelPartial": "Cancel",
+    "parentResults.partialInvalid":
+      "Enter more than 0 and less than {points} points.",
     "parentResults.saving": "Saving…",
     "parentResults.savedCorrect":
       "A parent marked this answer correct.",
     "parentResults.savedIncorrect":
       "A parent marked this answer incorrect.",
+    "parentResults.savedPartial":
+      "A parent awarded partial credit. This answer remains for correction.",
     "parentResults.comment": "Note for the child (optional)",
     "parentResults.commentHint":
       "Add a short hint or encouraging explanation.",
@@ -1287,9 +1297,19 @@ const messages = {
       "この画像の解答は自動採点していません。内容を見て判定してください。",
     "parentResults.markCorrect": "正解にする",
     "parentResults.markIncorrect": "やり直しにする",
+    "parentResults.markPartial": "部分点をつける",
+    "parentResults.partialPoints": "得点（{points} 点満点）",
+    "parentResults.partialHint":
+      "この解答は、やり直しと復習の対象に残ります。",
+    "parentResults.savePartial": "部分点を保存",
+    "parentResults.cancelPartial": "キャンセル",
+    "parentResults.partialInvalid":
+      "0 より大きく、{points} より小さい点数を入力してください。",
     "parentResults.saving": "保存中…",
     "parentResults.savedCorrect": "保護者が正解と判定しました。",
     "parentResults.savedIncorrect": "保護者が不正解と判定しました。",
+    "parentResults.savedPartial":
+      "保護者が部分点をつけました。この解答はやり直しに残ります。",
     "parentResults.comment": "お子さまへのメモ（任意）",
     "parentResults.commentHint": "短いヒントや励ましを入力できます。",
     "parentResults.savedComment": "お子さまへのメモ：{comment}",
@@ -2014,9 +2034,18 @@ const messages = {
       "系统没有自动判断这份图像答案，请家长根据孩子的作答来裁定。",
     "parentResults.markCorrect": "判为正确",
     "parentResults.markIncorrect": "需要订正",
+    "parentResults.markPartial": "给部分分",
+    "parentResults.partialPoints": "本题得分（满分 {points}）",
+    "parentResults.partialHint": "这道题仍会进入订正和复习。",
+    "parentResults.savePartial": "保存部分分",
+    "parentResults.cancelPartial": "取消",
+    "parentResults.partialInvalid":
+      "请输入大于 0 且小于 {points} 的分数。",
     "parentResults.saving": "正在保存…",
     "parentResults.savedCorrect": "这道题已由家长判为正确。",
     "parentResults.savedIncorrect": "这道题已由家长判为错误。",
+    "parentResults.savedPartial":
+      "家长已给出部分分；这道题仍会进入订正。",
     "parentResults.comment": "给孩子的说明（可选）",
     "parentResults.commentHint": "可以写一句简短的提示或鼓励。",
     "parentResults.savedComment": "给孩子的说明：{comment}",

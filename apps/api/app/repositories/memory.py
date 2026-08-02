@@ -12,6 +12,7 @@ from app.domain.errors import (
     LibrarySubmissionStatusConflict,
     ListeningReplayLimitReached,
     NotFoundError,
+    ParentDecisionInvalid,
     QuestionAnswerRequired,
     ResponseVersionConflict,
     SubmittedAttemptImmutable,
@@ -2435,6 +2436,14 @@ class MemoryRepository:
             raise NotFoundError
         if parent_id not in self.family_parents.get(str(result.family_id), set()):
             raise NotFoundError
+        question = self.questions.get(str(result.question_id))
+        if question is None:
+            raise NotFoundError
+        if (
+            request.awarded_points is not None
+            and request.awarded_points > question.points
+        ):
+            raise ParentDecisionInvalid
         decision = ParentDecision(
             result=result,
             parent_outcome=request.outcome,
@@ -2442,6 +2451,20 @@ class MemoryRepository:
             parent_comment=request.comment,
         )
         self.parent_decisions[result_id] = decision
+        if request.outcome == "incorrect":
+            item = ReviewItemView(
+                id=result.id,
+                child_id=self.attempts[str(result.attempt_id)].child_id,
+                source_question_id=result.question_id,
+                prompt=question.prompt,
+                type=question.type,
+                options=question.options,
+                answer_mode=review_answer_mode(question.type),
+                due_on=(datetime.now(UTC) + timedelta(days=1)).date(),
+                interval_days=1,
+                level="standard",
+            )
+            self.review_items[str(item.id)] = item
         return decision
 
     async def create_family_invitation(

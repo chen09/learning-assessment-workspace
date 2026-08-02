@@ -42,6 +42,10 @@ class AssignmentStatusConflict(DomainError):
     pass
 
 
+class ParentDecisionInvalid(DomainError):
+    pass
+
+
 class LibrarySubmissionStatusConflict(DomainError):
     pass
 

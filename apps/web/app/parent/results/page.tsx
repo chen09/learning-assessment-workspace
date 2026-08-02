@@ -31,6 +31,7 @@ import {
 } from "@/lib/api-client";
 
 type Decision = "correct" | "incorrect";
+type SavedDecision = Decision | "partial";
 type Point = { x: number; y: number } | [number, number];
 type Stroke = {
   points?: Point[];
@@ -379,13 +380,17 @@ function ParentResultsContent() {
   const [loadState, setLoadState] = useState<
     "loading" | "ready" | "error"
   >("loading");
-  const [decisions, setDecisions] = useState<Record<string, Decision>>({});
+  const [decisions, setDecisions] = useState<Record<string, SavedDecision>>({});
   const [decisionComments, setDecisionComments] = useState<
     Record<string, string>
   >({});
   const [savedComments, setSavedComments] = useState<Record<string, string>>(
     {},
   );
+  const [partialPoints, setPartialPoints] = useState<Record<string, string>>(
+    {},
+  );
+  const [partialEntryId, setPartialEntryId] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [decisionErrorId, setDecisionErrorId] = useState<string | null>(null);
 
@@ -430,7 +435,11 @@ function ParentResultsContent() {
     };
   }, [attemptId]);
 
-  const decide = async (item: ParentReviewItem, outcome: Decision) => {
+  const decide = async (
+    item: ParentReviewItem,
+    outcome: Decision,
+    awardedPoints?: number,
+  ) => {
     setSavingId(item.result_id);
     setDecisionErrorId(null);
     try {
@@ -438,7 +447,8 @@ function ParentResultsContent() {
       if (!token) {
         throw new Error("Parent session is unavailable.");
       }
-      const points = outcome === "correct" ? item.question_points : 0;
+      const points =
+        awardedPoints ?? (outcome === "correct" ? item.question_points : 0);
       const comment = decisionComments[item.result_id]?.trim() || null;
       await decideParentReview(
         item.result_id,
@@ -452,7 +462,7 @@ function ParentResultsContent() {
       );
       setDecisions((current) => ({
         ...current,
-        [item.result_id]: outcome,
+        [item.result_id]: outcome === "incorrect" && points > 0 ? "partial" : outcome,
       }));
       if (comment) {
         setSavedComments((current) => ({
@@ -533,6 +543,14 @@ function ParentResultsContent() {
             ) : (
               review.reviews.map((item) => {
                 const decision = decisions[item.result_id];
+                const isPartialEntry = partialEntryId === item.result_id;
+                const enteredPartialPoints = Number(
+                  partialPoints[item.result_id] ?? "",
+                );
+                const canSavePartial =
+                  Number.isFinite(enteredPartialPoints) &&
+                  enteredPartialPoints > 0 &&
+                  enteredPartialPoints < item.question_points;
                 const typeLabel = t(
                   item.response_kind === "photo"
                     ? "parentResults.photo"
@@ -577,6 +595,8 @@ function ParentResultsContent() {
                             {t(
                               decision === "correct"
                                 ? "parentResults.savedCorrect"
+                                : decision === "partial"
+                                  ? "parentResults.savedPartial"
                                 : "parentResults.savedIncorrect",
                             )}
                           </p>
@@ -625,7 +645,82 @@ function ParentResultsContent() {
                           >
                             {t("parentResults.markIncorrect")}
                           </button>
+                          <button
+                            aria-expanded={isPartialEntry}
+                            className="button ghost"
+                            disabled={savingId === item.result_id}
+                            onClick={() =>
+                              setPartialEntryId((current) =>
+                                current === item.result_id
+                                  ? null
+                                  : item.result_id,
+                              )
+                            }
+                            type="button"
+                          >
+                            {t("parentResults.markPartial")}
+                          </button>
                         </div>
+                        {isPartialEntry ? (
+                          <div className="parent-review-partial">
+                            <label className="field-label">
+                              {t("parentResults.partialPoints", {
+                                points: item.question_points,
+                              })}
+                              <input
+                                inputMode="decimal"
+                                max={item.question_points}
+                                min="0"
+                                onChange={(event) =>
+                                  setPartialPoints((current) => ({
+                                    ...current,
+                                    [item.result_id]: event.target.value,
+                                  }))
+                                }
+                                step="0.5"
+                                type="number"
+                                value={partialPoints[item.result_id] ?? ""}
+                              />
+                            </label>
+                            <p>{t("parentResults.partialHint")}</p>
+                            <div className="decision-row">
+                              <button
+                                className="button primary"
+                                disabled={
+                                  savingId === item.result_id || !canSavePartial
+                                }
+                                onClick={() =>
+                                  void decide(
+                                    item,
+                                    "incorrect",
+                                    enteredPartialPoints,
+                                  )
+                                }
+                                type="button"
+                              >
+                                {savingId === item.result_id
+                                  ? t("parentResults.saving")
+                                  : t("parentResults.savePartial")}
+                              </button>
+                              <button
+                                className="button ghost"
+                                disabled={savingId === item.result_id}
+                                onClick={() => setPartialEntryId(null)}
+                                type="button"
+                              >
+                                {t("parentResults.cancelPartial")}
+                              </button>
+                            </div>
+                            {!canSavePartial &&
+                            partialPoints[item.result_id] ? (
+                              <p className="form-error" role="alert">
+                                {t("parentResults.partialInvalid", {
+                                  points: item.question_points,
+                                })}
+                              </p>
+                            ) : null}
+                          </div>
+                        ) : null}
                       </div>
                     )}
                     {decisionErrorId === item.result_id ? (

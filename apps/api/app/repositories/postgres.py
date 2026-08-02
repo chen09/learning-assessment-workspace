@@ -21,6 +21,7 @@ from app.domain.errors import (
     LibrarySubmissionStatusConflict,
     ListeningReplayLimitReached,
     NotFoundError,
+    ParentDecisionInvalid,
     QuestionAnswerRequired,
     ResponseVersionConflict,
     SubmittedAttemptImmutable,
@@ -4687,12 +4688,13 @@ class PostgresRepository:
             result = await connection.execute(
                 text(
                     """
-                    select id, family_id, attempt_id, question_id, outcome,
-                           awarded_points, confidence, feedback, grader_version,
-                           parent_outcome, parent_awarded_points, parent_comment,
-                           parent_reviewed_at
-                    from public.question_results
-                    where id = :result_id
+                    select qr.id, qr.family_id, qr.attempt_id, qr.question_id, qr.outcome,
+                           qr.awarded_points, qr.confidence, qr.feedback, qr.grader_version,
+                           qr.parent_outcome, qr.parent_awarded_points, qr.parent_comment,
+                           qr.parent_reviewed_at, q.points as question_points
+                    from public.question_results qr
+                    join public.questions q on q.id = qr.question_id
+                    where qr.id = :result_id
                     for update
                     """
                 ),
@@ -4702,6 +4704,11 @@ class PostgresRepository:
             if row is None:
                 raise NotFoundError
             await self._require_parent(connection, parent_id, row["family_id"])
+            if (
+                request.awarded_points is not None
+                and request.awarded_points > float(row["question_points"])
+            ):
+                raise ParentDecisionInvalid
             if row["parent_outcome"] is None:
                 result = await connection.execute(
                     text(

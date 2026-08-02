@@ -3726,6 +3726,22 @@ button {
   margin-top: 1rem;
 }
 
+.parent-review-partial {
+  margin-top: 1rem;
+  border-top: 1px solid var(--line);
+  padding-top: 1rem;
+}
+
+.parent-review-partial input {
+  max-width: 12rem;
+}
+
+.parent-review-partial > p {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0.55rem 0 0;
+}
+
 .parent-review-comment {
   margin-top: 1rem;
 }

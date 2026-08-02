@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 
 from app.api.dependencies import Repository, get_repository, require_parent
-from app.domain.errors import NotFoundError
+from app.domain.errors import NotFoundError, ParentDecisionInvalid
 from app.domain.models import (
     ParentAttemptReview,
     ParentDecision,
@@ -53,4 +53,9 @@ async def decide_result(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="The grading result is not available.",
+        ) from error
+    except ParentDecisionInvalid as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Awarded points must not exceed the question total.",
         ) from error

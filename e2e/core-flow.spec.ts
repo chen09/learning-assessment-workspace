@@ -2416,9 +2416,13 @@ test("parent creation reaches child grading and correction through the API", asy
   await page
     .getByLabel("Note for the child (optional)")
     .fill("Your explanation is clear. Nice work!");
-  await page.getByRole("button", { name: "Mark correct" }).click();
+  await page.getByRole("button", { name: "Award partial credit" }).click();
+  await page.getByLabel("Points earned (out of 2)").fill("1");
+  await page.getByRole("button", { name: "Save partial credit" }).click();
   await expect(
-    page.getByText("A parent marked this answer correct."),
+    page.getByText(
+      "A parent awarded partial credit. This answer remains for correction.",
+    ),
   ).toBeVisible();
 
   await page.goto(
@@ -2429,7 +2433,7 @@ test("parent creation reaches child grading and correction through the API", asy
   ).toBeVisible();
   await page.getByRole("button", { name: "Correct these answers" }).click();
   await expect(page).toHaveURL(/\/child\/work\/\?attemptId=/);
-  await expect(page.getByText("0/1", { exact: true })).toBeVisible();
+  await expect(page.getByText("0/2", { exact: true })).toBeVisible();
   await expect(
     page.getByRole("heading", {
       name: "Complete: My brother ___ tennis on Sundays.",

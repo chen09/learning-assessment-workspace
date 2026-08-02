@@ -897,26 +897,37 @@ def test_submission_is_immutable_and_fixture_grading_releases_full_results() -> 
     ]
     assert child_cannot_open_parent_results.status_code == 401
     uncertain_result_id = results.json()["results"][2]["id"]
+    over_award = client.post(
+        f"/v1/grading-results/{uncertain_result_id}/parent-decision",
+        headers={**PARENT_HEADERS, "Idempotency-Key": "reject-over-award"},
+        json={
+            "outcome": "correct",
+            "awarded_points": 3,
+        },
+    )
+
+    assert over_award.status_code == 422
     parent_decision = client.post(
         f"/v1/grading-results/{uncertain_result_id}/parent-decision",
         headers={**PARENT_HEADERS, "Idempotency-Key": "decide-handwriting-result"},
         json={
-            "outcome": "correct",
-            "awarded_points": 2,
-            "comment": "The steps and final answer are clear.",
+            "outcome": "incorrect",
+            "awarded_points": 1,
+            "comment": "Your structure is right. Please check the final sign.",
         },
     )
 
     assert parent_decision.status_code == 200
-    assert parent_decision.json()["parent_outcome"] == "correct"
-    assert parent_decision.json()["parent_awarded_points"] == 2
+    assert parent_decision.json()["parent_outcome"] == "incorrect"
+    assert parent_decision.json()["parent_awarded_points"] == 1
     resolved_parent_results = client.get(
         f"/v1/grading-results/attempts/{attempt_id}",
         headers=PARENT_HEADERS,
     )
     assert resolved_parent_results.status_code == 200
-    assert resolved_parent_results.json()["awarded_points"] == 3
-    assert resolved_parent_results.json()["correct_count"] == 2
+    assert resolved_parent_results.json()["awarded_points"] == 2
+    assert resolved_parent_results.json()["correct_count"] == 1
+    assert resolved_parent_results.json()["correction_count"] == 2
     assert resolved_parent_results.json()["pending_review_count"] == 0
     assert resolved_parent_results.json()["reviews"] == []
     child_results_after_parent_decision = client.get(
@@ -929,9 +940,9 @@ def test_submission_is_immutable_and_fixture_grading_releases_full_results() -> 
         for result in child_results_after_parent_decision.json()["results"]
         if result["id"] == uncertain_result_id
     )
-    assert child_result["outcome"] == "correct"
-    assert child_result["awarded_points"] == 2
-    assert child_result["parent_comment"] == "The steps and final answer are clear."
+    assert child_result["outcome"] == "incorrect"
+    assert child_result["awarded_points"] == 1
+    assert child_result["parent_comment"] == "Your structure is right. Please check the final sign."
     correction = client.post(
         f"/v1/attempts/{attempt_id}/correction",
         headers={
@@ -942,7 +953,8 @@ def test_submission_is_immutable_and_fixture_grading_releases_full_results() -> 
     assert correction.status_code == 200
     assert correction.json()["assignment"]["status"] == "correcting"
     assert [question["id"] for question in correction.json()["questions"]] == [
-        questions[1]["id"]
+        questions[1]["id"],
+        questions[2]["id"],
     ]
 
 
