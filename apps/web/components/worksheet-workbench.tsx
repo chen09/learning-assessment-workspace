@@ -225,6 +225,7 @@ function WorksheetWorkbenchContent() {
   const [saveStatus, setSaveStatus] = useState<
     "idle" | "saving" | "saved" | "offline"
   >("idle");
+  const [isSyncingSavedAnswer, setIsSyncingSavedAnswer] = useState(false);
   const [dirtyQuestionId, setDirtyQuestionId] = useState<string | null>(null);
   const [playCounts, setPlayCounts] = useState<Record<string, number>>({});
   const audioRefs = useRef<Record<string, HTMLAudioElement | null>>({});
@@ -569,6 +570,21 @@ function WorksheetWorkbenchContent() {
     window.addEventListener("online", sync);
     return () => window.removeEventListener("online", sync);
   }, [childToken]);
+
+  async function retryPendingDraftSync() {
+    if (!childToken || isSyncingSavedAnswer) {
+      return;
+    }
+    setIsSyncingSavedAnswer(true);
+    try {
+      const synced = await syncPendingDrafts(childToken);
+      setSaveStatus(synced > 0 ? "saved" : "offline");
+    } catch {
+      setSaveStatus("offline");
+    } finally {
+      setIsSyncingSavedAnswer(false);
+    }
+  }
 
   async function submitAll(reason = "completed") {
     if (attemptId && childToken) {
@@ -1690,6 +1706,19 @@ function WorksheetWorkbenchContent() {
                   ? t("worksheet.savedDevice")
                   : t("worksheet.autoSave")}
           </span>
+          {saveStatus === "offline" ? (
+            <button
+              className="button ghost save-sync-button"
+              disabled={isSyncingSavedAnswer}
+              onClick={() => void retryPendingDraftSync()}
+              type="button"
+            >
+              <RefreshCw aria-hidden="true" size={15} />
+              {isSyncingSavedAnswer
+                ? t("worksheet.syncingSavedAnswer")
+                : t("worksheet.syncSavedAnswer")}
+            </button>
+          ) : null}
           <div className="mode-switch" aria-label={t("worksheet.layout")}>
             <button
               aria-label={t("worksheet.focusMode")}

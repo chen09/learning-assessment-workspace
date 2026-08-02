@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   uploadToSignedUrl: vi.fn(),
   cropAnswerImage: vi.fn(),
   rotateAnswerImage: vi.fn(),
+  syncPendingDrafts: vi.fn(),
 }));
 
 vi.mock("@/lib/api-client", async (importOriginal) => ({
@@ -43,6 +44,11 @@ vi.mock("@/lib/api-client", async (importOriginal) => ({
   submitAttempt: mocks.submitAttempt,
   submitQuestion: mocks.submitQuestion,
   uploadToSignedUrl: mocks.uploadToSignedUrl,
+}));
+
+vi.mock("@/lib/draft-queue", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/draft-queue")>()),
+  syncPendingDrafts: mocks.syncPendingDrafts,
 }));
 
 vi.mock("@/lib/photo-rotation", () => ({
@@ -218,6 +224,8 @@ describe("WorksheetWorkbench", () => {
         type: "image/jpeg",
       }),
     );
+    mocks.syncPendingDrafts.mockReset();
+    mocks.syncPendingDrafts.mockResolvedValue(0);
   });
 
   it("autosaves an answer and lets the child move to the next question", async () => {
@@ -242,6 +250,31 @@ describe("WorksheetWorkbench", () => {
         name: "Complete: She ___ to school every day.",
       }),
     ).toBeInTheDocument();
+  });
+
+  it("lets a child manually retry syncing a locally saved answer", async () => {
+    mocks.saveAttemptResponse.mockRejectedValueOnce(new Error("offline"));
+    mocks.syncPendingDrafts.mockResolvedValue(0);
+
+    render(<WorksheetWorkbench />);
+
+    fireEvent.click(
+      await screen.findByRole("radio", { name: "a² − b²" }),
+    );
+    expect(
+      await screen.findByText("Saved on this device"),
+    ).toBeInTheDocument();
+
+    mocks.syncPendingDrafts.mockResolvedValue(1);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Sync saved answer" }),
+    );
+
+    expect(await screen.findByText("Saved", { exact: true })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(mocks.syncPendingDrafts).toHaveBeenLastCalledWith("child-token");
+    });
   });
 
   it("retries loading the assigned work after a transient request failure", async () => {
