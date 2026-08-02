@@ -266,6 +266,19 @@ test("temporary parent completes the hosted family learning flow", async ({
         .getByText("Paper upload is safe and not yet assigned")
         .or(page.getByText("Your paper is being prepared")),
     ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Original completed pages" }),
+    ).toBeVisible();
+    const completedPaperPreview = page.getByRole("img", {
+      name: "Completed worksheet page 1",
+    });
+    await expect(completedPaperPreview).toHaveAttribute(
+      "src",
+      /\/storage\/v1\/object\/sign\/responses\//,
+    );
+    await expect(page.getByText(completedPaper.response_paths[0])).toHaveCount(
+      0,
+    );
     const { data: preConfirmationAssignments, error: preConfirmationError } =
       await supabaseAdmin
         .from("assignments")

@@ -3665,6 +3665,60 @@ button {
   width: 0.95rem;
 }
 
+.completed-paper-preview {
+  align-items: start;
+}
+
+.completed-paper-preview-pages {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  width: min(100%, 48rem);
+}
+
+.completed-paper-preview-pages figure,
+.completed-paper-preview-pdf {
+  background: var(--paper, #fffdf7);
+  border: 1px solid var(--line, #e8e2d7);
+  border-radius: 0.85rem;
+  margin: 0;
+  overflow: hidden;
+}
+
+.completed-paper-preview-pages img {
+  display: block;
+  height: auto;
+  max-height: 23rem;
+  object-fit: contain;
+  width: 100%;
+}
+
+.completed-paper-preview-pages figcaption {
+  color: var(--muted, #657080);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+  padding: 0.6rem 0.75rem;
+}
+
+.completed-paper-preview-pdf {
+  align-items: center;
+  color: inherit;
+  display: grid;
+  gap: 0.35rem;
+  min-height: 8rem;
+  padding: 1rem;
+  text-decoration: none;
+}
+
+.completed-paper-preview-pdf:hover {
+  border-color: var(--primary, #5167d9);
+}
+
+.completed-paper-preview-pdf svg {
+  color: var(--primary, #5167d9);
+  width: 1.35rem;
+}
+
 .photo-answer-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr));

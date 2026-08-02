@@ -67,7 +67,11 @@ describe("CreateWorkspace", () => {
       status: "needs_review",
       assignment_id: null,
       attempt_id: null,
+      filenames: ["completed-paper.jpg"],
       response_paths: ["family-1/responses/completed-paper.jpg"],
+      response_preview_urls: [
+        "https://storage.example.test/signed/completed-paper.jpg?short-lived=true",
+      ],
       extraction: {
         schema_version: "1.0",
         document: {
@@ -115,6 +119,15 @@ describe("CreateWorkspace", () => {
       "parent-token",
     );
     expect(screen.getByDisplayValue("Complete: She ___ to school.")).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: "Completed worksheet page 1" }),
+    ).toHaveAttribute(
+      "src",
+      "https://storage.example.test/signed/completed-paper.jpg?short-lived=true",
+    );
+    expect(
+      screen.queryByText("family-1/responses/completed-paper.jpg"),
+    ).not.toBeInTheDocument();
   });
 
   it("resumes an imported question-set review from its private recovery link", async () => {
@@ -1531,12 +1544,16 @@ describe("CreateWorkspace", () => {
       }),
     );
     mocks.uploadToSignedUrl.mockResolvedValue(undefined);
-    mocks.createCompletedWorksheetImport.mockResolvedValue({
+    const completedWorksheetImport = {
       id: "completed-worksheet-1",
       status: "needs_review",
       assignment_id: null,
       attempt_id: null,
+      filenames: ["completed-paper.jpg"],
       response_paths: ["family-1/completed-paper/responses-completed-paper.jpg"],
+      response_preview_urls: [
+        "https://storage.example.test/signed/completed-paper.jpg?short-lived=true",
+      ],
       extraction: {
         schema_version: "1.0",
         status: "needs_parent_confirmation",
@@ -1578,7 +1595,9 @@ describe("CreateWorkspace", () => {
         warnings: [],
       },
       job: { id: "analysis-job-1", status: "completed", type: "analyze_completed_worksheet" },
-    });
+    };
+    mocks.createCompletedWorksheetImport.mockResolvedValue(completedWorksheetImport);
+    mocks.getCompletedWorksheetImport.mockResolvedValue(completedWorksheetImport);
     mocks.confirmCompletedWorksheetImport.mockResolvedValue({
       completed_worksheet: { id: "completed-worksheet-1", status: "grading" },
       question_set_id: "question-set-1",

@@ -111,7 +111,9 @@ export type CompletedWorksheetImport = {
     | "failed";
   assignment_id: string | null;
   attempt_id: string | null;
+  filenames: string[];
   response_paths: string[];
+  response_preview_urls?: string[];
   answer_source_paths?: string[];
   reference_source_paths?: string[];
   extraction?: Record<string, unknown>;

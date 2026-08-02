@@ -536,6 +536,8 @@ class CompletedWorksheetImport(BaseModel):
     feedback_language: Literal["en", "ja", "zh"]
     filenames: list[str]
     response_paths: list[str]
+    # Short-lived, parent-authorized previews only. These are never persisted.
+    response_preview_urls: list[str] = Field(default_factory=list)
     answer_source_paths: list[str] = Field(default_factory=list)
     reference_source_paths: list[str] = Field(default_factory=list)
     extraction: dict[str, Any] = Field(default_factory=dict)

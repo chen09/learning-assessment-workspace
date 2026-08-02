@@ -1,6 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 
+const nonPersonalAnswerPng = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+  "base64",
+);
+
 test("verified parent completes the family assignment flow on PostgreSQL", async ({
   page,
   request,
@@ -71,6 +76,36 @@ test("verified parent completes the family assignment flow on PostgreSQL", async
     const childId = (
       (await (await childResponse).json()) as { id: string }
     ).id;
+
+    // The completed scan is a parent-only source. PostgreSQL/Supabase must
+    // return a temporary response-bucket URL, not disclose the storage path.
+    await page.goto(
+      `/parent/create/?familyId=${encodeURIComponent(familyId)}&childId=${encodeURIComponent(childId)}`,
+    );
+    await page.getByRole("button", { name: "Grade completed paper" }).click();
+    await page.getByLabel("Completed worksheet scans").setInputFiles({
+      name: "postgres-non-personal-completed-paper.png",
+      mimeType: "image/png",
+      buffer: nonPersonalAnswerPng,
+    });
+    const completedPaperResponse = page.waitForResponse(
+      (response) =>
+        response.url() === "http://127.0.0.1:8018/v1/completed-worksheets" &&
+        response.request().method() === "POST",
+    );
+    await page.getByRole("button", { name: "Upload for review" }).click();
+    const completedPaper = (await (
+      await completedPaperResponse
+    ).json()) as { response_paths: string[] };
+    await expect(
+      page.getByRole("heading", { name: "Original completed pages" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("img", { name: "Completed worksheet page 1" }),
+    ).toHaveAttribute("src", /\/storage\/v1\/object\/sign\/responses\//);
+    await expect(page.getByText(completedPaper.response_paths[0])).toHaveCount(
+      0,
+    );
 
     await page.goto(
       `/parent/create/?familyId=${encodeURIComponent(familyId)}&childId=${encodeURIComponent(childId)}`,

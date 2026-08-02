@@ -459,6 +459,12 @@ function CreateWorkspaceContent() {
   const [completedResponsePaths, setCompletedResponsePaths] = useState<string[]>(
     [],
   );
+  const [completedResponseFileNames, setCompletedResponseFileNames] = useState<
+    string[]
+  >([]);
+  const [completedResponsePreviewUrls, setCompletedResponsePreviewUrls] = useState<
+    string[]
+  >([]);
   const [completedPromptCopied, setCompletedPromptCopied] = useState(false);
   const [completedAttemptId, setCompletedAttemptId] = useState<string | null>(
     null,
@@ -581,6 +587,8 @@ function CreateWorkspaceContent() {
         setCompletedWorksheetId(imported.id);
         setCompletedWorksheetStatus(imported.status);
         setCompletedResponsePaths(imported.response_paths);
+        setCompletedResponseFileNames(imported.filenames);
+        setCompletedResponsePreviewUrls(imported.response_preview_urls ?? []);
         setCompletedAttemptId(imported.attempt_id);
         loadCompletedReviewDraft(imported.extraction);
       } catch {
@@ -1012,7 +1020,7 @@ function CreateWorkspaceContent() {
           "references",
           referenceSourcePaths,
         );
-        const imported = await createCompletedWorksheetImport(
+        const createdImport = await createCompletedWorksheetImport(
           {
             family_id: familyId,
             child_id: childId,
@@ -1028,10 +1036,22 @@ function CreateWorkspaceContent() {
           parentToken,
           `completed-worksheet-${uploadObjectId}`,
         );
+        let imported = createdImport;
+        try {
+          imported = await getCompletedWorksheetImport(
+            createdImport.id,
+            parentToken,
+          );
+        } catch {
+          // The paper has been stored successfully. A temporary preview can
+          // fail independently, so keep the parent on the review workflow.
+        }
         saveCompletedWorksheetRecoveryLink(imported.id);
         setCompletedWorksheetId(imported.id);
         setCompletedWorksheetStatus(imported.status);
         setCompletedResponsePaths(imported.response_paths);
+        setCompletedResponseFileNames(imported.filenames);
+        setCompletedResponsePreviewUrls(imported.response_preview_urls ?? []);
         loadCompletedReviewDraft(imported.extraction);
         setRequestStatus("idle");
       } catch {
@@ -2363,6 +2383,53 @@ function CreateWorkspaceContent() {
             </span>
           )}
         </section>
+        {completedResponsePreviewUrls.length > 0 ? (
+          <section
+            aria-labelledby="completed-paper-preview-title"
+            className="assignment-panel completed-paper-preview"
+          >
+            <div>
+              <p className="eyebrow">{t("completedPaper.privatePreview")}</p>
+              <h2 id="completed-paper-preview-title">
+                {t("completedPaper.originalPages")}
+              </h2>
+              <p>{t("completedPaper.originalPagesHelp")}</p>
+            </div>
+            <div className="completed-paper-preview-pages">
+              {completedResponsePreviewUrls.map((previewUrl, index) => {
+                const filename = completedResponseFileNames[index] ?? "";
+                const page = index + 1;
+                const label = t("completedPaper.page", { pages: page });
+                if (/\.pdf$/i.test(filename)) {
+                  return (
+                    <a
+                      className="completed-paper-preview-pdf"
+                      href={previewUrl}
+                      key={previewUrl}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      <FileText aria-hidden="true" />
+                      <span>{filename || label}</span>
+                      <small>{t("completedPaper.openOriginal")}</small>
+                    </a>
+                  );
+                }
+                return (
+                  <figure key={previewUrl}>
+                    {/* Signed private URLs cannot use the static image optimizer. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      alt={t("completedPaper.pagePreview", { page })}
+                      src={previewUrl}
+                    />
+                    <figcaption>{filename || label}</figcaption>
+                  </figure>
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
         {requestStatus === "error" ? (
           <p className="form-error" role="alert">
             {t("completedPaper.error")}

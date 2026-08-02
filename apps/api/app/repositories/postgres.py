@@ -317,6 +317,22 @@ class PostgresRepository:
     ) -> dict[str, str]:
         return await self._sign_private_asset_urls("responses", paths)
 
+    async def _with_completed_worksheet_previews(
+        self,
+        imported: CompletedWorksheetImport,
+    ) -> CompletedWorksheetImport:
+        """Expose only brief, parent-authorized previews of completed scans."""
+        signed_urls = await self._sign_response_photo_urls(imported.response_paths)
+        return imported.model_copy(
+            update={
+                "response_preview_urls": [
+                    signed_urls[path]
+                    for path in imported.response_paths
+                    if path in signed_urls
+                ]
+            }
+        )
+
     async def _sign_private_asset_urls(
         self,
         bucket: Literal["responses", "audio"],
@@ -3397,10 +3413,11 @@ class PostgresRepository:
             ).mappings().one_or_none()
             if job is None:
                 raise NotFoundError
-            return CompletedWorksheetImport(
+            completed_import = CompletedWorksheetImport(
                 **dict(imported),
                 job=Job(**dict(job)),
             )
+        return await self._with_completed_worksheet_previews(completed_import)
 
     async def list_completed_worksheet_imports(
         self,

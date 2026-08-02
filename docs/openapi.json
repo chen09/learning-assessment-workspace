@@ -616,6 +616,13 @@
             "title": "Response Paths",
             "type": "array"
           },
+          "response_preview_urls": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Response Preview Urls",
+            "type": "array"
+          },
           "status": {
             "$ref": "#/components/schemas/CompletedWorksheetStatus",
             "default": "processing"
