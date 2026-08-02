@@ -2178,6 +2178,9 @@ test("parent creation reaches child grading and correction through the API", asy
   const clearHandwriting = page.getByRole("button", {
     name: "Clear handwriting",
   });
+  if (testInfo.project.name.startsWith("ipad-")) {
+    await expect(clearHandwriting).toHaveText("Clear handwriting");
+  }
   const undoHandwriting = page.getByRole("button", { name: "Undo" });
   await expect(undoHandwriting).toBeEnabled();
   const clearedResponseSave = page.waitForResponse(

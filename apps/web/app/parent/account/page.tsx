@@ -4,9 +4,19 @@ import { type FormEvent, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { useLanguage } from "@/components/language-provider";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 export default function AccountSettingsPage() {
+  return (
+    <AppShell currentPath="/parent/family/" role="parent">
+      <AccountSettingsContent />
+    </AppShell>
+  );
+}
+
+function AccountSettingsContent() {
+  const { t } = useLanguage();
   const [password, setPassword] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -14,34 +24,31 @@ export default function AccountSettingsPage() {
     event.preventDefault();
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
-      setNotice("Local demo mode: no account change was sent.");
+      setNotice(t("account.demoNotice"));
       return;
     }
     const { error } = await supabase.auth.updateUser({ password });
-    setNotice(error ? error.message : "Password saved. One-time links still work.");
+    setNotice(error ? error.message : t("account.passwordSaved"));
     if (!error) {
       setPassword("");
     }
   };
 
   return (
-    <AppShell currentPath="/parent/family/" role="parent">
+    <>
       <header className="page-header">
         <div>
-          <p className="eyebrow">Sign-in and language</p>
-          <h1>My account</h1>
-          <p className="lede">
-            A password is optional. Email one-time links, Google, and LINE can
-            remain available after you set one.
-          </p>
+          <p className="eyebrow">{t("account.eyebrow")}</p>
+          <h1>{t("account.title")}</h1>
+          <p className="lede">{t("account.description")}</p>
         </div>
         <LanguageSwitcher />
       </header>
       <section className="settings-card account-card">
-        <h2>Set or change password</h2>
+        <h2>{t("account.passwordTitle")}</h2>
         <form className="invite-form" onSubmit={updatePassword}>
           <label>
-            New password
+            {t("account.newPassword")}
             <input
               autoComplete="new-password"
               minLength={8}
@@ -51,17 +58,25 @@ export default function AccountSettingsPage() {
               value={password}
             />
           </label>
-          <button className="button primary" type="submit">Save password</button>
+          <button className="button primary" type="submit">
+            {t("account.savePassword")}
+          </button>
         </form>
         {notice ? <p className="form-notice" role="status">{notice}</p> : null}
         <hr />
-        <h2>Connected sign-in methods</h2>
+        <h2>{t("account.methodsTitle")}</h2>
         <div className="connected-methods">
-          <span>Email link <strong>Ready</strong></span>
-          <span>Google <strong>Configure in Supabase</strong></span>
-          <span>LINE <strong>Configure custom OIDC</strong></span>
+          <span>
+            {t("account.emailLink")} <strong>{t("account.ready")}</strong>
+          </span>
+          <span>
+            Google <strong>{t("account.configureSupabase")}</strong>
+          </span>
+          <span>
+            LINE <strong>{t("account.configureOidc")}</strong>
+          </span>
         </div>
       </section>
-    </AppShell>
+    </>
   );
 }

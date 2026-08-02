@@ -1457,6 +1457,18 @@ button {
   touch-action: manipulation;
 }
 
+.canvas-toolbar .canvas-clear-button {
+  display: inline-flex;
+  width: auto;
+  min-width: 2.75rem;
+  align-items: center;
+  gap: 0.35rem;
+  padding-inline: 0.65rem;
+  color: #9d332c;
+  font-size: 0.78rem;
+  font-weight: 760;
+}
+
 .canvas-toolbar button.active {
   background: var(--blue-soft);
   color: var(--blue-dark);
@@ -1540,6 +1552,11 @@ button {
   .canvas-toolbar button {
     width: 2.75rem;
     height: 2.75rem;
+  }
+
+  .canvas-toolbar .canvas-clear-button {
+    width: auto;
+    min-width: 6.8rem;
   }
 }
 
@@ -2356,6 +2373,17 @@ button {
 
   .app-main {
     padding: 1.5rem 1rem 2rem;
+  }
+
+  .canvas-toolbar .canvas-clear-button {
+    width: 2.75rem;
+    min-width: 0;
+    justify-content: center;
+    padding-inline: 0;
+  }
+
+  .canvas-toolbar .canvas-clear-button span {
+    display: none;
   }
 
   .shell-tools {

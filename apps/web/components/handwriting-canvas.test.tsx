@@ -115,6 +115,7 @@ describe("HandwritingCanvas", () => {
     expect(screen.getByRole("alertdialog")).toHaveTextContent(
       "Clear all handwriting?",
     );
+    expect(screen.getByRole("button", { name: "Clear now" })).toHaveFocus();
   });
 
   it("opens the clear confirmation when an iPad stylus only emits a pointer event", () => {

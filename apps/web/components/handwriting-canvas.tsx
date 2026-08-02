@@ -76,6 +76,7 @@ export function HandwritingCanvas({
 }: HandwritingCanvasProps) {
   const { t } = useLanguage();
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const clearNowButtonRef = useRef<HTMLButtonElement>(null);
   const drawingRef = useRef<Stroke | null>(null);
   const [strokes, setStrokes] = useState<Stroke[]>(initialStrokes);
   const [redoStack, setRedoStack] = useState<Stroke[]>([]);
@@ -126,6 +127,16 @@ export function HandwritingCanvas({
   useEffect(() => {
     draw(strokes);
   }, [canvasSize, draw, strokes]);
+
+  useEffect(() => {
+    if (!clearConfirmationOpen) {
+      return;
+    }
+    // On an iPad, the confirmation appears immediately below the compact
+    // toolbar. Move focus to its only destructive action so it is obvious
+    // that clearing requires one deliberate second tap.
+    clearNowButtonRef.current?.focus({ preventScroll: true });
+  }, [clearConfirmationOpen]);
 
   const pointFromEvent = (
     event: ReactPointerEvent<HTMLCanvasElement>,
@@ -390,6 +401,7 @@ export function HandwritingCanvas({
           </button>
           <button
             aria-label={t("handwriting.clear")}
+            className="canvas-clear-button"
             disabled={readOnly}
             onClick={() => handleClickAction("request-clear", requestClear)}
             onPointerDown={(event) =>
@@ -407,6 +419,7 @@ export function HandwritingCanvas({
             type="button"
           >
             <Trash2 size={17} />
+            <span>{t("handwriting.clear")}</span>
           </button>
         </div>
       </div>
@@ -455,6 +468,7 @@ export function HandwritingCanvas({
               {t("handwriting.keep")}
             </button>
             <button
+              ref={clearNowButtonRef}
               className="danger"
               onClick={() =>
                 handleClickAction("clear-immediately", clearImmediately)
