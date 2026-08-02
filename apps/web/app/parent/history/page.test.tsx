@@ -60,7 +60,7 @@ describe("ParentHistoryPage", () => {
     expect(await screen.findByRole("heading", { name: "学习记录" })).toBeInTheDocument();
     expect(screen.getByText("已完成、批改中和已归档的家庭练习。"))
       .toBeInTheDocument();
-    expect(screen.getByText("目前还没有家庭学习记录。"))
+    expect(await screen.findByText("目前还没有家庭学习记录。"))
       .toBeInTheDocument();
     expect(screen.queryByText("Completed, grading, and archived work for every child in this family.")).not.toBeInTheDocument();
   });

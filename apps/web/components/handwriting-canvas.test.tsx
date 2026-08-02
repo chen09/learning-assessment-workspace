@@ -117,6 +117,24 @@ describe("HandwritingCanvas", () => {
     );
   });
 
+  it("opens the clear confirmation when an iPad stylus only emits a pointer event", () => {
+    render(
+      <HandwritingCanvas
+        initialStrokes={initialStrokes}
+        onChange={vi.fn()}
+      />,
+    );
+
+    fireEvent.pointerUp(
+      screen.getByRole("button", { name: "Clear handwriting" }),
+      { pointerType: "pen", pointerId: 11 },
+    );
+
+    expect(screen.getByRole("alertdialog")).toHaveTextContent(
+      "Clear all handwriting?",
+    );
+  });
+
   it("closes the clear confirmation from a touch action", () => {
     const onChange = vi.fn();
 
@@ -155,6 +173,36 @@ describe("HandwritingCanvas", () => {
     fireEvent.click(clearButton);
 
     const confirmButton = screen.getByRole("button", { name: "Clear now" });
+    fireEvent.touchEnd(confirmButton);
+    fireEvent.click(confirmButton);
+
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenLastCalledWith([], {
+      width: 900,
+      height: 420,
+    });
+  });
+
+  it("clears exactly once when iPad emits pointer, touch, and click events", () => {
+    const onChange = vi.fn();
+
+    render(
+      <HandwritingCanvas
+        initialStrokes={initialStrokes}
+        onChange={onChange}
+      />,
+    );
+
+    const clearButton = screen.getByRole("button", {
+      name: "Clear handwriting",
+    });
+    fireEvent.pointerUp(clearButton, { pointerType: "pen", pointerId: 11 });
+    fireEvent.touchEnd(clearButton);
+    fireEvent.click(clearButton);
+
+    const confirmButton = screen.getByRole("button", { name: "Clear now" });
+    fireEvent.pointerUp(confirmButton, { pointerType: "pen", pointerId: 12 });
     fireEvent.touchEnd(confirmButton);
     fireEvent.click(confirmButton);
 

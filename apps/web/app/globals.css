@@ -1357,6 +1357,7 @@ button {
   border: 0;
   border-radius: 0.6rem;
   background: transparent;
+  touch-action: manipulation;
 }
 
 .canvas-toolbar button.active {
@@ -1396,6 +1397,7 @@ button {
   background: white;
   color: var(--ink);
   font-weight: 700;
+  touch-action: manipulation;
 }
 
 .canvas-clear-confirmation button.danger {

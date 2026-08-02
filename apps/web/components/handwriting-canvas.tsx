@@ -36,6 +36,11 @@ export type CanvasSize = {
   height: number;
 };
 
+type ToolbarAction =
+  | "request-clear"
+  | "keep-handwriting"
+  | "clear-immediately";
+
 type HandwritingCanvasProps = {
   annotations?: GradingAnnotation[];
   initialSize?: CanvasSize;
@@ -77,7 +82,10 @@ export function HandwritingCanvas({
   const [width, setWidth] = useState(2.5);
   const [eraser, setEraser] = useState(false);
   const [clearConfirmationOpen, setClearConfirmationOpen] = useState(false);
-  const lastTouchActionAtRef = useRef(0);
+  const lastTouchActionRef = useRef<{
+    action: ToolbarAction;
+    at: number;
+  } | null>(null);
   const [canvasSize, setCanvasSize] = useState<CanvasSize>(() =>
     normalizeCanvasSize(initialSize),
   );
@@ -224,21 +232,58 @@ export function HandwritingCanvas({
     setClearConfirmationOpen(false);
   };
 
+  const runTouchLikeAction = (
+    actionName: ToolbarAction,
+    action: () => void,
+  ) => {
+    const now = Date.now();
+    const previousAction = lastTouchActionRef.current;
+    if (
+      previousAction?.action === actionName &&
+      now - previousAction.at < 700
+    ) {
+      return;
+    }
+    lastTouchActionRef.current = { action: actionName, at: now };
+    action();
+  };
+
   const handleTouchAction = (
     event: React.TouchEvent<HTMLButtonElement>,
+    actionName: ToolbarAction,
     action: () => void,
   ) => {
     // On iPad Chrome, a toolbar tap can dispatch touch events without the
     // synthetic click that desktop browsers normally follow with.
     event.preventDefault();
-    lastTouchActionAtRef.current = Date.now();
-    action();
+    runTouchLikeAction(actionName, action);
   };
 
-  const handleClickAction = (action: () => void) => {
+  const handlePointerAction = (
+    event: ReactPointerEvent<HTMLButtonElement>,
+    actionName: ToolbarAction,
+    action: () => void,
+  ) => {
+    if (event.pointerType !== "touch" && event.pointerType !== "pen") {
+      return;
+    }
+    // Some iPad Chrome and Apple Pencil interactions complete with a pointer
+    // event but no TouchEvent or synthetic click. Treat it like touch input.
+    event.preventDefault();
+    runTouchLikeAction(actionName, action);
+  };
+
+  const handleClickAction = (
+    actionName: ToolbarAction,
+    action: () => void,
+  ) => {
     // A touchend on iPad can be followed by a synthetic click. Do not run a
     // destructive canvas action twice for one physical tap.
-    if (Date.now() - lastTouchActionAtRef.current < 700) {
+    const previousAction = lastTouchActionRef.current;
+    if (
+      previousAction?.action === actionName &&
+      Date.now() - previousAction.at < 700
+    ) {
       return;
     }
     action();
@@ -346,9 +391,12 @@ export function HandwritingCanvas({
           <button
             aria-label={t("handwriting.clear")}
             disabled={readOnly}
-            onClick={() => handleClickAction(requestClear)}
+            onClick={() => handleClickAction("request-clear", requestClear)}
+            onPointerUp={(event) =>
+              handlePointerAction(event, "request-clear", requestClear)
+            }
             onTouchEnd={(event) =>
-              handleTouchAction(event, requestClear)
+              handleTouchAction(event, "request-clear", requestClear)
             }
             type="button"
           >
@@ -365,9 +413,22 @@ export function HandwritingCanvas({
           <p>{t("handwriting.clearConfirm")}</p>
           <div>
             <button
-              onClick={() => handleClickAction(keepHandwriting)}
+              onClick={() =>
+                handleClickAction("keep-handwriting", keepHandwriting)
+              }
+              onPointerUp={(event) =>
+                handlePointerAction(
+                  event,
+                  "keep-handwriting",
+                  keepHandwriting,
+                )
+              }
               onTouchEnd={(event) =>
-                handleTouchAction(event, keepHandwriting)
+                handleTouchAction(
+                  event,
+                  "keep-handwriting",
+                  keepHandwriting,
+                )
               }
               type="button"
             >
@@ -375,9 +436,22 @@ export function HandwritingCanvas({
             </button>
             <button
               className="danger"
-              onClick={() => handleClickAction(clearImmediately)}
+              onClick={() =>
+                handleClickAction("clear-immediately", clearImmediately)
+              }
+              onPointerUp={(event) =>
+                handlePointerAction(
+                  event,
+                  "clear-immediately",
+                  clearImmediately,
+                )
+              }
               onTouchEnd={(event) =>
-                handleTouchAction(event, clearImmediately)
+                handleTouchAction(
+                  event,
+                  "clear-immediately",
+                  clearImmediately,
+                )
               }
               type="button"
             >
