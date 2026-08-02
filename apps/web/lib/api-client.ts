@@ -125,7 +125,7 @@ export type CompletedWorksheetImport = {
   answer_source_paths?: string[];
   reference_source_paths?: string[];
   extraction?: Record<string, unknown>;
-  job: { id: string; status: string; type: string };
+  job: { id: string; status: string; type: string; error_code?: string | null };
 };
 
 export type FamilyCompletedWorksheetImport = {

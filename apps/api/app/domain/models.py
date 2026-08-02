@@ -322,6 +322,9 @@ class Job(BaseModel):
     subject_id: UUID
     type: str = "grade_submission"
     status: JobStatus = JobStatus.QUEUED
+    # Safe, controlled failure category for a recoverable parent workflow.
+    # The underlying error detail stays worker-only.
+    error_code: str | None = None
     payload: dict[str, Any] = Field(default_factory=dict)
     attempt_count: int = 0
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

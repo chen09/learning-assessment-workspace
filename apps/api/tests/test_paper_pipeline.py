@@ -3,7 +3,10 @@ import numpy as np
 import pytest
 from pypdf import PdfWriter
 
-from app.services.database_jobs import fixture_job_handler
+from app.services.database_jobs import (
+    _completed_worksheet_failure_code,
+    fixture_job_handler,
+)
 from app.services.paper_pipeline import (
     A4_PIXEL_SIZE,
     AnswerRegion,
@@ -73,6 +76,25 @@ def test_completed_pdf_is_rendered_to_one_image_per_page(tmp_path) -> None:
 
     assert [page.name for page in pages] == ["page-1.png", "page-2.png"]
     assert all(cv2.imread(str(page)) is not None for page in pages)
+
+
+@pytest.mark.parametrize(
+    ("message", "expected"),
+    [
+        ("The scan PDF has more than 100 pages.", "pdf_too_many_pages"),
+        ("The scan is not a readable PDF.", "pdf_unreadable"),
+        ("PDF rendering timed out.", "pdf_render_timeout"),
+        ("Worksheet scan exceeds the 15 MB analysis limit.", "scan_too_large"),
+        ("Worksheet scan has more than 100 analysis pages.", "scan_too_many_pages"),
+        ("Storage service temporarily failed.", "worker_error"),
+    ],
+)
+def test_completed_paper_failures_use_safe_parent_facing_codes(
+    message: str,
+    expected: str,
+) -> None:
+    """Raw errors never become parent-facing completed-paper copy."""
+    assert _completed_worksheet_failure_code(RuntimeError(message)) == expected
 
 
 @pytest.mark.asyncio

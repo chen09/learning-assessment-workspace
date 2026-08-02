@@ -582,6 +582,7 @@ describe("CreateWorkspace", () => {
         id: "analysis-job-1",
         status: "failed",
         type: "analyze_completed_worksheet",
+        error_code: "pdf_too_many_pages",
       },
     };
     mocks.getCompletedWorksheetImport
@@ -604,6 +605,11 @@ describe("CreateWorkspace", () => {
         name: "The review draft needs another try",
       }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "This PDF has more than 100 pages. Upload a shorter PDF or page images, then try again.",
+      ),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Retry analysis" }));
 
     await waitFor(() => {
@@ -615,6 +621,38 @@ describe("CreateWorkspace", () => {
     expect(
       screen.getByRole("heading", { name: "Reading the paper" }),
     ).toBeInTheDocument();
+  });
+
+  it("returns to the completed-paper uploader for a scan that needs replacing", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/parent/create/?completedWorksheetId=completed-worksheet-1",
+    );
+    mocks.getCompletedWorksheetImport.mockResolvedValue({
+      id: "completed-worksheet-1",
+      status: "failed",
+      assignment_id: null,
+      attempt_id: null,
+      response_paths: ["family-1/responses/completed-paper.pdf"],
+      job: {
+        id: "analysis-job-1",
+        status: "failed",
+        type: "analyze_completed_worksheet",
+        error_code: "pdf_too_many_pages",
+      },
+    });
+
+    render(<CreateWorkspace />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Upload a replacement" }),
+    );
+
+    expect(
+      await screen.findByRole("button", { name: "Upload for review" }),
+    ).toBeInTheDocument();
+    expect(window.location.search).not.toContain("completedWorksheetId");
   });
 
   it("never substitutes sample questions when a structured preview unexpectedly returns an empty draft", async () => {

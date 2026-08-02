@@ -762,6 +762,17 @@ const messages = {
     "completedPaper.analysisFailedTitle": "The review draft needs another try",
     "completedPaper.analysisFailedDetails":
       "The original paper remains private and unchanged. Retry the analysis; no child task or grade has been created.",
+    "completedPaper.failure.pdfTooManyPages":
+      "This PDF has more than 100 pages. Upload a shorter PDF or page images, then try again.",
+    "completedPaper.failure.pdfUnreadable":
+      "This PDF could not be read. Export it again or upload page images, then try again.",
+    "completedPaper.failure.pdfRendering":
+      "This PDF could not be prepared for review. Upload fewer or smaller pages, then try again.",
+    "completedPaper.failure.scanTooLarge":
+      "This scan is larger than 15 MB. Upload smaller images or a smaller PDF, then try again.",
+    "completedPaper.failure.scanTooManyPages":
+      "Only the first 100 scan pages can be analyzed. Upload fewer pages, then try again.",
+    "completedPaper.uploadReplacement": "Upload a replacement",
     "completedPaper.retry": "Retry analysis",
     "completedPaper.retrying": "Retrying…",
     "completedPaper.submitted": "Submitted for grading",
@@ -1611,6 +1622,17 @@ const messages = {
     "completedPaper.analysisFailedTitle": "確認用の下書きをもう一度準備します",
     "completedPaper.analysisFailedDetails":
       "元のプリントは非公開のまま変更されません。解析を再試行してください。子どもの課題や採点は作成されていません。",
+    "completedPaper.failure.pdfTooManyPages":
+      "この PDF は 100 ページを超えています。短い PDF またはページ画像をアップロードして、もう一度お試しください。",
+    "completedPaper.failure.pdfUnreadable":
+      "この PDF を読み取れませんでした。PDF を再出力するか、ページ画像をアップロードして、もう一度お試しください。",
+    "completedPaper.failure.pdfRendering":
+      "この PDF を確認用に準備できませんでした。ページ数または画像サイズを減らして、もう一度お試しください。",
+    "completedPaper.failure.scanTooLarge":
+      "このスキャンは 15 MB を超えています。小さい画像または PDF をアップロードして、もう一度お試しください。",
+    "completedPaper.failure.scanTooManyPages":
+      "解析できるスキャンは 100 ページまでです。ページ数を減らして、もう一度お試しください。",
+    "completedPaper.uploadReplacement": "新しいファイルをアップロード",
     "completedPaper.retry": "解析を再試行",
     "completedPaper.retrying": "再試行中…",
     "completedPaper.submitted": "採点に提出しました",
@@ -2432,6 +2454,17 @@ const messages = {
     "completedPaper.analysisFailedTitle": "审核草稿需要重新尝试",
     "completedPaper.analysisFailedDetails":
       "原始试卷仍保持私密且未被修改。请重新尝试解析；尚未创建孩子任务或成绩。",
+    "completedPaper.failure.pdfTooManyPages":
+      "这份 PDF 超过 100 页。请上传更短的 PDF 或分页图片后重试。",
+    "completedPaper.failure.pdfUnreadable":
+      "无法读取这份 PDF。请重新导出 PDF，或上传分页图片后重试。",
+    "completedPaper.failure.pdfRendering":
+      "无法将这份 PDF 准备为审核内容。请减少页数或图片大小后重试。",
+    "completedPaper.failure.scanTooLarge":
+      "这份扫描文件超过 15 MB。请上传更小的图片或 PDF 后重试。",
+    "completedPaper.failure.scanTooManyPages":
+      "一次最多可解析 100 页扫描内容。请减少页数后重试。",
+    "completedPaper.uploadReplacement": "上传替换文件",
     "completedPaper.retry": "重新解析",
     "completedPaper.retrying": "正在重新解析…",
     "completedPaper.submitted": "已提交批改",

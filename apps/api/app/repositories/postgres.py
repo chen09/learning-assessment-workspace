@@ -235,6 +235,7 @@ def _job(row: RowMapping) -> Job:
         subject_id=row["subject_id"],
         type=row["type"],
         status=row["status"],
+        error_code=row.get("error_code"),
         attempt_count=row["attempt_count"],
         created_at=row["created_at"],
         completed_at=row["completed_at"],
@@ -3381,7 +3382,7 @@ class PostgresRepository:
                     await connection.execute(
                         text(
                             """
-                            select id, family_id, subject_id, type, status, payload,
+                            select id, family_id, subject_id, type, status, error_code, payload,
                                    attempt_count, created_at, completed_at
                             from public.jobs
                             where subject_id = :subject_id
@@ -3447,7 +3448,7 @@ class PostgresRepository:
                           :family_id, 'analyze_completed_worksheet', :subject_id,
                           jsonb_build_object('schema_version', '1.0')
                         )
-                        returning id, family_id, subject_id, type, status, payload,
+                        returning id, family_id, subject_id, type, status, error_code, payload,
                                   attempt_count, created_at, completed_at
                         """
                     ),
@@ -3496,7 +3497,7 @@ class PostgresRepository:
                 await connection.execute(
                     text(
                         """
-                        select id, family_id, subject_id, type, status, payload,
+                        select id, family_id, subject_id, type, status, error_code, payload,
                                attempt_count, created_at, completed_at
                         from public.jobs
                         where subject_id = :subject_id

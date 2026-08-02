@@ -497,6 +497,9 @@ function CreateWorkspaceContent() {
     | "failed"
     | null
   >(null);
+  const [completedPaperFailureCode, setCompletedPaperFailureCode] = useState<
+    string | null
+  >(null);
   const [draftQuestions, setDraftQuestions] = useState<ReviewDraftQuestion[]>(
     [],
   );
@@ -574,6 +577,50 @@ function CreateWorkspaceContent() {
     window.history.replaceState(window.history.state, "", url);
   };
 
+  const returnToCompletedPaperUpload = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("completedWorksheetId");
+    window.history.replaceState(window.history.state, "", url);
+    setCompletedWorksheetId(null);
+    setCompletedWorksheetStatus(null);
+    setCompletedPaperFailureCode(null);
+    setCompletedResponsePaths([]);
+    setCompletedResponsePageCount(0);
+    setCompletedResponseFileNames([]);
+    setCompletedResponsePreviewUrls([]);
+    setCompletedAttemptId(null);
+    setCompletedReview(null);
+    setCompletedReviewSource(null);
+    setMode("completed");
+  };
+
+  const completedPaperFailureDetails = () => {
+    switch (completedPaperFailureCode) {
+      case "pdf_too_many_pages":
+        return t("completedPaper.failure.pdfTooManyPages");
+      case "pdf_unreadable":
+        return t("completedPaper.failure.pdfUnreadable");
+      case "pdf_render_timeout":
+      case "pdf_render_failed":
+        return t("completedPaper.failure.pdfRendering");
+      case "scan_too_large":
+        return t("completedPaper.failure.scanTooLarge");
+      case "scan_too_many_pages":
+        return t("completedPaper.failure.scanTooManyPages");
+      default:
+        return t("completedPaper.analysisFailedDetails");
+    }
+  };
+
+  const completedPaperFailureNeedsReplacement = [
+    "pdf_too_many_pages",
+    "pdf_unreadable",
+    "pdf_render_timeout",
+    "pdf_render_failed",
+    "scan_too_large",
+    "scan_too_many_pages",
+  ].includes(completedPaperFailureCode ?? "");
+
   useEffect(() => {
     let active = true;
     void getParentAccessToken().then(async (parentToken) => {
@@ -648,6 +695,7 @@ function CreateWorkspaceContent() {
         }
         setCompletedWorksheetId(imported.id);
         setCompletedWorksheetStatus(imported.status);
+        setCompletedPaperFailureCode(imported.job.error_code ?? null);
         setCompletedResponsePaths(imported.response_paths);
         setCompletedResponsePageCount(
           completedPaperPageCount(
@@ -903,6 +951,7 @@ function CreateWorkspaceContent() {
         );
         if (active) {
           setCompletedWorksheetStatus(imported.status);
+          setCompletedPaperFailureCode(imported.job.error_code ?? null);
           setCompletedResponsePageCount(
             completedPaperPageCount(
               imported.extraction,
@@ -1932,6 +1981,7 @@ function CreateWorkspaceContent() {
       setRequestStatus("working");
       await retryJob(imported.job.id, parentToken);
       setCompletedWorksheetStatus("processing");
+      setCompletedPaperFailureCode(null);
       setRequestStatus("idle");
     } catch {
       setRequestStatus("error");
@@ -2143,7 +2193,7 @@ function CreateWorkspaceContent() {
                 : completedWorksheetStatus === "processing"
                   ? t("completedPaper.preparingDetails")
                   : completedWorksheetStatus === "failed"
-                    ? t("completedPaper.analysisFailedDetails")
+                    ? completedPaperFailureDetails()
                   : t("completedPaper.reviewDetails")}
             </p>
           </div>
@@ -2523,16 +2573,27 @@ function CreateWorkspaceContent() {
               </button>
             </div>
           ) : completedWorksheetStatus === "failed" ? (
-            <button
-              className="button primary"
-              disabled={requestStatus === "working"}
-              onClick={() => void retryCompletedPaperAnalysis()}
-              type="button"
-            >
-              {requestStatus === "working"
-                ? t("completedPaper.retrying")
-                : t("completedPaper.retry")}
-            </button>
+            <div className="button-row">
+              {completedPaperFailureNeedsReplacement ? (
+                <button
+                  className="button secondary"
+                  onClick={returnToCompletedPaperUpload}
+                  type="button"
+                >
+                  {t("completedPaper.uploadReplacement")}
+                </button>
+              ) : null}
+              <button
+                className="button primary"
+                disabled={requestStatus === "working"}
+                onClick={() => void retryCompletedPaperAnalysis()}
+                type="button"
+              >
+                {requestStatus === "working"
+                  ? t("completedPaper.retrying")
+                  : t("completedPaper.retry")}
+              </button>
+            </div>
           ) : (
             <span className="status-pill warm">
               {t("completedPaper.preparingReview")}

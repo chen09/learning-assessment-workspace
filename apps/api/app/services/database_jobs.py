@@ -29,6 +29,24 @@ JobHandler = Callable[
 ]
 
 
+def _completed_worksheet_failure_code(error: Exception) -> str:
+    """Map expected scan failures to safe parent-facing categories only."""
+    message = str(error)
+    if "more than 100 pages" in message and "PDF" in message:
+        return "pdf_too_many_pages"
+    if "not a readable PDF" in message or "PDF has no pages" in message:
+        return "pdf_unreadable"
+    if "PDF rendering timed out" in message:
+        return "pdf_render_timeout"
+    if "PDF" in message and "render" in message:
+        return "pdf_render_failed"
+    if "15 MB analysis limit" in message:
+        return "scan_too_large"
+    if "more than 100 analysis pages" in message:
+        return "scan_too_many_pages"
+    return "worker_error"
+
+
 def _json_value(value: Any) -> Any:
     return json.loads(value) if isinstance(value, str) else value
 
@@ -669,12 +687,17 @@ class DatabaseJobWorker:
                         json.dumps(result),
                     )
             except Exception as error:
+                error_code = (
+                    _completed_worksheet_failure_code(error)
+                    if job["type"] == "analyze_completed_worksheet"
+                    else "worker_error"
+                )
                 await connection.execute(
                     """
                     update public.jobs
                     set status = 'failed',
-                        error_code = 'worker_error',
-                        error_detail = left($2, 2000),
+                        error_code = $2,
+                        error_detail = left($3, 2000),
                         available_at = now() + make_interval(
                           secs => least(300, power(2, attempt_count)::integer)
                         ),
@@ -684,6 +707,7 @@ class DatabaseJobWorker:
                     where id = $1
                     """,
                     job["id"],
+                    error_code,
                     str(error),
                 )
                 if job["type"] == "analyze_completed_worksheet":
