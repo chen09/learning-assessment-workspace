@@ -6,7 +6,7 @@ import QRCode from "qrcode";
 import { useEffect, useState } from "react";
 
 import { LanguageSwitcher } from "@/components/language-switcher";
-import { useLanguage } from "@/components/language-provider";
+import { LanguageProvider, useLanguage } from "@/components/language-provider";
 import {
   type ApiQuestion,
   getParentAccessToken,
@@ -64,6 +64,14 @@ function answerLineCount(question: ApiQuestion) {
 }
 
 export default function PrintWorksheetPage() {
+  return (
+    <LanguageProvider storageKey="demo-parent">
+      <PrintWorksheetContent />
+    </LanguageProvider>
+  );
+}
+
+function PrintWorksheetContent() {
   const { t } = useLanguage();
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [setCode, setSetCode] = useState("");

@@ -1,8 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { LanguageProvider } from "@/components/language-provider";
-
 import PrintWorksheetPage from "./page";
 
 const mocks = vi.hoisted(() => ({
@@ -27,11 +25,7 @@ vi.mock("qrcode", () => ({
 }));
 
 function renderPage() {
-  return render(
-    <LanguageProvider>
-      <PrintWorksheetPage />
-    </LanguageProvider>,
-  );
+  return render(<PrintWorksheetPage />);
 }
 
 describe("PrintWorksheetPage", () => {
@@ -180,7 +174,7 @@ describe("PrintWorksheetPage", () => {
         },
       ],
     });
-    window.localStorage.setItem("luma-language:public", "zh");
+    window.localStorage.setItem("luma-language:demo-parent", "zh");
 
     renderPage();
     await screen.findByRole("heading", { name: "English practice" });
