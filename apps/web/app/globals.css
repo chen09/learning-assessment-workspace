@@ -3940,12 +3940,15 @@ button {
 }
 
 .library-assignment-actions {
+  position: relative;
+  z-index: 2;
   display: flex;
   flex-wrap: wrap;
   gap: 0.65rem;
 }
 
-.library-assignment-controls > .library-assignment-actions {
+.library-assignment-panel > .library-assignment-actions {
+  grid-column: 2;
   align-self: end;
 }
 
@@ -4210,7 +4213,7 @@ button {
     min-width: 0;
   }
 
-  .library-assignment-controls > .library-assignment-actions {
+  .library-assignment-panel > .library-assignment-actions {
     display: flex;
     margin-top: 1rem;
     min-width: 0;

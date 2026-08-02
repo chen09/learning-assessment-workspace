@@ -581,82 +581,96 @@ function LibraryContent() {
           {assignmentStatus === "loading_children" ? (
             <p>{text.assigning}</p>
           ) : (
-            <div className="library-assignment-controls">
-              <div className="library-assignment-fields">
-                <label>
-                  <span>{text.child}</span>
-                  <select
-                    aria-label={text.child}
-                    onChange={(event) => setAssignmentChildId(event.target.value)}
-                    value={assignmentChildId}
-                  >
-                    {children.map((child) => (
-                      <option key={child.id} value={child.id}>
-                        {child.nickname} · {child.grade_stage}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {children.length === 0 && assignmentStatus === "idle" ? (
-                  <p role="status">{text.noChildren}</p>
-                ) : null}
-                <fieldset className="assignment-mode-selector">
-                  <legend>{text.assign}</legend>
+            <>
+              <div className="library-assignment-controls">
+                <div
+                  aria-label={
+                    assignmentStatus === "success"
+                      ? "Assigned practice details"
+                      : undefined
+                  }
+                  className="library-assignment-fields"
+                  inert={assignmentStatus === "success"}
+                >
                   <label>
-                    <input
-                      checked={assignmentMode === "practice"}
-                      name="library-assignment-mode"
-                      onChange={() => setAssignmentMode("practice")}
-                      type="radio"
-                    />
-                    {text.practice}
+                    <span>{text.child}</span>
+                    <select
+                      aria-label={text.child}
+                      onChange={(event) =>
+                        setAssignmentChildId(event.target.value)
+                      }
+                      value={assignmentChildId}
+                    >
+                      {children.map((child) => (
+                        <option key={child.id} value={child.id}>
+                          {child.nickname} · {child.grade_stage}
+                        </option>
+                      ))}
+                    </select>
                   </label>
-                  <label>
-                    <input
-                      checked={assignmentMode === "exam"}
-                      name="library-assignment-mode"
-                      onChange={() => setAssignmentMode("exam")}
-                      type="radio"
-                    />
-                    {text.exam}
-                  </label>
-                  {assignmentMode === "exam" ? (
-                    <label>
-                      <span>{text.timeLimit}</span>
-                      <select
-                        aria-label={text.timeLimit}
-                        onChange={(event) =>
-                          setAssignmentMinutes(Number(event.target.value))
-                        }
-                        value={assignmentMinutes}
-                      >
-                        {[10, 20, 30, 45, 60].map((minutes) => (
-                          <option key={minutes} value={minutes}>
-                            {text.minutes(minutes)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                  {children.length === 0 && assignmentStatus === "idle" ? (
+                    <p role="status">{text.noChildren}</p>
                   ) : null}
-                </fieldset>
-                <label className="assignment-note">
-                  <span>{text.note}</span>
-                  <textarea
-                    aria-label={text.note}
-                    maxLength={300}
-                    onChange={(event) => setAssignmentNote(event.target.value)}
-                    value={assignmentNote}
-                  />
-                  <small>{text.noteHint}</small>
-                </label>
-                {assignmentStatus === "error" ? (
-                  <p role="alert">{assignmentMessage}</p>
-                ) : null}
-                {assignmentStatus === "success" ? (
-                  <p className="confirmed-message" role="status">
-                    {assignmentMessage}
-                  </p>
-                ) : null}
+                  <fieldset className="assignment-mode-selector">
+                    <legend>{text.assign}</legend>
+                    <label>
+                      <input
+                        checked={assignmentMode === "practice"}
+                        name="library-assignment-mode"
+                        onChange={() => setAssignmentMode("practice")}
+                        type="radio"
+                      />
+                      {text.practice}
+                    </label>
+                    <label>
+                      <input
+                        checked={assignmentMode === "exam"}
+                        name="library-assignment-mode"
+                        onChange={() => setAssignmentMode("exam")}
+                        type="radio"
+                      />
+                      {text.exam}
+                    </label>
+                    {assignmentMode === "exam" ? (
+                      <label>
+                        <span>{text.timeLimit}</span>
+                        <select
+                          aria-label={text.timeLimit}
+                          onChange={(event) =>
+                            setAssignmentMinutes(Number(event.target.value))
+                          }
+                          value={assignmentMinutes}
+                        >
+                          {[10, 20, 30, 45, 60].map((minutes) => (
+                            <option key={minutes} value={minutes}>
+                              {text.minutes(minutes)}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
+                  </fieldset>
+                  <label className="assignment-note">
+                    <span>{text.note}</span>
+                    <textarea
+                      aria-label={text.note}
+                      maxLength={300}
+                      onChange={(event) =>
+                        setAssignmentNote(event.target.value)
+                      }
+                      value={assignmentNote}
+                    />
+                    <small>{text.noteHint}</small>
+                  </label>
+                  {assignmentStatus === "error" ? (
+                    <p role="alert">{assignmentMessage}</p>
+                  ) : null}
+                  {assignmentStatus === "success" ? (
+                    <p className="confirmed-message" role="status">
+                      {assignmentMessage}
+                    </p>
+                  ) : null}
+                </div>
               </div>
               <div className="library-assignment-actions">
                 <button
@@ -691,7 +705,7 @@ function LibraryContent() {
                     : text.confirmAssignment}
                 </button>
               </div>
-            </div>
+            </>
           )}
         </section>
       ) : null}
