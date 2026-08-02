@@ -244,6 +244,26 @@ describe("WorksheetWorkbench", () => {
     ).toBeInTheDocument();
   });
 
+  it("retries loading the assigned work after a transient request failure", async () => {
+    mocks.startAssignment
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce(assignmentWork);
+
+    render(<WorksheetWorkbench />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We could not open this practice.",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Choose the correct expansion of (a + b)(a − b).",
+      }),
+    ).toBeInTheDocument();
+    expect(mocks.startAssignment).toHaveBeenCalledTimes(2);
+  });
+
   it("uses the parent-selected exam timer and does not let the child change it", async () => {
     mocks.startAssignment.mockResolvedValue({
       ...assignmentWork,

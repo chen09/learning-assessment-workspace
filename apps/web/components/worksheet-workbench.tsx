@@ -205,6 +205,7 @@ function WorksheetWorkbenchContent() {
   const { t } = useLanguage();
   const [title, setTitle] = useState("");
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [loadRequest, setLoadRequest] = useState(0);
   const [loadState, setLoadState] = useState<
     "loading" | "ready" | "empty" | "signed-out" | "error"
   >("loading");
@@ -420,7 +421,7 @@ function WorksheetWorkbenchContent() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [loadRequest]);
 
   useEffect(() => {
     if (!dirtyQuestionId) {
@@ -1621,22 +1622,36 @@ function WorksheetWorkbenchContent() {
                 ? t("childHome.allClear")
                 : t("worksheet.unavailable")}
           </span>
-          <h1>
-            {isLoading
-              ? t("worksheet.loadingTitle")
-              : isEmpty
-                ? t("childHome.noAssigned")
-                : loadState === "signed-out"
-                  ? t("worksheet.signInRequired")
-                  : t("worksheet.loadError")}
-          </h1>
-          <p>
-            {isLoading
-              ? t("worksheet.loadingBody")
-              : isEmpty
-                ? t("childHome.parentCanAssign")
-                : t("worksheet.tryAgain")}
-          </p>
+          <div role={loadState === "error" ? "alert" : undefined}>
+            <h1>
+              {isLoading
+                ? t("worksheet.loadingTitle")
+                : isEmpty
+                  ? t("childHome.noAssigned")
+                  : loadState === "signed-out"
+                    ? t("worksheet.signInRequired")
+                    : t("worksheet.loadError")}
+            </h1>
+            <p>
+              {isLoading
+                ? t("worksheet.loadingBody")
+                : isEmpty
+                  ? t("childHome.parentCanAssign")
+                  : t("worksheet.tryAgain")}
+            </p>
+            {loadState === "error" ? (
+              <button
+                className="button primary"
+                onClick={() => {
+                  setLoadState("loading");
+                  setLoadRequest((current) => current + 1);
+                }}
+                type="button"
+              >
+                {t("worksheet.retryLoad")}
+              </button>
+            ) : null}
+          </div>
         </div>
       </section>
     );
