@@ -2803,6 +2803,16 @@
       },
       "QuestionSetDraft": {
         "properties": {
+          "import_job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Job"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "question_set": {
             "$ref": "#/components/schemas/QuestionSet"
           },
