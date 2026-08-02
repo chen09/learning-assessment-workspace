@@ -742,6 +742,8 @@ const messages = {
     "completedPaper.preparingReview": "Preparing private review",
     "completedPaper.error":
       "The reviewed JSON must match every confirmed question and answer region. Nothing was assigned; correct it and try again.",
+    "completedPaper.pageReferenceError":
+      "This upload has {pages} page(s). Each answer page must be between 1 and {pages}.",
     "completedPaper.composeTitle": "Upload a paper the child has already completed",
     "completedPaper.composeDescription":
       "Upload the original scan or photos. The handwriting stays private and is reviewed only after you confirm the draft.",
@@ -1504,6 +1506,8 @@ const messages = {
     "completedPaper.preparingReview": "非公開の確認を準備中",
     "completedPaper.error":
       "確認用 JSON は、確定するすべての問題と解答エリアに対応する必要があります。割り当ては行われていません。修正してもう一度お試しください。",
+    "completedPaper.pageReferenceError":
+      "このアップロードは {pages} ページです。解答ページ番号は 1 から {pages} の範囲にしてください。",
     "completedPaper.composeTitle": "子どもが解き終えたプリントをアップロード",
     "completedPaper.composeDescription":
       "元のスキャンまたは写真をアップロードします。手書きは非公開のまま、下書きを確認した後だけレビューされます。",
@@ -2241,6 +2245,8 @@ const messages = {
     "completedPaper.preparingReview": "正在准备私密审核",
     "completedPaper.error":
       "审核 JSON 必须匹配每一道已确认题目和答题区域。尚未安排任何练习；请修正后重试。",
+    "completedPaper.pageReferenceError":
+      "这次上传共有 {pages} 页；每题的答题页码必须在 1 到 {pages} 之间。",
     "completedPaper.composeTitle": "上传孩子已经做完的试卷",
     "completedPaper.composeDescription":
       "上传原始扫描件或照片。手写内容保持私密，只会在你确认草稿后审核。",

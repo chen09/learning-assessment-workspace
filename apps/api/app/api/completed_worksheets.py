@@ -43,6 +43,32 @@ class ConfirmCompletedWorksheetRequest(BaseModel):
         return self
 
 
+def _validate_uploaded_page_references(
+    responses: list[CompletedWorksheetResponseInput],
+    *,
+    uploaded_page_count: int,
+) -> None:
+    """Keep a reviewed answer attached only to real pages in this scan."""
+    for response in responses:
+        page_numbers = response.answer.get("page_numbers")
+        if not isinstance(page_numbers, list) or not page_numbers:
+            raise ValueError(
+                f"Answer for question {response.question_position} needs at least one page number."
+            )
+        for page_number in page_numbers:
+            if (
+                isinstance(page_number, bool)
+                or not isinstance(page_number, int)
+                or page_number < 1
+                or page_number > uploaded_page_count
+            ):
+                raise ValueError(
+                    f"Answer for question {response.question_position} references page "
+                    f"{page_number}, but this paper only has "
+                    f"{uploaded_page_count} uploaded page(s)."
+                )
+
+
 @router.post(
     "",
     response_model=CompletedWorksheetImport,
@@ -122,6 +148,14 @@ async def confirm_completed_worksheet_import(
 ) -> CompletedWorksheetConfirmation:
     """Create the formal question set and submitted attempt after review."""
     try:
+        imported = await repository.get_completed_worksheet_import(
+            str(worksheet_id),
+            parent_id,
+        )
+        _validate_uploaded_page_references(
+            request.responses,
+            uploaded_page_count=len(imported.response_paths),
+        )
         return await repository.confirm_completed_worksheet_import(
             str(worksheet_id),
             document=request.document,
@@ -133,4 +167,9 @@ async def confirm_completed_worksheet_import(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="The completed worksheet is not available for confirmation.",
+        ) from error
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(error),
         ) from error

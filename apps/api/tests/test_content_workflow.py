@@ -277,6 +277,29 @@ def test_parent_confirmation_turns_completed_worksheet_into_submitted_attempt() 
         **PARENT_HEADERS,
         "Idempotency-Key": "confirm-completed-check",
     }
+    invalid_page_reference = client.post(
+        f"/v1/completed-worksheets/{created.json()['id']}/confirm",
+        headers={
+            **PARENT_HEADERS,
+            "Idempotency-Key": "reject-missing-completed-page",
+        },
+        json={
+            **body,
+            "responses": [
+                {
+                    **body["responses"][0],
+                    "answer": {
+                        **body["responses"][0]["answer"],
+                        "page_numbers": [2],
+                    },
+                }
+            ],
+        },
+    )
+
+    assert invalid_page_reference.status_code == 422
+    assert "page 2" in invalid_page_reference.json()["detail"]
+
     confirmed = client.post(
         f"/v1/completed-worksheets/{created.json()['id']}/confirm",
         headers=headers,

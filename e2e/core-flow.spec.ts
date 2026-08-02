@@ -1562,7 +1562,7 @@ test("parent validates a local-AI completed-paper review before submitting it", 
   await page
     .getByLabel("Reference answer for question 5")
     .fill("Show the two factors.");
-  await page.getByLabel("Answer page numbers for question 1").fill("2");
+  await page.getByLabel("Answer page numbers for question 1").fill("1");
   await page
     .getByLabel("Answer transcription for question 1")
     .fill("(x - 5)(x + 5)");
@@ -1622,7 +1622,7 @@ test("parent validates a local-AI completed-paper review before submitting it", 
   expect(confirmationBody.responses[0]?.answer.source_paths).toEqual(
     imported.response_paths,
   );
-  expect(confirmationBody.responses[0]?.answer.page_numbers).toEqual([2]);
+  expect(confirmationBody.responses[0]?.answer.page_numbers).toEqual([1]);
   expect(confirmationBody.responses[0]?.answer.transcription).toBe(
     "(x - 5)(x + 5)",
   );

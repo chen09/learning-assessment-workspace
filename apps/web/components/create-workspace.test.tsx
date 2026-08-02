@@ -1716,6 +1716,17 @@ describe("CreateWorkspace", () => {
     fireEvent.change(screen.getByLabelText("Answer page numbers for question 1"), {
       target: { value: "2" },
     });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirm and start grading" }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "This upload has 1 page(s). Each answer page must be between 1 and 1.",
+    );
+    expect(mocks.confirmCompletedWorksheetImport).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText("Answer page numbers for question 1"), {
+      target: { value: "1" },
+    });
     fireEvent.change(screen.getByLabelText("Correct word order for question 5"), {
       target: { value: "She\nwalks\nto" },
     });
@@ -1778,7 +1789,7 @@ describe("CreateWorkspace", () => {
                 source_paths: [
                   "family-1/completed-paper/responses-completed-paper.jpg",
                 ],
-                page_numbers: [2],
+                page_numbers: [1],
                 regions: [{ x: 0.12, y: 0.45, width: 0.7, height: 0.2 }],
                 transcription: "(x - 5)(x + 5)",
                 legibility: "clear",

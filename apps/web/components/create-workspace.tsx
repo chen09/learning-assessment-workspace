@@ -233,7 +233,10 @@ function hasSameTokenInventory(left: string[], right: string[]) {
   return [...counts.values()].every((count) => count === 0);
 }
 
-function parseCompletedPaperReview(value: string): CompletedPaperReview {
+function parseCompletedPaperReview(
+  value: string,
+  uploadedPageCount?: number,
+): CompletedPaperReview {
   const parsed: unknown = JSON.parse(value);
   if (!isRecord(parsed) || !isRecord(parsed.document)) {
     throw new Error("The review must include a document object.");
@@ -319,10 +322,19 @@ function parseCompletedPaperReview(value: string): CompletedPaperReview {
       !Array.isArray(pageNumbers) ||
       pageNumbers.length === 0 ||
       pageNumbers.some(
-        (page) => typeof page !== "number" || !Number.isInteger(page) || page < 1,
+        (page) =>
+          typeof page !== "number" ||
+          !Number.isInteger(page) ||
+          page < 1,
       )
     ) {
       throw new Error("Each answer region needs a question position and page number.");
+    }
+    if (
+      uploadedPageCount !== undefined &&
+      pageNumbers.some((page) => page > uploadedPageCount)
+    ) {
+      throw new Error("An answer region references a page outside the uploaded scan.");
     }
     const regions = candidate.regions;
     if (
@@ -459,6 +471,9 @@ function CreateWorkspaceContent() {
   const [completedResponsePaths, setCompletedResponsePaths] = useState<string[]>(
     [],
   );
+  const [completedPaperError, setCompletedPaperError] = useState<string | null>(
+    null,
+  );
   const [completedResponseFileNames, setCompletedResponseFileNames] = useState<
     string[]
   >([]);
@@ -500,12 +515,20 @@ function CreateWorkspaceContent() {
   const assignmentTimeLimitSeconds =
     assignmentMode === "exam" ? Number(assignmentDurationMinutes) * 60 : null;
 
-  const loadCompletedReviewDraft = (extraction?: Record<string, unknown>) => {
+  const loadCompletedReviewDraft = (
+    extraction?: Record<string, unknown>,
+    uploadedPageCount?: number,
+  ) => {
     if (!extraction) {
       return;
     }
     try {
-      setCompletedReview(parseCompletedPaperReview(JSON.stringify(extraction)));
+      setCompletedReview(
+        parseCompletedPaperReview(
+          JSON.stringify(extraction),
+          uploadedPageCount,
+        ),
+      );
       setCompletedReviewSource("ai");
       setCompletedReviewFile(null);
       setRequestStatus("idle");
@@ -590,7 +613,10 @@ function CreateWorkspaceContent() {
         setCompletedResponseFileNames(imported.filenames);
         setCompletedResponsePreviewUrls(imported.response_preview_urls ?? []);
         setCompletedAttemptId(imported.attempt_id);
-        loadCompletedReviewDraft(imported.extraction);
+        loadCompletedReviewDraft(
+          imported.extraction,
+          imported.response_paths.length,
+        );
       } catch {
         if (active) {
           setRequestStatus("error");
@@ -829,7 +855,10 @@ function CreateWorkspaceContent() {
         );
         if (active) {
           setCompletedWorksheetStatus(imported.status);
-          loadCompletedReviewDraft(imported.extraction);
+          loadCompletedReviewDraft(
+            imported.extraction,
+            imported.response_paths.length,
+          );
         }
       } catch {
         if (active) {
@@ -1052,7 +1081,10 @@ function CreateWorkspaceContent() {
         setCompletedResponsePaths(imported.response_paths);
         setCompletedResponseFileNames(imported.filenames);
         setCompletedResponsePreviewUrls(imported.response_preview_urls ?? []);
-        loadCompletedReviewDraft(imported.extraction);
+        loadCompletedReviewDraft(
+          imported.extraction,
+          imported.response_paths.length,
+        );
         setRequestStatus("idle");
       } catch {
         setRequestStatus("error");
@@ -1713,12 +1745,24 @@ function CreateWorkspaceContent() {
       setRequestStatus("error");
       return;
     }
+    setCompletedPaperError(null);
     let validatedReview: CompletedPaperReview;
     try {
       validatedReview = parseCompletedPaperReview(
         JSON.stringify(completedReview),
+        completedResponsePaths.length,
       );
-    } catch {
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message === "An answer region references a page outside the uploaded scan."
+      ) {
+        setCompletedPaperError(
+          t("completedPaper.pageReferenceError", {
+            pages: completedResponsePaths.length,
+          }),
+        );
+      }
       setRequestStatus("error");
       return;
     }
@@ -1816,7 +1860,12 @@ function CreateWorkspaceContent() {
       return;
     }
     try {
-      setCompletedReview(parseCompletedPaperReview(await readTextFile(file)));
+      setCompletedReview(
+        parseCompletedPaperReview(
+          await readTextFile(file),
+          completedResponsePaths.length || undefined,
+        ),
+      );
       setCompletedReviewSource("file");
       setRequestStatus("idle");
     } catch {
@@ -2463,7 +2512,7 @@ function CreateWorkspaceContent() {
         ) : null}
         {requestStatus === "error" ? (
           <p className="form-error" role="alert">
-            {t("completedPaper.error")}
+            {completedPaperError ?? t("completedPaper.error")}
           </p>
         ) : null}
       </>
