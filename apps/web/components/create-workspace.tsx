@@ -2083,39 +2083,34 @@ function CreateWorkspaceContent() {
               onClick={() => setStage("compose")}
               type="button"
             >
-              <ArrowLeft size={16} /> Back to source
+              <ArrowLeft size={16} /> {t("draftReview.back")}
             </button>
-            <p className="eyebrow">AI structured draft</p>
-            <h1>Review before assigning</h1>
-            <p className="lede">
-              Check wording, answers, difficulty, and response type. Children
-              cannot see this until you confirm it.
-            </p>
+            <p className="eyebrow">{t("draftReview.eyebrow")}</p>
+            <h1>{t("draftReview.title")}</h1>
+            <p className="lede">{t("draftReview.description")}</p>
           </div>
           <LanguageSwitcher />
         </header>
         <div className="draft-toolbar">
           <span className="status-pill warm">
-            Draft · not visible to children
+            {t("draftReview.private")}
           </span>
           <span>
-            {draftQuestions.length} questions ·{" "}
+            {t("draftReview.questions", { count: draftQuestions.length })} ·{" "}
             {mode === "structured"
-              ? "validated JSON · answers stay private"
+              ? t("draftReview.validated")
               : assignmentMode === "exam"
-                ? `${assignmentDurationMinutes}-minute timed exam`
-                : "practice mode · no timer"}
+                ? t("draftReview.timed", {
+                    minutes: assignmentDurationMinutes,
+                  })
+                : t("draftReview.practice")}
           </span>
         </div>
         <section className="draft-question-list">
           {draftQuestions.length === 0 ? (
             <div className="empty-state" role="status">
-              <h2>No confirmed questions yet</h2>
-              <p>
-                Return to the source and import valid question JSON or create a
-                question manually. Nothing can be assigned until real questions
-                are present in this draft.
-              </p>
+              <h2>{t("draftReview.emptyTitle")}</h2>
+              <p>{t("draftReview.emptyDescription")}</p>
             </div>
           ) : (
             draftQuestions.map((question, index) => (
@@ -2227,7 +2222,7 @@ function CreateWorkspaceContent() {
                     </span>
                     <h2>{question.prompt}</h2>
                     <details>
-                      <summary>Answer and grading guide</summary>
+                      <summary>{t("draftReview.answerGuide")}</summary>
                       <p>
                         {question.answer ?? JSON.stringify(question.answer_key)}
                       </p>
@@ -2322,24 +2317,26 @@ function CreateWorkspaceContent() {
         </section>
         <section className="assignment-panel">
           <div>
-            <p className="eyebrow">Assign</p>
+            <p className="eyebrow">{t("draftReview.assign")}</p>
             <h2>
               {children.find((child) => child.id === selectedChildId)
-                ?.nickname ?? "Selected child"}{" "}
+                ?.nickname ?? t("draftReview.selectedChild")}{" "}
               ·{" "}
               {assignmentMode === "exam"
-                ? `${assignmentDurationMinutes}-minute timed exam`
-                : "practice mode"}
+                ? t("draftReview.timed", {
+                    minutes: assignmentDurationMinutes,
+                  })
+                : t("draftReview.practice")}
             </h2>
             <p>
               {assignmentMode === "exam"
-                ? `Timer: ${assignmentDurationMinutes} minutes. `
-                : "No timer. "}
-              Results appear after the whole set is graded.
+                ? `${t("draftReview.timeLimit")}: ${assignmentDurationMinutes}. `
+                : `${t("draftReview.noTimer")} `}
+              {t("draftReview.results")}
             </p>
             {!confirmed ? (
               <fieldset className="assignment-mode-selector">
-                <legend>Assignment settings</legend>
+                <legend>{t("draftReview.settings")}</legend>
                 <label>
                   <input
                     aria-label="Practice mode"
@@ -2348,7 +2345,7 @@ function CreateWorkspaceContent() {
                     onChange={() => setAssignmentMode("practice")}
                     type="radio"
                   />
-                  Practice
+                  {t("draftReview.practiceMode")}
                 </label>
                 <label>
                   <input
@@ -2358,11 +2355,11 @@ function CreateWorkspaceContent() {
                     onChange={() => setAssignmentMode("exam")}
                     type="radio"
                   />
-                  Timed exam
+                  {t("draftReview.examMode")}
                 </label>
                 {assignmentMode === "exam" ? (
                   <label>
-                    Time limit
+                    {t("draftReview.timeLimit")}
                     <select
                       aria-label="Time limit"
                       onChange={(event) =>
@@ -2381,12 +2378,12 @@ function CreateWorkspaceContent() {
                   </label>
                 ) : null}
                 <label className="assignment-note">
-                  A note for your child (optional)
+                  {t("draftReview.note")}
                   <textarea
                     aria-label="A note for your child"
                     maxLength={300}
                     onChange={(event) => setAssignmentNote(event.target.value)}
-                    placeholder="For example: Try this on your own first."
+                    placeholder={t("draftReview.notePlaceholder")}
                     rows={2}
                     value={assignmentNote}
                   />
@@ -2397,7 +2394,7 @@ function CreateWorkspaceContent() {
           </div>
           {confirmed ? (
             <div className="confirmed-message" role="status">
-              <Check size={18} /> Confirmed and assigned
+              <Check size={18} /> {t("draftReview.confirmed")}
             </div>
           ) : (
             <button
@@ -2406,13 +2403,12 @@ function CreateWorkspaceContent() {
               onClick={() => void confirmAndAssign()}
               type="button"
             >
-              Confirm and assign
+              {t("draftReview.confirm")}
             </button>
           )}
           {requestStatus === "error" ? (
             <p className="form-error" role="alert">
-              The JSON could not be imported. Check that the family and child
-              are still available, then try again.
+              {t("draftReview.error")}
             </p>
           ) : null}
           <Link
@@ -2423,7 +2419,7 @@ function CreateWorkspaceContent() {
                 : "/parent/print/"
             }
           >
-            <Printer size={17} /> Print A4 instead
+            <Printer size={17} /> {t("draftReview.print")}
           </Link>
         </section>
       </>

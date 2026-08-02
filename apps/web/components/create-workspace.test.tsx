@@ -411,6 +411,17 @@ describe("CreateWorkspace", () => {
       screen.getByRole("heading", { name: "___ it rains, stay home." }),
     ).toBeInTheDocument();
 
+    fireEvent.change(screen.getByLabelText("Language"), {
+      target: { value: "ja" },
+    });
+    expect(
+      await screen.findByRole("heading", { name: "割り当て前に確認" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("AI 構造化下書き")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("言語"), {
+      target: { value: "en" },
+    });
+
     fireEvent.click(
       screen.getByRole("button", { name: "Edit question 1" }),
     );
