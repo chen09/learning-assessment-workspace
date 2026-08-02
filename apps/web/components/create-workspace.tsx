@@ -2758,6 +2758,14 @@ function CreateWorkspaceContent() {
           >
             <Printer size={17} /> {t("draftReview.print")}
           </Link>
+          {assignmentId && selectedChildId ? (
+            <Link
+              className="button ghost"
+              href={`/child/login/?childId=${encodeURIComponent(selectedChildId)}&assignmentId=${encodeURIComponent(assignmentId)}`}
+            >
+              {t("draftReview.openChildSignIn")}
+            </Link>
+          ) : null}
         </section>
       </>
     );

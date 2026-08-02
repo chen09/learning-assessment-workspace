@@ -939,7 +939,15 @@ test("parent previews an AI JSON file before assigning its structured questions"
   }).assignment_id;
   await expect(page.getByText("Confirmed and assigned")).toBeVisible();
 
-  await page.goto(
+  const childSignIn = page.getByRole("link", { name: "Open child sign-in" });
+  await expect(childSignIn).toHaveAttribute(
+    "href",
+    new RegExp(
+      `^/child/login/?\\?childId=${encodeURIComponent(child.id)}&assignmentId=${encodeURIComponent(assignmentId)}$`,
+    ),
+  );
+  await childSignIn.click();
+  await expect(page).toHaveURL(
     `/child/login/?childId=${encodeURIComponent(child.id)}&assignmentId=${encodeURIComponent(assignmentId)}`,
   );
   for (const digit of ["1", "2", "3", "4", "5", "6"]) {

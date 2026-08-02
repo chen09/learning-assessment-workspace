@@ -718,6 +718,12 @@ describe("CreateWorkspace", () => {
     expect(
       await screen.findByText("Confirmed and assigned"),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Open child sign-in" }),
+    ).toHaveAttribute(
+      "href",
+      "/child/login?childId=child-1&assignmentId=assignment-1",
+    );
   });
 
   it("links a later AI JSON import back to an existing private source material", async () => {

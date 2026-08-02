@@ -133,6 +133,7 @@ const messages = {
     "draftReview.error":
       "The JSON could not be imported. Check that the family and child are still available, then try again.",
     "draftReview.print": "Print A4 instead",
+    "draftReview.openChildSignIn": "Open child sign-in",
     "draftReview.questionWording": "Question wording",
     "draftReview.points": "Points",
     "draftReview.responseType": "Response type",
@@ -859,6 +860,7 @@ const messages = {
     "draftReview.error":
       "JSON を読み込めませんでした。家族と子どもが利用できることを確認して、もう一度お試しください。",
     "draftReview.print": "代わりに A4 で印刷",
+    "draftReview.openChildSignIn": "子どものログインを開く",
     "draftReview.questionWording": "問題文",
     "draftReview.points": "配点",
     "draftReview.responseType": "解答形式",
@@ -1579,6 +1581,7 @@ const messages = {
     "draftReview.error":
       "无法导入 JSON。请确认家庭和孩子仍可使用后重试。",
     "draftReview.print": "改用 A4 打印",
+    "draftReview.openChildSignIn": "打开孩子登录页",
     "draftReview.questionWording": "题目内容",
     "draftReview.points": "分值",
     "draftReview.responseType": "作答形式",
