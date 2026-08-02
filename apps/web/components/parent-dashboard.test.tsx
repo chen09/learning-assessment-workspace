@@ -5,6 +5,7 @@ import { ParentDashboard } from "@/components/parent-dashboard";
 
 const mocks = vi.hoisted(() => ({
   getChildren: vi.fn(),
+  getParentAttemptReview: vi.fn(),
   getFamilyHistory: vi.fn(),
   getFamilies: vi.fn(),
   getParentAccessToken: vi.fn(),
@@ -17,6 +18,7 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/lib/api-client", () => ({
   getChildren: mocks.getChildren,
+  getParentAttemptReview: mocks.getParentAttemptReview,
   getFamilyHistory: mocks.getFamilyHistory,
   getFamilies: mocks.getFamilies,
   getParentAccessToken: mocks.getParentAccessToken,
@@ -32,6 +34,8 @@ describe("ParentDashboard", () => {
     mocks.getChildren.mockResolvedValue([]);
     mocks.getFamilyHistory.mockReset();
     mocks.getFamilyHistory.mockResolvedValue([]);
+    mocks.getParentAttemptReview.mockReset();
+    mocks.getParentAttemptReview.mockResolvedValue({ pending_review_count: 0 });
     mocks.replace.mockReset();
     window.localStorage.clear();
     window.history.replaceState({}, "", "/parent/");
@@ -120,6 +124,49 @@ describe("ParentDashboard", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("正在批阅")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "查看结果" })).toHaveAttribute(
+      "href",
+      "/parent/results?attemptId=attempt-1",
+    );
+  });
+
+  it("calls out handwriting answers that need a parent decision", async () => {
+    window.localStorage.setItem("luma-language:demo-parent", "zh");
+    mocks.getFamilies.mockResolvedValue([
+      { id: "family-1", name: "肉肉如意" },
+    ]);
+    mocks.getChildren.mockResolvedValue([
+      {
+        id: "child-1",
+        family_id: "family-1",
+        nickname: "肉肉",
+        grade_stage: "Junior high 1",
+        ui_language: "zh",
+      },
+    ]);
+    mocks.getFamilyHistory.mockResolvedValue([
+      {
+        assignment_id: "assignment-1",
+        attempt_id: "attempt-1",
+        child_id: "child-1",
+        child_nickname: "肉肉",
+        title: "手写英文练习",
+        status: "results_ready",
+        submitted_at: "2026-08-02T00:00:00Z",
+        awarded_points: 8,
+        available_points: 10,
+        correction_count: 1,
+        source_material_title: null,
+        source_material_subject: null,
+      },
+    ]);
+    mocks.getParentAttemptReview.mockResolvedValue({ pending_review_count: 2 });
+
+    render(<ParentDashboard />);
+
+    expect(
+      await screen.findByText("有 2 道手写题等待您确认"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "去确认" })).toHaveAttribute(
       "href",
       "/parent/results?attemptId=attempt-1",
     );

@@ -183,6 +183,9 @@ const messages = {
     "parentDashboard.noActiveWork": "No active practice right now",
     "parentDashboard.viewProgress": "View progress",
     "parentDashboard.viewResults": "View results",
+    "parentDashboard.pendingParentReview":
+      "{count} handwritten answer(s) need your decision",
+    "parentDashboard.reviewNow": "Review now",
     "parentDashboard.status.assigned": "Assigned",
     "parentDashboard.status.inProgress": "In progress",
     "parentDashboard.status.submitted": "Submitted",
@@ -906,6 +909,9 @@ const messages = {
     "parentDashboard.noActiveWork": "進行中の練習はありません",
     "parentDashboard.viewProgress": "進捗を見る",
     "parentDashboard.viewResults": "結果を見る",
+    "parentDashboard.pendingParentReview":
+      "手書きの回答 {count} 件の確認が必要です",
+    "parentDashboard.reviewNow": "確認する",
     "parentDashboard.status.assigned": "割り当て済み",
     "parentDashboard.status.inProgress": "学習中",
     "parentDashboard.status.submitted": "提出済み",
@@ -1622,6 +1628,8 @@ const messages = {
     "parentDashboard.noActiveWork": "当前没有进行中的练习",
     "parentDashboard.viewProgress": "查看进度",
     "parentDashboard.viewResults": "查看结果",
+    "parentDashboard.pendingParentReview": "有 {count} 道手写题等待您确认",
+    "parentDashboard.reviewNow": "去确认",
     "parentDashboard.status.assigned": "已布置",
     "parentDashboard.status.inProgress": "正在作答",
     "parentDashboard.status.submitted": "已提交",

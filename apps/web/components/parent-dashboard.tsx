@@ -15,6 +15,7 @@ import {
   getChildren,
   getFamilyHistory,
   getFamilies,
+  getParentAttemptReview,
   getParentAccessToken,
 } from "@/lib/api-client";
 
@@ -56,6 +57,9 @@ export function ParentDashboard() {
   const [families, setFamilies] = useState<Family[] | null>(null);
   const [children, setChildren] = useState<ChildProfile[]>([]);
   const [familyHistory, setFamilyHistory] = useState<ParentHistoryItem[]>([]);
+  const [pendingReviewCountByAttempt, setPendingReviewCountByAttempt] = useState<
+    Record<string, number>
+  >({});
   const [workspaceError, setWorkspaceError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -90,12 +94,33 @@ export function ParentDashboard() {
               getFamilyHistory(firstFamily.id, accessToken),
             ])
           : [[], []];
+        const reviewableAttempts = nextFamilyHistory.filter(
+          (work) =>
+            work.attempt_id !== null &&
+            ["results_ready", "correcting"].includes(work.status),
+        );
+        const reviewCounts = await Promise.allSettled(
+          reviewableAttempts.map(async (work) => {
+            const review = await getParentAttemptReview(
+              work.attempt_id as string,
+              accessToken,
+            );
+            return [work.attempt_id as string, review.pending_review_count] as const;
+          }),
+        );
         if (!active) {
           return;
         }
         setFamilies(nextFamilies);
         setChildren(nextChildren);
         setFamilyHistory(nextFamilyHistory);
+        setPendingReviewCountByAttempt(
+          Object.fromEntries(
+            reviewCounts.flatMap((result) =>
+              result.status === "fulfilled" ? [result.value] : [],
+            ),
+          ),
+        );
       } catch {
         if (active && !hasParentSession) {
           router.replace("/login/");
@@ -122,6 +147,7 @@ export function ParentDashboard() {
         childProfiles={children}
         familyHistory={familyHistory}
         families={families}
+        pendingReviewCountByAttempt={pendingReviewCountByAttempt}
         workspaceError={workspaceError}
         onRetry={() => setReloadKey((value) => value + 1)}
       />
@@ -134,11 +160,13 @@ function ParentDashboardContent({
   childProfiles,
   familyHistory,
   workspaceError,
+  pendingReviewCountByAttempt,
   onRetry,
 }: {
   families: Family[] | null;
   childProfiles: ChildProfile[];
   familyHistory: ParentHistoryItem[];
+  pendingReviewCountByAttempt: Record<string, number>;
   workspaceError: boolean;
   onRetry: () => void;
 }) {
@@ -206,6 +234,9 @@ function ParentDashboardContent({
             <div className="dashboard-child-grid">
               {childProfiles.map((child) => {
                 const currentWork = currentWorkByChild.get(child.id);
+                const pendingReviewCount = currentWork?.attempt_id
+                  ? (pendingReviewCountByAttempt[currentWork.attempt_id] ?? 0)
+                  : 0;
                 return (
                   <article className="dashboard-child-card" key={child.id}>
                     <strong>{child.nickname}</strong>
@@ -228,6 +259,21 @@ function ParentDashboardContent({
                             ? t("parentDashboard.viewResults")
                             : t("parentDashboard.viewProgress")}
                         </Link>
+                        {pendingReviewCount > 0 ? (
+                          <div className="dashboard-parent-review">
+                            <span>
+                              {t("parentDashboard.pendingParentReview", {
+                                count: pendingReviewCount,
+                              })}
+                            </span>
+                            <Link
+                              className="quiet-link"
+                              href={`/parent/results?attemptId=${encodeURIComponent(currentWork.attempt_id as string)}`}
+                            >
+                              {t("parentDashboard.reviewNow")}
+                            </Link>
+                          </div>
+                        ) : null}
                       </div>
                     ) : (
                       <p className="dashboard-no-work">

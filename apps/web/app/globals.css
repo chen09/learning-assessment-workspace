@@ -406,6 +406,24 @@ button {
   color: #13795b !important;
 }
 
+.dashboard-parent-review {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  border-radius: 0.6rem;
+  background: #fff0eb;
+  color: #a94b3c;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.dashboard-parent-review .quiet-link {
+  color: #a94b3c;
+  white-space: nowrap;
+}
+
 .dashboard-child-card .button {
   justify-content: center;
 }

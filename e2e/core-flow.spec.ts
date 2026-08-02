@@ -69,6 +69,75 @@ test("parent dashboard shows saved family data and opens child practice", async 
   );
 });
 
+test("parent dashboard highlights handwritten answers awaiting a decision", async ({
+  page,
+}) => {
+  await page.route("**/v1/families", async (route) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify([{ id: "review-family", name: "Review family" }]),
+    });
+  });
+  await page.route("**/v1/families/review-family/children", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          id: "review-child",
+          family_id: "review-family",
+          nickname: "Alex",
+          grade_stage: "Junior high 1",
+          ui_language: "en",
+        },
+      ]),
+    });
+  });
+  await page.route("**/v1/history/families/review-family", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          assignment_id: "review-assignment",
+          attempt_id: "review-attempt",
+          child_id: "review-child",
+          child_nickname: "Alex",
+          title: "Handwritten grammar response",
+          status: "results_ready",
+          submitted_at: "2026-08-02T00:00:00Z",
+          awarded_points: 8,
+          available_points: 10,
+          correction_count: 1,
+          source_material_title: null,
+          source_material_subject: null,
+        },
+      ]),
+    });
+  });
+  await page.route(
+    "**/v1/grading-results/attempts/review-attempt",
+    async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ pending_review_count: 2 }),
+      });
+    },
+  );
+
+  await page.goto("/parent/");
+
+  await expect(
+    page.getByText("2 handwritten answer(s) need your decision"),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Review now" })).toHaveAttribute(
+    "href",
+    "/parent/results/?attemptId=review-attempt",
+  );
+});
+
 test("authenticated parent legacy link is cleaned and remains responsive in all languages", async ({
   page,
 }, testInfo) => {
