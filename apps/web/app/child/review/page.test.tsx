@@ -147,6 +147,35 @@ describe("ChildReviewPage", () => {
     expect(screen.getByRole("button", { name: "今日はスキップ" })).toBeEnabled();
   });
 
+  it("does not mistake a failed review-plan load for an empty review day", async () => {
+    getTodayReviews
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce([
+        {
+          id: "review-retry",
+          source_question_id: "question-retry",
+          prompt: "Retry review prompt",
+          type: "typed_text",
+          options: null,
+          answer_mode: "text",
+          due_on: "2026-07-29",
+          interval_days: 1,
+          level: "standard",
+        },
+      ]);
+
+    render(<ChildReviewPage />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "今日の復習を読み込めませんでした。",
+    );
+    expect(screen.queryByText("今日の復習はありません。")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "もう一度試す" }));
+
+    expect(await screen.findByText("Retry review prompt")).toBeInTheDocument();
+  });
+
   it("refreshes today\u2019s review when the child returns to the page", async () => {
     getTodayReviews
       .mockResolvedValueOnce([])

@@ -52,7 +52,9 @@ function ChildReviewContent() {
   const [completed, setCompleted] = useState<Record<string, CompletedReview>>(
     {},
   );
-  const [loading, setLoading] = useState(true);
+  const [loadState, setLoadState] = useState<
+    "loading" | "ready" | "signed-out" | "error"
+  >("loading");
   const [skipping, setSkipping] = useState(false);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<ReviewActionError | null>(
@@ -69,7 +71,7 @@ function ChildReviewContent() {
         return;
       }
       setReviews([]);
-      setLoading(false);
+      setLoadState("signed-out");
       return;
     }
     try {
@@ -78,15 +80,13 @@ function ChildReviewContent() {
         return;
       }
       setReviews(nextReviews);
+      setLoadState("ready");
     } catch {
       if (latestReviewRequest.current !== request) {
         return;
       }
       setReviews([]);
-    } finally {
-      if (latestReviewRequest.current === request) {
-        setLoading(false);
-      }
+      setLoadState("error");
     }
   }, []);
 
@@ -262,12 +262,16 @@ function ChildReviewContent() {
         </span>
         <p className="eyebrow">{t("review.today")}</p>
         <h1>
-          {loading
+          {loadState === "loading"
             ? t("review.loading")
+            : loadState === "error"
+              ? t("review.loadError")
+              : loadState === "signed-out"
+                ? t("history.signedOut")
             : t(countKey, { count: reviews.length })}
         </h1>
         <p>{t("review.description")}</p>
-        {!loading && reviews.length === 0 ? (
+        {loadState === "ready" && reviews.length === 0 ? (
           <>
             <p>{t("review.none")}</p>
             <Link className="button primary large" href="/child/">
@@ -275,9 +279,29 @@ function ChildReviewContent() {
             </Link>
           </>
         ) : null}
+        {loadState === "error" ? (
+          <div className="form-error" role="alert">
+            <p>{t("review.loadError")}</p>
+            <button
+              className="button ghost"
+              onClick={() => {
+                setLoadState("loading");
+                void refreshReviews();
+              }}
+              type="button"
+            >
+              {t("worksheet.retryLoad")}
+            </button>
+          </div>
+        ) : null}
+        {loadState === "signed-out" ? (
+          <Link className="button primary large" href="/child/login/">
+            {t("review.backHome")} <ArrowRight size={17} />
+          </Link>
+        ) : null}
       </section>
 
-      {reviews.length > 0 ? (
+      {loadState === "ready" && reviews.length > 0 ? (
         <section className="draft-question-list">
           {reviews.map((review, index) => (
             <article key={review.id}>
@@ -339,7 +363,7 @@ function ChildReviewContent() {
       <button
         className="skip-button"
         disabled={
-          loading ||
+          loadState !== "ready" ||
           reviews.length === 0 ||
           skipping ||
           reviews.every((review) => Boolean(completed[review.id]))

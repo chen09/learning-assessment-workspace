@@ -591,6 +591,7 @@ const messages = {
     "review.description":
       "A short mix at the right level, with no timer.",
     "review.loading": "Loading today's review…",
+    "review.loadError": "Today's review could not be loaded.",
     "review.none": "Nothing is due today.",
     "review.backHome": "Back home",
     "review.level.reinforcement": "Reinforcement",
@@ -1373,6 +1374,7 @@ const messages = {
     "review.quickMany": "すぐできる復習 {count} 問",
     "review.description": "今の力に合った短い復習です。時間制限はありません。",
     "review.loading": "今日の復習を読み込み中…",
+    "review.loadError": "今日の復習を読み込めませんでした。",
     "review.none": "今日の復習はありません。",
     "review.backHome": "ホームに戻る",
     "review.level.reinforcement": "基礎固め",
@@ -2136,6 +2138,7 @@ const messages = {
     "review.quickMany": "{count} 道快速复习题",
     "review.description": "根据当前水平安排的短时复习，不限时间。",
     "review.loading": "正在加载今日复习…",
+    "review.loadError": "无法加载今日复习。",
     "review.none": "今天没有到期的复习。",
     "review.backHome": "返回首页",
     "review.level.reinforcement": "巩固",
