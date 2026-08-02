@@ -653,6 +653,48 @@ def test_parent_can_retry_a_failed_source_import_without_losing_the_source() -> 
     assert repository.imports[imported["id"]].status == QuestionSetStatus.PROCESSING
 
 
+def test_library_marks_a_failed_source_import_as_retryable() -> None:
+    client = TestClient(create_app())
+    fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+    imported = client.post(
+        "/v1/question-sets/imports",
+        headers={**PARENT_HEADERS, "Idempotency-Key": "library-failed-import"},
+        json={
+            "family_id": fixture["family"]["id"],
+            "filenames": ["private-textbook.pdf"],
+            "purpose": "generate_similar",
+            "title": "Private textbook",
+            "subject": "English",
+        },
+    ).json()
+    repository = client.app.state.repository
+    question_set = repository.question_sets[imported["question_set_id"]]
+    source_import = repository.imports[imported["id"]]
+    question_set.status = QuestionSetStatus.PROCESSING
+    source_import.status = QuestionSetStatus.PROCESSING
+    failed_job = Job(
+        family_id=question_set.family_id,
+        subject_id=source_import.id,
+        type="extract_source",
+        status=JobStatus.FAILED,
+    )
+    repository.jobs[str(failed_job.id)] = failed_job
+
+    library = client.get(
+        f"/v1/library/families/{fixture['family']['id']}/question-sets",
+        headers=PARENT_HEADERS,
+    )
+
+    assert library.status_code == 200
+    card = next(
+        item
+        for item in library.json()
+        if item["id"] == imported["question_set_id"]
+    )
+    assert card["status"] == "processing"
+    assert card["import_job_status"] == "failed"
+
+
 def test_lesson_one_import_keeps_answer_key_private_and_creates_real_questions() -> None:
     client = TestClient(create_app())
     fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()

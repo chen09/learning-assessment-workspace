@@ -146,6 +146,29 @@ describe("LibraryPage", () => {
     );
   });
 
+  it("marks a failed source import as retryable in the family library", async () => {
+    mocks.getFamilyQuestionSets.mockResolvedValueOnce([
+      {
+        id: "set-failed-import",
+        family_id: "family-1",
+        title: "Scanned maths worksheet",
+        subject: "Math",
+        status: "processing",
+        import_job_status: "failed",
+        question_count: 0,
+        source_summary: {},
+      },
+    ]);
+
+    render(<LibraryPage />);
+
+    expect(await screen.findByText("导入失败，可重新处理")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "重新处理导入" })).toHaveAttribute(
+      "href",
+      "/parent/create?questionSetId=set-failed-import",
+    );
+  });
+
   it("lets a parent assign a confirmed library set to a child", async () => {
     mocks.getFamilyQuestionSets.mockResolvedValueOnce([
       {

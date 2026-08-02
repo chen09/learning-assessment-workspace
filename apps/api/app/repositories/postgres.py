@@ -3711,6 +3711,16 @@ class PostgresRepository:
                         """
                         select qs.id, qs.family_id, qs.title, qs.subject,
                                qs.status, qs.source_summary,
+                               (
+                                 select j.status
+                                 from public.question_set_imports i
+                                 join public.jobs j
+                                   on j.subject_id = i.id
+                                  and j.type = 'extract_source'
+                                 where i.question_set_id = qs.id
+                                 order by j.created_at desc
+                                 limit 1
+                               ) as import_job_status,
                                count(q.id)::integer as question_count
                         from public.question_sets qs
                         left join public.questions q

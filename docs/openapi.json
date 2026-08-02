@@ -1294,6 +1294,16 @@
             "title": "Id",
             "type": "string"
           },
+          "import_job_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "question_count": {
             "minimum": 0.0,
             "title": "Question Count",

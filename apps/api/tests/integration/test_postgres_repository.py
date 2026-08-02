@@ -168,8 +168,34 @@ async def test_postgres_vertical_flow_and_family_isolation() -> None:
                 """,
                 imported.id,
             )
+            await retry_connection.execute(
+                """
+                update public.question_set_imports
+                set status = 'processing'
+                where id = $1
+                """,
+                imported.id,
+            )
+            await retry_connection.execute(
+                """
+                update public.question_sets
+                set status = 'processing'
+                where id = $1
+                """,
+                imported.question_set_id,
+            )
         finally:
             await retry_connection.close()
+        library_sets = await repository.list_family_question_sets(
+            family_a,
+            str(parent_a),
+        )
+        imported_library_set = next(
+            item
+            for item in library_sets
+            if item.id == imported.question_set_id
+        )
+        assert imported_library_set.import_job_status.value == "failed"
         retried_job = await repository.retry_job(
             str(failed_job_id),
             str(parent_a),

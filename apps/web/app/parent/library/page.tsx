@@ -45,6 +45,8 @@ const copy = {
     rejected: "Review needs changes",
     resumeReview: "Continue question-set review",
     resumeImport: "Check import progress",
+    importFailed: "Import needs to be retried",
+    retryImport: "Retry import",
     assign: "Assign to child",
     assignTitle: (title: string) => `Assign “${title}”`,
     child: "Child",
@@ -89,6 +91,8 @@ const copy = {
     rejected: "レビューで修正が必要",
     resumeReview: "問題セットの確認を続ける",
     resumeImport: "取込状況を確認する",
+    importFailed: "取込の再実行が必要です",
+    retryImport: "取込をやり直す",
     assign: "子どもに割り当てる",
     assignTitle: (title: string) => `「${title}」を割り当てる`,
     child: "子ども",
@@ -132,6 +136,8 @@ const copy = {
     rejected: "审核需要修改",
     resumeReview: "继续审核题单",
     resumeImport: "查看导入进度",
+    importFailed: "导入失败，可重新处理",
+    retryImport: "重新处理导入",
     assign: "分配给孩子",
     assignTitle: (title: string) => `分配「${title}」`,
     child: "孩子",
@@ -475,6 +481,8 @@ function LibraryContent() {
             set.source_summary.source_material_title?.trim();
           const sourceMaterialSubject =
             set.source_summary.source_material_subject?.trim() ?? "";
+          const sourceImportFailed =
+            set.status === "processing" && set.import_job_status === "failed";
           return (
             <article className="library-card" key={set.id}>
               <span className="library-icon">
@@ -493,12 +501,14 @@ function LibraryContent() {
               ) : null}
               <span
                 className={
-                  set.status === "needs_review"
+                  set.status === "needs_review" || sourceImportFailed
                     ? "status-pill warm"
                     : "status-pill"
                 }
               >
-                {text.status[set.status]}
+                {sourceImportFailed
+                  ? text.importFailed
+                  : text.status[set.status]}
               </span>
               {set.status === "confirmed" ? (
                 <div className="library-card-actions">
@@ -582,7 +592,7 @@ function LibraryContent() {
                       set.id,
                     )}`}
                   >
-                    {text.resumeImport}
+                    {sourceImportFailed ? text.retryImport : text.resumeImport}
                   </Link>
                 </div>
               ) : null}

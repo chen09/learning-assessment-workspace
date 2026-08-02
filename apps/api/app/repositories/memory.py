@@ -1869,6 +1869,28 @@ class MemoryRepository:
             or parent_id not in self.family_parents.get(family_id, set())
         ):
             raise NotFoundError
+
+        def source_import_job_status(question_set_id: UUID) -> JobStatus | None:
+            source_import = next(
+                (
+                    imported
+                    for imported in self.imports.values()
+                    if imported.question_set_id == question_set_id
+                ),
+                None,
+            )
+            if source_import is None:
+                return None
+            import_jobs = [
+                job
+                for job in self.jobs.values()
+                if job.type == "extract_source"
+                and str(job.subject_id) == str(source_import.id)
+            ]
+            if not import_jobs:
+                return None
+            return max(import_jobs, key=lambda job: job.created_at).status
+
         return [
             FamilyLibraryQuestionSet(
                 id=question_set.id,
@@ -1881,6 +1903,7 @@ class MemoryRepository:
                     for question in self.questions.values()
                 ),
                 source_summary=question_set.source_summary,
+                import_job_status=source_import_job_status(question_set.id),
             )
             for question_set in reversed(list(self.question_sets.values()))
             if str(question_set.family_id) == family_id

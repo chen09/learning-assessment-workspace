@@ -380,6 +380,7 @@ export type FamilyQuestionSet = {
   title: string;
   subject: string;
   status: "draft" | "processing" | "needs_review" | "confirmed";
+  import_job_status?: "queued" | "running" | "succeeded" | "failed" | null;
   question_count: number;
   source_summary: {
     artifact_kind?: string;

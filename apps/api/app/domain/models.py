@@ -577,6 +577,7 @@ class FamilyLibraryQuestionSet(BaseModel):
     status: QuestionSetStatus
     question_count: int = Field(ge=0)
     source_summary: dict[str, Any] = Field(default_factory=dict)
+    import_job_status: JobStatus | None = None
 
 
 class CreateAssignmentRequest(BaseModel):
