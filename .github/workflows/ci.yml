@@ -42,6 +42,8 @@ jobs:
       - uses: astral-sh/setup-uv@v9.0.0
         with:
           python-version: "3.13"
+      - name: Install PDF rendering dependency
+        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends poppler-utils
       - run: uv sync --project apps/api --all-groups
       - run: npm run lint:api
       - run: npm run typecheck:api
