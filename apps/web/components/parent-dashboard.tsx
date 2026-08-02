@@ -55,6 +55,7 @@ export function ParentDashboard() {
   const router = useRouter();
   const [authenticated, setAuthenticated] = useState(false);
   const [families, setFamilies] = useState<Family[] | null>(null);
+  const [activeFamilyId, setActiveFamilyId] = useState<string | null>(null);
   const [children, setChildren] = useState<ChildProfile[]>([]);
   const [familyHistory, setFamilyHistory] = useState<ParentHistoryItem[]>([]);
   const [pendingReviewCountByAttempt, setPendingReviewCountByAttempt] = useState<
@@ -87,11 +88,13 @@ export function ParentDashboard() {
         if (!active) {
           return;
         }
-        const firstFamily = nextFamilies[0];
-        const [nextChildren, nextFamilyHistory] = firstFamily
+        const nextActiveFamily =
+          nextFamilies.find((family) => family.id === activeFamilyId) ??
+          nextFamilies[0];
+        const [nextChildren, nextFamilyHistory] = nextActiveFamily
           ? await Promise.all([
-              getChildren(firstFamily.id, accessToken),
-              getFamilyHistory(firstFamily.id, accessToken),
+              getChildren(nextActiveFamily.id, accessToken),
+              getFamilyHistory(nextActiveFamily.id, accessToken),
             ])
           : [[], []];
         const reviewableAttempts = nextFamilyHistory.filter(
@@ -112,6 +115,7 @@ export function ParentDashboard() {
           return;
         }
         setFamilies(nextFamilies);
+        setActiveFamilyId(nextActiveFamily?.id ?? null);
         setChildren(nextChildren);
         setFamilyHistory(nextFamilyHistory);
         setPendingReviewCountByAttempt(
@@ -135,7 +139,7 @@ export function ParentDashboard() {
     return () => {
       active = false;
     };
-  }, [reloadKey, router]);
+  }, [activeFamilyId, reloadKey, router]);
 
   if (!authenticated) {
     return null;
@@ -147,8 +151,13 @@ export function ParentDashboard() {
         childProfiles={children}
         familyHistory={familyHistory}
         families={families}
+        activeFamilyId={activeFamilyId}
         pendingReviewCountByAttempt={pendingReviewCountByAttempt}
         workspaceError={workspaceError}
+        onSelectFamily={(familyId) => {
+          setFamilies(null);
+          setActiveFamilyId(familyId);
+        }}
         onRetry={() => setReloadKey((value) => value + 1)}
       />
     </AppShell>
@@ -157,16 +166,20 @@ export function ParentDashboard() {
 
 function ParentDashboardContent({
   families,
+  activeFamilyId,
   childProfiles,
   familyHistory,
   workspaceError,
   pendingReviewCountByAttempt,
+  onSelectFamily,
   onRetry,
 }: {
   families: Family[] | null;
+  activeFamilyId: string | null;
   childProfiles: ChildProfile[];
   familyHistory: ParentHistoryItem[];
   pendingReviewCountByAttempt: Record<string, number>;
+  onSelectFamily: (familyId: string) => void;
   workspaceError: boolean;
   onRetry: () => void;
 }) {
@@ -196,7 +209,8 @@ function ParentDashboardContent({
     );
   }
 
-  const activeFamily = families[0];
+  const activeFamily =
+    families.find((family) => family.id === activeFamilyId) ?? families[0];
   if (activeFamily) {
     const currentWorkByChild = new Map<string, ParentHistoryItem>();
     for (const work of familyHistory) {
@@ -219,7 +233,24 @@ function ParentDashboardContent({
               })}
             </p>
           </div>
-          <LanguageSwitcher />
+          <div className="header-actions">
+            {families.length > 1 ? (
+              <label className="dashboard-family-selector">
+                <span>{t("family.currentLabel")}</span>
+                <select
+                  value={activeFamily.id}
+                  onChange={(event) => onSelectFamily(event.target.value)}
+                >
+                  {families.map((family) => (
+                    <option key={family.id} value={family.id}>
+                      {family.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            <LanguageSwitcher />
+          </div>
         </header>
 
         <section className="settings-card dashboard-family-card">

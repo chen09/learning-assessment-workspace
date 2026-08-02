@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ParentDashboard } from "@/components/parent-dashboard";
@@ -127,6 +127,39 @@ describe("ParentDashboard", () => {
       "href",
       "/parent/results?attemptId=attempt-1",
     );
+  });
+
+  it("switches the homepage to another family without mixing child data", async () => {
+    window.localStorage.setItem("luma-language:demo-parent", "zh");
+    mocks.getFamilies.mockResolvedValue([
+      { id: "family-1", name: "肉肉如意" },
+      { id: "family-2", name: "第二个家庭" },
+    ]);
+    mocks.getChildren.mockImplementation((familyId: string) =>
+      Promise.resolve([
+        {
+          id: `${familyId}-child`,
+          family_id: familyId,
+          nickname: familyId === "family-1" ? "肉肉" : "小明",
+          grade_stage: "Junior high 1",
+          ui_language: "zh",
+        },
+      ]),
+    );
+
+    render(<ParentDashboard />);
+
+    expect(await screen.findByRole("heading", { name: "肉肉如意" }))
+      .toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("当前家庭"), {
+      target: { value: "family-2" },
+    });
+
+    expect(await screen.findByRole("heading", { name: "第二个家庭" }))
+      .toBeInTheDocument();
+    expect(screen.getByText("小明", { selector: "strong" }))
+      .toBeInTheDocument();
+    expect(mocks.getChildren).toHaveBeenLastCalledWith("family-2", "parent-token");
   });
 
   it("calls out handwriting answers that need a parent decision", async () => {

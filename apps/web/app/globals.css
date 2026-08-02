@@ -245,6 +245,25 @@ button {
   gap: 0.7rem;
 }
 
+.dashboard-family-selector {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 760;
+}
+
+.dashboard-family-selector select {
+  min-width: 10rem;
+  height: 2.7rem;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  padding: 0 2.1rem 0 0.8rem;
+}
+
 .language-picker select {
   height: 2.7rem;
   border: 1px solid var(--line);

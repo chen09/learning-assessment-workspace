@@ -69,6 +69,54 @@ test("parent dashboard shows saved family data and opens child practice", async 
   );
 });
 
+test("parent dashboard switches families before showing another child's work", async ({
+  page,
+}) => {
+  await page.route("**/v1/families", async (route) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify([
+        { id: "switch-family-1", name: "First family" },
+        { id: "switch-family-2", name: "Second family" },
+      ]),
+    });
+  });
+  await page.route("**/v1/families/*/children", async (route) => {
+    const familyId = route.request().url().includes("switch-family-2")
+      ? "switch-family-2"
+      : "switch-family-1";
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          id: `${familyId}-child`,
+          family_id: familyId,
+          nickname: familyId === "switch-family-1" ? "First child" : "Second child",
+          grade_stage: "Junior high 1",
+          ui_language: "en",
+        },
+      ]),
+    });
+  });
+  await page.route("**/v1/history/families/*", async (route) => {
+    await route.fulfill({ contentType: "application/json", body: "[]" });
+  });
+
+  await page.goto("/parent/");
+  await expect(page.getByRole("heading", { name: "First family" })).toBeVisible();
+  await expect(page.getByText("First child", { exact: true })).toBeVisible();
+
+  await page.getByLabel("Current family").selectOption("switch-family-2");
+
+  await expect(page.getByRole("heading", { name: "Second family" })).toBeVisible();
+  await expect(page.getByText("Second child", { exact: true })).toBeVisible();
+  await expect(page.getByText("First child", { exact: true })).toBeHidden();
+});
+
 test("parent dashboard highlights handwritten answers awaiting a decision", async ({
   page,
 }) => {
