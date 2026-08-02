@@ -101,6 +101,11 @@ type CropTarget = {
   bounds: CropBounds;
 };
 
+type DirtyQuestion = {
+  id: string;
+  revision: number;
+};
+
 const MINIMUM_PHOTO_FILE_BYTES = 100 * 1024;
 
 function hasMeaningfulAnswer(answer: Answer | undefined) {
@@ -237,7 +242,9 @@ function WorksheetWorkbenchContent() {
     "idle" | "saving" | "saved" | "offline"
   >("idle");
   const [isSyncingSavedAnswer, setIsSyncingSavedAnswer] = useState(false);
-  const [dirtyQuestionId, setDirtyQuestionId] = useState<string | null>(null);
+  const [dirtyQuestion, setDirtyQuestion] = useState<DirtyQuestion | null>(
+    null,
+  );
   const [playCounts, setPlayCounts] = useState<Record<string, number>>({});
   const audioRefs = useRef<Record<string, HTMLAudioElement | null>>({});
   const [examMode, setExamMode] = useState(false);
@@ -245,9 +252,10 @@ function WorksheetWorkbenchContent() {
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [familyId, setFamilyId] = useState<string | null>(null);
   const [childToken, setChildToken] = useState<string | null>(null);
-  const [responseVersions, setResponseVersions] = useState<
-    Record<string, number>
-  >({});
+  const responseVersions = useRef<Record<string, number>>({});
+  const saveChains = useRef(new Map<string, Promise<void>>());
+  const autosaveTimers = useRef(new Map<string, number>());
+  const latestDirtyRevision = useRef(0);
   const [submittedQuestionIds, setSubmittedQuestionIds] = useState<string[]>(
     [],
   );
@@ -275,6 +283,16 @@ function WorksheetWorkbenchContent() {
         URL.revokeObjectURL(previewUrl);
       }
       photoObjectUrls.current.clear();
+    },
+    [],
+  );
+
+  useEffect(
+    () => () => {
+      for (const timer of autosaveTimers.current.values()) {
+        window.clearTimeout(timer);
+      }
+      autosaveTimers.current.clear();
     },
     [],
   );
@@ -374,13 +392,11 @@ function WorksheetWorkbenchContent() {
               ]),
           ),
         );
-        setResponseVersions(
-          Object.fromEntries(
-            savedResponses.map((response) => [
-              response.question_id,
-              response.version,
-            ]),
-          ),
+        responseVersions.current = Object.fromEntries(
+          savedResponses.map((response) => [
+            response.question_id,
+            response.version,
+          ]),
         );
         const submittedIds = work.submitted_question_ids ?? [];
         setSubmittedQuestionIds(submittedIds);
@@ -435,15 +451,20 @@ function WorksheetWorkbenchContent() {
     };
   }, [loadRequest]);
 
-  useEffect(() => {
-    if (!dirtyQuestionId) {
-      return;
+  const scheduleAnswerSave = (
+    questionId: string,
+    answer: Answer,
+    answerRevision: number,
+  ) => {
+    const existingTimer = autosaveTimers.current.get(questionId);
+    if (existingTimer !== undefined) {
+      window.clearTimeout(existingTimer);
     }
     const timer = window.setTimeout(() => {
-      const answer = answers[dirtyQuestionId];
-      const queueKey = `${attemptId ?? "demo-attempt"}:${dirtyQuestionId}`;
+      autosaveTimers.current.delete(questionId);
+      const queueKey = `${attemptId ?? "demo-attempt"}:${questionId}`;
       const question = questions.find(
-        (candidate) => candidate.id === dirtyQuestionId,
+        (candidate) => candidate.id === questionId,
       );
       const kind: DraftSyncRequest["payload"]["kind"] =
         question?.type === "photo"
@@ -474,27 +495,26 @@ function WorksheetWorkbenchContent() {
                 strokes: answer?.strokes ?? [],
                 canvas_size: answer?.canvasSize,
               };
-      const syncRequest: DraftSyncRequest | undefined =
-        attemptId && childToken
-          ? {
-              attemptId,
-              questionId: dirtyQuestionId,
-              payload: {
-                kind,
-                answer: apiAnswer,
-                expected_version: responseVersions[dirtyQuestionId] ?? 0,
-              },
-            }
-          : undefined;
-      void savePendingDraft(
-        queueKey,
-        answer,
-        syncRequest,
-      )
-        .then(async () => {
+      const persistAnswer = async () => {
+        const syncRequest: DraftSyncRequest | undefined =
+          attemptId && childToken
+            ? {
+                attemptId,
+                questionId,
+                payload: {
+                  kind,
+                  answer: apiAnswer,
+                  expected_version: responseVersions.current[questionId] ?? 0,
+                },
+              }
+            : undefined;
+        try {
+          await savePendingDraft(queueKey, answer, syncRequest);
           if (!syncRequest || !childToken) {
-            setSaveStatus("saved");
-            setDirtyQuestionId(null);
+            if (latestDirtyRevision.current === answerRevision) {
+              setSaveStatus("saved");
+              setDirtyQuestion(null);
+            }
             return;
           }
           const saved = await saveAttemptResponse(
@@ -503,25 +523,40 @@ function WorksheetWorkbenchContent() {
             syncRequest.payload,
             childToken,
           );
-          setResponseVersions((current) => ({
-            ...current,
-            [dirtyQuestionId]: saved.version,
-          }));
+          responseVersions.current = {
+            ...responseVersions.current,
+            [questionId]: saved.version,
+          };
           await removePendingDraft(queueKey);
-          setSaveStatus("saved");
-          setDirtyQuestionId(null);
-        })
-        .catch(() => setSaveStatus("offline"));
+          if (latestDirtyRevision.current === answerRevision) {
+            setSaveStatus("saved");
+            setDirtyQuestion(null);
+          }
+        } catch {
+          if (latestDirtyRevision.current === answerRevision) {
+            setSaveStatus("offline");
+          }
+          throw new Error("Unable to persist the latest answer.");
+        }
+      };
+      const previousSave = saveChains.current.get(queueKey) ?? Promise.resolve();
+      const queuedSave = previousSave.catch(() => undefined).then(persistAnswer);
+      saveChains.current.set(queueKey, queuedSave);
+      void queuedSave.then(
+        () => {
+          if (saveChains.current.get(queueKey) === queuedSave) {
+            saveChains.current.delete(queueKey);
+          }
+        },
+        () => {
+          if (saveChains.current.get(queueKey) === queuedSave) {
+            saveChains.current.delete(queueKey);
+          }
+        },
+      );
     }, 350);
-    return () => window.clearTimeout(timer);
-  }, [
-    answers,
-    attemptId,
-    childToken,
-    dirtyQuestionId,
-    questions,
-    responseVersions,
-  ]);
+    autosaveTimers.current.set(questionId, timer);
+  };
 
   useEffect(() => {
     if (!examMode) {
@@ -704,7 +739,14 @@ function WorksheetWorkbenchContent() {
         ),
       );
       setAnswers({});
-      setResponseVersions({});
+      responseVersions.current = {};
+      saveChains.current.clear();
+      for (const timer of autosaveTimers.current.values()) {
+        window.clearTimeout(timer);
+      }
+      autosaveTimers.current.clear();
+      latestDirtyRevision.current += 1;
+      setDirtyQuestion(null);
       setSubmittedQuestionIds([]);
       setQuestionResults({});
       setGradingQuestionIds([]);
@@ -814,8 +856,11 @@ function WorksheetWorkbenchContent() {
       return;
     }
     setAnswers((current) => ({ ...current, [questionId]: answer }));
-    setDirtyQuestionId(questionId);
+    const revision = latestDirtyRevision.current + 1;
+    latestDirtyRevision.current = revision;
+    setDirtyQuestion({ id: questionId, revision });
     setSaveStatus("saving");
+    scheduleAnswerSave(questionId, answer, revision);
   };
 
   const playListeningAudio = async (question: Question) => {
@@ -1069,7 +1114,7 @@ function WorksheetWorkbenchContent() {
       const isUploadingPhotos = photoUploadQuestionId === question.id;
       const isSavingPhotoAnswer =
         isUploadingPhotos ||
-        (dirtyQuestionId === question.id && saveStatus === "saving");
+        (dirtyQuestion?.id === question.id && saveStatus === "saving");
       const canManagePhotoOrder = photoNames.length === photoPaths.length;
       const updatePhotos = (names: string[], paths: string[]) => {
         updateAnswer(question.id, { photoNames: names, photoPaths: paths });

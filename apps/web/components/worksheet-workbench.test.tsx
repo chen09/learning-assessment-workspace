@@ -252,6 +252,37 @@ describe("WorksheetWorkbench", () => {
     ).toBeInTheDocument();
   });
 
+  it("keeps an autosave queued when the child moves to another question", async () => {
+    render(<WorksheetWorkbench />);
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Choose the correct expansion of (a + b)(a − b).",
+      }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("radio", { name: "a² − b²" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next question" }));
+    fireEvent.change(
+      await screen.findByLabelText("Your answer"),
+      { target: { value: "goes" } },
+    );
+
+    await waitFor(() => {
+      expect(mocks.saveAttemptResponse).toHaveBeenCalledWith(
+        "attempt-1",
+        "algebra-choice",
+        expect.objectContaining({ answer: { choices: [0] } }),
+        "child-token",
+      );
+      expect(mocks.saveAttemptResponse).toHaveBeenCalledWith(
+        "attempt-1",
+        "english-fill",
+        expect.objectContaining({ answer: { text: "goes" } }),
+        "child-token",
+      );
+    });
+  });
+
   it("lets a child reorder or remove selected sentence words before saving", async () => {
     mocks.startAssignment.mockResolvedValueOnce({
       ...assignmentWork,
@@ -293,6 +324,53 @@ describe("WorksheetWorkbench", () => {
         "word-order",
         expect.objectContaining({
           answer: { tokens: ["She", "walks", "to"] },
+        }),
+        "child-token",
+      );
+    });
+  });
+
+  it("serializes consecutive word-order saves with the latest response version", async () => {
+    mocks.startAssignment.mockResolvedValueOnce({
+      ...assignmentWork,
+      questions: [
+        {
+          id: "word-order",
+          position: 1,
+          type: "word_order" as const,
+          prompt: "Put the words in order.",
+          options: ["She", "school.", "walks", "to"],
+          points: 1,
+        },
+      ],
+    });
+    let resolveFirstSave: ((value: { version: number }) => void) | undefined;
+    const firstSave = new Promise<{ version: number }>((resolve) => {
+      resolveFirstSave = resolve;
+    });
+    mocks.saveAttemptResponse
+      .mockImplementationOnce(() => firstSave)
+      .mockResolvedValueOnce({ version: 2 });
+
+    render(<WorksheetWorkbench />);
+
+    await screen.findByRole("heading", { name: "Put the words in order." });
+    for (const token of ["She", "school.", "walks", "to"]) {
+      fireEvent.click(screen.getByRole("button", { name: token }));
+    }
+    await waitFor(() => expect(mocks.saveAttemptResponse).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole("button", { name: "Move school. earlier" }));
+    resolveFirstSave?.({ version: 1 });
+
+    await waitFor(() => {
+      expect(mocks.saveAttemptResponse).toHaveBeenNthCalledWith(
+        2,
+        "attempt-1",
+        "word-order",
+        expect.objectContaining({
+          answer: { tokens: ["school.", "She", "walks", "to"] },
+          expected_version: 1,
         }),
         "child-token",
       );
