@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import ParentHistoryPage from "./page";
@@ -97,6 +103,80 @@ describe("ParentHistoryPage", () => {
       );
     });
     expect(window.location.search).toBe("?familyId=family-2");
+  });
+
+  it("clears the previous family history while browser navigation opens another family", async () => {
+    let releaseSecondFamily!: (
+      value: Parameters<typeof mocks.getFamilyHistory.mockResolvedValue>[0],
+    ) => void;
+    const secondFamilyHistory = new Promise<Parameters<
+      typeof mocks.getFamilyHistory.mockResolvedValue
+    >[0]>((resolve) => {
+      releaseSecondFamily = resolve;
+    });
+    mocks.getFamilies.mockResolvedValue([
+      { id: "family-1", name: "Family one" },
+      { id: "family-2", name: "Family two" },
+    ]);
+    mocks.getFamilyHistory.mockImplementation((familyId: string) =>
+      familyId === "family-1"
+        ? Promise.resolve([
+            {
+              assignment_id: "first-assignment",
+              attempt_id: null,
+              child_id: "child-1",
+              child_nickname: "First family child",
+              title: "First family history",
+              status: "assigned",
+              submitted_at: null,
+              awarded_points: 0,
+              available_points: 10,
+              correction_count: 0,
+            },
+          ])
+        : secondFamilyHistory,
+    );
+
+    render(<ParentHistoryPage />);
+
+    expect(
+      await screen.findByRole("heading", { name: "First family history" }),
+    ).toBeInTheDocument();
+
+    await act(async () => {
+      window.history.pushState(
+        {},
+        "",
+        "/parent/history/?familyId=family-2",
+      );
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+
+    expect(
+      screen.queryByRole("heading", { name: "First family history" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Loading family history…")).toBeInTheDocument();
+
+    await act(async () => {
+      releaseSecondFamily([
+        {
+          assignment_id: "second-assignment",
+          attempt_id: null,
+          child_id: "child-2",
+          child_nickname: "Second family child",
+          title: "Second family history",
+          status: "assigned",
+          submitted_at: null,
+          awarded_points: 0,
+          available_points: 10,
+          correction_count: 0,
+        },
+      ]);
+    });
+
+    expect(
+      await screen.findByRole("heading", { name: "Second family history" }),
+    ).toBeInTheDocument();
   });
 
   it("lets a parent retry a temporary family-history loading failure", async () => {

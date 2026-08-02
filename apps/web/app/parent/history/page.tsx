@@ -60,6 +60,25 @@ function ParentHistoryContent() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
+    const reloadForHistoryNavigation = () => {
+      setItems([]);
+      setFamilies([]);
+      setFamilyId(null);
+      setCompletedWorksheetImports([]);
+      setChildFilter("all");
+      setActionAssignmentId(null);
+      setActionError(null);
+      setLoadState("loading");
+      setReloadVersion((current) => current + 1);
+    };
+
+    window.addEventListener("popstate", reloadForHistoryNavigation);
+    return () => {
+      window.removeEventListener("popstate", reloadForHistoryNavigation);
+    };
+  }, []);
+
+  useEffect(() => {
     let active = true;
 
     void (async () => {

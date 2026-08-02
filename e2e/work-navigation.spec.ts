@@ -439,3 +439,105 @@ test("browser navigation clears the previous family before another family loads"
     page.getByRole("heading", { name: "Second navigation family" }),
   ).toBeVisible();
 });
+
+test("browser navigation clears parent history before another family loads", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "A single desktop browser regression covers parent history navigation.",
+  );
+
+  await page.addInitScript(() => {
+    window.localStorage.setItem("luma-language:demo-parent", "en");
+  });
+  await page.route("**/v1/families", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify([
+        { id: "history-family-first", name: "First history family" },
+        { id: "history-family-second", name: "Second history family" },
+      ]),
+    });
+  });
+  await page.route("**/v1/completed-worksheets/families/*", async (route) => {
+    await route.fulfill({ contentType: "application/json", body: "[]" });
+  });
+  await page.route(
+    "**/v1/history/families/history-family-first",
+    async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            assignment_id: "history-assignment-first",
+            attempt_id: null,
+            child_id: "history-child-first",
+            child_nickname: "First history child",
+            title: "First history navigation item",
+            status: "assigned",
+            submitted_at: null,
+            awarded_points: 0,
+            available_points: 10,
+            correction_count: 0,
+            source_material_title: null,
+            source_material_subject: null,
+          },
+        ]),
+      });
+    },
+  );
+  let releaseSecondHistory: (() => void) | undefined;
+  const secondHistoryGate = new Promise<void>((resolve) => {
+    releaseSecondHistory = resolve;
+  });
+  await page.route(
+    "**/v1/history/families/history-family-second",
+    async (route) => {
+      await secondHistoryGate;
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            assignment_id: "history-assignment-second",
+            attempt_id: null,
+            child_id: "history-child-second",
+            child_nickname: "Second history child",
+            title: "Second history navigation item",
+            status: "assigned",
+            submitted_at: null,
+            awarded_points: 0,
+            available_points: 10,
+            correction_count: 0,
+            source_material_title: null,
+            source_material_subject: null,
+          },
+        ]),
+      });
+    },
+  );
+
+  await page.goto("/parent/history/?familyId=history-family-first");
+  await expect(
+    page.getByRole("heading", { name: "First history navigation item" }),
+  ).toBeVisible();
+
+  await page.evaluate(() => {
+    window.history.pushState(
+      {},
+      "",
+      "/parent/history/?familyId=history-family-second",
+    );
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  });
+
+  await expect(page.getByText("Loading family history…")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "First history navigation item" }),
+  ).toHaveCount(0);
+
+  releaseSecondHistory?.();
+  await expect(
+    page.getByRole("heading", { name: "Second history navigation item" }),
+  ).toBeVisible();
+});
