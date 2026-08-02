@@ -1197,10 +1197,10 @@ test("parent collects several manual questions into one assigned practice", asyn
   await page.goto(
     `/parent/create/?familyId=${encodeURIComponent(family.id)}&childId=${encodeURIComponent(child.id)}`,
   );
-  await page.evaluate(() => {
-    window.localStorage.setItem("luma-language:demo-parent", "zh");
-  });
-  await page.reload();
+  await page.locator(".language-picker select").selectOption("zh");
+  await expect(
+    page.getByRole("button", { name: "手工创建题单" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "手工创建题单" }).click();
   await page.getByLabel("练习名称").fill("Two question check");
   await page

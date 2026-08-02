@@ -1756,6 +1756,17 @@
             "title": "Created At",
             "type": "string"
           },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
           "family_id": {
             "format": "uuid",
             "title": "Family Id",
