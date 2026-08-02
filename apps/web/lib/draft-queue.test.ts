@@ -56,4 +56,25 @@ describe("private draft queue", () => {
     expect(mocks.saveAttemptResponse).not.toHaveBeenCalled();
     await expect(getPendingDraftsByPrefix("attempt-a:")).resolves.toEqual([]);
   });
+
+  it("reports the server response version after reconnecting a draft", async () => {
+    const request = {
+      attemptId: "attempt-a",
+      questionId: "question-1",
+      payload: {
+        kind: "text" as const,
+        answer: { text: "goes" },
+        expected_version: 0,
+      },
+    };
+    await savePendingDraft("attempt-a:question-1", { text: "goes" }, request);
+    mocks.saveAttemptResponse.mockResolvedValue({ version: 4 });
+    const onSynced = vi.fn();
+
+    await expect(
+      syncPendingDrafts("child-token", undefined, onSynced),
+    ).resolves.toBe(1);
+
+    expect(onSynced).toHaveBeenCalledWith(request, 4);
+  });
 });

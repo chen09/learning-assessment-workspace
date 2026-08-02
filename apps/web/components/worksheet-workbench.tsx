@@ -294,6 +294,15 @@ function WorksheetWorkbenchContent() {
   const photoObjectUrls = useRef(new Set<string>());
   const currentQuestion = questions[currentIndex];
 
+  function syncPendingDraftsWithVersions(token: string) {
+    return syncPendingDrafts(token, undefined, (request, responseVersion) => {
+      responseVersions.current = {
+        ...responseVersions.current,
+        [request.questionId]: responseVersion,
+      };
+    });
+  }
+
   useEffect(
     () => () => {
       for (const previewUrl of photoObjectUrls.current) {
@@ -475,7 +484,7 @@ function WorksheetWorkbenchContent() {
             retryAttempt ? "&retry=1" : ""
           }`,
         );
-        void syncPendingDrafts(token)
+        void syncPendingDraftsWithVersions(token)
           .then((synced) => {
             if (active && synced > 0) {
               setSaveStatus("saved");
@@ -651,7 +660,7 @@ function WorksheetWorkbenchContent() {
       return;
     }
     const sync = () => {
-      void syncPendingDrafts(childToken)
+      void syncPendingDraftsWithVersions(childToken)
         .then((count) => {
           if (count > 0) {
             setSaveStatus("saved");
@@ -669,7 +678,7 @@ function WorksheetWorkbenchContent() {
     }
     setIsSyncingSavedAnswer(true);
     try {
-      const synced = await syncPendingDrafts(childToken);
+      const synced = await syncPendingDraftsWithVersions(childToken);
       setSaveStatus(synced > 0 ? "saved" : "offline");
     } catch {
       setSaveStatus("offline");
@@ -686,7 +695,7 @@ function WorksheetWorkbenchContent() {
             pendingSave.catch(() => undefined),
           ),
         );
-        await syncPendingDrafts(childToken);
+        await syncPendingDraftsWithVersions(childToken);
         const pendingDrafts = await getPendingDraftsByPrefix(`${attemptId}:`);
         if (pendingDrafts.length > 0) {
           setSaveStatus("offline");
@@ -750,7 +759,7 @@ function WorksheetWorkbenchContent() {
           pendingSave.catch(() => undefined),
         ),
       );
-      await syncPendingDrafts(childToken);
+      await syncPendingDraftsWithVersions(childToken);
       const pendingDrafts = await getPendingDraftsByPrefix(
         `${attemptId}:${questionId}`,
       );

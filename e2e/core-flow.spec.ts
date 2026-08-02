@@ -2764,6 +2764,28 @@ test("a child restores an offline typed answer after reopening the same practice
   await page.reload();
   await expect(page.getByLabel("Your answer")).toHaveValue("goes");
   await expect(page.getByText("Saved on this device")).toBeVisible();
+
+  await page.unroute("**/v1/attempts/*/responses/*");
+  await page.reload();
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+  const updatedAnswerRequest = page.waitForRequest((request) => {
+    if (
+      request.url().includes("/v1/attempts/") &&
+      request.url().includes("/responses/") &&
+      request.method() === "PUT"
+    ) {
+      const body = request.postDataJSON() as {
+        answer?: { text?: string };
+      };
+      return body.answer?.text === "walks";
+    }
+    return false;
+  });
+  await page.getByLabel("Your answer").fill("walks");
+  const updatedAnswer = (await updatedAnswerRequest).postDataJSON() as {
+    expected_version: number;
+  };
+  expect(updatedAnswer.expected_version).toBe(1);
 });
 
 test("parent creation reaches child grading and correction through the API", async ({

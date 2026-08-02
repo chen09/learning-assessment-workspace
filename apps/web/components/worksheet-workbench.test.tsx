@@ -490,7 +490,47 @@ describe("WorksheetWorkbench", () => {
 
     expect(await screen.findByText("Saved", { exact: true })).toBeInTheDocument();
     await waitFor(() => {
-      expect(mocks.syncPendingDrafts).toHaveBeenLastCalledWith("child-token");
+      expect(mocks.syncPendingDrafts.mock.calls.at(-1)?.[0]).toBe("child-token");
+    });
+  });
+
+  it("uses the reconnected draft's server version for the next autosave", async () => {
+    const reconnectedRequest = {
+      attemptId: "attempt-1",
+      questionId: "algebra-choice",
+      payload: {
+        kind: "choice" as const,
+        answer: { choices: [0] },
+        expected_version: 0,
+      },
+    };
+    mocks.saveAttemptResponse.mockRejectedValueOnce(new Error("offline"));
+    render(<WorksheetWorkbench />);
+
+    fireEvent.click(
+      await screen.findByRole("radio", { name: "a² − b²" }),
+    );
+    await screen.findByText("Saved on this device");
+    mocks.syncPendingDrafts.mockImplementationOnce(
+      async (_token, _now, onSynced) => {
+        onSynced?.(reconnectedRequest, 4);
+        return 1;
+      },
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Sync saved answer" }),
+    );
+    await screen.findByText("Saved", { exact: true });
+    fireEvent.click(screen.getByRole("radio", { name: "a² + b²" }));
+
+    await waitFor(() => {
+      expect(mocks.saveAttemptResponse).toHaveBeenLastCalledWith(
+        "attempt-1",
+        "algebra-choice",
+        { kind: "choice", answer: { choices: [1] }, expected_version: 4 },
+        "child-token",
+      );
     });
   });
 
