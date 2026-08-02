@@ -102,7 +102,7 @@ describe("ParentResultsPage", () => {
       await screen.findByRole("heading", { name: "确认作答结果" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("请写出平方差公式的推导过程。"),
+      await screen.findByText("请写出平方差公式的推导过程。"),
     ).toBeInTheDocument();
     expect(
       screen.getByText("基于教材：Lesson 1 textbook · English"),
