@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import ChildHomePage from "@/app/child/page";
@@ -114,5 +114,26 @@ describe("ChildHomePage", () => {
       "href",
       "/child/work?attemptId=attempt-2",
     );
+  });
+
+  it("refreshes the plan when a child returns to the open page", async () => {
+    mocks.getChildAssignments
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([assignment]);
+
+    render(<ChildHomePage />);
+
+    expect(
+      await screen.findByText("目前没有待完成的练习。"),
+    ).toBeInTheDocument();
+
+    fireEvent.focus(window);
+
+    await waitFor(() => {
+      expect(mocks.getChildAssignments).toHaveBeenCalledTimes(2);
+    });
+    expect(
+      screen.getByRole("heading", { name: "Algebra & English warm-up" }),
+    ).toBeInTheDocument();
   });
 });

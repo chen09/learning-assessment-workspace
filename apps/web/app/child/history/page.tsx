@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { useLanguage } from "@/components/language-provider";
@@ -46,36 +46,49 @@ function ChildHistoryContent() {
   const [loadState, setLoadState] = useState<
     "loading" | "ready" | "signed-out" | "error"
   >("loading");
+  const latestHistoryRequest = useRef(0);
 
-  useEffect(() => {
-    let active = true;
+  const refreshHistory = useCallback(async () => {
+    const request = latestHistoryRequest.current + 1;
+    latestHistoryRequest.current = request;
     const token = getChildAccessToken();
     if (!token) {
-      queueMicrotask(() => {
-        if (active) {
-          setLoadState("signed-out");
-        }
-      });
-      return () => {
-        active = false;
-      };
+      if (latestHistoryRequest.current !== request) {
+        return;
+      }
+      setItems([]);
+      setLoadState("signed-out");
+      return;
     }
-    void getChildHistory(token)
-      .then((nextItems) => {
-        if (active) {
-          setItems(nextItems);
-          setLoadState("ready");
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setLoadState("error");
-        }
-      });
-    return () => {
-      active = false;
-    };
+    try {
+      const nextItems = await getChildHistory(token);
+      if (latestHistoryRequest.current !== request) {
+        return;
+      }
+      setItems(nextItems);
+      setLoadState("ready");
+    } catch {
+      if (latestHistoryRequest.current !== request) {
+        return;
+      }
+      setLoadState("error");
+    }
   }, []);
+
+  useEffect(() => {
+    const initialRefresh = window.setTimeout(() => {
+      void refreshHistory();
+    }, 0);
+    const refreshWhenReturning = () => {
+      void refreshHistory();
+    };
+    window.addEventListener("focus", refreshWhenReturning);
+    return () => {
+      latestHistoryRequest.current += 1;
+      window.clearTimeout(initialRefresh);
+      window.removeEventListener("focus", refreshWhenReturning);
+    };
+  }, [refreshHistory]);
 
   const dateLocale = { en: "en-US", ja: "ja-JP", zh: "zh-CN" }[language];
 

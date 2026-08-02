@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import ChildHistoryPage from "./page";
@@ -98,5 +98,38 @@ describe("ChildHistoryPage", () => {
       "/child/work?attemptId=attempt-in-progress",
     );
     expect(screen.queryByText("0 / 20")).not.toBeInTheDocument();
+  });
+
+  it("refreshes history when a child returns to the open page", async () => {
+    mocks.getChildHistory
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          assignment_id: "assignment-new",
+          attempt_id: null,
+          child_id: "child-1",
+          child_nickname: "肉肉",
+          title: "刚安排的练习",
+          status: "assigned",
+          submitted_at: null,
+          awarded_points: 0,
+          available_points: 20,
+          correction_count: 0,
+        },
+      ]);
+
+    render(<ChildHistoryPage />);
+
+    expect(await screen.findByText("目前还没有学习记录。"))
+      .toBeInTheDocument();
+
+    fireEvent.focus(window);
+
+    await waitFor(() => {
+      expect(mocks.getChildHistory).toHaveBeenCalledTimes(2);
+    });
+    expect(
+      screen.getByRole("heading", { name: "刚安排的练习" }),
+    ).toBeInTheDocument();
   });
 });

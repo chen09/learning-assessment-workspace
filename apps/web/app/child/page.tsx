@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowRight, BookOpen, Clock3, Sparkles } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { useLanguage } from "@/components/language-provider";
@@ -43,36 +43,54 @@ function ChildHomeContent() {
   const [loadState, setLoadState] = useState<
     "loading" | "ready" | "signed-out" | "error"
   >("loading");
+  const latestPlanRequest = useRef(0);
 
-  useEffect(() => {
-    let active = true;
-    void (async () => {
-      const childToken = getChildAccessToken();
-      if (!childToken) {
-        setLoadState("signed-out");
+  const refreshPlan = useCallback(async () => {
+    const request = latestPlanRequest.current + 1;
+    latestPlanRequest.current = request;
+    const childToken = getChildAccessToken();
+    if (!childToken) {
+      if (latestPlanRequest.current !== request) {
         return;
       }
-      try {
-        const [loadedAssignments, reviews] = await Promise.all([
-          getChildAssignments(childToken),
-          getTodayReviews(childToken),
-        ]);
-        if (!active) {
-          return;
-        }
-        setAssignments(loadedAssignments);
-        setReviewCount(reviews.length);
-        setLoadState("ready");
-      } catch {
-        if (active) {
-          setLoadState("error");
-        }
+      setAssignments([]);
+      setReviewCount(0);
+      setLoadState("signed-out");
+      return;
+    }
+    try {
+      const [loadedAssignments, reviews] = await Promise.all([
+        getChildAssignments(childToken),
+        getTodayReviews(childToken),
+      ]);
+      if (latestPlanRequest.current !== request) {
+        return;
       }
-    })();
-    return () => {
-      active = false;
-    };
+      setAssignments(loadedAssignments);
+      setReviewCount(reviews.length);
+      setLoadState("ready");
+    } catch {
+      if (latestPlanRequest.current !== request) {
+        return;
+      }
+      setLoadState("error");
+    }
   }, []);
+
+  useEffect(() => {
+    const initialRefresh = window.setTimeout(() => {
+      void refreshPlan();
+    }, 0);
+    const refreshWhenReturning = () => {
+      void refreshPlan();
+    };
+    window.addEventListener("focus", refreshWhenReturning);
+    return () => {
+      latestPlanRequest.current += 1;
+      window.clearTimeout(initialRefresh);
+      window.removeEventListener("focus", refreshWhenReturning);
+    };
+  }, [refreshPlan]);
 
   const current = assignments[0];
   const additionalAssignments = assignments.slice(1);
