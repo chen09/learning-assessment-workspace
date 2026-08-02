@@ -520,6 +520,8 @@ const messages = {
     "worksheet.saving": "Saving…",
     "worksheet.saved": "Saved",
     "worksheet.savedDevice": "Saved on this device",
+    "worksheet.timeLimitSyncPending":
+      "Time is up. Your answers are saved on this device and will submit when a connection returns.",
     "worksheet.syncConflict": "Saved on this device — another change needs review",
     "worksheet.syncSavedAnswer": "Sync saved answer",
     "worksheet.syncingSavedAnswer": "Syncing saved answer…",
@@ -1432,6 +1434,8 @@ const messages = {
     "worksheet.saving": "保存中…",
     "worksheet.saved": "保存済み",
     "worksheet.savedDevice": "この端末に保存済み",
+    "worksheet.timeLimitSyncPending":
+      "時間切れです。回答はこの端末に保存され、接続が戻ると自動提出されます。",
     "worksheet.syncConflict": "この端末に保存済み — 別の変更を確認してください",
     "worksheet.syncSavedAnswer": "保存した回答を同期",
     "worksheet.syncingSavedAnswer": "保存した回答を同期しています…",
@@ -2331,6 +2335,8 @@ const messages = {
     "worksheet.saving": "正在保存…",
     "worksheet.saved": "已保存",
     "worksheet.savedDevice": "已保存在此设备",
+    "worksheet.timeLimitSyncPending":
+      "时间已到。答案已保存在此设备，恢复网络后会自动提交。",
     "worksheet.syncConflict": "已保存在此设备——需要确认另一处修改",
     "worksheet.syncSavedAnswer": "同步已保存的答案",
     "worksheet.syncingSavedAnswer": "正在同步已保存的答案…",

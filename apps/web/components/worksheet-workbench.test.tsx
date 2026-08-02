@@ -616,6 +616,11 @@ describe("WorksheetWorkbench", () => {
     render(<WorksheetWorkbench />);
 
     expect(await screen.findByText("Saved on this device")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Time is up. Your answers are saved on this device and will submit when a connection returns.",
+      ),
+    ).toBeInTheDocument();
     await new Promise((resolve) => window.setTimeout(resolve, 50));
     expect(mocks.submitAttempt).not.toHaveBeenCalled();
   });

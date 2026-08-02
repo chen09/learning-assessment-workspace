@@ -290,6 +290,8 @@ function WorksheetWorkbenchContent() {
   const [regradingQuestionId, setRegradingQuestionId] = useState<string | null>(
     null,
   );
+  const [timeLimitSubmissionBlocked, setTimeLimitSubmissionBlocked] =
+    useState(false);
   const automaticSubmissionAttemptId = useRef<string | null>(null);
   const timeLimitAwaitingSyncAttemptId = useRef<string | null>(null);
   const photoObjectUrls = useRef(new Set<string>());
@@ -638,10 +640,12 @@ function WorksheetWorkbenchContent() {
           const pendingDrafts = await getPendingDraftsByPrefix(`${attemptId}:`);
           if (pendingDrafts.length > 0) {
             timeLimitAwaitingSyncAttemptId.current = attemptId;
+            setTimeLimitSubmissionBlocked(true);
             setSaveStatus("offline");
             return;
           }
           timeLimitAwaitingSyncAttemptId.current = null;
+          setTimeLimitSubmissionBlocked(false);
           automaticSubmissionAttemptId.current = attemptId;
           await submitAttempt(
             attemptId,
@@ -656,6 +660,7 @@ function WorksheetWorkbenchContent() {
           );
         } catch {
           timeLimitAwaitingSyncAttemptId.current = attemptId;
+          setTimeLimitSubmissionBlocked(true);
           setSaveStatus("offline");
         }
         return;
@@ -710,6 +715,7 @@ function WorksheetWorkbenchContent() {
     }
 
     timeLimitAwaitingSyncAttemptId.current = null;
+    setTimeLimitSubmissionBlocked(false);
     automaticSubmissionAttemptId.current = attemptId;
     void submitAttempt(attemptId, childToken, `submit-${attemptId}-time-limit`)
       .then(() => removePendingDraftsByPrefix(`${attemptId}:`))
@@ -723,6 +729,7 @@ function WorksheetWorkbenchContent() {
       .catch(() => {
         automaticSubmissionAttemptId.current = null;
         timeLimitAwaitingSyncAttemptId.current = attemptId;
+        setTimeLimitSubmissionBlocked(true);
         setSaveStatus("offline");
       });
   }, [attemptId, childToken, examMode, saveStatus, secondsRemaining]);
@@ -2026,6 +2033,12 @@ function WorksheetWorkbenchContent() {
           </div>
         </div>
       </header>
+
+      {timeLimitSubmissionBlocked ? (
+        <p className="time-limit-sync-notice" role="status">
+          {t("worksheet.timeLimitSyncPending")}
+        </p>
+      ) : null}
 
       <div className="work-layout">
         <aside className="question-index">

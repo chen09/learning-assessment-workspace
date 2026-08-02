@@ -819,6 +819,18 @@ button {
   color: #9c6c21;
 }
 
+.time-limit-sync-notice {
+  margin: -0.35rem 0 1rem;
+  border: 1px solid rgb(202 143 54 / 35%);
+  border-radius: 0.85rem;
+  background: #fff8e9;
+  color: #76531f;
+  padding: 0.75rem 0.9rem;
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
 .mode-switch {
   gap: 0.2rem;
   border: 1px solid var(--line);
