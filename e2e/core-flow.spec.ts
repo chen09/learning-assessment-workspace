@@ -1,5 +1,24 @@
 import { expect, test } from "@playwright/test";
 
+test.beforeEach(async ({ page, request }) => {
+  const preferenceReset = await request.put(
+    "http://127.0.0.1:8017/v1/profiles/me/language",
+    {
+      headers: { Authorization: "Bearer parent-fixture" },
+      data: { ui_language: "en" },
+    },
+  );
+  expect(preferenceReset.ok()).toBeTruthy();
+  await page.addInitScript(() => {
+    if (window.sessionStorage.getItem("e2e-language-baseline")) {
+      return;
+    }
+    window.localStorage.removeItem("luma-language:demo-parent");
+    window.localStorage.removeItem("luma-language:demo-child");
+    window.sessionStorage.setItem("e2e-language-baseline", "ready");
+  });
+});
+
 test("parent dashboard offers the assigned child sign-in route", async ({
   page,
 }) => {
