@@ -6,6 +6,7 @@ import ParentHistoryPage from "./page";
 const mocks = vi.hoisted(() => ({
   getCompletedWorksheetImports: vi.fn(),
   getFamilyHistory: vi.fn(),
+  getFamilies: vi.fn(),
   getParentAccessToken: vi.fn(),
   stopAssignment: vi.fn(),
   withdrawAssignment: vi.fn(),
@@ -18,6 +19,7 @@ vi.mock("@/lib/api-client", async (importOriginal) => {
     ...original,
     getCompletedWorksheetImports: mocks.getCompletedWorksheetImports,
     getFamilyHistory: mocks.getFamilyHistory,
+    getFamilies: mocks.getFamilies,
     getParentAccessToken: mocks.getParentAccessToken,
     stopAssignment: mocks.stopAssignment,
     withdrawAssignment: mocks.withdrawAssignment,
@@ -33,6 +35,8 @@ describe("ParentHistoryPage", () => {
     );
     mocks.getParentAccessToken.mockReset();
     mocks.getParentAccessToken.mockResolvedValue("parent-token");
+    mocks.getFamilies.mockReset();
+    mocks.getFamilies.mockResolvedValue([{ id: "family-1", name: "Family one" }]);
     window.localStorage.clear();
     mocks.getFamilyHistory.mockReset();
     mocks.getFamilyHistory.mockReturnValue(new Promise(() => undefined));
@@ -67,6 +71,32 @@ describe("ParentHistoryPage", () => {
     expect(await screen.findByText("目前还没有家庭学习记录。"))
       .toBeInTheDocument();
     expect(screen.queryByText("Completed, grading, and archived work for every child in this family.")).not.toBeInTheDocument();
+  });
+
+  it("opens the first family when history is opened from the sidebar", async () => {
+    window.history.replaceState({}, "", "/parent/history/");
+    mocks.getFamilies.mockResolvedValue([
+      { id: "family-1", name: "Family one" },
+      { id: "family-2", name: "Family two" },
+    ]);
+    mocks.getFamilyHistory.mockResolvedValue([]);
+
+    render(<ParentHistoryPage />);
+
+    expect(
+      await screen.findByText("No family learning history yet."),
+    ).toBeInTheDocument();
+    expect(mocks.getFamilyHistory).toHaveBeenCalledWith("family-1", "parent-token");
+    fireEvent.change(screen.getByLabelText("Current family"), {
+      target: { value: "family-2" },
+    });
+    await waitFor(() => {
+      expect(mocks.getFamilyHistory).toHaveBeenLastCalledWith(
+        "family-2",
+        "parent-token",
+      );
+    });
+    expect(window.location.search).toBe("?familyId=family-2");
   });
 
   it("lets a parent reopen a paper upload that still needs review", async () => {

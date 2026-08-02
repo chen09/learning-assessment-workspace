@@ -117,6 +117,71 @@ test("parent dashboard switches families before showing another child's work", a
   await expect(page.getByText("First child", { exact: true })).toBeHidden();
 });
 
+test("parent history selects an authorized family when opened from the sidebar", async ({
+  page,
+}) => {
+  await page.route("**/v1/families", async (route) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify([
+        { id: "history-family-1", name: "History family one" },
+        { id: "history-family-2", name: "History family two" },
+      ]),
+    });
+  });
+  await page.route("**/v1/history/families/*", async (route) => {
+    const isSecondFamily = route
+      .request()
+      .url()
+      .includes("history-family-2");
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify(
+        isSecondFamily
+          ? [
+              {
+                assignment_id: "history-assignment-2",
+                attempt_id: "history-attempt-2",
+                child_id: "history-child-2",
+                child_nickname: "Second child",
+                title: "Second family practice",
+                status: "assigned",
+                submitted_at: null,
+                awarded_points: 0,
+                available_points: 10,
+                correction_count: 0,
+                source_material_title: null,
+                source_material_subject: null,
+              },
+            ]
+          : [],
+      ),
+    });
+  });
+  await page.route("**/v1/completed-worksheets/families/*", async (route) => {
+    await route.fulfill({ contentType: "application/json", body: "[]" });
+  });
+
+  await page.goto("/parent/history/");
+  await expect(page.getByText("No family learning history yet.")).toBeVisible();
+  await expect(page.getByLabel("Current family")).toHaveValue(
+    "history-family-1",
+  );
+
+  await page
+    .getByLabel("Current family")
+    .selectOption("history-family-2");
+
+  await expect(page).toHaveURL(/familyId=history-family-2/);
+  await expect(
+    page.getByRole("heading", { name: "Second family practice" }),
+  ).toBeVisible();
+});
+
 test("parent dashboard highlights handwritten answers awaiting a decision", async ({
   page,
 }) => {

@@ -10,6 +10,8 @@ import { useLanguage } from "@/components/language-provider";
 import {
   getCompletedWorksheetImports,
   getFamilyHistory,
+  getFamilies,
+  type Family,
   type FamilyCompletedWorksheetImport,
   type ParentHistoryItem,
   getParentAccessToken,
@@ -44,6 +46,8 @@ export default function ParentHistoryPage() {
 function ParentHistoryContent() {
   const { t } = useLanguage();
   const [items, setItems] = useState<ParentHistoryItem[]>([]);
+  const [families, setFamilies] = useState<Family[]>([]);
+  const [familyId, setFamilyId] = useState<string | null>(null);
   const [completedWorksheetImports, setCompletedWorksheetImports] = useState<
     FamilyCompletedWorksheetImport[]
   >([]);
@@ -56,19 +60,48 @@ function ParentHistoryContent() {
 
   useEffect(() => {
     let active = true;
-    const familyId = new URLSearchParams(window.location.search).get(
-      "familyId",
-    );
-    if (!familyId) {
-      queueMicrotask(() => {
-        if (active) {
-          setLoadState("missing");
+
+    void (async () => {
+      try {
+        const token = await getParentAccessToken();
+        if (!token) {
+          if (active) {
+            setLoadState("error");
+          }
+          return;
         }
-      });
-      return () => {
-        active = false;
-      };
+        const availableFamilies = await getFamilies(token);
+        if (active) {
+          const requestedFamilyId = new URLSearchParams(
+            window.location.search,
+          ).get("familyId");
+          const selectedFamily =
+            availableFamilies.find((family) => family.id === requestedFamilyId) ??
+            availableFamilies[0];
+          setFamilies(availableFamilies);
+          if (!selectedFamily) {
+            setLoadState("missing");
+            return;
+          }
+          setFamilyId(selectedFamily.id);
+        }
+      } catch {
+        if (active) {
+          setLoadState("error");
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!familyId) {
+      return;
     }
+    let active = true;
 
     void (async () => {
       try {
@@ -98,7 +131,22 @@ function ParentHistoryContent() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [familyId]);
+
+  const selectFamily = (nextFamilyId: string) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("familyId", nextFamilyId);
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${url.pathname}${url.search}${url.hash}`,
+    );
+    setLoadState("loading");
+    setItems([]);
+    setCompletedWorksheetImports([]);
+    setChildFilter("all");
+    setFamilyId(nextFamilyId);
+  };
 
   const children = Array.from(
     new Map(items.map((item) => [item.child_id, item.child_nickname])),
@@ -163,7 +211,24 @@ function ParentHistoryContent() {
           <h1>{t("parentHistory.title")}</h1>
           <p className="lede">{t("parentHistory.description")}</p>
         </div>
-        <LanguageSwitcher />
+        <div className="header-actions">
+          {families.length > 1 && familyId ? (
+            <label className="dashboard-family-selector">
+              <span>{t("family.currentLabel")}</span>
+              <select
+                value={familyId}
+                onChange={(event) => selectFamily(event.target.value)}
+              >
+                {families.map((family) => (
+                  <option key={family.id} value={family.id}>
+                    {family.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          <LanguageSwitcher />
+        </div>
       </header>
       <section className="filter-row" aria-label={t("parentHistory.filters")}>
         <button
