@@ -225,6 +225,11 @@ function ChildResultsContent() {
                           ? t("results.tryAgain")
                           : t("results.parentCheck")}
                     </h2>
+                    {result.feedback.summary ? (
+                      <p className="result-summary">
+                        {result.feedback.summary}
+                      </p>
+                    ) : null}
                     {result.feedback.action ? (
                       <p className="result-hint">
                         {result.feedback.action}

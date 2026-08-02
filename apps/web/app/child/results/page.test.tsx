@@ -76,7 +76,10 @@ describe("ChildResultsPage", () => {
           outcome: "correct",
           awarded_points: 1,
           confidence: 1,
-          feedback: { summary: "Correct." },
+          feedback: {
+            summary: "正确。",
+            action: "继续做下一题。",
+          },
         },
         {
           id: "result-incorrect",
@@ -84,7 +87,10 @@ describe("ChildResultsPage", () => {
           outcome: "incorrect",
           awarded_points: 0,
           confidence: 1,
-          feedback: { summary: "Try again." },
+          feedback: {
+            summary: "平方差的两个括号需要使用相反符号。",
+            action: "请查看这道题后重新作答。",
+          },
           parent_comment: "请检查平方差的两个括号。",
         },
         {
@@ -93,7 +99,10 @@ describe("ChildResultsPage", () => {
           outcome: "uncertain",
           awarded_points: null,
           confidence: 0.4,
-          feedback: { summary: "Parent review." },
+          feedback: {
+            summary: "笔迹不够清楚，需由家长确认。",
+            action: "家长可以确认这份答案是否正确。",
+          },
         },
       ],
     });
@@ -114,6 +123,13 @@ describe("ChildResultsPage", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText("家长留言：请检查平方差的两个括号。"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("正确。")).toBeInTheDocument();
+    expect(
+      screen.getByText("平方差的两个括号需要使用相反符号。"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("笔迹不够清楚，需由家长确认。"),
     ).toBeInTheDocument();
     expect(screen.queryByText("Good work, Alex")).not.toBeInTheDocument();
   });

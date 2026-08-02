@@ -2020,8 +2020,19 @@ button {
   font-size: 0.7rem;
 }
 
+.result-summary {
+  margin-top: 0.35rem !important;
+  color: var(--ink) !important;
+  font-size: 0.82rem !important;
+  line-height: 1.45;
+}
+
 .result-hint {
   margin-top: 0.5rem !important;
+}
+
+.result-summary + .result-hint {
+  margin-top: 0.25rem !important;
 }
 
 .review-hero > span:first-child {

@@ -2507,6 +2507,7 @@ test("parent creation reaches child grading and correction through the API", asy
   await resultsResponse;
   await expect(page.getByText("Try once more")).toBeVisible();
   await expect(page.getByText("Waiting for a parent")).toBeVisible();
+  await expect(page.getByText("请补充完整的句子。")).toBeVisible();
 
   const attemptId = new URL(page.url()).searchParams.get("attemptId");
   expect(attemptId).toBeTruthy();
