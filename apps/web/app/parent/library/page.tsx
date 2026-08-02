@@ -45,6 +45,7 @@ const copy = {
     published: "Published to the public library",
     rejected: "Review needs changes",
     resumeReview: "Continue question-set review",
+    useSourceMaterial: "Create questions from this material",
     resumeImport: "Check import progress",
     importFailed: "Import needs to be retried",
     retryImport: "Retry import",
@@ -91,6 +92,7 @@ const copy = {
     published: "公開問題ライブラリに掲載済み",
     rejected: "レビューで修正が必要",
     resumeReview: "問題セットの確認を続ける",
+    useSourceMaterial: "この教材をもとに問題を作る",
     resumeImport: "取込状況を確認する",
     importFailed: "取込の再実行が必要です",
     retryImport: "取込をやり直す",
@@ -136,6 +138,7 @@ const copy = {
     published: "已发布到公共题库",
     rejected: "审核需要修改",
     resumeReview: "继续审核题单",
+    useSourceMaterial: "基于这份教材出题",
     resumeImport: "查看导入进度",
     importFailed: "导入失败，可重新处理",
     retryImport: "重新处理导入",
@@ -484,6 +487,8 @@ function LibraryContent() {
             set.source_summary.source_material_subject?.trim() ?? "";
           const sourceImportFailed =
             set.status === "processing" && set.import_job_status === "failed";
+          const isPrivateSourceMaterial =
+            set.source_summary.artifact_kind === "private_source_material";
           return (
             <article className="library-card" key={set.id}>
               <span className="library-icon">
@@ -582,7 +587,9 @@ function LibraryContent() {
                       set.id,
                     )}`}
                   >
-                    {text.resumeReview}
+                    {isPrivateSourceMaterial
+                      ? text.useSourceMaterial
+                      : text.resumeReview}
                   </Link>
                 </div>
               ) : set.status === "processing" ? (

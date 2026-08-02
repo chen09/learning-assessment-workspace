@@ -123,6 +123,35 @@ describe("LibraryPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("labels a private textbook as material for creating a new question set", async () => {
+    mocks.getFamilyQuestionSets.mockResolvedValueOnce([
+      {
+        id: "set-textbook",
+        family_id: "family-1",
+        title: "Lesson 1 textbook",
+        subject: "English",
+        status: "needs_review",
+        question_count: 0,
+        source_summary: {
+          artifact_kind: "private_source_material",
+          reference_file_count: 27,
+        },
+      },
+    ]);
+
+    render(<LibraryPage />);
+
+    expect(
+      await screen.findByRole("link", { name: "基于这份教材出题" }),
+    ).toHaveAttribute(
+      "href",
+      "/parent/create?questionSetId=set-textbook",
+    );
+    expect(
+      screen.queryByRole("link", { name: "继续审核题单" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("lets a parent resume a source import that is still processing", async () => {
     mocks.getFamilyQuestionSets.mockResolvedValueOnce([
       {
