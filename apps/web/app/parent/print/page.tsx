@@ -83,6 +83,21 @@ function PrintWorksheetContent() {
   const printablePages = splitIntoPrintablePages(questions);
 
   useEffect(() => {
+    const reloadPrintableAssignmentFromHistory = () => {
+      setLoadState("loading");
+      setQrCode(null);
+      setSetCode("");
+      setTitle("");
+      setQuestions([]);
+      setLoadRequest((current) => current + 1);
+    };
+
+    window.addEventListener("popstate", reloadPrintableAssignmentFromHistory);
+    return () =>
+      window.removeEventListener("popstate", reloadPrintableAssignmentFromHistory);
+  }, []);
+
+  useEffect(() => {
     let active = true;
     const assignmentId = new URLSearchParams(window.location.search).get(
       "assignmentId",

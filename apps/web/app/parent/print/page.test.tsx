@@ -124,6 +124,100 @@ describe("PrintWorksheetPage", () => {
     });
   });
 
+  it("clears the previous printable assignment while browser navigation loads another", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/parent/print/?assignmentId=assignment-1",
+    );
+    let resolveSecondAssignment!: (value: {
+      assignment: { id: string };
+      title: string;
+      template_version: string;
+      questions: Array<{
+        id: string;
+        position: number;
+        type: "typed_text";
+        prompt: string;
+        options: null;
+        points: number;
+      }>;
+    }) => void;
+    const secondAssignment = new Promise<{
+      assignment: { id: string };
+      title: string;
+      template_version: string;
+      questions: Array<{
+        id: string;
+        position: number;
+        type: "typed_text";
+        prompt: string;
+        options: null;
+        points: number;
+      }>;
+    }>((resolve) => {
+      resolveSecondAssignment = resolve;
+    });
+    mocks.getPrintableAssignment.mockImplementation((assignmentId: string) =>
+      assignmentId === "assignment-2"
+        ? secondAssignment
+        : Promise.resolve({
+            assignment: { id: "assignment-1" },
+            title: "First printable practice",
+            template_version: "a4-v1",
+            questions: [
+              {
+                id: "question-1",
+                position: 1,
+                type: "typed_text" as const,
+                prompt: "First printable question.",
+                options: null,
+                points: 1,
+              },
+            ],
+          }),
+    );
+
+    renderPage();
+
+    expect(
+      await screen.findByRole("heading", { name: "First printable practice" }),
+    ).toBeInTheDocument();
+    window.history.pushState(
+      {},
+      "",
+      "/parent/print/?assignmentId=assignment-2",
+    );
+    window.dispatchEvent(new PopStateEvent("popstate"));
+
+    expect(
+      await screen.findByRole("heading", { name: "Loading printable assignment…" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "First printable practice" }),
+    ).not.toBeInTheDocument();
+
+    resolveSecondAssignment({
+      assignment: { id: "assignment-2" },
+      title: "Second printable practice",
+      template_version: "a4-v1",
+      questions: [
+        {
+          id: "question-2",
+          position: 1,
+          type: "typed_text",
+          prompt: "Second printable question.",
+          options: null,
+          points: 1,
+        },
+      ],
+    });
+
+    expect(
+      await screen.findByRole("heading", { name: "Second printable practice" }),
+    ).toBeInTheDocument();
+  });
+
   it("splits a long handwritten practice across numbered A4 sheets", async () => {
     window.history.replaceState(
       {},

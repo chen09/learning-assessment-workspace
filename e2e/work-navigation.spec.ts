@@ -160,3 +160,81 @@ test("browser navigation opens a completed-paper review from the parent create p
     page.getByRole("heading", { name: "Preparing the review draft" }),
   ).toBeVisible();
 });
+
+test("browser navigation clears a stale printable worksheet before loading another", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "A single desktop browser regression covers printable worksheet navigation.",
+  );
+
+  await page.route("**/v1/assignments/print-first/printable", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        assignment: { id: "print-first" },
+        title: "First printable practice",
+        template_version: "a4-v1",
+        questions: [
+          {
+            id: "first-print-question",
+            position: 1,
+            type: "typed_text",
+            prompt: "First printable question.",
+            options: null,
+            points: 1,
+          },
+        ],
+      }),
+    });
+  });
+
+  let releaseSecondPrint: (() => void) | undefined;
+  const secondPrintGate = new Promise<void>((resolve) => {
+    releaseSecondPrint = resolve;
+  });
+  await page.route("**/v1/assignments/print-second/printable", async (route) => {
+    await secondPrintGate;
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        assignment: { id: "print-second" },
+        title: "Second printable practice",
+        template_version: "a4-v1",
+        questions: [
+          {
+            id: "second-print-question",
+            position: 1,
+            type: "typed_text",
+            prompt: "Second printable question.",
+            options: null,
+            points: 1,
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.goto("/parent/print/?assignmentId=print-first");
+  await expect(
+    page.getByRole("heading", { name: "First printable practice" }),
+  ).toBeVisible();
+
+  await page.evaluate(() => {
+    window.history.pushState({}, "", "/parent/print/?assignmentId=print-second");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  });
+
+  await expect(
+    page.getByRole("heading", { name: "Loading printable assignment…" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "First printable practice" }),
+  ).toHaveCount(0);
+
+  releaseSecondPrint?.();
+  await expect(
+    page.getByRole("heading", { name: "Second printable practice" }),
+  ).toBeVisible();
+});
