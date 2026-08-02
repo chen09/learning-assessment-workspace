@@ -31,6 +31,7 @@ import { useLanguage } from "@/components/language-provider";
 import { MathText } from "@/components/math-text";
 import {
   type DraftSyncRequest,
+  getPendingDraftsByPrefix,
   removePendingDraftsByPrefix,
   removePendingDraft,
   savePendingDraft,
@@ -117,6 +118,22 @@ function hasMeaningfulAnswer(answer: Answer | undefined) {
         answer.text?.trim() ||
         answer.strokes?.length ||
         answer.photoNames?.length),
+  );
+}
+
+function isLocalAnswer(value: unknown): value is Answer {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const answer = value as Record<string, unknown>;
+  return (
+    typeof answer.choice === "number" ||
+    Array.isArray(answer.choices) ||
+    Array.isArray(answer.tokens) ||
+    typeof answer.text === "string" ||
+    Array.isArray(answer.strokes) ||
+    Array.isArray(answer.photoNames) ||
+    Array.isArray(answer.photoPaths)
   );
 }
 
@@ -368,17 +385,38 @@ function WorksheetWorkbenchContent() {
           work.questions.map((question) => [question.id, question.type]),
         );
         const savedResponses = work.responses ?? [];
-        setAnswers(
-          Object.fromEntries(
-            savedResponses.map((response) => [
-              response.question_id,
-              restoreAnswer(
-                response,
-                questionTypes.get(response.question_id),
-              ),
-            ]),
-          ),
+        const serverAnswers = Object.fromEntries(
+          savedResponses.map((response) => [
+            response.question_id,
+            restoreAnswer(
+              response,
+              questionTypes.get(response.question_id),
+            ),
+          ]),
         );
+        let pendingAnswers: Record<string, Answer> = {};
+        try {
+          const pendingDrafts = await getPendingDraftsByPrefix(
+            `${work.attempt.id}:`,
+          );
+          pendingAnswers = Object.fromEntries(
+            pendingDrafts.flatMap((draft) => {
+              const questionId = draft.syncRequest?.questionId;
+              return questionId &&
+                questionTypes.has(questionId) &&
+                isLocalAnswer(draft.answer)
+                ? [[questionId, draft.answer]]
+                : [];
+            }),
+          );
+        } catch {
+          // IndexedDB may be unavailable in a private browsing session. Server
+          // answers still open normally and the next save will report its state.
+        }
+        setAnswers({ ...serverAnswers, ...pendingAnswers });
+        if (Object.keys(pendingAnswers).length > 0) {
+          setSaveStatus("offline");
+        }
         setPhotoPreviewUrls(
           Object.fromEntries(
             savedResponses
@@ -437,7 +475,13 @@ function WorksheetWorkbenchContent() {
             retryAttempt ? "&retry=1" : ""
           }`,
         );
-        void syncPendingDrafts(token).catch(() => setSaveStatus("offline"));
+        void syncPendingDrafts(token)
+          .then((synced) => {
+            if (active && synced > 0) {
+              setSaveStatus("saved");
+            }
+          })
+          .catch(() => setSaveStatus("offline"));
       } catch {
         if (active) {
           setLoadState("error");

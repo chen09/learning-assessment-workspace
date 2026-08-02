@@ -2628,6 +2628,118 @@ test("child screens stay responsive across Chinese, Japanese, and English", asyn
   await expectNoHorizontalOverflow();
 });
 
+test("a child restores an offline typed answer after reopening the same practice", async ({
+  page,
+  request,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "The IndexedDB recovery flow is covered once in the desktop browser.",
+  );
+  const apiBaseUrl = "http://127.0.0.1:8017";
+  const fixtureKey = `offline-draft-${testInfo.workerIndex}`;
+  const family = (await (
+    await request.post(`${apiBaseUrl}/v1/families`, {
+      headers: {
+        Authorization: "Bearer parent-fixture",
+        "Idempotency-Key": `${fixtureKey}-family`,
+      },
+      data: { name: "Offline draft family" },
+    })
+  ).json()) as { id: string };
+  const child = (await (
+    await request.post(`${apiBaseUrl}/v1/families/${family.id}/children`, {
+      headers: {
+        Authorization: "Bearer parent-fixture",
+        "Idempotency-Key": `${fixtureKey}-child`,
+      },
+      data: {
+        nickname: "Offline child",
+        grade_stage: "Junior high 1",
+        ui_language: "en",
+        pin: "123456",
+      },
+    })
+  ).json()) as { id: string };
+  const imported = (await (
+    await request.post(`${apiBaseUrl}/v1/question-sets/imports/structured`, {
+      headers: {
+        Authorization: "Bearer parent-fixture",
+        "Idempotency-Key": `${fixtureKey}-import`,
+      },
+      data: {
+        family_id: family.id,
+        child_id: child.id,
+        source_name: "offline-draft.json",
+        document: {
+          schema_version: "1.0",
+          question_set: {
+            title: "Offline typed practice",
+            subject: "English",
+            locale: "en",
+            difficulty: "standard",
+            source_mode: "manual",
+            estimated_minutes: 3,
+          },
+          knowledge_tags: [{ code: "present-simple", label: "Present simple" }],
+          questions: [
+            {
+              position: 1,
+              type: "typed_text",
+              prompt: "Complete: She ___ to school every day.",
+              options: [],
+              answer_key: { text: "goes" },
+              rubric: { grading_mode: "exact" },
+              points: 1,
+              knowledge_code: "present-simple",
+            },
+          ],
+        },
+      },
+    })
+  ).json()) as { question_set_id: string };
+  const assignment = (await (
+    await request.post(
+      `${apiBaseUrl}/v1/question-sets/${imported.question_set_id}/assignments`,
+      {
+        headers: {
+          Authorization: "Bearer parent-fixture",
+          "Idempotency-Key": `${fixtureKey}-assignment`,
+        },
+        data: {
+          child_id: child.id,
+          mode: "practice",
+          time_limit_seconds: null,
+          parent_note: null,
+        },
+      },
+    )
+  ).json()) as { id: string };
+
+  await page.goto(
+    `/child/login/?childId=${encodeURIComponent(child.id)}&assignmentId=${encodeURIComponent(assignment.id)}`,
+  );
+  for (const digit of ["1", "2", "3", "4", "5", "6"]) {
+    await page.getByRole("button", { name: digit, exact: true }).click();
+  }
+  await page.getByRole("button", { name: "Open my work" }).click();
+  await expect(page.getByLabel("Your answer")).toBeVisible();
+
+  await page.route("**/v1/attempts/*/responses/*", async (route) => {
+    await route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ detail: "offline test" }),
+    });
+  });
+  await page.getByLabel("Your answer").fill("goes");
+  await expect(page.getByText("Saved on this device")).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByLabel("Your answer")).toHaveValue("goes");
+  await expect(page.getByText("Saved on this device")).toBeVisible();
+});
+
 test("parent creation reaches child grading and correction through the API", async ({
   page,
   request,

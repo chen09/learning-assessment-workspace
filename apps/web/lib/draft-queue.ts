@@ -79,6 +79,20 @@ export async function removePendingDraft(key: string): Promise<void> {
   await db.delete(STORE_NAME, key);
 }
 
+export async function getPendingDraftsByPrefix(
+  prefix: string,
+  now = new Date(),
+): Promise<PendingDraft[]> {
+  const db = await database();
+  const drafts = (await db.getAll(STORE_NAME)) as PendingDraft[];
+  return drafts
+    .filter(
+      (draft) =>
+        draft.key.startsWith(prefix) && new Date(draft.expiresAt) > now,
+    )
+    .sort((left, right) => left.savedAt.localeCompare(right.savedAt));
+}
+
 export async function removePendingDraftsByPrefix(prefix: string): Promise<void> {
   const db = await database();
   const transaction = db.transaction(STORE_NAME, "readwrite");

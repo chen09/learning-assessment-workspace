@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   cropAnswerImage: vi.fn(),
   rotateAnswerImage: vi.fn(),
   syncPendingDrafts: vi.fn(),
+  getPendingDraftsByPrefix: vi.fn(),
 }));
 
 vi.mock("@/lib/api-client", async (importOriginal) => ({
@@ -48,6 +49,7 @@ vi.mock("@/lib/api-client", async (importOriginal) => ({
 
 vi.mock("@/lib/draft-queue", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/draft-queue")>()),
+  getPendingDraftsByPrefix: mocks.getPendingDraftsByPrefix,
   syncPendingDrafts: mocks.syncPendingDrafts,
 }));
 
@@ -226,6 +228,8 @@ describe("WorksheetWorkbench", () => {
     );
     mocks.syncPendingDrafts.mockReset();
     mocks.syncPendingDrafts.mockResolvedValue(0);
+    mocks.getPendingDraftsByPrefix.mockReset();
+    mocks.getPendingDraftsByPrefix.mockResolvedValue([]);
   });
 
   it("autosaves an answer and lets the child move to the next question", async () => {
@@ -280,6 +284,40 @@ describe("WorksheetWorkbench", () => {
         expect.objectContaining({ answer: { text: "goes" } }),
         "child-token",
       );
+    });
+  });
+
+  it("restores an answer saved on this device when the same practice is reopened", async () => {
+    mocks.getPendingDraftsByPrefix.mockResolvedValueOnce([
+      {
+        key: "attempt-1:english-fill",
+        answer: { text: "goes" },
+        syncRequest: {
+          attemptId: "attempt-1",
+          questionId: "english-fill",
+          payload: {
+            kind: "text",
+            answer: { text: "goes" },
+            expected_version: 0,
+          },
+        },
+        savedAt: "2026-08-03T00:00:00.000Z",
+        expiresAt: "2026-08-04T00:00:00.000Z",
+      },
+    ]);
+
+    render(<WorksheetWorkbench />);
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Choose the correct expansion of (a + b)(a − b).",
+      }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Next question" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Your answer")).toHaveValue("goes");
+      expect(screen.getByText("Saved on this device")).toBeInTheDocument();
     });
   });
 
