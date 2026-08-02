@@ -1727,6 +1727,11 @@ test("parent validates a local-AI completed-paper review before submitting it", 
     { headers: parentHeaders },
   );
   expect(processedResponse.ok()).toBeTruthy();
+
+  await page.reload();
+  await expect(
+    page.getByRole("link", { name: "Print a clean A4 copy" }),
+  ).toHaveAttribute("href", /\/parent\/print\/?\?assignmentId=.+/);
 });
 
 test("an expired child session returns to PIN login and resumes the requested page", async ({
