@@ -367,6 +367,45 @@ button {
   font-size: 0.86rem;
 }
 
+.dashboard-current-work {
+  display: grid;
+  gap: 0.4rem;
+  border-radius: 0.75rem;
+  background: rgb(255 255 255 / 0.72);
+  padding: 0.7rem;
+}
+
+.dashboard-current-work p,
+.dashboard-no-work {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.dashboard-status {
+  width: fit-content;
+  border-radius: 999px;
+  background: #e9efff;
+  color: var(--blue-dark) !important;
+  padding: 0.22rem 0.5rem;
+  font-size: 0.72rem !important;
+  font-weight: 800;
+}
+
+.dashboard-status.grading,
+.dashboard-status.submitted {
+  background: #fff2d9;
+  color: #8a5a00 !important;
+}
+
+.dashboard-status.results_ready,
+.dashboard-status.correcting {
+  background: #e5f7ef;
+  color: #13795b !important;
+}
+
 .dashboard-child-card .button {
   justify-content: center;
 }

@@ -5,6 +5,7 @@ import { ParentDashboard } from "@/components/parent-dashboard";
 
 const mocks = vi.hoisted(() => ({
   getChildren: vi.fn(),
+  getFamilyHistory: vi.fn(),
   getFamilies: vi.fn(),
   getParentAccessToken: vi.fn(),
   replace: vi.fn(),
@@ -16,6 +17,7 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/lib/api-client", () => ({
   getChildren: mocks.getChildren,
+  getFamilyHistory: mocks.getFamilyHistory,
   getFamilies: mocks.getFamilies,
   getParentAccessToken: mocks.getParentAccessToken,
 }));
@@ -28,6 +30,8 @@ describe("ParentDashboard", () => {
     mocks.getFamilies.mockResolvedValue([]);
     mocks.getChildren.mockReset();
     mocks.getChildren.mockResolvedValue([]);
+    mocks.getFamilyHistory.mockReset();
+    mocks.getFamilyHistory.mockResolvedValue([]);
     mocks.replace.mockReset();
     window.localStorage.clear();
     window.history.replaceState({}, "", "/parent/");
@@ -76,6 +80,49 @@ describe("ParentDashboard", () => {
     expect(
       screen.queryByRole("heading", { name: "设置家庭学习空间" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows each child's current assigned work on the family dashboard", async () => {
+    window.localStorage.setItem("luma-language:demo-parent", "zh");
+    mocks.getFamilies.mockResolvedValue([
+      { id: "family-1", name: "肉肉如意" },
+    ]);
+    mocks.getChildren.mockResolvedValue([
+      {
+        id: "child-1",
+        family_id: "family-1",
+        nickname: "肉肉",
+        grade_stage: "Junior high 1",
+        ui_language: "zh",
+      },
+    ]);
+    mocks.getFamilyHistory.mockResolvedValue([
+      {
+        assignment_id: "assignment-1",
+        attempt_id: "attempt-1",
+        child_id: "child-1",
+        child_nickname: "肉肉",
+        title: "Lesson 2 同レベル変形練習（インタラクティブ版）",
+        status: "grading",
+        submitted_at: "2026-08-02T00:00:00Z",
+        awarded_points: 0,
+        available_points: 100,
+        correction_count: 0,
+        source_material_title: null,
+        source_material_subject: null,
+      },
+    ]);
+
+    render(<ParentDashboard />);
+
+    expect(
+      await screen.findByText("Lesson 2 同レベル変形練習（インタラクティブ版）"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("正在批阅")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "查看结果" })).toHaveAttribute(
+      "href",
+      "/parent/results?attemptId=attempt-1",
+    );
   });
 
   it("translates the complete onboarding screen into Chinese", async () => {

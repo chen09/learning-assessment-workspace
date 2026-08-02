@@ -27,10 +27,37 @@ test("parent dashboard shows saved family data and opens child practice", async 
       ]),
     });
   });
+  await page.route("**/v1/history/families/dashboard-family", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          assignment_id: "dashboard-assignment",
+          attempt_id: "dashboard-attempt",
+          child_id: "dashboard-child",
+          child_nickname: "肉肉",
+          title: "Fractions recap",
+          status: "grading",
+          submitted_at: "2026-08-02T00:00:00Z",
+          awarded_points: 0,
+          available_points: 10,
+          correction_count: 0,
+          source_material_title: null,
+          source_material_subject: null,
+        },
+      ]),
+    });
+  });
 
   await page.goto("/parent/");
   await expect(page.getByRole("heading", { name: "肉肉如意" })).toBeVisible();
   await expect(page.getByText("肉肉", { exact: true })).toBeVisible();
+  await expect(page.getByText("Fractions recap")).toBeVisible();
+  await expect(page.getByText("Being graded")).toBeVisible();
+  await expect(page.getByRole("link", { name: "View results" })).toHaveAttribute(
+    "href",
+    "/parent/results/?attemptId=dashboard-attempt",
+  );
   const createPractice = page.getByRole("link", { name: "Create practice" });
   await expect(createPractice).toHaveAttribute(
     "href",

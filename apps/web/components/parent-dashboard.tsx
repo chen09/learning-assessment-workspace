@@ -11,7 +11,9 @@ import { LanguageSwitcher } from "@/components/language-switcher";
 import {
   type ChildProfile,
   type Family,
+  type ParentHistoryItem,
   getChildren,
+  getFamilyHistory,
   getFamilies,
   getParentAccessToken,
 } from "@/lib/api-client";
@@ -30,11 +32,30 @@ function removeLegacyAuthCode() {
   );
 }
 
+const dashboardStatusKey = {
+  assigned: "parentDashboard.status.assigned",
+  in_progress: "parentDashboard.status.inProgress",
+  submitted: "parentDashboard.status.submitted",
+  grading: "parentDashboard.status.grading",
+  results_ready: "parentDashboard.status.resultsReady",
+  correcting: "parentDashboard.status.correcting",
+  completed: "parentDashboard.status.completed",
+  withdrawn: "parentDashboard.status.withdrawn",
+  stopped: "parentDashboard.status.stopped",
+} as const;
+
+function getDashboardStatusKey(status: string) {
+  return dashboardStatusKey[
+    status as keyof typeof dashboardStatusKey
+  ] ?? dashboardStatusKey.assigned;
+}
+
 export function ParentDashboard() {
   const router = useRouter();
   const [authenticated, setAuthenticated] = useState(false);
   const [families, setFamilies] = useState<Family[] | null>(null);
   const [children, setChildren] = useState<ChildProfile[]>([]);
+  const [familyHistory, setFamilyHistory] = useState<ParentHistoryItem[]>([]);
   const [workspaceError, setWorkspaceError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -63,14 +84,18 @@ export function ParentDashboard() {
           return;
         }
         const firstFamily = nextFamilies[0];
-        const nextChildren = firstFamily
-          ? await getChildren(firstFamily.id, accessToken)
-          : [];
+        const [nextChildren, nextFamilyHistory] = firstFamily
+          ? await Promise.all([
+              getChildren(firstFamily.id, accessToken),
+              getFamilyHistory(firstFamily.id, accessToken),
+            ])
+          : [[], []];
         if (!active) {
           return;
         }
         setFamilies(nextFamilies);
         setChildren(nextChildren);
+        setFamilyHistory(nextFamilyHistory);
       } catch {
         if (active && !hasParentSession) {
           router.replace("/login/");
@@ -95,6 +120,7 @@ export function ParentDashboard() {
     <AppShell currentPath="/parent/" role="parent">
       <ParentDashboardContent
         childProfiles={children}
+        familyHistory={familyHistory}
         families={families}
         workspaceError={workspaceError}
         onRetry={() => setReloadKey((value) => value + 1)}
@@ -106,11 +132,13 @@ export function ParentDashboard() {
 function ParentDashboardContent({
   families,
   childProfiles,
+  familyHistory,
   workspaceError,
   onRetry,
 }: {
   families: Family[] | null;
   childProfiles: ChildProfile[];
+  familyHistory: ParentHistoryItem[];
   workspaceError: boolean;
   onRetry: () => void;
 }) {
@@ -142,6 +170,15 @@ function ParentDashboardContent({
 
   const activeFamily = families[0];
   if (activeFamily) {
+    const currentWorkByChild = new Map<string, ParentHistoryItem>();
+    for (const work of familyHistory) {
+      if (
+        !currentWorkByChild.has(work.child_id) &&
+        !["completed", "withdrawn", "stopped"].includes(work.status)
+      ) {
+        currentWorkByChild.set(work.child_id, work);
+      }
+    }
     return (
       <>
         <header className="page-header">
@@ -167,18 +204,45 @@ function ParentDashboardContent({
           </div>
           {childProfiles.length > 0 ? (
             <div className="dashboard-child-grid">
-              {childProfiles.map((child) => (
-                <article className="dashboard-child-card" key={child.id}>
-                  <strong>{child.nickname}</strong>
-                  <span>{child.grade_stage}</span>
-                  <Link
-                    className="button primary"
-                    href={`/parent/create?familyId=${encodeURIComponent(activeFamily.id)}&childId=${encodeURIComponent(child.id)}`}
-                  >
-                    {t("family.createPractice")}
-                  </Link>
-                </article>
-              ))}
+              {childProfiles.map((child) => {
+                const currentWork = currentWorkByChild.get(child.id);
+                return (
+                  <article className="dashboard-child-card" key={child.id}>
+                    <strong>{child.nickname}</strong>
+                    <span>{child.grade_stage}</span>
+                    {currentWork ? (
+                      <div className="dashboard-current-work">
+                        <span className={`dashboard-status ${currentWork.status}`}>
+                          {t(getDashboardStatusKey(currentWork.status))}
+                        </span>
+                        <p>{currentWork.title}</p>
+                        <Link
+                          className="quiet-link"
+                          href={
+                            currentWork.attempt_id
+                              ? `/parent/results?attemptId=${encodeURIComponent(currentWork.attempt_id)}`
+                              : `/parent/history?familyId=${encodeURIComponent(activeFamily.id)}`
+                          }
+                        >
+                          {currentWork.attempt_id
+                            ? t("parentDashboard.viewResults")
+                            : t("parentDashboard.viewProgress")}
+                        </Link>
+                      </div>
+                    ) : (
+                      <p className="dashboard-no-work">
+                        {t("parentDashboard.noActiveWork")}
+                      </p>
+                    )}
+                    <Link
+                      className="button primary"
+                      href={`/parent/create?familyId=${encodeURIComponent(activeFamily.id)}&childId=${encodeURIComponent(child.id)}`}
+                    >
+                      {t("family.createPractice")}
+                    </Link>
+                  </article>
+                );
+              })}
             </div>
           ) : (
             <div className="dashboard-empty-children">
