@@ -1,8 +1,12 @@
+from datetime import UTC, datetime
+
 import cv2
 import numpy as np
 import pytest
+from PIL import Image
 from pypdf import PdfWriter
 
+from app.ai.codex_cli import CodexCLIGradingAdapter
 from app.services.database_jobs import (
     _completed_worksheet_failure_code,
     fixture_job_handler,
@@ -135,3 +139,110 @@ async def test_completed_paper_without_an_allowed_ai_adapter_stays_manual_review
     assert isinstance(extraction, str)
     assert '"needs_parent_confirmation"' in extraction
     assert '"question_units": []' in extraction
+
+
+@pytest.mark.asyncio
+async def test_allowed_codex_worker_grades_a_private_response_photo(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    family_id = "00000000-0000-0000-0000-000000000001"
+    attempt_id = "00000000-0000-0000-0000-000000000002"
+    question_id = "00000000-0000-0000-0000-000000000003"
+    question_set_id = "00000000-0000-0000-0000-000000000004"
+    child_id = "00000000-0000-0000-0000-000000000005"
+    response_page = tmp_path / "private-response.png"
+    Image.new("RGB", (20, 20), "white").save(response_page)
+    download_calls: list[dict[str, object]] = []
+    codex_commands: list[list[str]] = []
+    executed: list[tuple[str, tuple[object, ...]]] = []
+
+    async def fake_download_private_pages(**kwargs: object):
+        download_calls.append(kwargs)
+        return [response_page]
+
+    monkeypatch.setattr(
+        "app.services.database_jobs._download_private_analysis_pages",
+        fake_download_private_pages,
+    )
+
+    def fake_runner(command: list[str], _timeout_seconds: int) -> None:
+        codex_commands.append(command)
+        output_path = command[command.index("--output-last-message") + 1]
+        with open(output_path, "w", encoding="utf-8") as output:
+            output.write(
+                '{"schema_version":"1.0","outcome":"correct",'
+                '"awarded_points":2,"confidence":0.96,'
+                '"evidence":["The photographed response is readable."],'
+                '"feedback":"Correct."}'
+            )
+
+    class FakeConnection:
+        async def fetch(self, query: str, _attempt_id: object, *_args: object):
+            if "from public.questions q" in query:
+                return [
+                    {
+                        "id": question_id,
+                        "family_id": family_id,
+                        "question_set_id": question_set_id,
+                        "position": 1,
+                        "type": "handwriting",
+                        "prompt": {"ja": "因数分解しなさい。"},
+                        "options": None,
+                        "answer_key": {"reference": "(x - 2)(x + 2)"},
+                        "rubric": {"grading_guide": "Accept equivalent forms."},
+                        "points": 2,
+                        "primary_knowledge_tag_id": None,
+                        "child_id": child_id,
+                        "ui_language": "ja",
+                    }
+                ]
+            if "from public.responses" in query:
+                return [
+                    {
+                        "id": "00000000-0000-0000-0000-000000000006",
+                        "family_id": family_id,
+                        "attempt_id": attempt_id,
+                        "question_id": question_id,
+                        "kind": "photo",
+                        "answer": {
+                            "paths": [f"{family_id}/responses/page-1.png"]
+                        },
+                        "version": 1,
+                        "saved_at": datetime.now(UTC),
+                    }
+                ]
+            raise AssertionError("Unexpected query")
+
+        async def execute(self, query: str, *args: object):
+            executed.append((query, args))
+
+    result = await fixture_job_handler(
+        FakeConnection(),  # type: ignore[arg-type]
+        {
+            "id": "00000000-0000-0000-0000-000000000007",
+            "type": "grade_submission",
+            "family_id": family_id,
+            "subject_id": attempt_id,
+            "payload": {"question_id": question_id},
+        },
+        visual_adapter=CodexCLIGradingAdapter(runner=fake_runner),
+        allowed_visual_family_ids=frozenset({family_id}),
+        supabase_url="https://example.supabase.co",
+        supabase_service_role_key="private-worker-key",
+    )
+
+    assert result["adapter"] == "codex-cli-v1"
+    assert result["outcomes"] == {"correct": 1}
+    assert download_calls[0]["bucket"] == "responses"
+    assert download_calls[0]["paths"] == [f"{family_id}/responses/page-1.png"]
+    assert [
+        command[index + 1]
+        for command in codex_commands
+        for index, value in enumerate(command)
+        if value == "--image"
+    ] == [str(response_page)]
+    result_insert = next(
+        args for query, args in executed if "insert into public.question_results" in query
+    )
+    assert "private-response.png" not in str(result_insert)

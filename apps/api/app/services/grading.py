@@ -243,11 +243,16 @@ def grade_response_with_ai(
     grading_guide: str = "",
     minimum_confidence: float = 0.75,
     feedback_language: Literal["en", "ja", "zh"] = "en",
+    attachment_paths: list[str] | None = None,
 ) -> QuestionResult:
     if (
         visual_adapter is None
         or response is None
-        or response.kind != ResponseKind.STROKES
+        or response.kind not in {ResponseKind.STROKES, ResponseKind.PHOTO}
+        or (
+            response.kind == ResponseKind.PHOTO
+            and not attachment_paths
+        )
     ):
         return FixtureGrader().grade(
             job,
@@ -273,6 +278,7 @@ def grade_response_with_ai(
                 "kind": response.kind.value,
                 **response.answer,
             },
+            attachment_paths=attachment_paths or [],
         )
     )
     outcome = grade.outcome

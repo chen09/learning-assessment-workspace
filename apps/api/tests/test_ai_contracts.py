@@ -198,6 +198,64 @@ def test_codex_cli_grades_anonymous_handwriting_with_a_locked_down_command() -> 
     assert grade.confidence == 0.94
 
 
+def test_codex_cli_grades_private_photo_pages_in_order(tmp_path) -> None:
+    observed: dict[str, object] = {}
+    first_page = tmp_path / "answer-page-1.png"
+    second_page = tmp_path / "answer-page-2.png"
+    Image.new("RGB", (20, 20), "white").save(first_page)
+    Image.new("RGB", (20, 20), "white").save(second_page)
+
+    def fake_runner(command: list[str], _timeout_seconds: int) -> None:
+        observed["command"] = command
+        image_paths = [
+            command[index + 1]
+            for index, value in enumerate(command)
+            if value == "--image"
+        ]
+        observed["image_paths"] = image_paths
+        observed["prompt"] = command[-1]
+        output_path = command[command.index("--output-last-message") + 1]
+        with open(output_path, "w", encoding="utf-8") as output:
+            output.write(
+                json.dumps(
+                    {
+                        "schema_version": "1.0",
+                        "outcome": "correct",
+                        "awarded_points": 1,
+                        "confidence": 0.98,
+                        "evidence": ["The photographed answer is legible."],
+                        "feedback": "Correct.",
+                    }
+                )
+            )
+
+    grade = CodexCLIGradingAdapter(runner=fake_runner).grade_response(
+        GradeResponseInput(
+            question=GeneratedQuestion(
+                client_id="photo-question",
+                type="handwriting",
+                prompt="因数分解しなさい。",
+                answer_key={"reference": "(x - 2)(x + 2)"},
+                grading_guide="Accept equivalent factorisations.",
+                difficulty="standard",
+                knowledge_points=["factorisation"],
+                points=1,
+            ),
+            response={
+                "kind": "photo",
+                "paths": ["family-id/response/page-1.png"],
+            },
+            attachment_paths=[str(first_page), str(second_page)],
+            language="ja",
+        )
+    )
+
+    assert observed["image_paths"] == [str(first_page), str(second_page)]
+    assert "photographed answer" in str(observed["prompt"])
+    assert "page order" in str(observed["prompt"])
+    assert grade.outcome == GradingOutcome.CORRECT
+
+
 def test_codex_cli_only_returns_a_parent_review_draft_for_completed_paper(
     tmp_path,
 ) -> None:
@@ -402,6 +460,68 @@ def test_low_confidence_visual_grade_is_routed_to_human_review() -> None:
         }
     ]
     assert result.feedback["action"] == "请家长确认这份答案。"
+
+
+def test_photo_response_uses_visual_grader_only_with_private_attachment() -> None:
+    observed: list[GradeResponseInput] = []
+
+    class PhotoVisualAdapter:
+        version = "codex-cli-v1"
+
+        def grade_response(self, request: GradeResponseInput) -> GradeResponseOutput:
+            observed.append(request)
+            return GradeResponseOutput(
+                outcome="correct",
+                awarded_points=2,
+                confidence=0.98,
+                evidence=["The photographed work is readable."],
+                feedback="Correct.",
+            )
+
+    job = Job(
+        family_id="00000000-0000-0000-0000-000000000001",
+        subject_id="00000000-0000-0000-0000-000000000002",
+    )
+    question = Question(
+        family_id=job.family_id,
+        question_set_id="00000000-0000-0000-0000-000000000003",
+        position=1,
+        type=QuestionType.HANDWRITING,
+        prompt="因数分解しなさい。",
+        answer_key={"reference": "(x - 2)(x + 2)"},
+        points=2,
+    )
+    response = SavedResponse(
+        family_id=job.family_id,
+        attempt_id=job.subject_id,
+        question_id=question.id,
+        kind=ResponseKind.PHOTO,
+        answer={"paths": ["family-id/attempt/page-1.jpg"]},
+    )
+
+    result = grade_response_with_ai(
+        job,
+        question,
+        response,
+        visual_adapter=PhotoVisualAdapter(),
+        attachment_paths=["/private/worker/page-1.jpg"],
+        feedback_language="ja",
+    )
+
+    assert result.outcome == GradingOutcome.CORRECT
+    assert observed[0].attachment_paths == ["/private/worker/page-1.jpg"]
+    assert observed[0].response["kind"] == "photo"
+
+    unavailable = grade_response_with_ai(
+        job,
+        question,
+        response,
+        visual_adapter=PhotoVisualAdapter(),
+        feedback_language="ja",
+    )
+
+    assert unavailable.outcome == GradingOutcome.NEEDS_PARENT_REVIEW
+    assert len(observed) == 1
 
 
 def test_visual_grading_adapter_is_limited_to_allowed_families() -> None:

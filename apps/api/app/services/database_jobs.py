@@ -11,7 +11,7 @@ import structlog
 
 from app.ai.codex_cli import CodexCLIGradingAdapter
 from app.ai.contracts import CompletedWorksheetAnalysisInput
-from app.domain.models import Job, Question, SavedResponse
+from app.domain.models import Job, Question, ResponseKind, SavedResponse
 from app.fixtures.english_lesson_one import (
     lesson_one_question_specs,
     lesson_one_source_summary,
@@ -60,6 +60,17 @@ def _localized_text(value: Any) -> str:
             if isinstance(candidate, str):
                 return candidate
     return ""
+
+
+def _response_photo_paths(response: SavedResponse | None) -> list[str]:
+    """Return only persisted private photo paths, never signed viewer URLs."""
+    if response is None or response.kind != ResponseKind.PHOTO:
+        return []
+    for field in ("paths", "source_paths"):
+        paths = response.answer.get(field)
+        if isinstance(paths, list):
+            return [path for path in paths if isinstance(path, str)]
+    return []
 
 
 def _visual_adapter_for_family(
@@ -553,18 +564,57 @@ async def fixture_job_handler(
                 if isinstance(rubric, dict)
                 else str(rubric)
             )
-            result = grade_response_with_ai(
-                job_model,
-                question,
-                responses.get(str(question.id)),
-                visual_adapter=job_visual_adapter,
-                grading_guide=grading_guide,
-                minimum_confidence=minimum_confidence,
-                feedback_language=cast(
-                    Literal["en", "ja", "zh"],
-                    str(row["ui_language"]),
-                ),
-            )
+            response = responses.get(str(question.id))
+            photo_paths = _response_photo_paths(response)
+            attachment_paths: list[str] = []
+            if (
+                isinstance(job_visual_adapter, CodexCLIGradingAdapter)
+                and photo_paths
+                and supabase_url
+                and supabase_service_role_key
+            ):
+                with TemporaryDirectory(
+                    prefix="luma-private-response-grade-"
+                ) as directory:
+                    workspace = Path(directory)
+                    attachment_paths = [
+                        str(path)
+                        for path in await _download_private_analysis_pages(
+                            supabase_url=supabase_url,
+                            service_role_key=supabase_service_role_key,
+                            family_id=str(job_model.family_id),
+                            bucket="responses",
+                            paths=photo_paths,
+                            destination=workspace,
+                            prefix="response",
+                        )
+                    ]
+                    result = grade_response_with_ai(
+                        job_model,
+                        question,
+                        response,
+                        visual_adapter=job_visual_adapter,
+                        grading_guide=grading_guide,
+                        minimum_confidence=minimum_confidence,
+                        feedback_language=cast(
+                            Literal["en", "ja", "zh"],
+                            str(row["ui_language"]),
+                        ),
+                        attachment_paths=attachment_paths,
+                    )
+            else:
+                result = grade_response_with_ai(
+                    job_model,
+                    question,
+                    response,
+                    visual_adapter=job_visual_adapter,
+                    grading_guide=grading_guide,
+                    minimum_confidence=minimum_confidence,
+                    feedback_language=cast(
+                        Literal["en", "ja", "zh"],
+                        str(row["ui_language"]),
+                    ),
+                )
             grader_versions.add(result.grader_version)
             await connection.execute(
                 """
