@@ -5,6 +5,7 @@ import { KeyRound, LineChart, Mail } from "lucide-react";
 import { type FormEvent, useState } from "react";
 
 import { Brand } from "@/components/brand";
+import { useLanguage } from "@/components/language-provider";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
@@ -17,6 +18,7 @@ function getCallbackUrl(nextPath: string) {
 }
 
 export function AuthPanel() {
+  const { t } = useLanguage();
   const [mode, setMode] = useState<AuthMode>("otp");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -33,7 +35,7 @@ export function AuthPanel() {
   const submitEmail = async (event: FormEvent) => {
     event.preventDefault();
     if (!supabase) {
-      finish("Local demo mode: add the public Supabase settings to enable sign-in.");
+      finish(t("auth.localSettingsRequired"));
       return;
     }
     setBusy(true);
@@ -43,7 +45,7 @@ export function AuthPanel() {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: getCallbackUrl("/parent/account/"),
       });
-      finish(error ? error.message : "Password reset instructions sent.");
+      finish(error ? error.message : t("auth.resetSent"));
       return;
     }
 
@@ -55,7 +57,7 @@ export function AuthPanel() {
       if (!error) {
         window.location.assign("/parent/family/");
       }
-      finish(error ? error.message : "Signed in.");
+      finish(error ? error.message : t("auth.signedIn"));
       return;
     }
 
@@ -66,12 +68,12 @@ export function AuthPanel() {
         shouldCreateUser: true,
       },
     });
-    finish(error ? error.message : "Check your email for the secure sign-in link.");
+    finish(error ? error.message : t("auth.otpSent"));
   };
 
   const signInWithProvider = async (provider: "google" | `custom:${string}`) => {
     if (!supabase) {
-      setNotice("Local demo mode: authentication is not connected yet.");
+      setNotice(t("auth.localNotConnected"));
       return;
     }
     const { error } = await supabase.auth.signInWithOAuth({
@@ -88,14 +90,11 @@ export function AuthPanel() {
       <section className="auth-story">
         <Brand />
         <div>
-          <p className="eyebrow">One family, one learning space</p>
-          <h1>Stay close to their work.</h1>
-          <p>
-            Create, print, answer, photograph, review, and return to the right
-            questions at the right time.
-          </p>
+          <p className="eyebrow">{t("auth.storyEyebrow")}</p>
+          <h1>{t("auth.storyTitle")}</h1>
+          <p>{t("auth.storyDescription")}</p>
         </div>
-        <p className="auth-privacy">Student work stays private to the family.</p>
+        <p className="auth-privacy">{t("auth.privacy")}</p>
       </section>
 
       <section className="auth-panel">
@@ -104,27 +103,27 @@ export function AuthPanel() {
             <Brand />
           </span>
           <Link className="quiet-link" href="/">
-            Back
+            {t("auth.back")}
           </Link>
           <LanguageSwitcher />
         </div>
         <div className="auth-card">
-          <p className="eyebrow">Parent sign in</p>
+          <p className="eyebrow">{t("auth.parentSignIn")}</p>
           <h2>
             {mode === "forgot"
-              ? "Reset your password"
-              : "Welcome to your family workspace"}
+              ? t("auth.resetTitle")
+              : t("auth.welcomeTitle")}
           </h2>
           <p>
             {mode === "otp"
-              ? "We will email a one-time link. No password needed."
+              ? t("auth.otpDescription")
               : mode === "password"
-                ? "Use the password you set for this account."
-                : "We will send a secure reset link to your email."}
+                ? t("auth.passwordDescription")
+                : t("auth.forgotDescription")}
           </p>
           <form className="auth-form" onSubmit={submitEmail}>
             <label>
-              Email
+              {t("auth.email")}
               <input
                 autoComplete="email"
                 onChange={(event) => setEmail(event.target.value)}
@@ -135,7 +134,7 @@ export function AuthPanel() {
             </label>
             {mode === "password" ? (
               <label>
-                Password
+                {t("auth.password")}
                 <input
                   autoComplete="current-password"
                   minLength={8}
@@ -153,12 +152,12 @@ export function AuthPanel() {
                 <Mail size={17} />
               )}
               {busy
-                ? "Please wait…"
+                ? t("auth.pleaseWait")
                 : mode === "otp"
-                  ? "Email me a sign-in link"
+                  ? t("auth.sendSignInLink")
                   : mode === "password"
-                    ? "Sign in"
-                    : "Send reset link"}
+                    ? t("auth.signIn")
+                    : t("auth.sendResetLink")}
             </button>
           </form>
           {notice ? (
@@ -173,7 +172,7 @@ export function AuthPanel() {
               onClick={() => setMode("otp")}
               type="button"
             >
-              One-time link
+              {t("auth.oneTimeLink")}
             </button>
             <button
               aria-pressed={mode === "password"}
@@ -181,7 +180,7 @@ export function AuthPanel() {
               onClick={() => setMode("password")}
               type="button"
             >
-              Password
+              {t("auth.passwordMode")}
             </button>
             <button
               aria-pressed={mode === "forgot"}
@@ -189,11 +188,11 @@ export function AuthPanel() {
               onClick={() => setMode("forgot")}
               type="button"
             >
-              Forgot password
+              {t("auth.forgotPassword")}
             </button>
           </div>
           <div className="auth-divider">
-            <span>or</span>
+            <span>{t("auth.or")}</span>
           </div>
           <div className="provider-grid">
             <button
@@ -201,23 +200,23 @@ export function AuthPanel() {
               onClick={() => void signInWithProvider("google")}
               type="button"
             >
-              <span className="provider-mark">G</span> Google
+              <span className="provider-mark">G</span> {t("auth.google")}
             </button>
             <button
               className="button ghost"
               onClick={() => void signInWithProvider("custom:line")}
               type="button"
             >
-              <LineChart size={17} aria-hidden="true" /> LINE
+              <LineChart size={17} aria-hidden="true" /> {t("auth.line")}
             </button>
           </div>
           {!supabase ? (
             <Link className="demo-entry" href="/parent/">
-              Continue with the local family demo
+              {t("auth.localDemo")}
             </Link>
           ) : null}
           <p className="auth-child-note">
-            Children join from the family screen with their six-digit PIN.
+            {t("auth.childNote")}
           </p>
         </div>
       </section>
