@@ -135,6 +135,35 @@ describe("HandwritingCanvas", () => {
     );
   });
 
+  it("opens and confirms clearing when iPad only delivers pointerdown to the toolbar", () => {
+    const onChange = vi.fn();
+
+    render(
+      <HandwritingCanvas
+        initialStrokes={initialStrokes}
+        onChange={onChange}
+      />,
+    );
+
+    fireEvent.pointerDown(
+      screen.getByRole("button", { name: "Clear handwriting" }),
+      { pointerType: "pen", pointerId: 11 },
+    );
+
+    const dialog = screen.getByRole("alertdialog");
+    expect(dialog).toHaveTextContent("Clear all handwriting?");
+    fireEvent.pointerDown(
+      screen.getByRole("button", { name: "Clear now" }),
+      { pointerType: "pen", pointerId: 12 },
+    );
+
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(onChange).toHaveBeenLastCalledWith([], {
+      width: 900,
+      height: 420,
+    });
+  });
+
   it("closes the clear confirmation from a touch action", () => {
     const onChange = vi.fn();
 

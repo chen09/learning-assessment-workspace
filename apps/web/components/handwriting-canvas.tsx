@@ -392,8 +392,14 @@ export function HandwritingCanvas({
             aria-label={t("handwriting.clear")}
             disabled={readOnly}
             onClick={() => handleClickAction("request-clear", requestClear)}
+            onPointerDown={(event) =>
+              handlePointerAction(event, "request-clear", requestClear)
+            }
             onPointerUp={(event) =>
               handlePointerAction(event, "request-clear", requestClear)
+            }
+            onTouchStart={(event) =>
+              handleTouchAction(event, "request-clear", requestClear)
             }
             onTouchEnd={(event) =>
               handleTouchAction(event, "request-clear", requestClear)
@@ -416,8 +422,22 @@ export function HandwritingCanvas({
               onClick={() =>
                 handleClickAction("keep-handwriting", keepHandwriting)
               }
+              onPointerDown={(event) =>
+                handlePointerAction(
+                  event,
+                  "keep-handwriting",
+                  keepHandwriting,
+                )
+              }
               onPointerUp={(event) =>
                 handlePointerAction(
+                  event,
+                  "keep-handwriting",
+                  keepHandwriting,
+                )
+              }
+              onTouchStart={(event) =>
+                handleTouchAction(
                   event,
                   "keep-handwriting",
                   keepHandwriting,
@@ -439,8 +459,22 @@ export function HandwritingCanvas({
               onClick={() =>
                 handleClickAction("clear-immediately", clearImmediately)
               }
+              onPointerDown={(event) =>
+                handlePointerAction(
+                  event,
+                  "clear-immediately",
+                  clearImmediately,
+                )
+              }
               onPointerUp={(event) =>
                 handlePointerAction(
+                  event,
+                  "clear-immediately",
+                  clearImmediately,
+                )
+              }
+              onTouchStart={(event) =>
+                handleTouchAction(
                   event,
                   "clear-immediately",
                   clearImmediately,
