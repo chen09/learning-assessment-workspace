@@ -85,6 +85,14 @@ function displaySubject(subject: string, language: "en" | "ja" | "zh") {
 }
 
 export default function PublicLibraryPage() {
+  return (
+    <AppShell currentPath="/parent/library/" role="parent">
+      <PublicLibraryContent />
+    </AppShell>
+  );
+}
+
+function PublicLibraryContent() {
   const { language } = useLanguage();
   const text = copy[language];
   const [families, setFamilies] = useState<Family[]>([]);
@@ -170,8 +178,7 @@ export default function PublicLibraryPage() {
   }
 
   return (
-    <AppShell currentPath="/parent/library/" role="parent">
-      <>
+    <>
         <header className="page-header">
           <div>
             <p className="eyebrow">{text.eyebrow}</p>
@@ -243,7 +250,6 @@ export default function PublicLibraryPage() {
           ))}
         </section>
         {!loadError && visibleItems.length === 0 ? <p>{text.empty}</p> : null}
-      </>
-    </AppShell>
+    </>
   );
 }

@@ -53,10 +53,10 @@ describe("PublicLibraryPage", () => {
     expect(
       await screen.findByRole("heading", { name: "Factorisation basics" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Mathematics")).toBeInTheDocument();
-    expect(screen.getByText("12 questions · revision 1")).toBeInTheDocument();
+    expect(screen.getByText("数学")).toBeInTheDocument();
+    expect(screen.getByText("12 道题 · 版本 1")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Copy to my family" }));
+    fireEvent.click(screen.getByRole("button", { name: "复制到我的家庭" }));
     await waitFor(() => {
       expect(mocks.copyPublicLibraryItem).toHaveBeenCalledWith(
         "library-1",
@@ -65,7 +65,7 @@ describe("PublicLibraryPage", () => {
         expect.any(String),
       );
     });
-    expect(await screen.findByText("Copied to 肉肉如意's family library."))
+    expect(await screen.findByText("已复制到「肉肉如意」的家庭题库。"))
       .toBeInTheDocument();
   });
 
@@ -86,10 +86,10 @@ describe("PublicLibraryPage", () => {
     render(<PublicLibraryPage />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "The public library could not be loaded.",
+      "无法加载公共题库。",
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    fireEvent.click(screen.getByRole("button", { name: "重试" }));
 
     expect(
       await screen.findByRole("heading", { name: "Retryable practice" }),

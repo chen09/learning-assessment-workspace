@@ -835,26 +835,29 @@ test("a reviewed public item can be copied without exposing its private answer d
     })
   ).json()) as { id: string };
 
+  await page.addInitScript(() => {
+    window.localStorage.setItem("luma-language:demo-parent", "zh");
+  });
   await page.goto("/parent/library/public/");
   await expect(
     page.getByRole("heading", { name: "Anonymous algebra practice" }),
   ).toBeVisible();
-  await expect(page.getByText("Mathematics")).toBeVisible();
-  await expect(page.getByText("1 questions · revision 1")).toBeVisible();
+  await expect(page.getByText("数学")).toBeVisible();
+  await expect(page.getByText("1 道题 · 版本 1")).toBeVisible();
   await expect(page.getByText("What is 2 + 2?")).toHaveCount(0);
   await expect(page.getByText("4", { exact: true })).toHaveCount(0);
 
-  await page.getByRole("combobox", { name: "Target family" }).selectOption(destinationFamily.id);
+  await page.getByRole("combobox", { name: "复制目标家庭" }).selectOption(destinationFamily.id);
   const copyResponse = page.waitForResponse(
     (response) =>
       /\/v1\/library\/items\/[^/]+\/copies$/.test(response.url()) &&
       response.request().method() === "POST" &&
       response.status() === 201,
   );
-  await page.getByRole("button", { name: "Copy to my family" }).click();
+  await page.getByRole("button", { name: "复制到我的家庭" }).click();
   await copyResponse;
   await expect(
-    page.getByText("Copied to Destination family's family library."),
+    page.getByText("已复制到「Destination family」的家庭题库。"),
   ).toBeVisible();
 
   await page.goto(`/parent/library/?familyId=${encodeURIComponent(destinationFamily.id)}`);
