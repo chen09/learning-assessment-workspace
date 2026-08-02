@@ -46,8 +46,9 @@ function ChildResultsContent() {
   const [results, setResults] = useState<AttemptResult[]>([]);
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [loadState, setLoadState] = useState<
-    "loading" | "ready" | "missing"
+    "loading" | "ready" | "missing" | "error"
   >("loading");
+  const [resultReloadVersion, setResultReloadVersion] = useState(0);
   const [correctionStatus, setCorrectionStatus] = useState<
     "idle" | "working" | "error"
   >("idle");
@@ -96,7 +97,7 @@ function ChildResultsContent() {
         timer = window.setTimeout(() => void poll(), 2000);
       } catch {
         if (!cancelled) {
-          timer = window.setTimeout(() => void poll(), 4000);
+          setLoadState("error");
         }
       }
     };
@@ -107,7 +108,7 @@ function ChildResultsContent() {
         window.clearTimeout(timer);
       }
     };
-  }, [requestedAttemptId]);
+  }, [requestedAttemptId, resultReloadVersion]);
 
   const score = useMemo(
     () =>
@@ -121,6 +122,7 @@ function ChildResultsContent() {
     (result) => result.outcome !== "correct",
   ).length;
   const visibleComplete = loadState === "ready";
+  const resultLoadFailed = loadState === "error";
   const correctionActionReady =
     hydrated && loadState === "ready" && Boolean(attemptId);
   const correctionButtonLabel =
@@ -148,6 +150,11 @@ function ChildResultsContent() {
     }
   };
 
+  const retryResults = () => {
+    setLoadState("loading");
+    setResultReloadVersion((current) => current + 1);
+  };
+
   return (
     <>
       <header className="result-header">
@@ -155,6 +162,8 @@ function ChildResultsContent() {
           <p className="eyebrow">
             {loadState === "missing"
               ? t("results.unavailable")
+              : resultLoadFailed
+                ? t("results.unavailable")
               : visibleComplete
                 ? t("results.ready")
                 : t("results.checking")}
@@ -162,6 +171,8 @@ function ChildResultsContent() {
           <h1>
             {loadState === "missing"
               ? t("results.unavailableTitle")
+              : resultLoadFailed
+                ? t("results.loadErrorTitle")
               : visibleComplete
                 ? t("results.goodWork", {
                     name: childName ?? t("role.child"),
@@ -171,6 +182,8 @@ function ChildResultsContent() {
           <p>
             {loadState === "missing"
               ? t("results.unavailableBody")
+              : resultLoadFailed
+                ? t("results.loadErrorBody")
               : visibleComplete
                 ? t(
                     correctionCount === 1
@@ -181,7 +194,7 @@ function ChildResultsContent() {
                 : t("results.fullResult")}
           </p>
         </div>
-        {loadState !== "missing" ? (
+        {loadState !== "missing" && !resultLoadFailed ? (
           <div className="score-badge">
             <strong>{visibleComplete ? score : "—"}</strong>
             <span>{t("results.points")}</span>
@@ -254,6 +267,11 @@ function ChildResultsContent() {
             })
           : null}
       </section>
+      {resultLoadFailed ? (
+        <button className="button primary" onClick={retryResults} type="button">
+          {t("history.retry")}
+        </button>
+      ) : null}
       {visibleComplete && correctionCount > 0 ? (
         <button
           aria-busy={

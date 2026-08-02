@@ -502,6 +502,8 @@ const messages = {
     "results.unavailableTitle": "No results to show",
     "results.unavailableBody":
       "Open a submitted assignment from History to see its results.",
+    "results.loadErrorTitle": "Couldn't load results",
+    "results.loadErrorBody": "Your work is safe. Try loading the results again.",
     "results.correctionOne":
       "{count} answer is ready for one more try or a parent check.",
     "results.correctionMany":
@@ -1281,6 +1283,8 @@ const messages = {
     "results.unavailableTitle": "表示できる結果がありません",
     "results.unavailableBody":
       "学習履歴から提出済みの練習を開いてください。",
+    "results.loadErrorTitle": "結果を読み込めませんでした",
+    "results.loadErrorBody": "あなたの解答は保存されています。もう一度結果を読み込みます。",
     "results.correctionOne":
       "{count} 問をもう一度解くか、保護者に確認してもらいます。",
     "results.correctionMany":
@@ -2045,6 +2049,8 @@ const messages = {
     "results.unavailable": "暂时无法显示结果",
     "results.unavailableTitle": "没有可显示的结果",
     "results.unavailableBody": "请从学习记录中打开已提交练习的结果。",
+    "results.loadErrorTitle": "无法加载结果",
+    "results.loadErrorBody": "你的作答已保存。请重新加载结果。",
     "results.correctionOne": "有 {count} 道题需要再试一次或等待家长确认。",
     "results.correctionMany": "有 {count} 道题需要再试一次或等待家长确认。",
     "results.fullResult": "所有题目批改完成后才会显示完整结果。",

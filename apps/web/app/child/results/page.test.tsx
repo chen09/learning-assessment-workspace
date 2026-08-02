@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -58,6 +58,39 @@ describe("ChildResultsPage", () => {
     expect(
       screen.queryByRole("button", { name: "Correct these answers" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("lets a child retry a temporary result-loading failure without leaving the result page", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/child/results/?attemptId=hosted-attempt",
+    );
+    mocks.getAttemptResults
+      .mockRejectedValueOnce(new Error("network unavailable"))
+      .mockResolvedValueOnce({
+        complete: true,
+        results: [
+          {
+            id: "result-correct",
+            question_id: "question-1",
+            outcome: "correct",
+            awarded_points: 1,
+            confidence: 1,
+            feedback: {},
+          },
+        ],
+      });
+
+    render(<ChildResultsPage />);
+
+    const retry = await screen.findByRole("button", { name: "Try again" });
+    fireEvent.click(retry);
+
+    expect(
+      await screen.findByRole("heading", { name: "Good work, 肉肉" }),
+    ).toBeInTheDocument();
+    expect(mocks.getAttemptResults).toHaveBeenCalledTimes(2);
   });
 
   it("shows result and correction states in Chinese", async () => {
