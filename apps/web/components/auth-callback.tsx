@@ -4,11 +4,15 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { Brand } from "@/components/brand";
+import { useLanguage } from "@/components/language-provider";
 import { completeAuthCallback } from "@/lib/auth-callback";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 export function AuthCallback() {
-  const [error, setError] = useState("");
+  const { t } = useLanguage();
+  const [error, setError] = useState<"not-configured" | "failed" | null>(
+    null,
+  );
 
   useEffect(() => {
     let active = true;
@@ -17,7 +21,7 @@ export function AuthCallback() {
     if (!supabase) {
       queueMicrotask(() => {
         if (active) {
-          setError("Authentication is not configured for this site.");
+          setError("not-configured");
         }
       });
       return () => {
@@ -31,13 +35,9 @@ export function AuthCallback() {
           window.location.replace(nextPath);
         }
       })
-      .catch((cause: unknown) => {
+      .catch(() => {
         if (active) {
-          setError(
-            cause instanceof Error
-              ? cause.message
-              : "The sign-in link could not be completed.",
-          );
+          setError("failed");
         }
       });
 
@@ -51,24 +51,31 @@ export function AuthCallback() {
       <section className="auth-story">
         <Brand />
         <div>
-          <p className="eyebrow">Secure family access</p>
-          <h1>Opening your workspace.</h1>
-          <p>We are confirming this one-time link with your learning account.</p>
+          <p className="eyebrow">{t("authCallback.secureAccess")}</p>
+          <h1>{t("authCallback.openingTitle")}</h1>
+          <p>{t("authCallback.openingDescription")}</p>
         </div>
-        <p className="auth-privacy">Student work stays private to the family.</p>
+        <p className="auth-privacy">{t("auth.privacy")}</p>
       </section>
 
       <section className="auth-panel">
         <div className="auth-card">
-          <p className="eyebrow">{error ? "Link problem" : "Signing you in"}</p>
-          <h2>{error ? "This link could not be completed" : "Just a moment…"}</h2>
+          <p className="eyebrow">
+            {error ? t("authCallback.linkProblem") : t("authCallback.signingIn")}
+          </p>
+          <h2>
+            {error ? t("authCallback.failedTitle") : t("authCallback.waiting")}
+          </h2>
           <p role="status">
-            {error ||
-              "After the secure link is confirmed, this page will continue automatically."}
+            {error === "not-configured"
+              ? t("authCallback.notConfigured")
+              : error === "failed"
+                ? t("authCallback.failed")
+                : t("authCallback.continuing")}
           </p>
           {error ? (
             <Link className="button primary large" href="/login/">
-              Request a new sign-in link
+              {t("authCallback.requestNew")}
             </Link>
           ) : null}
         </div>
