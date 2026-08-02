@@ -252,6 +252,43 @@ describe("WorksheetWorkbench", () => {
     ).toBeInTheDocument();
   });
 
+  it("opens a private question figure at a readable size", async () => {
+    mocks.startAssignment.mockResolvedValueOnce({
+      ...assignmentWork,
+      questions: [
+        {
+          ...assignmentWork.questions[0],
+          figure: {
+            image_url: "https://storage.example.test/question-figure.png",
+            alt_text: "A difference of squares diagram",
+          },
+        },
+      ],
+    });
+
+    render(<WorksheetWorkbench />);
+
+    expect(
+      await screen.findByRole("img", {
+        name: "A difference of squares diagram",
+      }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand figure" }));
+
+    expect(
+      screen.getByRole("dialog", { name: "Question figure" }),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("dialog")).getByRole("img", {
+        name: "A difference of squares diagram",
+      }),
+    ).toHaveAttribute(
+      "src",
+      "https://storage.example.test/question-figure.png",
+    );
+  });
+
   it("lets a child manually retry syncing a locally saved answer", async () => {
     mocks.saveAttemptResponse.mockRejectedValueOnce(new Error("offline"));
     mocks.syncPendingDrafts.mockResolvedValue(0);

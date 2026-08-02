@@ -14,6 +14,10 @@ export type ApiQuestion = {
   prompt: string;
   options: string[] | null;
   points: number;
+  figure?: {
+    image_url: string;
+    alt_text: string | null;
+  } | null;
   listening?: {
     audio_url: string | null;
     replay_limit: number;
@@ -31,6 +35,10 @@ export type StructuredQuestion = {
   rubric: Record<string, unknown>;
   points: number;
   knowledge_code: string;
+  figure?: {
+    image_path?: string | null;
+    alt_text?: string | null;
+  } | null;
   listening?: {
     audio_path?: string | null;
     replay_limit?: number;

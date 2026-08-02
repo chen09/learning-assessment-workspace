@@ -1248,6 +1248,101 @@ describe("CreateWorkspace", () => {
     });
   });
 
+  it("uploads a private figure before assigning a question", async () => {
+    const document = {
+      schema_version: "1.0" as const,
+      question_set: {
+        title: "Diagram check",
+        subject: "Mathematics",
+        locale: "en" as const,
+        difficulty: "standard" as const,
+        source_mode: "convert" as const,
+        estimated_minutes: 5,
+      },
+      knowledge_tags: [{ code: "difference-squares", label: "Difference of squares" }],
+      questions: [
+        {
+          position: 1,
+          type: "single_choice" as const,
+          prompt: "Choose the expression shown in the diagram.",
+          options: ["a² − b²", "a² + b²"],
+          answer_key: { choice: 0 },
+          rubric: { grading_mode: "exact" },
+          points: 1,
+          knowledge_code: "difference-squares",
+        },
+      ],
+    };
+    mocks.previewStructuredQuestionSet.mockResolvedValue({
+      title: "Diagram check",
+      subject: "Mathematics",
+      locale: "en",
+      question_count: 1,
+      total_points: 1,
+      estimated_minutes: 5,
+      knowledge_tag_count: 1,
+      answer_keys_present: true,
+      checksum: "figure-preview",
+      source_summary: {},
+      questions: document.questions,
+    });
+    mocks.createUploadIntent.mockResolvedValue({
+      bucket: "sources",
+      path: "family-1/sources/difference-squares.png",
+      upload_url: "fixture://figure-upload",
+      expires_in: 300,
+    });
+    mocks.uploadToSignedUrl.mockResolvedValue(undefined);
+    mocks.importStructuredQuestionSet.mockResolvedValue({
+      question_set_id: "figure-set",
+      assignment_id: "figure-assignment",
+      status: "confirmed",
+      reused_existing: false,
+    });
+    window.history.replaceState(
+      {},
+      "",
+      "/parent/create/?familyId=family-1&childId=child-1",
+    );
+
+    render(<CreateWorkspace />);
+    await screen.findByRole("combobox", { name: "Child" });
+    fireEvent.click(screen.getByRole("button", { name: "Import AI question JSON" }));
+    fireEvent.change(screen.getByLabelText("AI question JSON"), {
+      target: { files: [new File([JSON.stringify(document)], "diagram.json")] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Preview questions" }));
+    await screen.findByRole("heading", { name: "Review before assigning" });
+    fireEvent.change(screen.getByLabelText("Figure for question 1"), {
+      target: { files: [new File(["image"], "diagram.png", { type: "image/png" })] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm and assign" }));
+
+    await waitFor(() => {
+      expect(mocks.createUploadIntent).toHaveBeenCalledWith(
+        expect.objectContaining({ bucket: "sources", content_type: "image/png" }),
+        "parent-token",
+        expect.stringContaining("question-figure-"),
+      );
+      expect(mocks.uploadToSignedUrl).toHaveBeenCalled();
+      expect(mocks.importStructuredQuestionSet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          document: expect.objectContaining({
+            questions: [
+              expect.objectContaining({
+                figure: expect.objectContaining({
+                  image_path: "family-1/sources/difference-squares.png",
+                }),
+              }),
+            ],
+          }),
+        }),
+        "parent-token",
+        expect.any(String),
+      );
+    });
+  });
+
   it("lets a parent collect several authored questions before opening the review draft", async () => {
     mocks.previewStructuredQuestionSet.mockResolvedValue({
       title: "Two question check",

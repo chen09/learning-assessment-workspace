@@ -152,7 +152,7 @@ Return this strict JSON shape:
 
 Rules:
 1. Positions must be continuous from 1. Every question must use one listed knowledge_code.
-2. Use single_choice only with options and answer_key.choice as a zero-based number. Use typed_text with answer_key.text. Use handwriting for work that must be handwritten; then use answer_key.reference and rubric.grading_mode "parent_review". A listening question uses type listening, options, answer_key.choice, and a listening object with replay_limit (0–10), transcript, and transcript_policy (never, after_submission, or always). Do not provide audio_path: the parent attaches the private audio file during review.
+2. Use single_choice only with options and answer_key.choice as a zero-based number. Use typed_text with answer_key.text. Use handwriting for work that must be handwritten; then use answer_key.reference and rubric.grading_mode "parent_review". A listening question uses type listening, options, answer_key.choice, and a listening object with replay_limit (0–10), transcript, and transcript_policy (never, after_submission, or always). Do not provide audio_path or figure.image_path: the parent attaches private media during review.
 3. Keep answers and rubrics private in the JSON. Never include answer keys inside the child-facing prompt.
 4. Make the requested difficulty genuinely easier, similar, harder, or competition-level by changing reasoning demands, not merely calculation length.`;
 
@@ -190,9 +190,10 @@ ${JSON.stringify(
 Use source_mode "similar". Preserve only the learning goals, not the original wording. Return the strict JSON object defined above.`;
 }
 
-type ReviewDraftQuestion = Omit<ApiQuestion, "listening"> & {
+type ReviewDraftQuestion = Omit<ApiQuestion, "listening" | "figure"> & {
   answer_key: Record<string, unknown>;
   answer?: string;
+  figure?: StructuredQuestionSetDocument["questions"][number]["figure"];
   listening?: StructuredQuestionSetDocument["questions"][number]["listening"];
 };
 
@@ -498,6 +499,9 @@ function CreateWorkspaceContent() {
     [],
   );
   const [listeningAudioFiles, setListeningAudioFiles] = useState<
+    Record<string, File>
+  >({});
+  const [questionFigureFiles, setQuestionFigureFiles] = useState<
     Record<string, File>
   >({});
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(
@@ -1168,10 +1172,12 @@ function CreateWorkspaceContent() {
             options: question.options.length > 0 ? question.options : null,
             points: question.points,
             answer_key: question.answer_key,
+            figure: question.figure,
             listening: question.listening,
           })),
         );
         setListeningAudioFiles({});
+        setQuestionFigureFiles({});
         setStage("review");
         setRequestStatus("idle");
       } catch {
@@ -1237,10 +1243,12 @@ function CreateWorkspaceContent() {
             options: question.options.length > 0 ? question.options : null,
             points: question.points,
             answer_key: question.answer_key,
+            figure: question.figure,
             listening: question.listening,
           })),
         );
         setListeningAudioFiles({});
+        setQuestionFigureFiles({});
         setStage("review");
         setRequestStatus("idle");
       } catch {
@@ -1420,16 +1428,53 @@ function CreateWorkspaceContent() {
         const draftQuestionByPosition = new Map(
           draftQuestions.map((question) => [question.position, question]),
         );
-        const documentWithPrivateAudio: StructuredQuestionSetDocument = {
+        const documentWithPrivateMedia: StructuredQuestionSetDocument = {
           ...structuredDocument,
           questions: await Promise.all(
             structuredDocument.questions.map(async (question) => {
-              if (question.type !== "listening") {
-                return question;
-              }
               const draftQuestion = draftQuestionByPosition.get(
                 question.position,
               );
+              const figureFile = draftQuestion
+                ? questionFigureFiles[draftQuestion.id]
+                : undefined;
+              let questionWithPrivateMedia = question;
+              if (figureFile) {
+                const contentType =
+                  figureFile.type === "image/png" ||
+                  figureFile.name.toLowerCase().endsWith(".png")
+                    ? "image/png"
+                    : figureFile.type === "image/jpeg" ||
+                        figureFile.name.toLowerCase().endsWith(".jpg") ||
+                        figureFile.name.toLowerCase().endsWith(".jpeg")
+                      ? "image/jpeg"
+                      : null;
+                if (!contentType) {
+                  throw new Error("Use a PNG or JPEG question figure.");
+                }
+                const intent = await createUploadIntent(
+                  {
+                    family_id: familyId,
+                    bucket: "sources",
+                    object_id: crypto.randomUUID(),
+                    filename: figureFile.name,
+                    content_type: contentType,
+                  },
+                  parentToken,
+                  `question-figure-${structuredImportKey}-${question.position}`,
+                );
+                await uploadToSignedUrl(intent, figureFile);
+                questionWithPrivateMedia = {
+                  ...question,
+                  figure: {
+                    ...question.figure,
+                    image_path: intent.path,
+                  },
+                };
+              }
+              if (question.type !== "listening") {
+                return questionWithPrivateMedia;
+              }
               const audioFile = draftQuestion
                 ? listeningAudioFiles[draftQuestion.id]
                 : undefined;
@@ -1439,7 +1484,7 @@ function CreateWorkspaceContent() {
                 );
               }
               if (!audioFile) {
-                return question;
+                return questionWithPrivateMedia;
               }
               const contentType =
                 audioFile.type === "audio/mpeg" ||
@@ -1467,9 +1512,9 @@ function CreateWorkspaceContent() {
               );
               await uploadToSignedUrl(intent, audioFile);
               return {
-                ...question,
+                ...questionWithPrivateMedia,
                 listening: {
-                  ...question.listening,
+                  ...questionWithPrivateMedia.listening,
                   audio_path: intent.path,
                 },
               };
@@ -1484,7 +1529,7 @@ function CreateWorkspaceContent() {
             assignment_mode: assignmentMode,
             time_limit_seconds: assignmentTimeLimitSeconds,
             parent_note: assignmentNote.trim() || null,
-            document: documentWithPrivateAudio,
+            document: documentWithPrivateMedia,
           },
           parentToken,
           `${mode}-${structuredImportKey}-${childId}`,
@@ -2951,6 +2996,32 @@ function CreateWorkspaceContent() {
                         </span>
                       </label>
                     ) : null}
+                    <label className="draft-listening-audio">
+                      {t("draftReview.privateFigure")}
+                      <input
+                        accept="image/png,image/jpeg,.png,.jpg,.jpeg"
+                        aria-label={t("draftReview.figureForQuestion", {
+                          number: index + 1,
+                        })}
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          if (!file) {
+                            return;
+                          }
+                          setQuestionFigureFiles((current) => ({
+                            ...current,
+                            [question.id]: file,
+                          }));
+                        }}
+                        type="file"
+                      />
+                      <span>
+                        {questionFigureFiles[question.id]?.name ??
+                          (question.figure?.image_path
+                            ? t("draftReview.figureAttached")
+                            : t("draftReview.privateFigure"))}
+                      </span>
+                    </label>
                   </>
                 )}
               </div>

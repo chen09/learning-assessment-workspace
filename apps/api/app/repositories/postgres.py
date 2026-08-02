@@ -55,6 +55,8 @@ from app.domain.models import (
     FamilyCompletedWorksheetImport,
     FamilyInvitation,
     FamilyLibraryQuestionSet,
+    FigureConfig,
+    FigureQuestionView,
     GradingOutcome,
     HistoryItem,
     Job,
@@ -152,6 +154,7 @@ def _question(row: RowMapping) -> Question:
     )
     rubric = cast(dict[str, Any], row.get("rubric") or {})
     listening = None
+    figure = None
     if row["type"] == "listening":
         raw_listening = rubric.get("_listening")
         if isinstance(raw_listening, dict):
@@ -164,6 +167,12 @@ def _question(row: RowMapping) -> Question:
                 )
             except ValueError:
                 logger.warning("Ignoring malformed private listening settings.")
+    raw_figure = rubric.get("_figure")
+    if isinstance(raw_figure, dict):
+        try:
+            figure = FigureConfig.model_validate(raw_figure)
+        except ValueError:
+            logger.warning("Ignoring malformed private figure settings.")
     return Question(
         id=row["id"],
         family_id=row["family_id"],
@@ -175,6 +184,7 @@ def _question(row: RowMapping) -> Question:
         answer_key=cast(dict[str, Any], row["answer_key"]),
         points=float(row["points"]),
         listening=listening,
+        figure=figure,
     )
 
 
@@ -341,7 +351,7 @@ class PostgresRepository:
 
     async def _sign_private_asset_urls(
         self,
-        bucket: Literal["responses", "audio"],
+        bucket: Literal["responses", "audio", "sources"],
         paths: list[str],
     ) -> dict[str, str]:
         if not paths or not self._service_role_key:
@@ -2344,6 +2354,7 @@ class PostgresRepository:
                         select q.id, q.family_id, q.question_set_id, q.position,
                                q.type, q.prompt, q.options, q.answer_key, q.rubric,
                                q.points, q.transcript_policy, audio.object_path as audio_path,
+                               figure.object_path as figure_path,
                                coalesce(playback.play_count, 0) as audio_play_count
                         from public.questions q
                         left join lateral (
@@ -2358,6 +2369,19 @@ class PostgresRepository:
                           order by question_asset.position
                           limit 1
                         ) audio on q.type = 'listening'
+                        left join lateral (
+                          select asset.object_path
+                          from public.question_assets question_asset
+                          join public.assets asset on asset.id = question_asset.asset_id
+                          where question_asset.question_id = q.id
+                            and question_asset.purpose = 'figure'
+                            and asset.family_id = q.family_id
+                            and asset.bucket_id = 'sources'
+                            and asset.media_type in ('image/png', 'image/jpeg')
+                            and asset.deleted_at is null
+                          order by question_asset.position
+                          limit 1
+                        ) figure on true
                         left join public.attempt_audio_playbacks playback
                           on playback.attempt_id = :attempt_id
                          and playback.question_id = q.id
@@ -2453,6 +2477,16 @@ class PostgresRepository:
         signed_response_photo_urls = await self._sign_response_photo_urls(
             sorted(valid_response_photo_paths)
         )
+        figure_paths = sorted(
+            {
+                str(row["figure_path"])
+                for row in question_rows
+                if row["figure_path"] is not None
+            }
+        )
+        signed_figure_urls = await self._sign_private_asset_urls(
+            "sources", figure_paths
+        )
         questions = [_question(row) for row in question_rows]
         saved_responses: list[SavedResponse] = []
         for response_row in response_rows:
@@ -2490,7 +2524,17 @@ class PostgresRepository:
                             )
                             if question.listening is not None
                             else None
-                        )
+                        ),
+                        "figure": (
+                            FigureQuestionView(
+                                image_url=signed_figure_urls[str(row["figure_path"])],
+                                alt_text=question.figure.alt_text,
+                            )
+                            if question.figure is not None
+                            and row["figure_path"] is not None
+                            and str(row["figure_path"]) in signed_figure_urls
+                            else None
+                        ),
                     }
                 )
                 for row, question in zip(question_rows, questions, strict=True)

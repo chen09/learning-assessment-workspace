@@ -176,6 +176,22 @@ class ListeningQuestionView(BaseModel):
     transcript: str | None = None
 
 
+class FigureConfig(BaseModel):
+    """Private image configuration attached to a question by its parent.
+
+    The object path remains server-side. Active child attempts receive only a
+    short-lived URL, so a worksheet image cannot be reused outside its family.
+    """
+
+    image_path: str = Field(min_length=1, max_length=500)
+    alt_text: str | None = Field(default=None, max_length=500)
+
+
+class FigureQuestionView(BaseModel):
+    image_url: str
+    alt_text: str | None = None
+
+
 class Question(BaseModel):
     id: UUID = Field(default_factory=uuid4)
     family_id: UUID
@@ -187,6 +203,7 @@ class Question(BaseModel):
     answer_key: dict[str, Any]
     points: float = 1
     listening: ListeningConfig | None = Field(default=None, exclude=True)
+    figure: FigureConfig | None = Field(default=None, exclude=True)
 
 
 class QuestionView(BaseModel):
@@ -197,6 +214,7 @@ class QuestionView(BaseModel):
     options: list[str] | None = None
     points: float
     listening: ListeningQuestionView | None = None
+    figure: FigureQuestionView | None = None
 
 
 class Assignment(BaseModel):

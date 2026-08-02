@@ -555,6 +555,86 @@ def test_listening_question_uses_private_audio_and_hides_transcript_until_submis
     assert results.json()["results"][0]["transcript"] == "I walk to school every morning."
 
 
+def test_question_figure_is_private_but_available_to_the_assigned_child() -> None:
+    client = TestClient(create_app())
+    fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+    figure_intent = client.post(
+        "/v1/uploads/intents",
+        headers={
+            **PARENT_HEADERS,
+            "Idempotency-Key": "question-figure-upload-intent",
+        },
+        json={
+            "family_id": fixture["family"]["id"],
+            "bucket": "sources",
+            "object_id": "d4f53bbc-f4cb-42e5-8baf-bcb9ffcb3d4b",
+            "filename": "difference-of-squares.png",
+            "content_type": "image/png",
+        },
+    )
+    assert figure_intent.status_code == 201
+
+    document = _structured_question_set()
+    questions = document["questions"]
+    assert isinstance(questions, list)
+    questions[0]["figure"] = {
+        "image_path": figure_intent.json()["path"],
+        "alt_text": "Difference of squares diagram",
+    }
+    imported = client.post(
+        "/v1/question-sets/imports/structured",
+        headers={**PARENT_HEADERS, "Idempotency-Key": "structured-figure-import"},
+        json={
+            "family_id": fixture["family"]["id"],
+            "child_id": fixture["child"]["id"],
+            "source_name": "figure-question.json",
+            "document": document,
+        },
+    )
+    assert imported.status_code == 201
+
+    child_session = client.post(
+        f"/v1/children/{fixture['child']['id']}/sessions",
+        json={"pin": "123456"},
+    ).json()
+    work = client.post(
+        f"/v1/assignments/{imported.json()['assignment_id']}/start",
+        headers={"Authorization": f"Bearer {child_session['access_token']}"},
+    )
+
+    assert work.status_code == 200
+    figure = work.json()["questions"][0]["figure"]
+    assert figure["image_url"].startswith("fixture://private-figure/")
+    assert figure["alt_text"] == "Difference of squares diagram"
+    assert "image_path" not in work.json()["questions"][0]["figure"]
+
+
+def test_structured_import_rejects_a_question_figure_not_owned_by_the_family() -> None:
+    client = TestClient(create_app())
+    fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+    document = _structured_question_set()
+    questions = document["questions"]
+    assert isinstance(questions, list)
+    questions[0]["figure"] = {
+        "image_path": "another-family/question-figure.png",
+        "alt_text": "Untrusted figure",
+    }
+
+    imported = client.post(
+        "/v1/question-sets/imports/structured",
+        headers={**PARENT_HEADERS, "Idempotency-Key": "reject-foreign-figure"},
+        json={
+            "family_id": fixture["family"]["id"],
+            "child_id": fixture["child"]["id"],
+            "source_name": "foreign-figure.json",
+            "document": document,
+        },
+    )
+
+    assert imported.status_code == 422
+    assert "figure" in imported.json()["detail"].lower()
+
+
 def test_listening_question_set_cannot_copy_private_audio_into_public_library() -> None:
     client = TestClient(create_app())
     fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()

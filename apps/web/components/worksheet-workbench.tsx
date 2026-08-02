@@ -12,6 +12,7 @@ import {
   Crop,
   Focus,
   Grid2X2,
+  Maximize2,
   RefreshCw,
   RotateCw,
   Send,
@@ -73,6 +74,7 @@ type Question = {
   options?: string[];
   points: number;
   listening?: ApiQuestion["listening"];
+  figure?: ApiQuestion["figure"];
 };
 
 type Answer = {
@@ -190,6 +192,7 @@ function questionFromApi(question: ApiQuestion): Question {
     options: question.options ?? undefined,
     points: question.points,
     listening: question.listening,
+    figure: question.figure,
   };
 }
 
@@ -222,6 +225,9 @@ function WorksheetWorkbenchContent() {
     string | null
   >(null);
   const [cropTarget, setCropTarget] = useState<CropTarget | null>(null);
+  const [expandedFigure, setExpandedFigure] = useState<NonNullable<
+    ApiQuestion["figure"]
+  > | null>(null);
   const [saveStatus, setSaveStatus] = useState<
     "idle" | "saving" | "saved" | "offline"
   >("idle");
@@ -1572,6 +1578,26 @@ function WorksheetWorkbenchContent() {
         </div>
       </header>
       <h1>{question.prompt}</h1>
+      {question.figure ? (
+        <figure className="question-figure">
+          <button
+            aria-label={t("worksheet.expandFigure")}
+            onClick={() => setExpandedFigure(question.figure!)}
+            type="button"
+          >
+            {/* Private signed URLs cannot use the static image optimizer. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              alt={question.figure.alt_text ?? t("worksheet.questionFigure")}
+              src={question.figure.image_url}
+            />
+            <span>
+              <Maximize2 aria-hidden="true" size={16} />
+              {t("worksheet.expandFigure")}
+            </span>
+          </button>
+        </figure>
+      ) : null}
       <div
         aria-disabled={submitted}
         className={submitted ? "response-locked" : undefined}
@@ -1892,6 +1918,36 @@ function WorksheetWorkbenchContent() {
           </footer>
         </section>
       </div>
+      {expandedFigure ? (
+        <div
+          aria-label={t("worksheet.questionFigure")}
+          className="figure-dialog-backdrop"
+          onClick={() => setExpandedFigure(null)}
+          role="presentation"
+        >
+          <section
+            aria-label={t("worksheet.questionFigure")}
+            className="figure-dialog"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+          >
+            <button
+              aria-label={t("worksheet.cancel")}
+              className="figure-dialog-close"
+              onClick={() => setExpandedFigure(null)}
+              type="button"
+            >
+              ×
+            </button>
+            {/* Private signed URLs cannot use the static image optimizer. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              alt={expandedFigure.alt_text ?? t("worksheet.questionFigure")}
+              src={expandedFigure.image_url}
+            />
+          </section>
+        </div>
+      ) : null}
     </>
   );
 }

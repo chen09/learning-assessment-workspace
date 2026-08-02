@@ -119,6 +119,7 @@ def _photo_revision_change(
 
 def _question_view(question: Question, *, play_count: int = 0) -> QuestionView:
     listening = question.listening
+    figure = question.figure
     return QuestionView(
         id=question.id,
         position=question.position,
@@ -126,6 +127,14 @@ def _question_view(question: Question, *, play_count: int = 0) -> QuestionView:
         prompt=question.prompt,
         options=question.options,
         points=question.points,
+        figure=(
+            {
+                "image_url": f"fixture://private-figure/{figure.image_path}",
+                "alt_text": figure.alt_text,
+            }
+            if figure is not None
+            else None
+        ),
         listening=(
             {
                 "audio_url": None,
@@ -172,6 +181,7 @@ class MemoryRepository:
         self.assignment_idempotency: dict[tuple[str, str], str] = {}
         self.upload_intents: dict[tuple[str, str], UploadIntent] = {}
         self.private_audio_paths: set[tuple[str, str]] = set()
+        self.private_figure_paths: set[tuple[str, str]] = set()
         self.library_submissions: dict[str, LibrarySubmission] = {}
         self.library_idempotency: dict[tuple[str, str], str] = {}
         self.library_review_idempotency: dict[tuple[str, str], str] = {}
@@ -1749,6 +1759,7 @@ class MemoryRepository:
         self.question_sets[str(question_set.id)] = question_set
         for item in document.questions:
             listening = None
+            figure = None
             if item.type == QuestionType.LISTENING:
                 if item.listening is None:
                     raise ValueError(
@@ -1758,6 +1769,12 @@ class MemoryRepository:
                 if (family_key, listening.audio_path) not in self.private_audio_paths:
                     raise ValueError(
                         "A listening audio file is not available to this family."
+                    )
+            if item.figure is not None:
+                figure = item.figure.private_config()
+                if (family_key, figure.image_path) not in self.private_figure_paths:
+                    raise ValueError(
+                        "A question figure is not available to this family."
                     )
             question = Question(
                 family_id=family_id,
@@ -1769,6 +1786,7 @@ class MemoryRepository:
                 answer_key=item.answer_key,
                 points=float(item.points),
                 listening=listening,
+                figure=figure,
             )
             self.questions[str(question.id)] = question
         assignment = None
@@ -2262,6 +2280,11 @@ class MemoryRepository:
         self.upload_intents[record_key] = intent
         if request.bucket.value == "audio":
             self.private_audio_paths.add((family_id, path))
+        if request.bucket.value == "sources" and request.content_type in {
+            "image/png",
+            "image/jpeg",
+        }:
+            self.private_figure_paths.add((family_id, path))
         return intent
 
     async def create_child_upload_intent(

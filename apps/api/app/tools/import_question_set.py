@@ -15,7 +15,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.config import get_settings
-from app.domain.models import ListeningConfig, QuestionType
+from app.domain.models import FigureConfig, ListeningConfig, QuestionType
 
 
 class StrictModel(BaseModel):
@@ -62,6 +62,22 @@ class ListeningInput(StrictModel):
         )
 
 
+class FigureInput(StrictModel):
+    """A parent-attached private image used by a single question.
+
+    AI JSON never needs to invent a storage path. The review screen adds this
+    field only after a parent selects an image from their device.
+    """
+
+    image_path: str | None = Field(default=None, min_length=1, max_length=500)
+    alt_text: str | None = Field(default=None, max_length=500)
+
+    def private_config(self) -> FigureConfig:
+        if not self.image_path:
+            raise ValueError("Question figures need a private image file.")
+        return FigureConfig(image_path=self.image_path, alt_text=self.alt_text)
+
+
 class QuestionInput(StrictModel):
     position: int = Field(gt=0)
     type: QuestionType
@@ -72,6 +88,7 @@ class QuestionInput(StrictModel):
     points: Decimal = Field(gt=0)
     knowledge_code: str = Field(min_length=1)
     listening: ListeningInput | None = None
+    figure: FigureInput | None = None
 
     @model_validator(mode="after")
     def validate_answer_key(self) -> "QuestionInput":
@@ -391,6 +408,8 @@ async def import_question_set(
 
             listening_assets: dict[str, UUID] = {}
             listening_configs: dict[int, ListeningConfig] = {}
+            figure_assets: dict[str, UUID] = {}
+            figure_configs: dict[int, FigureConfig] = {}
             for question in document.questions:
                 if question.type != QuestionType.LISTENING:
                     continue
@@ -400,6 +419,11 @@ async def import_question_set(
                     )
                 config = question.listening.private_config()
                 listening_configs[question.position] = config
+
+            for question in document.questions:
+                if question.figure is None:
+                    continue
+                figure_configs[question.position] = question.figure.private_config()
 
             if listening_configs:
                 audio_paths = [config.audio_path for config in listening_configs.values()]
@@ -424,6 +448,29 @@ async def import_question_set(
                 missing_audio_paths = sorted(set(audio_paths) - set(listening_assets))
                 if missing_audio_paths:
                     raise ValueError("A listening audio file is not available to this family.")
+
+            if figure_configs:
+                figure_paths = [config.image_path for config in figure_configs.values()]
+                asset_rows = (
+                    await connection.execute(
+                        text(
+                            """
+                            select id, object_path
+                            from public.assets
+                            where family_id = :family_id
+                              and bucket_id = 'sources'
+                              and media_type in ('image/png', 'image/jpeg')
+                              and deleted_at is null
+                              and object_path = any(cast(:figure_paths as text[]))
+                            """
+                        ),
+                        {"family_id": family_id, "figure_paths": figure_paths},
+                    )
+                ).mappings().all()
+                figure_assets = {str(row["object_path"]): row["id"] for row in asset_rows}
+                missing_figure_paths = sorted(set(figure_paths) - set(figure_assets))
+                if missing_figure_paths:
+                    raise ValueError("A question figure is not available to this family.")
 
             knowledge_tag_ids: dict[str, UUID] = {}
             for tag in document.knowledge_tags:
@@ -508,9 +555,12 @@ async def import_question_set(
 
             for question in document.questions:
                 listening = listening_configs.get(question.position)
+                figure = figure_configs.get(question.position)
                 stored_rubric = dict(question.rubric)
                 if listening is not None:
                     stored_rubric["_listening"] = listening.model_dump()
+                if figure is not None:
+                    stored_rubric["_figure"] = figure.model_dump()
                 question_id = await connection.scalar(
                     text(
                         """
@@ -569,6 +619,22 @@ async def import_question_set(
                         {
                             "question_id": question_id,
                             "asset_id": listening_assets[listening.audio_path],
+                        },
+                    )
+                if figure is not None:
+                    await connection.execute(
+                        text(
+                            """
+                            insert into public.question_assets (
+                              question_id, asset_id, purpose, position
+                            ) values (
+                              :question_id, :asset_id, 'figure', 1
+                            )
+                            """
+                        ),
+                        {
+                            "question_id": question_id,
+                            "asset_id": figure_assets[figure.image_path],
                         },
                     )
 

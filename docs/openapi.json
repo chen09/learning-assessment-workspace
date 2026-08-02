@@ -1394,6 +1394,91 @@
         "title": "FamilyLibraryQuestionSet",
         "type": "object"
       },
+      "FigureConfig": {
+        "description": "Private image configuration attached to a question by its parent.\n\nThe object path remains server-side. Active child attempts receive only a\nshort-lived URL, so a worksheet image cannot be reused outside its family.",
+        "properties": {
+          "alt_text": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alt Text"
+          },
+          "image_path": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Image Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "image_path"
+        ],
+        "title": "FigureConfig",
+        "type": "object"
+      },
+      "FigureInput": {
+        "additionalProperties": false,
+        "description": "A parent-attached private image used by a single question.\n\nAI JSON never needs to invent a storage path. The review screen adds this\nfield only after a parent selects an image from their device.",
+        "properties": {
+          "alt_text": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alt Text"
+          },
+          "image_path": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Path"
+          }
+        },
+        "title": "FigureInput",
+        "type": "object"
+      },
+      "FigureQuestionView": {
+        "properties": {
+          "alt_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alt Text"
+          },
+          "image_url": {
+            "title": "Image Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "image_url"
+        ],
+        "title": "FigureQuestionView",
+        "type": "object"
+      },
       "GradingOutcome": {
         "enum": [
           "correct",
@@ -2642,6 +2727,16 @@
             "title": "Answer Key",
             "type": "object"
           },
+          "figure": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FigureInput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "knowledge_code": {
             "minLength": 1,
             "title": "Knowledge Code",
@@ -2714,6 +2809,16 @@
             "additionalProperties": true,
             "title": "Answer Key",
             "type": "object"
+          },
+          "figure": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FigureInput"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "knowledge_code": {
             "minLength": 1,
@@ -3131,6 +3236,16 @@
       },
       "QuestionView": {
         "properties": {
+          "figure": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FigureQuestionView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
