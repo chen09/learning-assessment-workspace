@@ -1,16 +1,18 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { ReviewCompletion, ReviewItem } from "@/lib/api-client";
+
 import ChildReviewPage from "./page";
 
 const { completeReview, getTodayReviews, skipTodayReviews } = vi.hoisted(() => ({
-  completeReview: vi.fn(async () => ({
+  completeReview: vi.fn<() => Promise<ReviewCompletion>>(async () => ({
     item_id: "review-1",
     old_interval_days: 1,
     new_interval_days: 3,
     next_due_on: "2026-08-01",
   })),
-  skipTodayReviews: vi.fn(async () => [
+  skipTodayReviews: vi.fn<() => Promise<ReviewCompletion[]>>(async () => [
     {
       item_id: "review-1",
       old_interval_days: 1,
@@ -18,17 +20,17 @@ const { completeReview, getTodayReviews, skipTodayReviews } = vi.hoisted(() => (
       next_due_on: "2026-08-02",
     },
   ]),
-  getTodayReviews: vi.fn(async () => [
+  getTodayReviews: vi.fn<() => Promise<ReviewItem[]>>(async () => [
     {
       id: "review-1",
       source_question_id: "question-1",
       prompt: "What is 7 × 8?",
-      type: "typed_text" as const,
+      type: "typed_text",
       options: null,
-      answer_mode: "text" as const,
+      answer_mode: "text",
       due_on: "2026-07-29",
       interval_days: 1,
-      level: "standard" as const,
+      level: "standard",
     },
   ]),
 }));
@@ -105,6 +107,59 @@ describe("ChildReviewPage", () => {
     expect(
       screen.getByRole("button", { name: "今日はスキップ" }),
     ).toBeInTheDocument();
+  });
+
+  it("lets a child correct a selected word-order review answer in place", async () => {
+    getTodayReviews.mockResolvedValue([
+      {
+        id: "review-word-order",
+        source_question_id: "question-word-order",
+        prompt: "Build the sentence.",
+        type: "word_order",
+        options: ["She", "goes", "to", "school"],
+        answer_mode: "tokens",
+        due_on: "2026-07-29",
+        interval_days: 1,
+        level: "standard",
+      },
+    ]);
+    completeReview.mockResolvedValue({
+      item_id: "review-word-order",
+      old_interval_days: 1,
+      new_interval_days: 3,
+      next_due_on: "2026-08-01",
+      outcome: "correct",
+    });
+
+    render(<ChildReviewPage />);
+
+    await screen.findByText("Build the sentence.");
+    for (const token of ["She", "goes", "school", "to"]) {
+      fireEvent.click(screen.getByRole("button", { name: new RegExp(`^${token}$`) }));
+    }
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /^to を前へ移動$/ }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: /^She を取り除く$/ }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^She$/ }));
+    for (let index = 0; index < 3; index += 1) {
+      fireEvent.click(
+        screen.getByRole("button", { name: /^She を前へ移動$/ }),
+      );
+    }
+
+    fireEvent.click(screen.getByRole("button", { name: "答えを確認" }));
+
+    await waitFor(() => {
+      expect(completeReview).toHaveBeenCalledWith(
+        "review-word-order",
+        { tokens: ["She", "goes", "to", "school"] },
+        "child-token",
+      );
+    });
   });
 
   it("typesets an imported LaTeX review prompt", async () => {

@@ -1,12 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, CalendarDays, Sparkles } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  CalendarDays,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { useLanguage } from "@/components/language-provider";
 import { MathText } from "@/components/math-text";
+import {
+  getAvailableWordOrderTokens,
+  moveWordOrderToken,
+  removeWordOrderToken,
+} from "@/lib/word-order";
 import {
   completeReview,
   getChildAccessToken,
@@ -22,21 +33,6 @@ type CompletedReview = {
 };
 
 type ReviewActionError = "save" | "skip";
-
-function getAvailableTokens(options: string[], selected: string[]) {
-  const selectedCounts = new Map<string, number>();
-  for (const token of selected) {
-    selectedCounts.set(token, (selectedCounts.get(token) ?? 0) + 1);
-  }
-  return options.filter((token) => {
-    const count = selectedCounts.get(token) ?? 0;
-    if (count === 0) {
-      return true;
-    }
-    selectedCounts.set(token, count - 1);
-    return false;
-  });
-}
 
 export default function ChildReviewPage() {
   return (
@@ -229,9 +225,62 @@ function ChildReviewContent() {
       return (
         <div className="typed-answer">
           <span>{t("review.buildSentence")}</span>
-          <p>{selectedTokens.join(" ") || t("review.chooseWords")}</p>
-          <div className="header-actions">
-            {getAvailableTokens(review.options ?? [], selectedTokens).map((token, index) => (
+          {selectedTokens.length > 0 ? (
+            <ol
+              aria-label={t("worksheet.selectedWords")}
+              className="word-order-selected"
+            >
+              {selectedTokens.map((token, index) => (
+                <li className="word-order-token" key={`${token}-${index}`}>
+                  <span>{token}</span>
+                  <span className="word-order-token-actions">
+                    <button
+                      aria-label={t("worksheet.moveTokenEarlier", { token })}
+                      className="word-order-token-button"
+                      disabled={index === 0}
+                      onClick={() =>
+                        updateAnswer(review.id, {
+                          tokens: moveWordOrderToken(selectedTokens, index, "left"),
+                        })
+                      }
+                      type="button"
+                    >
+                      <ArrowLeft aria-hidden="true" size={16} />
+                    </button>
+                    <button
+                      aria-label={t("worksheet.moveTokenLater", { token })}
+                      className="word-order-token-button"
+                      disabled={index === selectedTokens.length - 1}
+                      onClick={() =>
+                        updateAnswer(review.id, {
+                          tokens: moveWordOrderToken(selectedTokens, index, "right"),
+                        })
+                      }
+                      type="button"
+                    >
+                      <ArrowRight aria-hidden="true" size={16} />
+                    </button>
+                    <button
+                      aria-label={t("worksheet.removeToken", { token })}
+                      className="word-order-token-button"
+                      onClick={() =>
+                        updateAnswer(review.id, {
+                          tokens: removeWordOrderToken(selectedTokens, index),
+                        })
+                      }
+                      type="button"
+                    >
+                      <Trash2 aria-hidden="true" size={15} />
+                    </button>
+                  </span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p>{t("review.chooseWords")}</p>
+          )}
+          <div className="word-order-options">
+            {getAvailableWordOrderTokens(review.options ?? [], selectedTokens).map((token, index) => (
               <button
                 className="button ghost"
                 key={`${token}-${index}`}
