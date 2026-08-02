@@ -197,7 +197,7 @@ Return this strict JSON shape:
 
 Rules:
 1. Positions must be continuous from 1. Every question must use one listed knowledge_code.
-2. Use single_choice only with options and answer_key.choice as a zero-based number. Use typed_text with answer_key.text. Use handwriting for work that must be handwritten; then use answer_key.reference and rubric.grading_mode "parent_review". A listening question uses type listening, options, answer_key.choice, and a listening object with replay_limit (0–10), transcript, and transcript_policy (never, after_submission, or always). Do not provide audio_path or figure.image_path: the parent attaches private media during review.
+2. Use single_choice only with options and answer_key.choice as a zero-based number. Use typed_text with answer_key.text. Use handwriting for work that must be handwritten. Use photo for work written on paper and submitted as one or more answer photos. Both handwriting and photo require answer_key.reference and rubric.grading_mode "parent_review". A listening question uses type listening, options, answer_key.choice, and a listening object with replay_limit (0–10), transcript, and transcript_policy (never, after_submission, or always). Do not provide audio_path or figure.image_path: the parent attaches private media during review.
 3. Keep answers and rubrics private in the JSON. Never include answer keys inside the child-facing prompt.
 4. Make the requested difficulty genuinely easier, similar, harder, or competition-level by changing reasoning demands, not merely calculation length.`;
 
