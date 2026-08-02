@@ -23,6 +23,7 @@ import {
   getFamilies,
   getManagementPinStatus,
   getPendingInvitations,
+  getRecoverableDeletions,
   type PendingInvitation,
   getParentAccessToken,
   setManagementPin,
@@ -78,10 +79,9 @@ function FamilySettingsContent() {
   const [deleteCandidate, setDeleteCandidate] = useState<ChildProfile | null>(
     null,
   );
-  const [pendingDeletion, setPendingDeletion] = useState<{
-    child: ChildProfile;
-    request: DeletionRequest;
-  } | null>(null);
+  const [recoverableDeletions, setRecoverableDeletions] = useState<
+    DeletionRequest[]
+  >([]);
   const [status, setStatus] = useState<"idle" | "working" | "error">("idle");
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">(
     "loading",
@@ -112,6 +112,9 @@ function FamilySettingsContent() {
         const pinStatus = selected
           ? await getManagementPinStatus(selected.id, parentToken)
           : { configured: false };
+        const recoverable = selected
+          ? await getRecoverableDeletions(selected.id, parentToken)
+          : [];
         if (cancelled) {
           return;
         }
@@ -120,6 +123,7 @@ function FamilySettingsContent() {
         setPendingInvitations(invitations);
         setFamilyId(selected?.id ?? null);
         setChildren(loadedChildren);
+        setRecoverableDeletions(recoverable);
         setManagementPinConfigured(pinStatus.configured);
         setLoadState("ready");
       } catch {
@@ -131,6 +135,7 @@ function FamilySettingsContent() {
         setPendingInvitations([]);
         setFamilyId(null);
         setChildren([]);
+        setRecoverableDeletions([]);
         setManagementPinConfigured(false);
         setLoadState("error");
       }
@@ -151,6 +156,7 @@ function FamilySettingsContent() {
     const previousFamilyId = familyId;
     setFamilyId(nextFamilyId);
     setChildren([]);
+    setRecoverableDeletions([]);
     setManagementUnlock(null);
     setManagementPinValue("");
     setManagementPinConfigured(false);
@@ -159,12 +165,15 @@ function FamilySettingsContent() {
       try {
         const nextChildren = await getChildren(nextFamilyId, token);
         const pinStatus = await getManagementPinStatus(nextFamilyId, token);
+        const recoverable = await getRecoverableDeletions(nextFamilyId, token);
         setChildren(nextChildren);
+        setRecoverableDeletions(recoverable);
         setManagementPinConfigured(pinStatus.configured);
         setStatus("idle");
       } catch {
         setFamilyId(previousFamilyId);
         setChildren([]);
+        setRecoverableDeletions([]);
         setManagementPinConfigured(false);
         setStatus("error");
       }
@@ -186,6 +195,7 @@ function FamilySettingsContent() {
       setFamilies((current) => [...current, family]);
       setFamilyId(family.id);
       setChildren([]);
+      setRecoverableDeletions([]);
       setNewFamilyName("");
       setStatus("idle");
     } catch {
@@ -288,12 +298,15 @@ function FamilySettingsContent() {
         "child",
         deleteCandidate.id,
         token,
-        `delete-child-${familyId}-${deleteCandidate.id}`,
+        `delete-child-${crypto.randomUUID()}`,
       );
       setChildren((current) =>
         current.filter((child) => child.id !== deleteCandidate.id),
       );
-      setPendingDeletion({ child: deleteCandidate, request: deletion });
+      setRecoverableDeletions((current) => [
+        { ...deletion, target_label: deleteCandidate.nickname },
+        ...current,
+      ]);
       setDeleteCandidate(null);
       setStatus("idle");
     } catch {
@@ -301,16 +314,18 @@ function FamilySettingsContent() {
     }
   };
 
-  const restoreChild = async () => {
-    if (!token || !familyId || !pendingDeletion) {
+  const restoreChild = async (deletion: DeletionRequest) => {
+    if (!token || !familyId) {
       return;
     }
     setStatus("working");
     try {
-      await restoreDeletionRequest(pendingDeletion.request.id, token);
+      await restoreDeletionRequest(deletion.id, token);
       const restoredChildren = await getChildren(familyId, token);
       setChildren(restoredChildren);
-      setPendingDeletion(null);
+      setRecoverableDeletions((current) =>
+        current.filter((item) => item.id !== deletion.id),
+      );
       setStatus("idle");
     } catch {
       setStatus("error");
@@ -640,32 +655,37 @@ function FamilySettingsContent() {
               </button>
             </section>
           ) : null}
-          {pendingDeletion ? (
-            <section className="invite-ready" role="status">
-              <Shield />
-              <div>
-                <strong>
-                  {t("family.childRemoved", {
-                    name: pendingDeletion.child.nickname,
-                    date: new Intl.DateTimeFormat(languageLocales[language]).format(
-                      new Date(pendingDeletion.request.purge_after),
-                    ),
-                  })}
-                </strong>
-                <p>{t("family.removeChildWarning")}</p>
-              </div>
-              <button
-                className="button primary"
-                disabled={status === "working"}
-                onClick={() => void restoreChild()}
-                type="button"
-              >
-                {t("family.restoreChild", {
-                  name: pendingDeletion.child.nickname,
-                })}
-              </button>
-            </section>
-          ) : null}
+          {recoverableDeletions
+            .filter((deletion) => deletion.target_type === "child")
+            .map((deletion) => {
+              const childName = deletion.target_label ?? deletion.target_id;
+              return (
+                <section className="invite-ready" key={deletion.id} role="status">
+                  <Shield />
+                  <div>
+                    <strong>
+                      {t("family.childRemoved", {
+                        name: childName,
+                        date: new Intl.DateTimeFormat(
+                          languageLocales[language],
+                        ).format(new Date(deletion.purge_after)),
+                      })}
+                    </strong>
+                    <p>{t("family.removeChildWarning")}</p>
+                  </div>
+                  <button
+                    className="button primary"
+                    disabled={status === "working"}
+                    onClick={() => void restoreChild(deletion)}
+                    type="button"
+                  >
+                    {t("family.restoreChild", {
+                      name: childName,
+                    })}
+                  </button>
+                </section>
+              );
+            })}
           {token && familyId ? (
             <form className="invite-form" onSubmit={addChild}>
               <label>

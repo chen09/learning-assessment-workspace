@@ -3126,6 +3126,40 @@ class PostgresRepository:
             )
             return DeletionRequestView(**dict(result.mappings().one()))
 
+    async def list_recoverable_deletions(
+        self,
+        family_id: str,
+        parent_id: str,
+    ) -> list[DeletionRequestView]:
+        family_uuid = _uuid(family_id)
+        async with self._engine.connect() as connection:
+            await self._require_parent(connection, parent_id, family_uuid)
+            result = await connection.execute(
+                text(
+                    """
+                    select d.id, d.family_id, d.target_type, d.target_id,
+                           d.requested_at, d.purge_after, d.restored_at,
+                           case
+                             when d.target_type = 'child' then child.nickname
+                             when d.target_type = 'family' then family.name
+                             else null
+                           end as target_label
+                    from public.deletion_requests d
+                    left join public.children child
+                      on d.target_type = 'child' and child.id = d.target_id
+                    left join public.families family
+                      on d.target_type = 'family' and family.id = d.target_id
+                    where d.family_id = :family_id
+                      and d.restored_at is null
+                      and d.purged_at is null
+                      and d.purge_after > now()
+                    order by d.requested_at desc
+                    """
+                ),
+                {"family_id": family_uuid},
+            )
+        return [DeletionRequestView(**dict(row)) for row in result.mappings().all()]
+
     async def complete_review(
         self,
         item_id: str,

@@ -482,6 +482,7 @@ class DeletionRequestView(BaseModel):
     requested_at: datetime
     purge_after: datetime
     restored_at: datetime | None = None
+    target_label: str | None = None
 
 
 class ParentDecisionRequest(BaseModel):

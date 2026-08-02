@@ -718,12 +718,23 @@ async def test_postgres_vertical_flow_and_family_isolation() -> None:
             str(parent_a),
             "integration-delete-child",
         )
+        recoverable = await repository.list_recoverable_deletions(
+            str(family_a),
+            str(parent_a),
+        )
         assert await repository.get_child(str(child_a)) is None
+        assert [(item.target_id, item.target_label) for item in recoverable] == [
+            (child_a, "Alex"),
+        ]
         restored = await repository.restore_deletion_request(
             str(deletion.id),
             str(parent_a),
         )
         assert restored.restored_at is not None
+        assert await repository.list_recoverable_deletions(
+            str(family_a),
+            str(parent_a),
+        ) == []
         assert await repository.get_child(str(child_a)) is not None
         with pytest.raises(SubmittedAttemptImmutable):
             await repository.save_response(

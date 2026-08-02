@@ -1085,6 +1085,34 @@ class MemoryRepository:
         self.deletion_requests[deletion_id] = restored
         return restored
 
+    async def list_recoverable_deletions(
+        self,
+        family_id: str,
+        parent_id: str,
+    ) -> list[DeletionRequestView]:
+        if parent_id not in self.family_parents.get(family_id, set()):
+            raise NotFoundError
+        now = datetime.now(UTC)
+        recoverable: list[DeletionRequestView] = []
+        for deletion in self.deletion_requests.values():
+            if (
+                str(deletion.family_id) != family_id
+                or deletion.restored_at is not None
+                or deletion.purge_after <= now
+            ):
+                continue
+            target_label = None
+            if deletion.target_type == "child":
+                child = self.children.get(str(deletion.target_id))
+                target_label = child.nickname if child is not None else None
+            elif deletion.target_type == "family":
+                family = self.families.get(family_id)
+                target_label = family.name if family is not None else None
+            recoverable.append(
+                deletion.model_copy(update={"target_label": target_label})
+            )
+        return sorted(recoverable, key=lambda item: item.requested_at, reverse=True)
+
     async def complete_review(
         self,
         item_id: str,

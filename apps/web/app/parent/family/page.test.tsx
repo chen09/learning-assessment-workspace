@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   createDeletionRequest: vi.fn(),
   getChildren: vi.fn(),
   getFamilies: vi.fn(),
+  getRecoverableDeletions: vi.fn(),
   restoreDeletionRequest: vi.fn(),
   setManagementPin: vi.fn(),
   unlockFamilyManagement: vi.fn(),
@@ -22,6 +23,7 @@ vi.mock("@/lib/api-client", () => ({
   createFamilyInvitation: vi.fn(),
   getChildren: mocks.getChildren,
   getFamilies: mocks.getFamilies,
+  getRecoverableDeletions: mocks.getRecoverableDeletions,
   getManagementPinStatus: vi.fn().mockResolvedValue({ configured: false }),
   getParentAccessToken: vi.fn().mockResolvedValue("parent-token"),
   getPendingInvitations: vi.fn().mockResolvedValue([]),
@@ -40,6 +42,8 @@ describe("FamilySettingsPage", () => {
     mocks.getChildren.mockResolvedValue([]);
     mocks.getFamilies.mockReset();
     mocks.getFamilies.mockResolvedValue([]);
+    mocks.getRecoverableDeletions.mockReset();
+    mocks.getRecoverableDeletions.mockResolvedValue([]);
     mocks.restoreDeletionRequest.mockReset();
     mocks.setManagementPin.mockReset();
     mocks.unlockFamilyManagement.mockReset();
@@ -281,5 +285,29 @@ describe("FamilySettingsPage", () => {
       );
     });
     expect(await screen.findByText("Alex")).toBeInTheDocument();
+  });
+
+  it("keeps a recoverable child available after a family settings reload", async () => {
+    mocks.getFamilies.mockResolvedValue([
+      { id: "family-1", name: "肉肉如意" },
+    ]);
+    mocks.getRecoverableDeletions.mockResolvedValue([
+      {
+        id: "deletion-1",
+        family_id: "family-1",
+        target_type: "child",
+        target_id: "child-1",
+        target_label: "Alex",
+        requested_at: "2026-08-03T00:00:00.000Z",
+        purge_after: "2026-09-02T00:00:00.000Z",
+        restored_at: null,
+      },
+    ]);
+
+    render(<FamilySettingsPage />);
+
+    expect(
+      await screen.findByRole("button", { name: "恢复 Alex" }),
+    ).toBeInTheDocument();
   });
 });

@@ -774,7 +774,19 @@ export type DeletionRequest = {
   requested_at: string;
   purge_after: string;
   restored_at: string | null;
+  target_label?: string | null;
 };
+
+export async function getRecoverableDeletions(
+  familyId: string,
+  parentToken: string,
+) {
+  return apiRequest<DeletionRequest[]>(
+    `/v1/deletions?family_id=${encodeURIComponent(familyId)}`,
+    { method: "GET" },
+    parentToken,
+  );
+}
 
 export async function createDeletionRequest(
   familyId: string,

@@ -443,6 +443,10 @@ test("a parent can remove and restore a child only after management unlock", asy
   await expect(
     page.getByRole("link", { name: "Child sign in" }),
   ).toHaveCount(0);
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Restore Recoverable child" }),
+  ).toBeVisible();
 
   const restoreResponse = page.waitForResponse(
     (response) =>

@@ -1155,6 +1155,17 @@
             "title": "Target Id",
             "type": "string"
           },
+          "target_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Label"
+          },
           "target_type": {
             "enum": [
               "family",
@@ -5563,6 +5574,67 @@
       }
     },
     "/v1/deletions": {
+      "get": {
+        "operationId": "list_recoverable_deletions_v1_deletions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "family_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Family Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DeletionRequestView"
+                  },
+                  "title": "Response List Recoverable Deletions V1 Deletions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Recoverable Deletions",
+        "tags": [
+          "deletions"
+        ]
+      },
       "post": {
         "operationId": "create_deletion_request_v1_deletions_post",
         "parameters": [

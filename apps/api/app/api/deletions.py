@@ -10,6 +10,24 @@ from app.domain.models import CreateDeletionRequest, DeletionRequestView
 router = APIRouter(prefix="/v1/deletions", tags=["deletions"])
 
 
+@router.get("", response_model=list[DeletionRequestView])
+async def list_recoverable_deletions(
+    family_id: UUID,
+    repository: Annotated[Repository, Depends(get_repository)],
+    parent_id: Annotated[str, Depends(require_parent)],
+) -> list[DeletionRequestView]:
+    try:
+        return await repository.list_recoverable_deletions(
+            str(family_id),
+            parent_id,
+        )
+    except NotFoundError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The family is not available.",
+        ) from error
+
+
 @router.post(
     "",
     response_model=DeletionRequestView,

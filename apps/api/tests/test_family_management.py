@@ -212,11 +212,30 @@ def test_parent_creates_family_and_child_then_rotates_child_pin() -> None:
             "target_id": child_id,
         },
     )
+    recoverable = client.get(
+        "/v1/deletions",
+        headers=PARENT_HEADERS,
+        params={"family_id": family_id},
+    )
     restored = client.post(
         f"/v1/deletions/{deleted.json()['id']}/restore",
         headers=PARENT_HEADERS,
     )
+    recoverable_after_restore = client.get(
+        "/v1/deletions",
+        headers=PARENT_HEADERS,
+        params={"family_id": family_id},
+    )
 
     assert deleted.status_code == 202
+    assert recoverable.status_code == 200
+    assert recoverable.json() == [
+        {
+            **deleted.json(),
+            "target_label": "Alex",
+        }
+    ]
     assert restored.status_code == 200
     assert restored.json()["restored_at"] is not None
+    assert recoverable_after_restore.status_code == 200
+    assert recoverable_after_restore.json() == []
