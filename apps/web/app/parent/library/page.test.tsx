@@ -123,6 +123,24 @@ describe("LibraryPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("lets a parent retry loading the private family question library", async () => {
+    mocks.getFamilies
+      .mockRejectedValueOnce(new Error("network unavailable"))
+      .mockResolvedValueOnce([{ id: "family-1", name: "肉肉如意" }]);
+
+    render(<LibraryPage />);
+
+    expect(await screen.findByText("无法加载家庭题库。")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "重试" }));
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Lesson 1 同レベル変形練習",
+      }),
+    ).toBeInTheDocument();
+    expect(mocks.getFamilies).toHaveBeenCalledTimes(2);
+  });
+
   it("labels a private textbook as material for creating a new question set", async () => {
     mocks.getFamilyQuestionSets.mockResolvedValueOnce([
       {

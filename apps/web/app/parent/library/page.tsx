@@ -197,6 +197,7 @@ function LibraryContent() {
   const [status, setStatus] = useState<"loading" | "ready" | "error">(
     "loading",
   );
+  const [loadRequest, setLoadRequest] = useState(0);
   const [assignmentSet, setAssignmentSet] =
     useState<FamilyQuestionSet | null>(null);
   const [children, setChildren] = useState<ChildProfile[]>([]);
@@ -220,14 +221,27 @@ function LibraryContent() {
   >("idle");
 
   useEffect(() => {
+    let cancelled = false;
+
     void (async () => {
+      setStatus("loading");
+      setFamilies([]);
+      setFamilyId("");
+      setSets([]);
+      setPendingSubmissions([]);
+      setIsLibraryReviewer(false);
       const token = await getParentAccessToken();
       if (!token) {
-        setStatus("error");
+        if (!cancelled) {
+          setStatus("error");
+        }
         return;
       }
       try {
         const availableFamilies = await getFamilies(token);
+        if (cancelled) {
+          return;
+        }
         setFamilies(availableFamilies);
         const requestedFamilyId = new URLSearchParams(
           window.location.search,
@@ -246,15 +260,28 @@ function LibraryContent() {
           getFamilyLibrarySubmissions(selectedFamily.id, token),
           getLibraryReviewerAccess(token),
         ]);
+        if (cancelled) {
+          return;
+        }
         setSets(questionSets);
         setPendingSubmissions(pendingSubmissions);
         setIsLibraryReviewer(reviewerAccess.is_reviewer);
         setStatus("ready");
       } catch {
-        setStatus("error");
+        if (!cancelled) {
+          setStatus("error");
+        }
       }
     })();
-  }, []);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadRequest]);
+
+  const retryLibraryLoad = () => {
+    setLoadRequest((current) => current + 1);
+  };
 
   const filteredSets = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();
@@ -289,6 +316,8 @@ function LibraryContent() {
   const switchFamily = async (nextFamilyId: string) => {
     setFamilyId(nextFamilyId);
     setStatus("loading");
+    setSets([]);
+    setPendingSubmissions([]);
     const token = await getParentAccessToken();
     if (!token) {
       setStatus("error");
@@ -473,9 +502,16 @@ function LibraryContent() {
         />
       </label>
       {status === "error" ? (
-        <p className="form-error" role="alert">
-          {text.error}
-        </p>
+        <div className="form-error" role="alert">
+          <p>{text.error}</p>
+          <button
+            className="button ghost"
+            onClick={retryLibraryLoad}
+            type="button"
+          >
+            {t("history.retry")}
+          </button>
+        </div>
       ) : null}
       {status === "ready" && filteredSets.length === 0 ? (
         <p>{text.empty}</p>
