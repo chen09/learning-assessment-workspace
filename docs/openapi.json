@@ -2794,6 +2794,17 @@
           "outcome": {
             "$ref": "#/components/schemas/GradingOutcome"
           },
+          "parent_comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Comment"
+          },
           "question_id": {
             "format": "uuid",
             "title": "Question Id",
