@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LanguageProvider } from "@/components/language-provider";
@@ -85,6 +85,49 @@ describe("PrintWorksheetPage", () => {
       }),
     ).toBeInTheDocument();
     expect(screen.queryByText("LA-DEMO-001")).not.toBeInTheDocument();
+  });
+
+  it("retries a temporary printable-assignment loading failure in place", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/parent/print/?assignmentId=assignment-1",
+    );
+    mocks.getPrintableAssignment
+      .mockRejectedValueOnce(new Error("network unavailable"))
+      .mockResolvedValueOnce({
+        assignment: { id: "assignment-1" },
+        title: "Recovered printable practice",
+        template_version: "a4-v1",
+        questions: [
+          {
+            id: "question-1",
+            position: 1,
+            type: "typed_text" as const,
+            prompt: "Recovered question.",
+            options: null,
+            points: 1,
+          },
+        ],
+      });
+
+    renderPage();
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Printable assignment could not be loaded",
+      }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Recovered printable practice",
+      }),
+    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(mocks.getPrintableAssignment).toHaveBeenCalledTimes(2);
+    });
   });
 
   it("splits a long handwritten practice across numbered A4 sheets", async () => {

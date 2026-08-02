@@ -70,6 +70,7 @@ export default function PrintWorksheetPage() {
   const [title, setTitle] = useState("");
   const [questions, setQuestions] = useState<ApiQuestion[]>([]);
   const [loadState, setLoadState] = useState<LoadState>("loading");
+  const [loadRequest, setLoadRequest] = useState(0);
   const printablePages = splitIntoPrintablePages(questions);
 
   useEffect(() => {
@@ -126,7 +127,16 @@ export default function PrintWorksheetPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [loadRequest]);
+
+  const retryLoad = () => {
+    setLoadState("loading");
+    setQrCode(null);
+    setSetCode("");
+    setTitle("");
+    setQuestions([]);
+    setLoadRequest((current) => current + 1);
+  };
 
   return (
     <main className="print-preview">
@@ -163,6 +173,9 @@ export default function PrintWorksheetPage() {
         <section className="a4-sheet">
           <h1>{t("print.errorTitle")}</h1>
           <p>{t("print.errorDescription")}</p>
+          <button className="button primary" onClick={retryLoad} type="button">
+            {t("history.retry")}
+          </button>
         </section>
       ) : null}
       {loadState === "ready" ? (
