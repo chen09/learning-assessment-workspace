@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import FamilySettingsPage from "@/app/parent/family/page";
@@ -202,6 +202,58 @@ describe("FamilySettingsPage", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText("Alex")).not.toBeInTheDocument();
     expect(screen.getByLabelText("当前家庭")).toHaveValue("family-1");
+  });
+
+  it("clears the previous family while browser history opens another family", async () => {
+    mocks.getFamilies.mockResolvedValue([
+      { id: "family-1", name: "肉肉如意" },
+      { id: "family-2", name: "另一家庭" },
+    ]);
+    const secondFamilyChildren = [
+      {
+        id: "child-2",
+        family_id: "family-2",
+        nickname: "Bea",
+        grade_stage: "初二",
+        ui_language: "ja",
+      },
+    ];
+    let releaseSecondFamily: ((value: typeof secondFamilyChildren) => void) | undefined;
+    const secondFamilyGate = new Promise<typeof secondFamilyChildren>((resolve) => {
+      releaseSecondFamily = resolve;
+    });
+    mocks.getChildren.mockImplementation((requestedFamilyId) =>
+      requestedFamilyId === "family-2"
+        ? secondFamilyGate
+        : Promise.resolve([
+            {
+              id: "child-1",
+              family_id: "family-1",
+              nickname: "Alex",
+              grade_stage: "初一",
+              ui_language: "zh",
+            },
+          ]),
+    );
+    window.history.replaceState({}, "", "/parent/family/?familyId=family-1");
+
+    render(<FamilySettingsPage />);
+
+    expect(await screen.findByText("Alex")).toBeInTheDocument();
+
+    await act(async () => {
+      window.history.pushState({}, "", "/parent/family/?familyId=family-2");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+
+    expect(screen.queryByText("Alex")).not.toBeInTheDocument();
+
+    releaseSecondFamily?.(secondFamilyChildren);
+
+    expect(await screen.findByText("Bea")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "另一家庭" }),
+    ).toBeInTheDocument();
   });
 
   it("requires management unlock and explicit confirmation before removing a child, then offers a restore", async () => {

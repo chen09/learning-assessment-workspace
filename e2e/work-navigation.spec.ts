@@ -340,3 +340,102 @@ test("browser navigation clears an open parent review before another review load
     page.getByRole("heading", { name: "Second parent review question." }),
   ).toBeVisible();
 });
+
+test("browser navigation clears the previous family before another family loads", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "A single desktop browser regression covers family settings navigation.",
+  );
+
+  await page.addInitScript(() => {
+    window.localStorage.setItem("luma-language:demo-parent", "en");
+  });
+  await page.route("**/v1/families", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify([
+        { id: "navigation-family-first", name: "First navigation family" },
+        { id: "navigation-family-second", name: "Second navigation family" },
+      ]),
+    });
+  });
+  await page.route("**/v1/invitations/pending", async (route) => {
+    await route.fulfill({ contentType: "application/json", body: "[]" });
+  });
+  await page.route("**/v1/families/*/management-pin", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ configured: false }),
+    });
+  });
+  await page.route("**/v1/deletions**", async (route) => {
+    await route.fulfill({ contentType: "application/json", body: "[]" });
+  });
+  await page.route(
+    "**/v1/families/navigation-family-first/children",
+    async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            id: "navigation-child-first",
+            family_id: "navigation-family-first",
+            nickname: "First navigation child",
+            grade_stage: "Grade 7",
+            ui_language: "en",
+          },
+        ]),
+      });
+    },
+  );
+  let releaseSecondFamily: (() => void) | undefined;
+  const secondFamilyGate = new Promise<void>((resolve) => {
+    releaseSecondFamily = resolve;
+  });
+  await page.route(
+    "**/v1/families/navigation-family-second/children",
+    async (route) => {
+      await secondFamilyGate;
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            id: "navigation-child-second",
+            family_id: "navigation-family-second",
+            nickname: "Second navigation child",
+            grade_stage: "Grade 8",
+            ui_language: "en",
+          },
+        ]),
+      });
+    },
+  );
+
+  await page.goto("/parent/family/?familyId=navigation-family-first");
+  await expect(
+    page.getByText("First navigation child", { exact: true }),
+  ).toBeVisible();
+
+  await page.evaluate(() => {
+    window.history.pushState(
+      {},
+      "",
+      "/parent/family/?familyId=navigation-family-second",
+    );
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  });
+
+  await expect(
+    page.getByText("First navigation child", { exact: true }),
+  ).toHaveCount(0);
+
+  releaseSecondFamily?.();
+  await expect(
+    page.getByText("Second navigation child", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Second navigation family" }),
+  ).toBeVisible();
+});

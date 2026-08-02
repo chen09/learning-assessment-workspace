@@ -89,6 +89,30 @@ function FamilySettingsContent() {
   const [loadRequest, setLoadRequest] = useState(0);
 
   useEffect(() => {
+    const reloadFamilyWorkspaceFromHistory = () => {
+      setToken(null);
+      setFamilies([]);
+      setPendingInvitations([]);
+      setFamilyId(null);
+      setChildren([]);
+      setPinEditor(null);
+      setNewPin("");
+      setManagementPinValue("");
+      setManagementUnlock(null);
+      setManagementPinConfigured(false);
+      setDeleteCandidate(null);
+      setRecoverableDeletions([]);
+      setStatus("idle");
+      setLoadState("loading");
+      setLoadRequest((current) => current + 1);
+    };
+
+    window.addEventListener("popstate", reloadFamilyWorkspaceFromHistory);
+    return () =>
+      window.removeEventListener("popstate", reloadFamilyWorkspaceFromHistory);
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
 
     const loadFamilyWorkspace = async () => {
