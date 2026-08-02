@@ -53,6 +53,7 @@ function ParentHistoryContent() {
   >([]);
   const [childFilter, setChildFilter] = useState("all");
   const [loadState, setLoadState] = useState<LoadState>("loading");
+  const [reloadVersion, setReloadVersion] = useState(0);
   const [actionAssignmentId, setActionAssignmentId] = useState<string | null>(
     null,
   );
@@ -95,7 +96,7 @@ function ParentHistoryContent() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [reloadVersion]);
 
   useEffect(() => {
     if (!familyId) {
@@ -131,7 +132,7 @@ function ParentHistoryContent() {
     return () => {
       active = false;
     };
-  }, [familyId]);
+  }, [familyId, reloadVersion]);
 
   const selectFamily = (nextFamilyId: string) => {
     const url = new URL(window.location.href);
@@ -146,6 +147,13 @@ function ParentHistoryContent() {
     setCompletedWorksheetImports([]);
     setChildFilter("all");
     setFamilyId(nextFamilyId);
+  };
+
+  const retryHistory = () => {
+    setLoadState("loading");
+    setItems([]);
+    setCompletedWorksheetImports([]);
+    setReloadVersion((current) => current + 1);
   };
 
   const children = Array.from(
@@ -298,7 +306,16 @@ function ParentHistoryContent() {
           <p>{t("parentHistory.missing")}</p>
         ) : null}
         {loadState === "error" ? (
-          <p>{t("parentHistory.error")}</p>
+          <>
+            <p>{t("parentHistory.error")}</p>
+            <button
+              className="button primary"
+              onClick={retryHistory}
+              type="button"
+            >
+              {t("history.retry")}
+            </button>
+          </>
         ) : null}
         {loadState === "ready" && visibleItems.length === 0 ? (
           <p>{t("parentHistory.empty")}</p>

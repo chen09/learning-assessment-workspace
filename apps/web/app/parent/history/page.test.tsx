@@ -99,6 +99,27 @@ describe("ParentHistoryPage", () => {
     expect(window.location.search).toBe("?familyId=family-2");
   });
 
+  it("lets a parent retry a temporary family-history loading failure", async () => {
+    mocks.getFamilyHistory
+      .mockRejectedValueOnce(new Error("network unavailable"))
+      .mockResolvedValueOnce([]);
+
+    render(<ParentHistoryPage />);
+
+    expect(
+      await screen.findByText("Family history could not be loaded."),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    await waitFor(() => {
+      expect(mocks.getFamilyHistory).toHaveBeenCalledTimes(2);
+    });
+    expect(
+      screen.getByText("No family learning history yet."),
+    ).toBeInTheDocument();
+  });
+
   it("lets a parent reopen a paper upload that still needs review", async () => {
     mocks.getFamilyHistory.mockResolvedValue([]);
     mocks.getCompletedWorksheetImports.mockResolvedValue([
