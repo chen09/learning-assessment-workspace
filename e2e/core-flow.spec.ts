@@ -1405,7 +1405,7 @@ test("parent authors a paper-photo question and assigns it through the reviewed 
   ).toBeVisible();
 });
 
-test("parent authors a listening question and keeps its audio private until assignment", async ({
+test("parent authors a typed listening question and the child completes it", async ({
   page,
   request,
 }, testInfo) => {
@@ -1443,17 +1443,15 @@ test("parent authors a listening question and keeps its audio private until assi
     `/parent/create/?familyId=${encodeURIComponent(family.id)}&childId=${encodeURIComponent(child.id)}`,
   );
   await page.getByRole("button", { name: "Start simple" }).click();
-  await page.getByLabel("Practice title").fill("Morning announcement");
+  await page.getByLabel("Practice title").fill("Library announcement");
   await page.getByLabel("Response type").selectOption("listening");
+  await page.getByLabel("Listening answer type").selectOption("text");
   await page
     .getByRole("textbox", { name: "Question", exact: true })
-    .fill("Listen and choose where the class will meet.");
-  await page
-    .getByLabel("Choices, one per line")
-    .fill("The library\nThe gym");
+    .fill("Listen and type the destination.");
   await page
     .getByLabel("Answer or grading guide")
-    .fill("The library");
+    .fill("the library");
   await page.getByLabel("Maximum replays").fill("2");
   await page
     .getByLabel("Transcript (optional)")
@@ -1464,7 +1462,7 @@ test("parent authors a listening question and keeps its audio private until assi
   await page.getByRole("button", { name: "Create review draft" }).click();
   await expect(
     page.getByRole("heading", {
-      name: "Listen and choose where the class will meet.",
+      name: "Listen and type the destination.",
     }),
   ).toBeVisible();
   await page.getByLabel("Audio for question 1").setInputFiles({
@@ -1483,12 +1481,12 @@ test("parent authors a listening question and keeps its audio private until assi
   expect(importedRequest.request().postDataJSON()).toMatchObject({
     source_name: "Manual question",
     document: {
-      question_set: { source_mode: "manual", title: "Morning announcement" },
+      question_set: { source_mode: "manual", title: "Library announcement" },
       questions: [
         {
           type: "listening",
-          options: ["The library", "The gym"],
-          answer_key: { choice: 0 },
+          options: [],
+          answer_key: { text: "the library" },
           listening: {
             replay_limit: 2,
             transcript: "Please meet in the library after school.",
@@ -1499,6 +1497,31 @@ test("parent authors a listening question and keeps its audio private until assi
       ],
     },
   });
+  const assignmentId = (await importedRequest.json() as {
+    assignment_id: string;
+  }).assignment_id;
+
+  await page.goto(
+    `/child/login/?childId=${encodeURIComponent(child.id)}&assignmentId=${encodeURIComponent(assignmentId)}`,
+  );
+  for (const digit of ["1", "2", "3", "4", "5", "6"]) {
+    await page.getByRole("button", { name: digit, exact: true }).click();
+  }
+  await page.getByRole("button", { name: "Open my work" }).click();
+  await expect(page.getByRole("textbox", { name: "Your answer" })).toBeVisible();
+  await expect(page.getByRole("radio")).toHaveCount(0);
+  await page.getByRole("textbox", { name: "Your answer" }).fill("The library");
+  await page.getByRole("button", { name: "Submit all answers" }).click();
+  await page.getByRole("button", { name: "Confirm full submission" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Your work is being checked" }),
+  ).toBeVisible();
+  const processed = await request.post(`${apiBaseUrl}/v1/demo/jobs/process-next`, {
+    headers: { Authorization: "Bearer parent-fixture" },
+  });
+  expect(processed.ok(), await processed.text()).toBeTruthy();
+  await page.getByRole("button", { name: "View results" }).click();
+  await expect(page.getByRole("heading", { name: "Correct" })).toBeVisible();
 });
 
 test("parent authors a multiple-choice question and the child is graded from every selected answer", async ({

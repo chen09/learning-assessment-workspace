@@ -92,7 +92,7 @@ class QuestionInput(StrictModel):
 
     @model_validator(mode="after")
     def validate_answer_key(self) -> "QuestionInput":
-        if self.type in {QuestionType.SINGLE_CHOICE, QuestionType.LISTENING}:
+        if self.type == QuestionType.SINGLE_CHOICE:
             choice = self.answer_key.get("choice")
             if (
                 not isinstance(choice, int)
@@ -101,6 +101,34 @@ class QuestionInput(StrictModel):
                 or choice >= len(self.options)
             ):
                 raise ValueError("Single-choice answer must index an option.")
+        if self.type == QuestionType.LISTENING:
+            if self.options:
+                choice = self.answer_key.get("choice")
+                if (
+                    not isinstance(choice, int)
+                    or isinstance(choice, bool)
+                    or choice < 0
+                    or choice >= len(self.options)
+                ):
+                    raise ValueError(
+                        "Listening choice answers must index an option."
+                    )
+            else:
+                text_answer = self.answer_key.get("text")
+                text_answers = self.answer_key.get("texts")
+                has_single = isinstance(text_answer, str) and bool(text_answer.strip())
+                has_multiple = (
+                    isinstance(text_answers, list)
+                    and bool(text_answers)
+                    and all(
+                        isinstance(answer, str) and bool(answer.strip())
+                        for answer in text_answers
+                    )
+                )
+                if not has_single and not has_multiple:
+                    raise ValueError(
+                        "Listening text questions need at least one accepted answer."
+                    )
         if self.type == QuestionType.MULTIPLE_CHOICE:
             choices = self.answer_key.get("choices")
             if (

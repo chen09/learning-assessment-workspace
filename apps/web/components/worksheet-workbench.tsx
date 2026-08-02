@@ -148,7 +148,7 @@ function restoreAnswer(
           (choice): choice is number => typeof choice === "number",
         )
       : [];
-    return questionType === "single_choice"
+    return questionType === "single_choice" || questionType === "listening"
       ? { choice: choices[0] }
       : { choices };
   }
@@ -1039,47 +1039,51 @@ function WorksheetWorkbenchContent() {
         </div>
       );
     }
-    if (question.type === "choice" || question.type === "listening") {
+    const listeningPlayer =
+      question.type === "listening" ? (
+        <div className="listening-player">
+          {question.listening ? (
+            <audio
+              preload="metadata"
+              ref={(element) => {
+                audioRefs.current[question.id] = element;
+              }}
+              src={question.listening.audio_url ?? undefined}
+            />
+          ) : null}
+          <button
+            className="button dark"
+            disabled={
+              !question.listening ||
+              (playCounts[question.id] ?? 0) >= question.listening.replay_limit
+            }
+            onClick={() => void playListeningAudio(question)}
+            type="button"
+          >
+            <Volume2 size={17} />
+            {t(examMode ? "worksheet.playAudio" : "worksheet.playSlow")}
+          </button>
+          <span>
+            {t("worksheet.playsUsed", {
+              count: playCounts[question.id] ?? 0,
+              limit: question.listening?.replay_limit ?? 0,
+            })}
+          </span>
+          {question.listening?.transcript ? (
+            <details className="listening-transcript">
+              <summary>{t("worksheet.transcript")}</summary>
+              <p>{question.listening.transcript}</p>
+            </details>
+          ) : null}
+        </div>
+      ) : null;
+    if (
+      question.type === "choice" ||
+      (question.type === "listening" && Boolean(question.options?.length))
+    ) {
       return (
         <>
-          {question.type === "listening" ? (
-            <div className="listening-player">
-              {question.listening ? (
-                <audio
-                  preload="metadata"
-                  ref={(element) => {
-                    audioRefs.current[question.id] = element;
-                  }}
-                  src={question.listening.audio_url ?? undefined}
-                />
-              ) : null}
-              <button
-                className="button dark"
-                disabled={
-                  !question.listening ||
-                  (playCounts[question.id] ?? 0) >=
-                    question.listening.replay_limit
-                }
-                onClick={() => void playListeningAudio(question)}
-                type="button"
-              >
-                <Volume2 size={17} />
-                {t(examMode ? "worksheet.playAudio" : "worksheet.playSlow")}
-              </button>
-              <span>
-                {t("worksheet.playsUsed", {
-                  count: playCounts[question.id] ?? 0,
-                  limit: question.listening?.replay_limit ?? 0,
-                })}
-              </span>
-              {question.listening?.transcript ? (
-                <details className="listening-transcript">
-                  <summary>{t("worksheet.transcript")}</summary>
-                  <p>{question.listening.transcript}</p>
-                </details>
-              ) : null}
-            </div>
-          ) : null}
+          {listeningPlayer}
           <fieldset className="choice-list">
             <legend className="sr-only">
               {t("worksheet.singleChoice")}
@@ -1593,23 +1597,26 @@ function WorksheetWorkbenchContent() {
         </div>
       );
     }
-    if (question.type === "text") {
+    if (question.type === "text" || question.type === "listening") {
       return (
-        <div className="typed-answer">
-          <label htmlFor={`${question.id}-answer`}>
-            {t("worksheet.yourAnswer")}
-          </label>
-          <input
-            autoComplete="off"
-            id={`${question.id}-answer`}
-            onChange={(event) =>
-              updateAnswer(question.id, { text: event.target.value })
-            }
-            placeholder={t("worksheet.typeHere")}
-            value={answer.text ?? ""}
-          />
-          <p>{t("worksheet.handwritingAlternative")}</p>
-        </div>
+        <>
+          {listeningPlayer}
+          <div className="typed-answer">
+            <label htmlFor={`${question.id}-answer`}>
+              {t("worksheet.yourAnswer")}
+            </label>
+            <input
+              autoComplete="off"
+              id={`${question.id}-answer`}
+              onChange={(event) =>
+                updateAnswer(question.id, { text: event.target.value })
+              }
+              placeholder={t("worksheet.typeHere")}
+              value={answer.text ?? ""}
+            />
+            <p>{t("worksheet.handwritingAlternative")}</p>
+          </div>
+        </>
       );
     }
     return (

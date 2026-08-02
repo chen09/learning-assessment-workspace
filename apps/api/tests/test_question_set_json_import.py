@@ -76,6 +76,53 @@ def test_rejects_single_choice_answer_outside_options() -> None:
         parse_import_document(json.dumps(payload))
 
 
+def test_accepts_listening_question_with_a_typed_answer() -> None:
+    payload = _valid_payload()
+    questions = payload["questions"]
+    assert isinstance(questions, list)
+    questions[0].update(
+        {
+            "type": "listening",
+            "prompt": "Listen and type the destination.",
+            "options": [],
+            "answer_key": {"texts": ["the library", "library"]},
+            "listening": {
+                "audio_path": "family/question/audio.mp3",
+                "replay_limit": 2,
+                "transcript_policy": "after_submission",
+            },
+        }
+    )
+
+    document = parse_import_document(json.dumps(payload))
+
+    assert document.questions[0].type == "listening"
+    assert document.questions[0].answer_key == {
+        "texts": ["the library", "library"],
+    }
+
+
+def test_rejects_listening_question_without_options_or_text_answer() -> None:
+    payload = _valid_payload()
+    questions = payload["questions"]
+    assert isinstance(questions, list)
+    questions[0].update(
+        {
+            "type": "listening",
+            "options": [],
+            "answer_key": {},
+            "listening": {
+                "audio_path": "family/question/audio.mp3",
+                "replay_limit": 2,
+                "transcript_policy": "never",
+            },
+        }
+    )
+
+    with pytest.raises(ValidationError, match="Listening text questions"):
+        parse_import_document(json.dumps(payload))
+
+
 def test_rejects_multiple_choice_answer_outside_options() -> None:
     payload = _valid_payload()
     questions = payload["questions"]

@@ -549,6 +549,51 @@ describe("WorksheetWorkbench", () => {
     );
   });
 
+  it("saves a typed answer for a listening question without choices", async () => {
+    mocks.startAssignment.mockResolvedValue({
+      ...assignmentWork,
+      questions: [
+        {
+          id: "listening-text",
+          position: 1,
+          type: "listening",
+          prompt: "Listen and type the destination.",
+          options: [],
+          points: 1,
+          listening: {
+            audio_url: null,
+            replay_limit: 2,
+            play_count: 0,
+            transcript: null,
+          },
+        },
+      ],
+    });
+
+    render(<WorksheetWorkbench />);
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Listen and type the destination.",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Your answer" })).toBeInTheDocument();
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Your answer" }), {
+      target: { value: "The library" },
+    });
+
+    await waitFor(() => {
+      expect(mocks.saveAttemptResponse).toHaveBeenCalledWith(
+        "attempt-1",
+        "listening-text",
+        { kind: "text", answer: { text: "The library" }, expected_version: 0 },
+        "child-token",
+      );
+    });
+  });
+
   it("submits only the current answer and keeps the rest of the attempt open", async () => {
     render(<WorksheetWorkbench />);
 

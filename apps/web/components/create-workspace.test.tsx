@@ -1930,6 +1930,75 @@ describe("CreateWorkspace", () => {
     });
   });
 
+  it("lets a parent author a typed listening answer without choices", async () => {
+    mocks.previewStructuredQuestionSet.mockResolvedValue({
+      title: "Library announcement",
+      subject: "English",
+      locale: "en",
+      question_count: 1,
+      total_points: 1,
+      estimated_minutes: 5,
+      knowledge_tag_count: 1,
+      answer_keys_present: true,
+      checksum: "manual-listening-text-preview",
+      source_summary: { source_kind: "manual" },
+      questions: [
+        {
+          position: 1,
+          type: "listening",
+          prompt: "Listen and type the destination.",
+          options: [],
+          answer_key: { texts: ["the library", "library"] },
+          rubric: { grading_mode: "exact" },
+          points: 1,
+          knowledge_code: "manual-practice",
+          listening: {
+            replay_limit: 2,
+            transcript: null,
+            transcript_policy: "never",
+          },
+        },
+      ],
+    });
+
+    render(<CreateWorkspace />);
+
+    await screen.findByRole("combobox", { name: "Child" });
+    fireEvent.click(screen.getByRole("button", { name: "Start simple" }));
+    fireEvent.change(screen.getByLabelText("Practice title"), {
+      target: { value: "Library announcement" },
+    });
+    fireEvent.change(screen.getByLabelText("Response type"), {
+      target: { value: "listening" },
+    });
+    fireEvent.change(screen.getByLabelText("Listening answer type"), {
+      target: { value: "text" },
+    });
+    fireEvent.change(screen.getByLabelText("Question"), {
+      target: { value: "Listen and type the destination." },
+    });
+    expect(screen.queryByLabelText("Choices, one per line")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Answer or grading guide"), {
+      target: { value: "the library" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create review draft" }));
+
+    await waitFor(() => {
+      expect(mocks.previewStructuredQuestionSet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          questions: [
+            expect.objectContaining({
+              type: "listening",
+              options: [],
+              answer_key: { text: "the library" },
+            }),
+          ],
+        }),
+        "parent-token",
+      );
+    });
+  });
+
   it("uploads a private figure before assigning a question", async () => {
     const document = {
       schema_version: "1.0" as const,
