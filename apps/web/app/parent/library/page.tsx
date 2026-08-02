@@ -336,14 +336,9 @@ function LibraryContent() {
     }
   };
 
-  const openAssignment = async (questionSet: FamilyQuestionSet) => {
-    setAssignmentSet(questionSet);
+  const loadAssignmentChildren = async (questionSet: FamilyQuestionSet) => {
     setChildren([]);
     setAssignmentChildId("");
-    setAssignmentNote("");
-    setNewAssignmentId(null);
-    setAssignmentMode("practice");
-    setAssignmentMinutes(20);
     setAssignmentMessage("");
     setAssignmentStatus("loading_children");
     const token = await getParentAccessToken();
@@ -361,6 +356,15 @@ function LibraryContent() {
       setAssignmentStatus("error");
       setAssignmentMessage(text.childrenError);
     }
+  };
+
+  const openAssignment = (questionSet: FamilyQuestionSet) => {
+    setAssignmentSet(questionSet);
+    setAssignmentNote("");
+    setNewAssignmentId(null);
+    setAssignmentMode("practice");
+    setAssignmentMinutes(20);
+    void loadAssignmentChildren(questionSet);
   };
 
   const submitAssignment = async () => {
@@ -756,7 +760,20 @@ function LibraryContent() {
                     <small>{text.noteHint}</small>
                   </label>
                   {assignmentStatus === "error" ? (
-                    <p role="alert">{assignmentMessage}</p>
+                    <div role="alert">
+                      <p>{assignmentMessage}</p>
+                      <button
+                        className="button ghost"
+                        onClick={() => {
+                          if (assignmentSet) {
+                            void loadAssignmentChildren(assignmentSet);
+                          }
+                        }}
+                        type="button"
+                      >
+                        {t("history.retry")}
+                      </button>
+                    </div>
                   ) : null}
                   {assignmentStatus === "success" ? (
                     <p className="confirmed-message" role="status">

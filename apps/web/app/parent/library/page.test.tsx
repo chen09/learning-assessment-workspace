@@ -296,6 +296,48 @@ describe("LibraryPage", () => {
     );
   });
 
+  it("lets a parent retry loading children before assigning a question set", async () => {
+    mocks.getFamilyQuestionSets.mockResolvedValueOnce([
+      {
+        id: "set-ready",
+        title: "Lesson 2 同レベル変形練習",
+        subject: "English",
+        status: "confirmed",
+        question_count: 71,
+        source_summary: {},
+      },
+    ]);
+    mocks.getChildren
+      .mockRejectedValueOnce(new Error("network unavailable"))
+      .mockResolvedValueOnce([
+        {
+          id: "child-1",
+          family_id: "family-1",
+          nickname: "肉肉",
+          grade_stage: "Junior high 1",
+          ui_language: "ja",
+        },
+      ]);
+
+    render(<LibraryPage />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "分配给孩子" }),
+    );
+    expect(
+      await screen.findByText("无法加载这个家庭的孩子资料。"),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "重试" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("combobox", { name: "孩子" })).toHaveValue(
+        "child-1",
+      );
+      expect(mocks.getChildren).toHaveBeenCalledTimes(2);
+    });
+  });
+
   it("keeps an optional exam time limit when assigning from the library", async () => {
     mocks.getFamilyQuestionSets.mockResolvedValueOnce([
       {
