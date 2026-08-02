@@ -323,12 +323,17 @@ class PostgresRepository:
     ) -> CompletedWorksheetImport:
         """Expose only brief, parent-authorized previews of completed scans."""
         signed_urls = await self._sign_response_photo_urls(imported.response_paths)
+        if any(path not in signed_urls for path in imported.response_paths):
+            logger.warning(
+                "Skipping completed worksheet previews because Storage returned "
+                "an incomplete signed URL set."
+            )
+            return imported
         return imported.model_copy(
             update={
                 "response_preview_urls": [
                     signed_urls[path]
                     for path in imported.response_paths
-                    if path in signed_urls
                 ]
             }
         )
