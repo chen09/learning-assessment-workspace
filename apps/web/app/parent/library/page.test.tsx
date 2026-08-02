@@ -100,6 +100,12 @@ describe("LibraryPage", () => {
     expect(
       screen.getByText("基于教材：Lesson 1 textbook · English"),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "继续审核题单" }),
+    ).toHaveAttribute(
+      "href",
+      "/parent/create?questionSetId=set-1",
+    );
     expect(mocks.getFamilyQuestionSets).toHaveBeenCalledWith(
       "family-1",
       "parent-token",
@@ -115,6 +121,29 @@ describe("LibraryPage", () => {
     expect(
       screen.getByRole("heading", { name: "Lesson 1 同レベル変形練習" }),
     ).toBeInTheDocument();
+  });
+
+  it("lets a parent resume a source import that is still processing", async () => {
+    mocks.getFamilyQuestionSets.mockResolvedValueOnce([
+      {
+        id: "set-processing",
+        family_id: "family-1",
+        title: "Scanned maths worksheet",
+        subject: "Math",
+        status: "processing",
+        question_count: 0,
+        source_summary: {},
+      },
+    ]);
+
+    render(<LibraryPage />);
+
+    expect(
+      await screen.findByRole("link", { name: "查看导入进度" }),
+    ).toHaveAttribute(
+      "href",
+      "/parent/create?questionSetId=set-processing",
+    );
   });
 
   it("lets a parent assign a confirmed library set to a child", async () => {

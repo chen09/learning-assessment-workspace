@@ -1633,7 +1633,7 @@ class PostgresRepository:
                     text(
                         """
                         update public.question_set_imports
-                        set status = 'processing', updated_at = now()
+                        set status = 'processing'
                         where id = :import_id
                         """
                     ),

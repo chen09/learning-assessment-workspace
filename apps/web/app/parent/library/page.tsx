@@ -43,6 +43,8 @@ const copy = {
     publicLink: "Browse public library",
     published: "Published to the public library",
     rejected: "Review needs changes",
+    resumeReview: "Continue question-set review",
+    resumeImport: "Check import progress",
     assign: "Assign to child",
     assignTitle: (title: string) => `Assign “${title}”`,
     child: "Child",
@@ -85,6 +87,8 @@ const copy = {
     publicLink: "公開問題を探す",
     published: "公開問題ライブラリに掲載済み",
     rejected: "レビューで修正が必要",
+    resumeReview: "問題セットの確認を続ける",
+    resumeImport: "取込状況を確認する",
     assign: "子どもに割り当てる",
     assignTitle: (title: string) => `「${title}」を割り当てる`,
     child: "子ども",
@@ -126,6 +130,8 @@ const copy = {
     publicLink: "浏览公共题库",
     published: "已发布到公共题库",
     rejected: "审核需要修改",
+    resumeReview: "继续审核题单",
+    resumeImport: "查看导入进度",
     assign: "分配给孩子",
     assignTitle: (title: string) => `分配「${title}」`,
     child: "孩子",
@@ -556,6 +562,28 @@ function LibraryContent() {
                       {t("librarySubmission.open")}
                     </button>
                   )}
+                </div>
+              ) : set.status === "needs_review" ? (
+                <div className="library-card-actions">
+                  <Link
+                    className="button secondary"
+                    href={`/parent/create/?questionSetId=${encodeURIComponent(
+                      set.id,
+                    )}`}
+                  >
+                    {text.resumeReview}
+                  </Link>
+                </div>
+              ) : set.status === "processing" ? (
+                <div className="library-card-actions">
+                  <Link
+                    className="button secondary"
+                    href={`/parent/create/?questionSetId=${encodeURIComponent(
+                      set.id,
+                    )}`}
+                  >
+                    {text.resumeImport}
+                  </Link>
                 </div>
               ) : null}
             </article>

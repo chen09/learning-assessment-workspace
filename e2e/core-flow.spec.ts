@@ -1009,9 +1009,17 @@ test("parent can return to an imported question-set review from its recovery lin
   await expect(page).toHaveURL(
     new RegExp(`questionSetId=${encodeURIComponent(imported.question_set_id)}`),
   );
-  await request.post(`${apiBaseUrl}/v1/demo/jobs/process-next`, {
-    headers: parentHeaders,
-  });
+  await page.goto(
+    `/parent/library/?familyId=${encodeURIComponent(family.id)}`,
+  );
+  await page.locator(".language-picker select").selectOption("en");
+  await expect(
+    page.getByRole("link", { name: "Continue question-set review" }),
+  ).toHaveAttribute(
+    "href",
+    `/parent/create/?questionSetId=${imported.question_set_id}`,
+  );
+  await page.getByRole("link", { name: "Continue question-set review" }).click();
   await expect(
     page.getByRole("heading", { name: "Review before assigning" }),
   ).toBeVisible();
