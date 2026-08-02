@@ -291,6 +291,7 @@ function WorksheetWorkbenchContent() {
     null,
   );
   const automaticSubmissionAttemptId = useRef<string | null>(null);
+  const timeLimitAwaitingSyncAttemptId = useRef<string | null>(null);
   const photoObjectUrls = useRef(new Set<string>());
   const currentQuestion = questions[currentIndex];
 
@@ -636,9 +637,11 @@ function WorksheetWorkbenchContent() {
           await syncPendingDraftsWithVersions(childToken);
           const pendingDrafts = await getPendingDraftsByPrefix(`${attemptId}:`);
           if (pendingDrafts.length > 0) {
+            timeLimitAwaitingSyncAttemptId.current = attemptId;
             setSaveStatus("offline");
             return;
           }
+          timeLimitAwaitingSyncAttemptId.current = null;
           automaticSubmissionAttemptId.current = attemptId;
           await submitAttempt(
             attemptId,
@@ -652,6 +655,7 @@ function WorksheetWorkbenchContent() {
             )}`,
           );
         } catch {
+          timeLimitAwaitingSyncAttemptId.current = attemptId;
           setSaveStatus("offline");
         }
         return;
@@ -691,6 +695,37 @@ function WorksheetWorkbenchContent() {
     window.addEventListener("online", sync);
     return () => window.removeEventListener("online", sync);
   }, [childToken]);
+
+  useEffect(() => {
+    if (
+      !examMode ||
+      secondsRemaining > 0 ||
+      !attemptId ||
+      !childToken ||
+      saveStatus !== "saved" ||
+      timeLimitAwaitingSyncAttemptId.current !== attemptId ||
+      automaticSubmissionAttemptId.current === attemptId
+    ) {
+      return;
+    }
+
+    timeLimitAwaitingSyncAttemptId.current = null;
+    automaticSubmissionAttemptId.current = attemptId;
+    void submitAttempt(attemptId, childToken, `submit-${attemptId}-time-limit`)
+      .then(() => removePendingDraftsByPrefix(`${attemptId}:`))
+      .then(() =>
+        window.location.assign(
+          `/child/submitted/?reason=time-limit&attemptId=${encodeURIComponent(
+            attemptId,
+          )}`,
+        ),
+      )
+      .catch(() => {
+        automaticSubmissionAttemptId.current = null;
+        timeLimitAwaitingSyncAttemptId.current = attemptId;
+        setSaveStatus("offline");
+      });
+  }, [attemptId, childToken, examMode, saveStatus, secondsRemaining]);
 
   async function retryPendingDraftSync() {
     if (!childToken || isSyncingSavedAnswer) {

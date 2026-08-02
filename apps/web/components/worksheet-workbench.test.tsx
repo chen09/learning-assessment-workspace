@@ -620,6 +620,44 @@ describe("WorksheetWorkbench", () => {
     expect(mocks.submitAttempt).not.toHaveBeenCalled();
   });
 
+  it("automatically submits an expired exam once its device-only answer reconnects", async () => {
+    mocks.startAssignment.mockResolvedValue({
+      ...assignmentWork,
+      assignment: {
+        ...assignmentWork.assignment,
+        mode: "exam",
+        time_limit_seconds: 1,
+      },
+      attempt: {
+        ...assignmentWork.attempt,
+        started_at: new Date(Date.now() - 10_000).toISOString(),
+      },
+    });
+    mocks.getPendingDraftsByPrefix.mockResolvedValue([
+      {
+        key: "attempt-1:algebra-choice",
+        answer: { choices: [0] },
+        savedAt: "2026-08-03T00:00:00.000Z",
+        expiresAt: "2026-08-04T00:00:00.000Z",
+      },
+    ]);
+
+    render(<WorksheetWorkbench />);
+
+    expect(await screen.findByText("Saved on this device")).toBeInTheDocument();
+    mocks.getPendingDraftsByPrefix.mockResolvedValue([]);
+    mocks.syncPendingDrafts.mockResolvedValue(1);
+    window.dispatchEvent(new Event("online"));
+
+    await waitFor(() => {
+      expect(mocks.submitAttempt).toHaveBeenCalledWith(
+        "attempt-1",
+        "child-token",
+        "submit-attempt-1-time-limit",
+      );
+    });
+  });
+
   it("plays private listening audio only after the server records a replay", async () => {
     const play = vi
       .spyOn(HTMLMediaElement.prototype, "play")
