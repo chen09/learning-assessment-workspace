@@ -62,6 +62,16 @@ test("parent dashboard offers the assigned child sign-in route", async ({
     "href",
     "/child/login/?childId=dashboard-child&assignmentId=dashboard-assignment",
   );
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"], {
+    origin: "http://127.0.0.1:3107",
+  });
+  await page.getByRole("button", { name: "Copy child sign-in link" }).click();
+  await expect.poll(() =>
+    page.evaluate(() => navigator.clipboard.readText()),
+  ).toBe(
+    "http://127.0.0.1:3107/child/login?childId=dashboard-child&assignmentId=dashboard-assignment",
+  );
+  await expect(page.getByText("Link copied")).toBeVisible();
   const createPractice = page.getByRole("link", { name: "Create practice" });
   await expect(createPractice).toHaveAttribute(
     "href",

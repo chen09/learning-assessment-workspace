@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
+import { CopyChildSignInLink } from "@/components/copy-child-sign-in-link";
 import { useLanguage } from "@/components/language-provider";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import {
@@ -292,12 +293,19 @@ function ParentDashboardContent({
                         </Link>
                         {currentWork.status === "assigned" &&
                         !currentWork.attempt_id ? (
-                          <Link
-                            className="quiet-link"
-                            href={`/child/login/?childId=${encodeURIComponent(child.id)}&assignmentId=${encodeURIComponent(currentWork.assignment_id)}`}
-                          >
-                            {t("draftReview.openChildSignIn")}
-                          </Link>
+                          <>
+                            <Link
+                              className="quiet-link"
+                              href={`/child/login/?childId=${encodeURIComponent(child.id)}&assignmentId=${encodeURIComponent(currentWork.assignment_id)}`}
+                            >
+                              {t("draftReview.openChildSignIn")}
+                            </Link>
+                            <CopyChildSignInLink
+                              assignmentId={currentWork.assignment_id}
+                              childId={child.id}
+                              className="quiet-link"
+                            />
+                          </>
                         ) : null}
                         {pendingReviewCount > 0 ? (
                           <div className="dashboard-parent-review">

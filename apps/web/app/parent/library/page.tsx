@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
+import { CopyChildSignInLink } from "@/components/copy-child-sign-in-link";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { useLanguage } from "@/components/language-provider";
 import {
@@ -729,12 +730,19 @@ function LibraryContent() {
                   </Link>
                 ) : null}
                 {newAssignmentId && assignmentChildId ? (
-                  <Link
-                    className="button secondary"
-                    href={`/child/login/?childId=${encodeURIComponent(assignmentChildId)}&assignmentId=${encodeURIComponent(newAssignmentId)}`}
-                  >
-                    {t("draftReview.openChildSignIn")}
-                  </Link>
+                  <>
+                    <Link
+                      className="button secondary"
+                      href={`/child/login/?childId=${encodeURIComponent(assignmentChildId)}&assignmentId=${encodeURIComponent(newAssignmentId)}`}
+                    >
+                      {t("draftReview.openChildSignIn")}
+                    </Link>
+                    <CopyChildSignInLink
+                      assignmentId={newAssignmentId}
+                      childId={assignmentChildId}
+                      className="button secondary"
+                    />
+                  </>
                 ) : null}
                 <button
                   className="button primary"

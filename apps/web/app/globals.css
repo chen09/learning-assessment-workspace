@@ -494,6 +494,27 @@ button {
   color: var(--blue-dark);
 }
 
+.copy-child-sign-in-link {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.copy-child-sign-in-link [role="status"],
+.copy-child-sign-in-link [role="alert"] {
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.copy-child-sign-in-link [role="status"] {
+  color: #217d67;
+}
+
+.copy-child-sign-in-link [role="alert"] {
+  color: #ad4e3e;
+}
+
 .section-heading {
   display: flex;
   align-items: end;

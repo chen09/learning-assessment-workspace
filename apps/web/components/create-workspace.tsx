@@ -16,6 +16,7 @@ import {
 import { useEffect, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
+import { CopyChildSignInLink } from "@/components/copy-child-sign-in-link";
 import { useLanguage } from "@/components/language-provider";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import {
@@ -2759,12 +2760,18 @@ function CreateWorkspaceContent() {
             <Printer size={17} /> {t("draftReview.print")}
           </Link>
           {assignmentId && selectedChildId ? (
-            <Link
-              className="button ghost"
-              href={`/child/login/?childId=${encodeURIComponent(selectedChildId)}&assignmentId=${encodeURIComponent(assignmentId)}`}
-            >
-              {t("draftReview.openChildSignIn")}
-            </Link>
+            <>
+              <Link
+                className="button ghost"
+                href={`/child/login/?childId=${encodeURIComponent(selectedChildId)}&assignmentId=${encodeURIComponent(assignmentId)}`}
+              >
+                {t("draftReview.openChildSignIn")}
+              </Link>
+              <CopyChildSignInLink
+                assignmentId={assignmentId}
+                childId={selectedChildId}
+              />
+            </>
           ) : null}
         </section>
       </>
