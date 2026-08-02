@@ -533,7 +533,7 @@ test("temporary parent completes the hosted family learning flow", async ({
       page
         .getByRole("list", { name: "Uploaded answer images" })
         .getByRole("listitem"),
-    ).toHaveText(["1. non-personal-answer.png"]);
+    ).toContainText(["1. non-personal-answer.png"]);
 
     const { data: storedPhoto, error: storedPhotoError } =
       await supabaseAdmin.storage

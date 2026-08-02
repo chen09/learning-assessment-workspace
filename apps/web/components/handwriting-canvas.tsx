@@ -99,8 +99,9 @@ export function HandwritingCanvas({
     action: ToolbarAction;
     at: number;
   } | null>(null);
-  const [canvasSize, setCanvasSize] = useState<CanvasSize>(() =>
-    normalizeCanvasSize(initialSize),
+  const canvasSizeRef = useRef<CanvasSize>(normalizeCanvasSize(initialSize));
+  const [canvasSize, setCanvasSize] = useState<CanvasSize>(
+    () => normalizeCanvasSize(initialSize),
   );
 
   const draw = useCallback((allStrokes: Stroke[]) => {
@@ -315,7 +316,12 @@ export function HandwritingCanvas({
     action();
   };
 
-  const resizeCanvas = (nextSize: CanvasSize) => {
+  const resizeCanvas = (resize: (currentSize: CanvasSize) => CanvasSize) => {
+    // Keep a synchronous source of truth for two quick toolbar taps. On a
+    // tablet, React may not render between "add right" and "add below";
+    // deriving both sizes from a stale closure would otherwise drop one axis.
+    const nextSize = normalizeCanvasSize(resize(canvasSizeRef.current));
+    canvasSizeRef.current = nextSize;
     setCanvasSize(nextSize);
     onChange(strokes, nextSize);
   };
@@ -368,13 +374,13 @@ export function HandwritingCanvas({
               readOnly || canvasSize.width >= MAX_CANVAS_SIZE.width
             }
             onClick={() =>
-              resizeCanvas({
-                ...canvasSize,
+              resizeCanvas((currentSize) => ({
+                ...currentSize,
                 width: Math.min(
-                  canvasSize.width + CANVAS_WIDTH_STEP,
+                  currentSize.width + CANVAS_WIDTH_STEP,
                   MAX_CANVAS_SIZE.width,
                 ),
-              })
+              }))
             }
             type="button"
           >
@@ -386,13 +392,13 @@ export function HandwritingCanvas({
               readOnly || canvasSize.height >= MAX_CANVAS_SIZE.height
             }
             onClick={() =>
-              resizeCanvas({
-                ...canvasSize,
+              resizeCanvas((currentSize) => ({
+                ...currentSize,
                 height: Math.min(
-                  canvasSize.height + CANVAS_HEIGHT_STEP,
+                  currentSize.height + CANVAS_HEIGHT_STEP,
                   MAX_CANVAS_SIZE.height,
                 ),
-              })
+              }))
             }
             type="button"
           >
