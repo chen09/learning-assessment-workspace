@@ -34,10 +34,13 @@ from app.services.database_jobs import DatabaseJobWorker
 
 DATABASE_URL = os.getenv("TEST_DATABASE_URL")
 
-pytestmark = pytest.mark.skipif(
-    not DATABASE_URL,
-    reason="TEST_DATABASE_URL is required for PostgreSQL integration tests.",
-)
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(
+        not DATABASE_URL,
+        reason="TEST_DATABASE_URL is required for PostgreSQL integration tests.",
+    ),
+]
 
 
 @pytest.mark.asyncio

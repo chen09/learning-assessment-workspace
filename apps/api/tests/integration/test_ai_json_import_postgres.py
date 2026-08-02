@@ -16,10 +16,13 @@ from app.tools.import_question_set import parse_import_document
 
 DATABASE_URL = os.getenv("TEST_DATABASE_URL")
 
-pytestmark = pytest.mark.skipif(
-    not DATABASE_URL,
-    reason="TEST_DATABASE_URL is required for PostgreSQL integration tests.",
-)
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(
+        not DATABASE_URL,
+        reason="TEST_DATABASE_URL is required for PostgreSQL integration tests.",
+    ),
+]
 
 
 @pytest.mark.asyncio
@@ -256,9 +259,14 @@ async def test_library_review_publishes_a_snapshot_without_answers_or_sources() 
             str(parent_id),
         )
 
-        snapshot = await connection.fetchval(
+        raw_snapshot = await connection.fetchval(
             "select snapshot from public.library_items where submission_id = $1",
             submission.id,
+        )
+        snapshot = (
+            json.loads(raw_snapshot)
+            if isinstance(raw_snapshot, str)
+            else raw_snapshot
         )
         serialized_snapshot = json.dumps(snapshot)
         assert reviewed.status == "published"
@@ -266,9 +274,20 @@ async def test_library_review_publishes_a_snapshot_without_answers_or_sources() 
         assert "answer_key" not in serialized_snapshot
         assert "source_summary" not in serialized_snapshot
         assert "Private book" not in serialized_snapshot
-        assert snapshot["questions"][0]["prompt"] == "___ it rains, stay home."
+        assert snapshot["questions"][0]["prompt"] == {
+            "ja": "___ it rains, stay home.",
+        }
     finally:
         await repository.close()
+        await connection.execute(
+            """
+            delete from public.library_items
+            where submission_id in (
+              select id from public.library_submissions where family_id = $1
+            )
+            """,
+            family_id,
+        )
         await connection.execute("delete from public.families where id = $1", family_id)
         await connection.execute("delete from auth.users where id = $1", parent_id)
         await connection.close()
