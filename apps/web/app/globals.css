@@ -1636,6 +1636,16 @@ button {
   opacity: 0.28;
 }
 
+.response-locked-hint {
+  margin: 0;
+  border-top: 1px solid #e6c7a8;
+  background: #fffaf4;
+  color: #795b36;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  padding: 0.75rem 1rem;
+}
+
 .canvas-clear-confirmation {
   display: grid;
   gap: 0.7rem;

@@ -1187,6 +1187,11 @@ describe("WorksheetWorkbench", () => {
     expect(
       screen.getByRole("button", { name: "Clear handwriting" }),
     ).toBeDisabled();
+    expect(
+      screen.getByText(
+        "This submitted answer is locked. Use Clear and redo this question below to make a new answer.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("lets a child clear and redo a submitted handwriting answer while grading is pending", async () => {

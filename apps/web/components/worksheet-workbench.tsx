@@ -1706,6 +1706,11 @@ function WorksheetWorkbenchContent() {
         className={submitted ? "response-locked" : undefined}
       >
         {renderResponse(question)}
+        {submitted ? (
+          <p className="response-locked-hint">
+            {t("worksheet.submittedLockedHint")}
+          </p>
+        ) : null}
       </div>
       {submitted ? (
         <div className={`question-grade-status ${result?.outcome ?? "grading"}`}>
