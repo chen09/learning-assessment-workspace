@@ -1436,6 +1436,7 @@ describe("CreateWorkspace", () => {
     ).toBeInTheDocument();
     expect(screen.getByLabelText("已完成试卷扫描件")).toBeInTheDocument();
     expect(screen.getByText(/手写内容保持私密/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "上传供审核" })).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Grade completed paper" }),
     ).not.toBeInTheDocument();

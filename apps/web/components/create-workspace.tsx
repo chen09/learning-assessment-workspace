@@ -3046,7 +3046,7 @@ function CreateWorkspaceContent() {
               : mode === "structured"
                 ? t("structuredImport.preview")
                 : mode === "completed"
-                  ? "Upload for review"
+                  ? t("completedPaper.uploadForReview")
                   : t("creation.createReviewDraft")}
           </button>
           {requestStatus === "error" ? (

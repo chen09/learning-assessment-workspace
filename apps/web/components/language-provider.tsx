@@ -577,6 +577,7 @@ const messages = {
     "librarySubmission.withdrawError": "The submission could not be withdrawn. Please retry.",
     "completedPaper.eyebrow": "Completed worksheet received",
     "completedPaper.mode": "Grade completed paper",
+    "completedPaper.uploadForReview": "Upload for review",
     "completedPaper.readingTitle": "Reading the paper",
     "completedPaper.reviewTitle": "Preparing the review draft",
     "completedPaper.description":
@@ -1236,6 +1237,7 @@ const messages = {
     "librarySubmission.withdrawError": "提出を取り消せませんでした。もう一度お試しください。",
     "completedPaper.eyebrow": "解答済みのプリントを受け取りました",
     "completedPaper.mode": "解答済みのプリントを採点",
+    "completedPaper.uploadForReview": "確認用にアップロード",
     "completedPaper.readingTitle": "プリントを読み込んでいます",
     "completedPaper.reviewTitle": "確認用の下書きを準備しています",
     "completedPaper.description":
@@ -1874,6 +1876,7 @@ const messages = {
     "librarySubmission.withdrawError": "无法撤回投稿，请重试。",
     "completedPaper.eyebrow": "已收到已完成的试卷",
     "completedPaper.mode": "批改已完成的试卷",
+    "completedPaper.uploadForReview": "上传供审核",
     "completedPaper.readingTitle": "正在读取试卷",
     "completedPaper.reviewTitle": "正在准备审核草稿",
     "completedPaper.description":
