@@ -278,6 +278,16 @@ async def test_postgres_vertical_flow_and_family_isolation() -> None:
                 family_a,
                 str(uuid4()),
             )
+        # Process the independently queued paper-analysis job before submitting
+        # a question below. The worker claims jobs in queue order, so this keeps
+        # the integration flow faithful to the single-worker production model.
+        assert await worker.run_once() is True
+        reviewed_completed_paper = await repository.get_completed_worksheet_import(
+            str(completed_paper.id),
+            str(parent_a),
+        )
+        assert reviewed_completed_paper.status.value == "needs_review"
+        assert reviewed_completed_paper.job.status.value == "succeeded"
 
         confirmed = await repository.confirm_question_set(
             str(imported.question_set_id),
