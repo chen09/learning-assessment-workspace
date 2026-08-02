@@ -1061,6 +1061,8 @@ test("parent previews an AI JSON file before assigning its structured questions"
 
   await page.goto("/child/work/");
   await expect(page).toHaveURL(/\/child\/work\/\?attemptId=/);
+  const attemptId = new URL(page.url()).searchParams.get("attemptId");
+  expect(attemptId).toBeTruthy();
   await expect(
     page.getByRole("heading", { name: "Uploaded JSON practice" }),
   ).toBeVisible();
@@ -1068,6 +1070,33 @@ test("parent previews an AI JSON file before assigning its structured questions"
     page.getByRole("heading", { name: "What is 3 + 3?" }),
   ).toBeVisible();
   await expect(page.locator(".exam-toggle")).toContainText(/1[45]:/);
+
+  await page.getByRole("radio", { name: "6" }).check();
+  const fullSubmission = page.waitForResponse(
+    (response) =>
+      response.url() === `${apiBaseUrl}/v1/attempts/${attemptId!}/submit` &&
+      response.request().method() === "POST" &&
+      response.status() === 202,
+  );
+  await page.getByRole("button", { name: "Submit all answers" }).click();
+  await page
+    .getByRole("button", { name: "Confirm full submission" })
+    .click();
+  await fullSubmission;
+  await expect(
+    page.getByRole("heading", { name: "Your work is being checked" }),
+  ).toBeVisible();
+
+  const processed = await request.post(`${apiBaseUrl}/v1/demo/jobs/process-next`, {
+    headers: { Authorization: "Bearer parent-fixture" },
+  });
+  expect(processed.ok(), await processed.text()).toBeTruthy();
+  await page.getByRole("button", { name: "View results" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Good work, JSON child" }),
+  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Correct" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Try once more" })).toBeVisible();
 });
 
 test("parent authors a paper-photo question and assigns it through the reviewed draft", async ({
