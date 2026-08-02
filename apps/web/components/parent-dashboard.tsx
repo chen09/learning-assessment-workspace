@@ -290,6 +290,15 @@ function ParentDashboardContent({
                             ? t("parentDashboard.viewResults")
                             : t("parentDashboard.viewProgress")}
                         </Link>
+                        {currentWork.status === "assigned" &&
+                        !currentWork.attempt_id ? (
+                          <Link
+                            className="quiet-link"
+                            href={`/child/login/?childId=${encodeURIComponent(child.id)}&assignmentId=${encodeURIComponent(currentWork.assignment_id)}`}
+                          >
+                            {t("draftReview.openChildSignIn")}
+                          </Link>
+                        ) : null}
                         {pendingReviewCount > 0 ? (
                           <div className="dashboard-parent-review">
                             <span>

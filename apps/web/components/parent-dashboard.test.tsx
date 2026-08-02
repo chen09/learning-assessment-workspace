@@ -129,6 +129,47 @@ describe("ParentDashboard", () => {
     );
   });
 
+  it("opens child sign-in for an assigned worksheet that has not started", async () => {
+    window.localStorage.setItem("luma-language:demo-parent", "zh");
+    mocks.getFamilies.mockResolvedValue([
+      { id: "family-1", name: "肉肉如意" },
+    ]);
+    mocks.getChildren.mockResolvedValue([
+      {
+        id: "child-1",
+        family_id: "family-1",
+        nickname: "肉肉",
+        grade_stage: "Junior high 1",
+        ui_language: "zh",
+      },
+    ]);
+    mocks.getFamilyHistory.mockResolvedValue([
+      {
+        assignment_id: "assignment-1",
+        attempt_id: null,
+        child_id: "child-1",
+        child_nickname: "肉肉",
+        title: "英语填空练习",
+        status: "assigned",
+        submitted_at: null,
+        awarded_points: 0,
+        available_points: 10,
+        correction_count: 0,
+        source_material_title: null,
+        source_material_subject: null,
+      },
+    ]);
+
+    render(<ParentDashboard />);
+
+    expect(
+      await screen.findByRole("link", { name: "打开孩子登录页" }),
+    ).toHaveAttribute(
+      "href",
+      "/child/login?childId=child-1&assignmentId=assignment-1",
+    );
+  });
+
   it("switches the homepage to another family without mixing child data", async () => {
     window.localStorage.setItem("luma-language:demo-parent", "zh");
     mocks.getFamilies.mockResolvedValue([

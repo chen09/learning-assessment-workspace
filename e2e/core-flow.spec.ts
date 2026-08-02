@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("parent dashboard shows saved family data and opens child practice", async ({
+test("parent dashboard offers the assigned child sign-in route", async ({
   page,
 }) => {
   await page.route("**/v1/families", async (route) => {
@@ -33,12 +33,12 @@ test("parent dashboard shows saved family data and opens child practice", async 
       body: JSON.stringify([
         {
           assignment_id: "dashboard-assignment",
-          attempt_id: "dashboard-attempt",
+          attempt_id: null,
           child_id: "dashboard-child",
           child_nickname: "肉肉",
           title: "Fractions recap",
-          status: "grading",
-          submitted_at: "2026-08-02T00:00:00Z",
+          status: "assigned",
+          submitted_at: null,
           awarded_points: 0,
           available_points: 10,
           correction_count: 0,
@@ -53,10 +53,14 @@ test("parent dashboard shows saved family data and opens child practice", async 
   await expect(page.getByRole("heading", { name: "肉肉如意" })).toBeVisible();
   await expect(page.getByText("肉肉", { exact: true })).toBeVisible();
   await expect(page.getByText("Fractions recap")).toBeVisible();
-  await expect(page.getByText("Being graded")).toBeVisible();
-  await expect(page.getByRole("link", { name: "View results" })).toHaveAttribute(
+  await expect(page.getByText("Assigned")).toBeVisible();
+  await expect(page.getByRole("link", { name: "View progress" })).toHaveAttribute(
     "href",
-    "/parent/results/?attemptId=dashboard-attempt",
+    "/parent/history/?familyId=dashboard-family",
+  );
+  await expect(page.getByRole("link", { name: "Open child sign-in" })).toHaveAttribute(
+    "href",
+    "/child/login/?childId=dashboard-child&assignmentId=dashboard-assignment",
   );
   const createPractice = page.getByRole("link", { name: "Create practice" });
   await expect(createPractice).toHaveAttribute(
