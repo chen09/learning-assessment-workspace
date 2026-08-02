@@ -153,6 +153,84 @@ describe("CreateWorkspace", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("refreshes the private paper preview when processing finishes", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/parent/create/?completedWorksheetId=completed-worksheet-1",
+    );
+    mocks.getCompletedWorksheetImport
+      .mockResolvedValueOnce({
+        id: "completed-worksheet-1",
+        status: "processing",
+        assignment_id: null,
+        attempt_id: null,
+        filenames: ["completed-paper.jpg"],
+        response_paths: ["family-1/responses/completed-paper.jpg"],
+        job: {
+          id: "analysis-job-1",
+          status: "running",
+          type: "analyze_completed_worksheet",
+        },
+      })
+      .mockResolvedValueOnce({
+        id: "completed-worksheet-1",
+        status: "needs_review",
+        assignment_id: null,
+        attempt_id: null,
+        filenames: ["completed-paper.jpg"],
+        response_paths: ["family-1/responses/completed-paper.jpg"],
+        response_preview_urls: [
+          "https://storage.example.test/signed/completed-paper.jpg?short-lived=true",
+        ],
+        extraction: {
+          schema_version: "1.0",
+          document: {
+            schema_version: "1.0",
+            question_set: {
+              title: "Completed paper",
+              subject: "English",
+              locale: "en",
+              difficulty: "standard",
+              source_mode: "convert",
+              estimated_minutes: 10,
+            },
+            knowledge_tags: [{ code: "grammar", label: "Grammar" }],
+            questions: [
+              {
+                position: 1,
+                type: "typed_text",
+                prompt: "Complete: She ___ to school.",
+                options: [],
+                answer_key: { text: "goes" },
+                rubric: { grading_mode: "exact" },
+                points: 1,
+                knowledge_code: "grammar",
+              },
+            ],
+          },
+          answer_regions: [
+            { question_position: 1, page_numbers: [1], legibility: "clear" },
+          ],
+        },
+        job: {
+          id: "analysis-job-1",
+          status: "succeeded",
+          type: "analyze_completed_worksheet",
+        },
+      });
+
+    render(<CreateWorkspace />);
+
+    expect(await screen.findByText("Analysis in progress")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("img", { name: "Completed worksheet page 1" }),
+    ).toHaveAttribute(
+      "src",
+      "https://storage.example.test/signed/completed-paper.jpg?short-lived=true",
+    );
+  });
+
   it("restores the clean A4 print link after a completed paper is graded", async () => {
     window.history.replaceState(
       {},

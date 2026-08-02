@@ -1060,6 +1060,11 @@ function CreateWorkspaceContent() {
         if (active) {
           setCompletedWorksheetStatus(imported.status);
           setCompletedPaperFailureCode(imported.job.error_code ?? null);
+          setCompletedResponsePaths(imported.response_paths);
+          setCompletedResponseFileNames(imported.filenames);
+          setCompletedResponsePreviewUrls(imported.response_preview_urls ?? []);
+          setAssignmentId(imported.assignment_id);
+          setCompletedAttemptId(imported.attempt_id);
           setCompletedResponsePageCount(
             completedPaperPageCount(
               imported.extraction,
