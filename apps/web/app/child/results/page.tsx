@@ -230,6 +230,13 @@ function ChildResultsContent() {
                         {result.feedback.action}
                       </p>
                     ) : null}
+                    {result.parent_comment ? (
+                      <p className="result-parent-comment">
+                        {t("results.parentComment", {
+                          comment: result.parent_comment,
+                        })}
+                      </p>
+                    ) : null}
                     {result.transcript ? (
                       <details className="result-transcript">
                         <summary>{t("worksheet.transcript")}</summary>

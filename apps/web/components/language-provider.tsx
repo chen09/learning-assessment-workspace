@@ -510,6 +510,7 @@ const messages = {
     "results.correct": "Correct",
     "results.tryAgain": "Try once more",
     "results.parentCheck": "Waiting for a parent",
+    "results.parentComment": "Note from your parent: {comment}",
     "results.demoAction": "Check the subject and the verb ending.",
     "results.openError":
       "Corrections could not be opened. Please try again.",
@@ -543,6 +544,10 @@ const messages = {
       "A parent marked this answer correct.",
     "parentResults.savedIncorrect":
       "A parent marked this answer incorrect.",
+    "parentResults.comment": "Note for the child (optional)",
+    "parentResults.commentHint":
+      "Add a short hint or encouraging explanation.",
+    "parentResults.savedComment": "Note for child: {comment}",
     "parentResults.decisionError":
       "The decision could not be saved. Please try again.",
     "parentResults.wholeSet": "Whole set",
@@ -1253,6 +1258,7 @@ const messages = {
     "results.correct": "正解",
     "results.tryAgain": "もう一度",
     "results.parentCheck": "保護者の確認待ち",
+    "results.parentComment": "保護者からのメモ：{comment}",
     "results.demoAction": "主語と動詞の語尾を確認しましょう。",
     "results.openError":
       "やり直しを開けませんでした。もう一度お試しください。",
@@ -1284,6 +1290,9 @@ const messages = {
     "parentResults.saving": "保存中…",
     "parentResults.savedCorrect": "保護者が正解と判定しました。",
     "parentResults.savedIncorrect": "保護者が不正解と判定しました。",
+    "parentResults.comment": "お子さまへのメモ（任意）",
+    "parentResults.commentHint": "短いヒントや励ましを入力できます。",
+    "parentResults.savedComment": "お子さまへのメモ：{comment}",
     "parentResults.decisionError":
       "判定を保存できませんでした。もう一度お試しください。",
     "parentResults.wholeSet": "全体",
@@ -1980,6 +1989,7 @@ const messages = {
     "results.correct": "正确",
     "results.tryAgain": "再试一次",
     "results.parentCheck": "等待家长确认",
+    "results.parentComment": "家长留言：{comment}",
     "results.demoAction": "检查主语和动词词尾。",
     "results.openError": "无法打开订正，请重试。",
     "parentResults.eyebrow": "{name} · {title}",
@@ -2007,6 +2017,9 @@ const messages = {
     "parentResults.saving": "正在保存…",
     "parentResults.savedCorrect": "这道题已由家长判为正确。",
     "parentResults.savedIncorrect": "这道题已由家长判为错误。",
+    "parentResults.comment": "给孩子的说明（可选）",
+    "parentResults.commentHint": "可以写一句简短的提示或鼓励。",
+    "parentResults.savedComment": "给孩子的说明：{comment}",
     "parentResults.decisionError": "无法保存裁定，请重试。",
     "parentResults.wholeSet": "整份练习",
     "parentResults.score": "{awarded} / {available} 分",

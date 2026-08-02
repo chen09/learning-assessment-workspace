@@ -380,6 +380,12 @@ function ParentResultsContent() {
     "loading" | "ready" | "error"
   >("loading");
   const [decisions, setDecisions] = useState<Record<string, Decision>>({});
+  const [decisionComments, setDecisionComments] = useState<
+    Record<string, string>
+  >({});
+  const [savedComments, setSavedComments] = useState<Record<string, string>>(
+    {},
+  );
   const [savingId, setSavingId] = useState<string | null>(null);
   const [decisionErrorId, setDecisionErrorId] = useState<string | null>(null);
 
@@ -433,12 +439,13 @@ function ParentResultsContent() {
         throw new Error("Parent session is unavailable.");
       }
       const points = outcome === "correct" ? item.question_points : 0;
+      const comment = decisionComments[item.result_id]?.trim() || null;
       await decideParentReview(
         item.result_id,
         {
           outcome,
           awarded_points: points,
-          comment: null,
+          comment,
         },
         token,
         `parent-review-${item.result_id}`,
@@ -447,6 +454,12 @@ function ParentResultsContent() {
         ...current,
         [item.result_id]: outcome,
       }));
+      if (comment) {
+        setSavedComments((current) => ({
+          ...current,
+          [item.result_id]: comment,
+        }));
+      }
       setReview((current) =>
         current
           ? {
@@ -559,33 +572,60 @@ function ParentResultsContent() {
                     {decision ? (
                       <div className="confirmed-message" role="status">
                         <ShieldCheck />
-                        {t(
-                          decision === "correct"
-                            ? "parentResults.savedCorrect"
-                            : "parentResults.savedIncorrect",
-                        )}
+                        <div>
+                          <p>
+                            {t(
+                              decision === "correct"
+                                ? "parentResults.savedCorrect"
+                                : "parentResults.savedIncorrect",
+                            )}
+                          </p>
+                          {savedComments[item.result_id] ? (
+                            <p className="parent-review-saved-comment">
+                              {t("parentResults.savedComment", {
+                                comment: savedComments[item.result_id],
+                              })}
+                            </p>
+                          ) : null}
+                        </div>
                       </div>
                     ) : (
-                      <div className="decision-row">
-                        <button
-                          className="button primary"
-                          disabled={savingId === item.result_id}
-                          onClick={() => void decide(item, "correct")}
-                          type="button"
-                        >
-                          <Check />
-                          {savingId === item.result_id
-                            ? t("parentResults.saving")
-                            : t("parentResults.markCorrect")}
-                        </button>
-                        <button
-                          className="button ghost"
-                          disabled={savingId === item.result_id}
-                          onClick={() => void decide(item, "incorrect")}
-                          type="button"
-                        >
-                          {t("parentResults.markIncorrect")}
-                        </button>
+                      <div className="parent-review-decision">
+                        <label className="field-label parent-review-comment">
+                          {t("parentResults.comment")}
+                          <textarea
+                            maxLength={500}
+                            onChange={(event) =>
+                              setDecisionComments((current) => ({
+                                ...current,
+                                [item.result_id]: event.target.value,
+                              }))
+                            }
+                            placeholder={t("parentResults.commentHint")}
+                            value={decisionComments[item.result_id] ?? ""}
+                          />
+                        </label>
+                        <div className="decision-row">
+                          <button
+                            className="button primary"
+                            disabled={savingId === item.result_id}
+                            onClick={() => void decide(item, "correct")}
+                            type="button"
+                          >
+                            <Check />
+                            {savingId === item.result_id
+                              ? t("parentResults.saving")
+                              : t("parentResults.markCorrect")}
+                          </button>
+                          <button
+                            className="button ghost"
+                            disabled={savingId === item.result_id}
+                            onClick={() => void decide(item, "incorrect")}
+                            type="button"
+                          >
+                            {t("parentResults.markIncorrect")}
+                          </button>
+                        </div>
                       </div>
                     )}
                     {decisionErrorId === item.result_id ? (

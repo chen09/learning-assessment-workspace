@@ -54,6 +54,7 @@ from app.domain.models import (
     FamilyCompletedWorksheetImport,
     FamilyInvitation,
     FamilyLibraryQuestionSet,
+    GradingOutcome,
     HistoryItem,
     Job,
     LibraryReviewSubmission,
@@ -1711,6 +1712,9 @@ class PostgresRepository:
                                result.question_id, result.outcome,
                                result.awarded_points, result.confidence,
                                result.feedback, result.grader_version,
+                               result.parent_outcome,
+                               result.parent_awarded_points,
+                               result.parent_comment,
                                question.rubric, question.transcript_policy
                         from public.question_results result
                         join public.questions question on question.id = result.question_id
@@ -1733,7 +1737,24 @@ class PostgresRepository:
                 and isinstance(raw_listening.get("transcript"), str)
                 else None
             )
-            results.append(result.model_copy(update={"transcript": transcript}))
+            results.append(
+                result.model_copy(
+                    update={
+                        "outcome": (
+                            GradingOutcome(row["parent_outcome"])
+                            if row["parent_outcome"] is not None
+                            else result.outcome
+                        ),
+                        "awarded_points": (
+                            _float(row["parent_awarded_points"])
+                            if row["parent_outcome"] is not None
+                            else result.awarded_points
+                        ),
+                        "parent_comment": row["parent_comment"],
+                        "transcript": transcript,
+                    }
+                )
+            )
         return AttemptResults(
             attempt_id=_uuid(attempt_id),
             complete=question_count > 0 and len(results) == question_count,

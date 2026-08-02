@@ -85,6 +85,7 @@ describe("ChildResultsPage", () => {
           awarded_points: 0,
           confidence: 1,
           feedback: { summary: "Try again." },
+          parent_comment: "请检查平方差的两个括号。",
         },
         {
           id: "result-uncertain",
@@ -110,6 +111,9 @@ describe("ChildResultsPage", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "订正这些题" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("家长留言：请检查平方差的两个括号。"),
     ).toBeInTheDocument();
     expect(screen.queryByText("Good work, Alex")).not.toBeInTheDocument();
   });

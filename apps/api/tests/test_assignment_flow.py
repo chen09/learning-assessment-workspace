@@ -919,6 +919,19 @@ def test_submission_is_immutable_and_fixture_grading_releases_full_results() -> 
     assert resolved_parent_results.json()["correct_count"] == 2
     assert resolved_parent_results.json()["pending_review_count"] == 0
     assert resolved_parent_results.json()["reviews"] == []
+    child_results_after_parent_decision = client.get(
+        f"/v1/attempts/{attempt_id}/results",
+        headers=child_headers,
+    )
+    assert child_results_after_parent_decision.status_code == 200
+    child_result = next(
+        result
+        for result in child_results_after_parent_decision.json()["results"]
+        if result["id"] == uncertain_result_id
+    )
+    assert child_result["outcome"] == "correct"
+    assert child_result["awarded_points"] == 2
+    assert child_result["parent_comment"] == "The steps and final answer are clear."
     correction = client.post(
         f"/v1/attempts/{attempt_id}/correction",
         headers={

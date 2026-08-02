@@ -45,6 +45,7 @@ from app.domain.models import (
     FamilyCompletedWorksheetImport,
     FamilyInvitation,
     FamilyLibraryQuestionSet,
+    GradingOutcome,
     HistoryItem,
     Job,
     JobStatus,
@@ -1094,6 +1095,7 @@ class MemoryRepository:
         question_by_id = {str(question.id): question for question in questions}
         visible_results = []
         for result in results:
+            decision = self.parent_decisions.get(str(result.id))
             listening = question_by_id.get(str(result.question_id))
             transcript = (
                 listening.listening.transcript
@@ -1103,7 +1105,26 @@ class MemoryRepository:
                 in {"always", "after_submission"}
                 else None
             )
-            visible_results.append(result.model_copy(update={"transcript": transcript}))
+            visible_results.append(
+                result.model_copy(
+                    update={
+                        "outcome": (
+                            GradingOutcome(decision.parent_outcome)
+                            if decision is not None
+                            else result.outcome
+                        ),
+                        "awarded_points": (
+                            decision.parent_awarded_points
+                            if decision is not None
+                            else result.awarded_points
+                        ),
+                        "parent_comment": (
+                            decision.parent_comment if decision is not None else None
+                        ),
+                        "transcript": transcript,
+                    }
+                )
+            )
         return AttemptResults(
             attempt_id=attempt.id,
             complete=len(visible_results) == len(questions),

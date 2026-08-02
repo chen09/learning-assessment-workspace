@@ -3726,6 +3726,21 @@ button {
   margin-top: 1rem;
 }
 
+.parent-review-comment {
+  margin-top: 1rem;
+}
+
+.parent-review-comment textarea {
+  min-height: 5.5rem;
+}
+
+.parent-review-saved-comment {
+  margin-top: 0.3rem !important;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
 .result-context h2 {
   margin: 0;
   font-size: 2rem;

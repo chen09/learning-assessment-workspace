@@ -332,6 +332,7 @@ class QuestionResult(BaseModel):
     feedback: dict[str, Any]
     grader_version: str = "fixture-v1"
     transcript: str | None = None
+    parent_comment: str | None = None
 
 
 class AttemptResults(BaseModel):

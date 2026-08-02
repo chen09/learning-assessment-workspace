@@ -2413,6 +2413,9 @@ test("parent creation reaches child grading and correction through the API", asy
   await expect(
     page.getByLabel("Child's handwritten answer"),
   ).toBeVisible();
+  await page
+    .getByLabel("Note for the child (optional)")
+    .fill("Your explanation is clear. Nice work!");
   await page.getByRole("button", { name: "Mark correct" }).click();
   await expect(
     page.getByText("A parent marked this answer correct."),
@@ -2421,6 +2424,9 @@ test("parent creation reaches child grading and correction through the API", asy
   await page.goto(
     `/child/results/?attemptId=${encodeURIComponent(attemptId!)}`,
   );
+  await expect(
+    page.getByText("Note from your parent: Your explanation is clear. Nice work!"),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Correct these answers" }).click();
   await expect(page).toHaveURL(/\/child\/work\/\?attemptId=/);
   await expect(page.getByText("0/1", { exact: true })).toBeVisible();

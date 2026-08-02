@@ -134,6 +134,32 @@ describe("ParentResultsPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("sends an optional child-visible note with a parent correction decision", async () => {
+    render(<ParentResultsPage />);
+
+    await screen.findByRole("heading", { name: "确认作答结果" });
+    fireEvent.change(screen.getByLabelText("给孩子的说明（可选）"), {
+      target: { value: "请检查平方差的两个括号。" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "需要订正" }));
+
+    await waitFor(() => {
+      expect(mocks.decideParentReview).toHaveBeenCalledWith(
+        "result-1",
+        {
+          outcome: "incorrect",
+          awarded_points: 0,
+          comment: "请检查平方差的两个括号。",
+        },
+        "parent-token",
+        expect.stringMatching(/^parent-review-/),
+      );
+    });
+    expect(
+      await screen.findByText("给孩子的说明：请检查平方差的两个括号。"),
+    ).toBeInTheDocument();
+  });
+
   it("keeps polling while the grading transaction is incomplete", async () => {
     vi.useFakeTimers();
     const completeReview = await mocks.getParentAttemptReview();

@@ -923,6 +923,7 @@ export type AttemptResult = {
     annotations?: GradingAnnotation[];
   };
   transcript?: string | null;
+  parent_comment?: string | null;
 };
 
 export async function recordListeningPlayback(
