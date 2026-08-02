@@ -21,6 +21,7 @@ from app.services.grading import (
     VisualGradingAdapter,
     grade_response_with_ai,
 )
+from app.services.paper_pipeline import render_pdf_pages
 
 JobHandler = Callable[
     [asyncpg.Connection, dict[str, Any]],
@@ -56,7 +57,7 @@ def _visual_adapter_for_family(
     return None
 
 
-async def _download_private_images(
+async def _download_private_analysis_pages(
     *,
     supabase_url: str,
     service_role_key: str,
@@ -66,20 +67,20 @@ async def _download_private_images(
     destination: Path,
     prefix: str,
 ) -> list[Path]:
-    """Download only same-family PNG/JPEG files into the worker's temp directory."""
+    """Download same-family scans and rasterize private PDFs for visual analysis."""
     if not supabase_url or not service_role_key:
         return []
-    image_paths = [
+    source_paths = [
         path
         for path in paths
-        if Path(path).suffix.lower() in {".jpg", ".jpeg", ".png"}
+        if Path(path).suffix.lower() in {".jpg", ".jpeg", ".png", ".pdf"}
     ]
     expected_prefix = f"{family_id}/"
-    if any(not path.startswith(expected_prefix) for path in image_paths):
+    if any(not path.startswith(expected_prefix) for path in source_paths):
         raise RuntimeError("Worksheet image path is outside its family boundary.")
     downloaded: list[Path] = []
     async with httpx.AsyncClient(timeout=30) as client:
-        for index, path in enumerate(image_paths, start=1):
+        for index, path in enumerate(source_paths, start=1):
             endpoint = (
                 f"{supabase_url.rstrip('/')}/storage/v1/object/{bucket}/"
                 f"{quote(path, safe='/')}"
@@ -93,11 +94,20 @@ async def _download_private_images(
             )
             response.raise_for_status()
             if len(response.content) > 15_000_000:
-                raise RuntimeError("Worksheet image exceeds the 15 MB analysis limit.")
+                raise RuntimeError("Worksheet scan exceeds the 15 MB analysis limit.")
             suffix = Path(path).suffix.lower()
-            image_path = destination / f"{prefix}-{index}{suffix}"
-            image_path.write_bytes(response.content)
-            downloaded.append(image_path)
+            source_path = destination / f"{prefix}-{index}{suffix}"
+            source_path.write_bytes(response.content)
+            if suffix == ".pdf":
+                rendered_pages = render_pdf_pages(
+                    source_path,
+                    destination / f"{prefix}-{index}-pages",
+                )
+                downloaded.extend(rendered_pages)
+            else:
+                downloaded.append(source_path)
+            if len(downloaded) > 100:
+                raise RuntimeError("Worksheet scan has more than 100 analysis pages.")
     return downloaded
 
 
@@ -193,7 +203,7 @@ async def fixture_job_handler(
         ):
             with TemporaryDirectory(prefix="luma-private-worksheet-") as directory:
                 workspace = Path(directory)
-                response_images = await _download_private_images(
+                response_images = await _download_private_analysis_pages(
                     supabase_url=supabase_url,
                     service_role_key=supabase_service_role_key,
                     family_id=str(worksheet["family_id"]),
@@ -203,7 +213,7 @@ async def fixture_job_handler(
                     prefix="response",
                 )
                 if response_images:
-                    answer_key_images = await _download_private_images(
+                    answer_key_images = await _download_private_analysis_pages(
                         supabase_url=supabase_url,
                         service_role_key=supabase_service_role_key,
                         family_id=str(worksheet["family_id"]),
@@ -212,7 +222,7 @@ async def fixture_job_handler(
                         destination=workspace,
                         prefix="answer-key",
                     )
-                    reference_images = await _download_private_images(
+                    reference_images = await _download_private_analysis_pages(
                         supabase_url=supabase_url,
                         service_role_key=supabase_service_role_key,
                         family_id=str(worksheet["family_id"]),
@@ -231,20 +241,21 @@ async def fixture_job_handler(
                                 Literal["en", "ja", "zh"],
                                 str(worksheet["feedback_language"]),
                             ),
-                            source_page_count=len(response_paths),
-                            answer_key_page_count=len(answer_source_paths),
-                            reference_page_count=len(reference_source_paths),
+                            source_page_count=len(response_images),
+                            answer_key_page_count=len(answer_key_images),
+                            reference_page_count=len(reference_images),
                         ),
                         response_page_images=response_images,
                         answer_key_images=answer_key_images,
                         reference_images=reference_images,
                     )
                     extraction = drafted.model_dump(mode="json")
+                    extraction["source_page_count"] = len(response_images)
                     adapter_name = worksheet_adapter.version
                 else:
                     extraction["warnings"].append(
-                        "Automatic extraction currently needs at least one PNG or JPEG "
-                        "worksheet page."
+                        "Automatic extraction currently needs at least one supported "
+                        "PNG, JPEG, or PDF worksheet page."
                     )
         await connection.execute(
             """

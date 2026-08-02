@@ -12,7 +12,7 @@ COPY apps/api/pyproject.toml apps/api/uv.lock* ./
 RUN uv sync --frozen --no-dev || uv sync --no-dev
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends chromium \
+    && apt-get install -y --no-install-recommends chromium poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
 COPY apps/api/app app

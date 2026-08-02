@@ -472,6 +472,8 @@ function CreateWorkspaceContent() {
   const [completedResponsePaths, setCompletedResponsePaths] = useState<string[]>(
     [],
   );
+  const [completedResponsePageCount, setCompletedResponsePageCount] =
+    useState(0);
   const [completedPaperError, setCompletedPaperError] = useState<string | null>(
     null,
   );
@@ -546,6 +548,18 @@ function CreateWorkspaceContent() {
     } catch {
       // A fixture or incomplete AI response remains safely manual-review only.
     }
+  };
+
+  const completedPaperPageCount = (
+    extraction: Record<string, unknown> | undefined,
+    fallback: number,
+  ) => {
+    const extractedCount = extraction?.source_page_count;
+    return typeof extractedCount === "number" &&
+      Number.isInteger(extractedCount) &&
+      extractedCount > 0
+      ? extractedCount
+      : fallback;
   };
 
   const saveCompletedWorksheetRecoveryLink = (worksheetId: string) => {
@@ -635,12 +649,21 @@ function CreateWorkspaceContent() {
         setCompletedWorksheetId(imported.id);
         setCompletedWorksheetStatus(imported.status);
         setCompletedResponsePaths(imported.response_paths);
+        setCompletedResponsePageCount(
+          completedPaperPageCount(
+            imported.extraction,
+            imported.response_paths.length,
+          ),
+        );
         setCompletedResponseFileNames(imported.filenames);
         setCompletedResponsePreviewUrls(imported.response_preview_urls ?? []);
         setCompletedAttemptId(imported.attempt_id);
         loadCompletedReviewDraft(
           imported.extraction,
-          imported.response_paths.length,
+          completedPaperPageCount(
+            imported.extraction,
+            imported.response_paths.length,
+          ),
         );
       } catch {
         if (active) {
@@ -880,9 +903,18 @@ function CreateWorkspaceContent() {
         );
         if (active) {
           setCompletedWorksheetStatus(imported.status);
+          setCompletedResponsePageCount(
+            completedPaperPageCount(
+              imported.extraction,
+              imported.response_paths.length,
+            ),
+          );
           loadCompletedReviewDraft(
             imported.extraction,
-            imported.response_paths.length,
+            completedPaperPageCount(
+              imported.extraction,
+              imported.response_paths.length,
+            ),
           );
         }
       } catch {
@@ -1104,11 +1136,20 @@ function CreateWorkspaceContent() {
         setCompletedWorksheetId(imported.id);
         setCompletedWorksheetStatus(imported.status);
         setCompletedResponsePaths(imported.response_paths);
+        setCompletedResponsePageCount(
+          completedPaperPageCount(
+            imported.extraction,
+            imported.response_paths.length,
+          ),
+        );
         setCompletedResponseFileNames(imported.filenames);
         setCompletedResponsePreviewUrls(imported.response_preview_urls ?? []);
         loadCompletedReviewDraft(
           imported.extraction,
-          imported.response_paths.length,
+          completedPaperPageCount(
+            imported.extraction,
+            imported.response_paths.length,
+          ),
         );
         setRequestStatus("idle");
       } catch {
@@ -1816,7 +1857,7 @@ function CreateWorkspaceContent() {
     try {
       validatedReview = parseCompletedPaperReview(
         JSON.stringify(completedReview),
-        completedResponsePaths.length,
+        completedResponsePageCount || completedResponsePaths.length,
       );
     } catch (error) {
       if (
@@ -1825,7 +1866,7 @@ function CreateWorkspaceContent() {
       ) {
         setCompletedPaperError(
           t("completedPaper.pageReferenceError", {
-            pages: completedResponsePaths.length,
+            pages: completedResponsePageCount || completedResponsePaths.length,
           }),
         );
       }
@@ -1929,7 +1970,7 @@ function CreateWorkspaceContent() {
       setCompletedReview(
         parseCompletedPaperReview(
           await readTextFile(file),
-          completedResponsePaths.length || undefined,
+          completedResponsePageCount || completedResponsePaths.length || undefined,
         ),
       );
       setCompletedReviewSource("file");

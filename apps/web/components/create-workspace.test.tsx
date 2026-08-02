@@ -153,6 +153,102 @@ describe("CreateWorkspace", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("accepts review regions from the second page of one uploaded PDF", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/parent/create/?completedWorksheetId=completed-pdf-1",
+    );
+    mocks.getCompletedWorksheetImport.mockResolvedValue({
+      id: "completed-pdf-1",
+      status: "needs_review",
+      assignment_id: null,
+      attempt_id: null,
+      filenames: ["two-page-completed-paper.pdf"],
+      response_paths: ["family-1/responses/two-page-completed-paper.pdf"],
+      response_preview_urls: [
+        "https://storage.example.test/signed/two-page-completed-paper.pdf?short-lived=true",
+      ],
+      extraction: {
+        schema_version: "1.0",
+        source_page_count: 2,
+        document: {
+          schema_version: "1.0",
+          question_set: {
+            title: "Two page paper",
+            subject: "English",
+            locale: "en",
+            difficulty: "standard",
+            source_mode: "convert",
+            estimated_minutes: 10,
+          },
+          knowledge_tags: [{ code: "grammar", label: "Grammar" }],
+          questions: [
+            {
+              position: 1,
+              type: "typed_text",
+              prompt: "Complete: She ___ to school.",
+              options: [],
+              answer_key: { text: "goes" },
+              rubric: { grading_mode: "exact" },
+              points: 1,
+              knowledge_code: "grammar",
+            },
+          ],
+        },
+        answer_regions: [
+          { question_position: 1, page_numbers: [2], legibility: "clear" },
+        ],
+      },
+      job: {
+        id: "analysis-job-pdf-1",
+        status: "succeeded",
+        type: "analyze_completed_worksheet",
+      },
+    });
+    mocks.confirmCompletedWorksheetImport.mockResolvedValue({
+      completed_worksheet: { id: "completed-pdf-1", status: "grading" },
+      question_set_id: "question-set-pdf-1",
+      assignment: { id: "assignment-pdf-1", status: "grading" },
+      attempt: { id: "attempt-pdf-1", submitted_at: "2026-08-02T00:00:00Z" },
+      grading_job: {
+        id: "grading-job-pdf-1",
+        status: "queued",
+        type: "grade_submission",
+      },
+    });
+
+    render(<CreateWorkspace />);
+
+    await screen.findByRole("heading", { name: "Preparing the review draft" });
+    expect(
+      screen.getByRole("link", {
+        name: "two-page-completed-paper.pdfOpen original",
+      }),
+    ).toHaveAttribute(
+      "href",
+      "https://storage.example.test/signed/two-page-completed-paper.pdf?short-lived=true",
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirm and start grading" }),
+    );
+
+    await waitFor(() => {
+      expect(mocks.confirmCompletedWorksheetImport).toHaveBeenCalledWith(
+        "completed-pdf-1",
+        expect.objectContaining({
+          responses: [
+            expect.objectContaining({
+              answer: expect.objectContaining({ page_numbers: [2] }),
+            }),
+          ],
+        }),
+        "parent-token",
+        "confirm-completed-completed-pdf-1",
+      );
+    });
+  });
+
   it("resumes an imported question-set review from its private recovery link", async () => {
     window.history.replaceState(
       {},

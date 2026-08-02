@@ -1,12 +1,14 @@
 import cv2
 import numpy as np
 import pytest
+from pypdf import PdfWriter
 
 from app.services.database_jobs import fixture_job_handler
 from app.services.paper_pipeline import (
     A4_PIXEL_SIZE,
     AnswerRegion,
     normalize_paper_scan,
+    render_pdf_pages,
     split_answer_regions,
 )
 
@@ -56,6 +58,21 @@ def test_paper_scan_is_rectified_to_a4_and_split_by_question_coordinates() -> No
     assert answers[0].question_id == "question-1"
     assert decoded_answer is not None
     assert decoded_answer.shape[0] > 400
+
+
+def test_completed_pdf_is_rendered_to_one_image_per_page(tmp_path) -> None:
+    """Whole-paper visual grading must see every PDF page in reading order."""
+    pdf_path = tmp_path / "completed-paper.pdf"
+    writer = PdfWriter()
+    writer.add_blank_page(width=612, height=792)
+    writer.add_blank_page(width=612, height=792)
+    with pdf_path.open("wb") as output:
+        writer.write(output)
+
+    pages = render_pdf_pages(pdf_path, tmp_path / "rendered")
+
+    assert [page.name for page in pages] == ["page-1.png", "page-2.png"]
+    assert all(cv2.imread(str(page)) is not None for page in pages)
 
 
 @pytest.mark.asyncio

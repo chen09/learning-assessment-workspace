@@ -1,3 +1,4 @@
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
@@ -9,6 +10,8 @@ from playwright.async_api import async_playwright
 from pypdf import PdfReader
 
 A4_PIXEL_SIZE = (1240, 1754)
+PDF_RENDER_DPI = 150
+MAX_PDF_RENDER_PAGES = 100
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +42,57 @@ def count_pdf_pages(pdf_bytes: bytes) -> int:
     from io import BytesIO
 
     return len(PdfReader(BytesIO(pdf_bytes)).pages)
+
+
+def render_pdf_pages(pdf_path: Path, destination: Path) -> list[Path]:
+    """Rasterize a bounded private PDF into ordered PNG pages for visual review.
+
+    The worker keeps both the original PDF and these temporary rendered pages
+    private. The PNGs live only in its temporary directory and are passed to the
+    visual adapter; neither paths nor rendered data are persisted.
+    """
+    try:
+        page_count = count_pdf_pages(pdf_path.read_bytes())
+    except Exception as error:
+        raise ValueError("The scan is not a readable PDF.") from error
+    if page_count < 1:
+        raise ValueError("The scan PDF has no pages.")
+    if page_count > MAX_PDF_RENDER_PAGES:
+        raise ValueError(
+            f"The scan PDF has more than {MAX_PDF_RENDER_PAGES} pages."
+        )
+
+    destination.mkdir(parents=True, exist_ok=True)
+    prefix = destination / "page"
+    try:
+        subprocess.run(
+            [
+                "pdftoppm",
+                "-png",
+                "-r",
+                str(PDF_RENDER_DPI),
+                "-f",
+                "1",
+                "-l",
+                str(page_count),
+                str(pdf_path),
+                str(prefix),
+            ],
+            check=True,
+            capture_output=True,
+            timeout=90,
+        )
+    except FileNotFoundError as error:
+        raise RuntimeError("PDF rendering is not available on this worker.") from error
+    except subprocess.CalledProcessError as error:
+        raise ValueError("The scan PDF could not be rendered.") from error
+    except subprocess.TimeoutExpired as error:
+        raise RuntimeError("PDF rendering timed out.") from error
+
+    pages = [destination / f"page-{index}.png" for index in range(1, page_count + 1)]
+    if not all(page.is_file() and page.stat().st_size > 0 for page in pages):
+        raise RuntimeError("PDF rendering did not create every worksheet page.")
+    return pages
 
 
 def _ordered_corners(points: NDArray[np.float32]) -> NDArray[np.float32]:
