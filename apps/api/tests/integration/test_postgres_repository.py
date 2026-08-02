@@ -15,6 +15,7 @@ from app.domain.errors import (
 from app.domain.models import (
     CompleteReviewRequest,
     CreateAssignmentRequest,
+    CreateCompletedWorksheetRequest,
     CreateDeletionRequest,
     CreateFamilyInvitationRequest,
     CreateImportRequest,
@@ -243,6 +244,40 @@ async def test_postgres_vertical_flow_and_family_isolation() -> None:
         assert lesson_draft.questions[0].prompt.endswith(
             "Emma ___ Leo are in the music club."
         )
+
+        completed_paper = await repository.create_completed_worksheet_import(
+            CreateCompletedWorksheetRequest(
+                family_id=family_a,
+                child_id=child_a,
+                title="Integration completed paper",
+                subject="Mathematics",
+                document_language="ja",
+                feedback_language="en",
+                filenames=["completed-algebra.jpg"],
+                response_paths=["family/responses/completed-algebra.jpg"],
+            ),
+            "integration-completed-paper",
+            str(parent_a),
+        )
+        completed_paper_summaries = (
+            await repository.list_completed_worksheet_imports(
+                family_a,
+                str(parent_a),
+            )
+        )
+        completed_paper_summary = next(
+            item
+            for item in completed_paper_summaries
+            if item.id == completed_paper.id
+        )
+        assert completed_paper_summary.child_nickname == "Alex"
+        assert completed_paper_summary.status.value == "processing"
+        assert completed_paper_summary.job_status.value == "queued"
+        with pytest.raises(NotFoundError):
+            await repository.list_completed_worksheet_imports(
+                family_a,
+                str(uuid4()),
+            )
 
         confirmed = await repository.confirm_question_set(
             str(imported.question_set_id),

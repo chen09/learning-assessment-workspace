@@ -545,6 +545,19 @@ class CompletedWorksheetImport(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+class FamilyCompletedWorksheetImport(BaseModel):
+    """Safe parent-facing summary used to recover an unfinished paper review."""
+
+    id: UUID
+    family_id: UUID
+    child_id: UUID
+    child_nickname: str
+    title: str
+    subject: str
+    status: CompletedWorksheetStatus
+    job_status: JobStatus
+
+
 class CompletedWorksheetResponseInput(BaseModel):
     """One reviewed answer region from an already-completed paper."""
 

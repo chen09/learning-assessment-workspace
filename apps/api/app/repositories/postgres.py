@@ -51,6 +51,7 @@ from app.domain.models import (
     DeletionRequestView,
     DemoBootstrap,
     Family,
+    FamilyCompletedWorksheetImport,
     FamilyInvitation,
     FamilyLibraryQuestionSet,
     HistoryItem,
@@ -3378,6 +3379,40 @@ class PostgresRepository:
                 **dict(imported),
                 job=Job(**dict(job)),
             )
+
+    async def list_completed_worksheet_imports(
+        self,
+        family_id: UUID,
+        parent_id: str,
+    ) -> list[FamilyCompletedWorksheetImport]:
+        async with self._engine.connect() as connection:
+            await self._require_parent(connection, parent_id, family_id)
+            result = await connection.execute(
+                text(
+                    """
+                    select cwi.id, cwi.family_id, cwi.child_id,
+                           c.nickname as child_nickname, cwi.title, cwi.subject,
+                           cwi.status, latest_job.status as job_status
+                    from public.completed_worksheet_imports cwi
+                    join public.children c on c.id = cwi.child_id
+                    join lateral (
+                      select status
+                      from public.jobs
+                      where subject_id = cwi.id
+                        and type = 'analyze_completed_worksheet'
+                      order by created_at desc
+                      limit 1
+                    ) latest_job on true
+                    where cwi.family_id = :family_id
+                    order by cwi.created_at desc
+                    """
+                ),
+                {"family_id": family_id},
+            )
+            return [
+                FamilyCompletedWorksheetImport(**dict(row))
+                for row in result.mappings().all()
+            ]
 
     async def confirm_completed_worksheet_import(
         self,

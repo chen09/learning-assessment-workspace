@@ -8,7 +8,9 @@ import { AppShell } from "@/components/app-shell";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { useLanguage } from "@/components/language-provider";
 import {
+  getCompletedWorksheetImports,
   getFamilyHistory,
+  type FamilyCompletedWorksheetImport,
   type ParentHistoryItem,
   getParentAccessToken,
   stopAssignment,
@@ -42,6 +44,9 @@ export default function ParentHistoryPage() {
 function ParentHistoryContent() {
   const { t } = useLanguage();
   const [items, setItems] = useState<ParentHistoryItem[]>([]);
+  const [completedWorksheetImports, setCompletedWorksheetImports] = useState<
+    FamilyCompletedWorksheetImport[]
+  >([]);
   const [childFilter, setChildFilter] = useState("all");
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [actionAssignmentId, setActionAssignmentId] = useState<string | null>(
@@ -74,9 +79,13 @@ function ParentHistoryContent() {
           }
           return;
         }
-        const historyItems = await getFamilyHistory(familyId, token);
+        const [historyItems, paperImports] = await Promise.all([
+          getFamilyHistory(familyId, token),
+          getCompletedWorksheetImports(familyId, token),
+        ]);
         if (active) {
           setItems(historyItems);
+          setCompletedWorksheetImports(paperImports);
           setLoadState("ready");
         }
       } catch {
@@ -98,6 +107,17 @@ function ParentHistoryContent() {
     childFilter === "all"
       ? items
       : items.filter((item) => item.child_id === childFilter);
+  const recoverablePaperImports = completedWorksheetImports.filter((item) =>
+    ["processing", "needs_review", "failed"].includes(item.status),
+  );
+  const paperImportStatusLabel = (status: string) =>
+    t(
+      status === "needs_review"
+        ? "parentHistory.paperNeedsReview"
+        : status === "failed"
+          ? "parentHistory.paperFailed"
+          : "parentHistory.paperProcessing",
+    );
 
   const updateAssignmentStatus = async (
     item: ParentHistoryItem,
@@ -164,6 +184,49 @@ function ParentHistoryContent() {
           </button>
         ))}
       </section>
+      {loadState === "ready" && recoverablePaperImports.length > 0 ? (
+        <section
+          aria-labelledby="pending-paper-imports-title"
+          className="record-table paper-review-table"
+        >
+          <header>
+            <h2 id="pending-paper-imports-title">
+              {t("parentHistory.paperImportsTitle")}
+            </h2>
+            <p>{t("parentHistory.paperImportsDescription")}</p>
+          </header>
+          {recoverablePaperImports.map((item) => (
+            <article key={item.id}>
+              <span className="record-icon">
+                {item.status === "processing" ? <Clock3 /> : <FileCheck2 />}
+              </span>
+              <div>
+                <p>
+                  {item.child_nickname} · {item.subject}
+                </p>
+                <h2>{item.title}</h2>
+              </div>
+              <span
+                className={
+                  item.status === "needs_review" || item.status === "failed"
+                    ? "status-pill warm"
+                    : "status-pill"
+                }
+              >
+                {paperImportStatusLabel(item.status)}
+              </span>
+              <Link
+                className="record-action"
+                href={`/parent/create/?completedWorksheetId=${encodeURIComponent(
+                  item.id,
+                )}`}
+              >
+                {t("parentHistory.paperContinue")}
+              </Link>
+            </article>
+          ))}
+        </section>
+      ) : null}
       <section className="record-table">
         {loadState === "loading" ? <p>{t("parentHistory.loading")}</p> : null}
         {loadState === "missing" ? (

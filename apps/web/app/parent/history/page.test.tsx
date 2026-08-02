@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import ParentHistoryPage from "./page";
 
 const mocks = vi.hoisted(() => ({
+  getCompletedWorksheetImports: vi.fn(),
   getFamilyHistory: vi.fn(),
   getParentAccessToken: vi.fn(),
   stopAssignment: vi.fn(),
@@ -15,6 +16,7 @@ vi.mock("@/lib/api-client", async (importOriginal) => {
     await importOriginal<typeof import("@/lib/api-client")>();
   return {
     ...original,
+    getCompletedWorksheetImports: mocks.getCompletedWorksheetImports,
     getFamilyHistory: mocks.getFamilyHistory,
     getParentAccessToken: mocks.getParentAccessToken,
     stopAssignment: mocks.stopAssignment,
@@ -34,6 +36,8 @@ describe("ParentHistoryPage", () => {
     window.localStorage.clear();
     mocks.getFamilyHistory.mockReset();
     mocks.getFamilyHistory.mockReturnValue(new Promise(() => undefined));
+    mocks.getCompletedWorksheetImports.mockReset();
+    mocks.getCompletedWorksheetImports.mockResolvedValue([]);
     mocks.stopAssignment.mockReset();
     mocks.withdrawAssignment.mockReset();
   });
@@ -63,6 +67,37 @@ describe("ParentHistoryPage", () => {
     expect(await screen.findByText("目前还没有家庭学习记录。"))
       .toBeInTheDocument();
     expect(screen.queryByText("Completed, grading, and archived work for every child in this family.")).not.toBeInTheDocument();
+  });
+
+  it("lets a parent reopen a paper upload that still needs review", async () => {
+    mocks.getFamilyHistory.mockResolvedValue([]);
+    mocks.getCompletedWorksheetImports.mockResolvedValue([
+      {
+        id: "completed-paper-1",
+        family_id: "family-1",
+        child_id: "child-1",
+        child_nickname: "Alex",
+        title: "Scanned factorisation practice",
+        subject: "Mathematics",
+        status: "needs_review",
+        job_status: "succeeded",
+      },
+    ]);
+
+    render(<ParentHistoryPage />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Paper uploads to review" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Scanned factorisation practice" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Continue paper review" }),
+    ).toHaveAttribute(
+      "href",
+      "/parent/create?completedWorksheetId=completed-paper-1",
+    );
   });
 
   it("lets a parent withdraw work that has not started", async () => {

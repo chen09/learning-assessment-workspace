@@ -118,6 +118,17 @@ export type CompletedWorksheetImport = {
   job: { id: string; status: string; type: string };
 };
 
+export type FamilyCompletedWorksheetImport = {
+  id: string;
+  family_id: string;
+  child_id: string;
+  child_nickname: string;
+  title: string;
+  subject: string;
+  status: "processing" | "needs_review" | "grading" | "results_ready" | "failed";
+  job_status: "queued" | "running" | "succeeded" | "failed";
+};
+
 const CHILD_TOKEN_KEY = "luma-child-session";
 const CHILD_PROFILE_KEY = "luma-child-profile";
 
@@ -1331,6 +1342,17 @@ export async function getCompletedWorksheetImport(
 ) {
   return apiRequest<CompletedWorksheetImport>(
     `/v1/completed-worksheets/${encodeURIComponent(worksheetId)}`,
+    { method: "GET" },
+    parentToken,
+  );
+}
+
+export async function getCompletedWorksheetImports(
+  familyId: string,
+  parentToken: string,
+) {
+  return apiRequest<FamilyCompletedWorksheetImport[]>(
+    `/v1/completed-worksheets/families/${encodeURIComponent(familyId)}`,
     { method: "GET" },
     parentToken,
   );

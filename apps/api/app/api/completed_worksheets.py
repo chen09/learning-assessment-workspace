@@ -11,6 +11,7 @@ from app.domain.models import (
     CompletedWorksheetImport,
     CompletedWorksheetResponseInput,
     CreateCompletedWorksheetRequest,
+    FamilyCompletedWorksheetImport,
 )
 from app.tools.import_question_set import ImportDocument
 
@@ -64,6 +65,28 @@ async def create_completed_worksheet_import(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="The selected family or child is not available.",
+        ) from error
+
+
+@router.get(
+    "/families/{family_id}",
+    response_model=list[FamilyCompletedWorksheetImport],
+)
+async def list_completed_worksheet_imports(
+    family_id: UUID,
+    repository: Annotated[Repository, Depends(get_repository)],
+    parent_id: Annotated[str, Depends(require_parent)],
+) -> list[FamilyCompletedWorksheetImport]:
+    """List recoverable paper-analysis drafts without returning private media paths."""
+    try:
+        return await repository.list_completed_worksheet_imports(
+            family_id,
+            parent_id,
+        )
+    except NotFoundError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The selected family is not available.",
         ) from error
 
 

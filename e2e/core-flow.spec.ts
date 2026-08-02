@@ -1025,6 +1025,82 @@ test("parent can return to an imported question-set review from its recovery lin
   ).toBeVisible();
 });
 
+test("parent recovers an unfinished completed-paper review from history", async ({
+  page,
+  request,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "The paper-recovery flow runs once; responsive history layout has component coverage.",
+  );
+  const apiBaseUrl = "http://127.0.0.1:8017";
+  const fixtureKey = `e2e-paper-recovery-${testInfo.workerIndex}`;
+  const parentHeaders = { Authorization: "Bearer parent-fixture" };
+  const family = (await (
+    await request.post(`${apiBaseUrl}/v1/families`, {
+      headers: { ...parentHeaders, "Idempotency-Key": `${fixtureKey}-family` },
+      data: { name: "Paper recovery family" },
+    })
+  ).json()) as { id: string };
+  const child = (await (
+    await request.post(`${apiBaseUrl}/v1/families/${family.id}/children`, {
+      headers: { ...parentHeaders, "Idempotency-Key": `${fixtureKey}-child` },
+      data: {
+        nickname: "Recovery child",
+        grade_stage: "Junior high 1",
+        ui_language: "en",
+        pin: "123456",
+      },
+    })
+  ).json()) as { id: string };
+  const created = await request.post(`${apiBaseUrl}/v1/completed-worksheets`, {
+    headers: {
+      ...parentHeaders,
+      "Idempotency-Key": `${fixtureKey}-completed-paper`,
+    },
+    data: {
+      family_id: family.id,
+      child_id: child.id,
+      title: "Unfinished factorisation paper",
+      subject: "Mathematics",
+      document_language: "ja",
+      feedback_language: "en",
+      filenames: ["unfinished-factorisation.jpg"],
+      response_paths: ["family/responses/unfinished-factorisation.jpg"],
+    },
+  });
+  expect(created.ok(), await created.text()).toBeTruthy();
+  const completedPaper = (await created.json()) as { id: string };
+
+  const processed = await request.post(
+    `${apiBaseUrl}/v1/demo/jobs/process-next`,
+    { headers: parentHeaders },
+  );
+  expect(processed.ok(), await processed.text()).toBeTruthy();
+
+  await page.goto(`/parent/history/?familyId=${encodeURIComponent(family.id)}`);
+  const recoveryLink = page.getByRole("link", {
+    name: "Continue paper review",
+  });
+  await expect(recoveryLink).toHaveAttribute(
+    "href",
+    `/parent/create/?completedWorksheetId=${completedPaper.id}`,
+  );
+  await expect(
+    page.getByRole("heading", { name: "Unfinished factorisation paper" }),
+  ).toBeVisible();
+  await recoveryLink.click();
+  await expect(page).toHaveURL(
+    new RegExp(`completedWorksheetId=${encodeURIComponent(completedPaper.id)}`),
+  );
+  await expect(
+    page.getByRole("heading", { name: "Preparing the review draft" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Copy local AI prompt" }),
+  ).toBeVisible();
+});
+
 test("parent validates a local-AI completed-paper review before submitting it", async ({
   page,
   request,

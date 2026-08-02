@@ -143,6 +143,49 @@ def test_parent_can_start_completed_worksheet_analysis_for_a_child() -> None:
     assert refreshed.json()["job"]["status"] == "succeeded"
 
 
+def test_parent_can_reopen_a_pending_completed_worksheet_from_the_family_list() -> None:
+    """A parent must be able to recover a paper-analysis draft after leaving its page."""
+    client = TestClient(create_app())
+    fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+
+    created = client.post(
+        "/v1/completed-worksheets",
+        headers={
+            **PARENT_HEADERS,
+            "Idempotency-Key": "list-pending-completed-worksheet",
+        },
+        json={
+            "family_id": fixture["family"]["id"],
+            "child_id": fixture["child"]["id"],
+            "title": "Scanned algebra practice",
+            "subject": "Mathematics",
+            "document_language": "ja",
+            "feedback_language": "en",
+            "filenames": ["algebra-practice.jpg"],
+            "response_paths": ["family/responses/algebra-practice.jpg"],
+        },
+    )
+    listed = client.get(
+        f"/v1/completed-worksheets/families/{fixture['family']['id']}",
+        headers=PARENT_HEADERS,
+    )
+
+    assert created.status_code == 202
+    assert listed.status_code == 200
+    assert listed.json() == [
+        {
+            "id": created.json()["id"],
+            "family_id": fixture["family"]["id"],
+            "child_id": fixture["child"]["id"],
+            "child_nickname": fixture["child"]["nickname"],
+            "title": "Scanned algebra practice",
+            "subject": "Mathematics",
+            "status": "processing",
+            "job_status": "queued",
+        }
+    ]
+
+
 def test_parent_can_retry_a_failed_completed_worksheet_analysis() -> None:
     """Retry returns the private paper to a pollable processing state."""
     application = create_app()

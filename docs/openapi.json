@@ -1218,6 +1218,56 @@
         "title": "Family",
         "type": "object"
       },
+      "FamilyCompletedWorksheetImport": {
+        "description": "Safe parent-facing summary used to recover an unfinished paper review.",
+        "properties": {
+          "child_id": {
+            "format": "uuid",
+            "title": "Child Id",
+            "type": "string"
+          },
+          "child_nickname": {
+            "title": "Child Nickname",
+            "type": "string"
+          },
+          "family_id": {
+            "format": "uuid",
+            "title": "Family Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "job_status": {
+            "$ref": "#/components/schemas/JobStatus"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CompletedWorksheetStatus"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "family_id",
+          "child_id",
+          "child_nickname",
+          "title",
+          "subject",
+          "status",
+          "job_status"
+        ],
+        "title": "FamilyCompletedWorksheetImport",
+        "type": "object"
+      },
       "FamilyInvitation": {
         "properties": {
           "accepted_at": {
@@ -5071,6 +5121,70 @@
           }
         },
         "summary": "Create Completed Worksheet Import",
+        "tags": [
+          "completed-worksheets"
+        ]
+      }
+    },
+    "/v1/completed-worksheets/families/{family_id}": {
+      "get": {
+        "description": "List recoverable paper-analysis drafts without returning private media paths.",
+        "operationId": "list_completed_worksheet_imports_v1_completed_worksheets_families__family_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "family_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Family Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FamilyCompletedWorksheetImport"
+                  },
+                  "title": "Response List Completed Worksheet Imports V1 Completed Worksheets Families  Family Id  Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Completed Worksheet Imports",
         "tags": [
           "completed-worksheets"
         ]

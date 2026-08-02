@@ -42,6 +42,7 @@ from app.domain.models import (
     DeletionRequestView,
     DemoBootstrap,
     Family,
+    FamilyCompletedWorksheetImport,
     FamilyInvitation,
     FamilyLibraryQuestionSet,
     HistoryItem,
@@ -1588,6 +1589,40 @@ class MemoryRepository:
             raise NotFoundError
         imported.job = job
         return imported
+
+    async def list_completed_worksheet_imports(
+        self,
+        family_id: UUID,
+        parent_id: str,
+    ) -> list[FamilyCompletedWorksheetImport]:
+        family_key = str(family_id)
+        if parent_id not in self.family_parents.get(family_key, set()):
+            raise NotFoundError
+        summaries: list[FamilyCompletedWorksheetImport] = []
+        for imported in sorted(
+            self.completed_worksheet_imports.values(),
+            key=lambda item: item.created_at,
+            reverse=True,
+        ):
+            if imported.family_id != family_id:
+                continue
+            child = self.children.get(str(imported.child_id))
+            job = self.jobs.get(str(imported.job.id))
+            if child is None or job is None:
+                continue
+            summaries.append(
+                FamilyCompletedWorksheetImport(
+                    id=imported.id,
+                    family_id=imported.family_id,
+                    child_id=imported.child_id,
+                    child_nickname=child.nickname,
+                    title=imported.title,
+                    subject=imported.subject,
+                    status=imported.status,
+                    job_status=job.status,
+                )
+            )
+        return summaries
 
     async def import_structured_question_set(
         self,
