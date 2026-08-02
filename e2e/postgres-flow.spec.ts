@@ -284,7 +284,9 @@ test("verified parent completes the family assignment flow on PostgreSQL", async
     await expect(page.getByText("Try once more")).toBeVisible({
       timeout: 30_000,
     });
-    await expect(page.getByText("Waiting for a parent")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Waiting for a parent" }),
+    ).toBeVisible();
 
     const attemptId = new URL(page.url()).searchParams.get("attemptId");
     expect(attemptId).toBeTruthy();
