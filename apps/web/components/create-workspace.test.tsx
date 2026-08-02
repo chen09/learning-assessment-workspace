@@ -446,11 +446,11 @@ describe("CreateWorkspace", () => {
       screen.getByRole("heading", { name: "If it rains, stay home." }),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByLabelText("Exam mode"));
+    fireEvent.click(screen.getByRole("radio", { name: "Timed exam" }));
     fireEvent.change(screen.getByLabelText("Time limit"), {
       target: { value: "30" },
     });
-    fireEvent.change(screen.getByLabelText("A note for your child"), {
+    fireEvent.change(screen.getByLabelText("A note for your child (optional)"), {
       target: { value: "Finish this independently first." },
     });
 

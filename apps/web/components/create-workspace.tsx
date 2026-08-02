@@ -2123,7 +2123,7 @@ function CreateWorkspaceContent() {
                     <label>
                       {t("draftReview.questionWording")}
                       <textarea
-                        aria-label="Question wording"
+                        aria-label={t("draftReview.questionWording")}
                         onChange={(event) =>
                           setEditedQuestionPrompt(event.target.value)
                         }
@@ -2134,7 +2134,7 @@ function CreateWorkspaceContent() {
                     <label>
                       {t("draftReview.points")}
                       <input
-                        aria-label="Points"
+                        aria-label={t("draftReview.points")}
                         min="0.5"
                         onChange={(event) =>
                           setEditedQuestionPoints(event.target.value)
@@ -2147,7 +2147,7 @@ function CreateWorkspaceContent() {
                     <label>
                       {t("draftReview.responseType")}
                       <select
-                        aria-label="Response type"
+                        aria-label={t("draftReview.responseType")}
                         onChange={(event) =>
                           setEditedQuestionType(
                             event.target.value as ManualQuestionType,
@@ -2170,7 +2170,7 @@ function CreateWorkspaceContent() {
                       <label>
                         {t("draftReview.choices")}
                         <textarea
-                          aria-label="Choices, one per line"
+                          aria-label={t("draftReview.choices")}
                           onChange={(event) =>
                             setEditedQuestionOptions(event.target.value)
                           }
@@ -2237,7 +2237,9 @@ function CreateWorkspaceContent() {
                         {t("draftReview.privateAudio")}
                         <input
                           accept="audio/mpeg,audio/mp4,.mp3,.m4a,.mp4"
-                          aria-label={`Audio for question ${index + 1}`}
+                          aria-label={t("draftReview.audioForQuestion", {
+                            number: index + 1,
+                          })}
                           onChange={(event) => {
                             const file = event.target.files?.[0];
                             if (!file) {
@@ -2354,7 +2356,7 @@ function CreateWorkspaceContent() {
                 <legend>{t("draftReview.settings")}</legend>
                 <label>
                   <input
-                    aria-label="Practice mode"
+                    aria-label={t("draftReview.practiceMode")}
                     checked={assignmentMode === "practice"}
                     name="assignment-mode"
                     onChange={() => setAssignmentMode("practice")}
@@ -2364,7 +2366,7 @@ function CreateWorkspaceContent() {
                 </label>
                 <label>
                   <input
-                    aria-label="Exam mode"
+                    aria-label={t("draftReview.examMode")}
                     checked={assignmentMode === "exam"}
                     name="assignment-mode"
                     onChange={() => setAssignmentMode("exam")}
@@ -2376,7 +2378,7 @@ function CreateWorkspaceContent() {
                   <label>
                     {t("draftReview.timeLimit")}
                     <select
-                      aria-label="Time limit"
+                      aria-label={t("draftReview.timeLimit")}
                       onChange={(event) =>
                         setAssignmentDurationMinutes(event.target.value)
                       }
@@ -2395,7 +2397,7 @@ function CreateWorkspaceContent() {
                 <label className="assignment-note">
                   {t("draftReview.note")}
                   <textarea
-                    aria-label="A note for your child"
+                    aria-label={t("draftReview.note")}
                     maxLength={300}
                     onChange={(event) => setAssignmentNote(event.target.value)}
                     placeholder={t("draftReview.notePlaceholder")}
