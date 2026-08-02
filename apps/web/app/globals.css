@@ -2382,10 +2382,6 @@ button {
     padding-inline: 0;
   }
 
-  .canvas-toolbar .canvas-clear-button span {
-    display: none;
-  }
-
   .shell-tools {
     position: relative;
     z-index: 2;
@@ -2625,6 +2621,12 @@ button {
   .landing-assurances > div + div {
     border-top: 1px solid var(--line);
     border-left: 0;
+  }
+}
+
+@media (max-width: 559px) {
+  .canvas-toolbar .canvas-clear-button span {
+    display: none;
   }
 }
 

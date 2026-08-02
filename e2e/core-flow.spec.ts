@@ -2182,7 +2182,13 @@ test("parent creation reaches child grading and correction through the API", asy
     name: "Clear handwriting",
   });
   if (testInfo.project.name.startsWith("ipad-")) {
+    // Some iPad browser layouts are narrower than the nominal device
+    // viewport once browser chrome and safe areas are accounted for. The
+    // destructive action must remain labelled, not become an unexplained
+    // trash-only icon next to an answer canvas.
+    await page.setViewportSize({ width: 744, height: 1_080 });
     await expect(clearHandwriting).toHaveText("Clear handwriting");
+    await expect(clearHandwriting.locator("span")).toBeVisible();
   }
   const undoHandwriting = page.getByRole("button", { name: "Undo" });
   await expect(undoHandwriting).toBeEnabled();
