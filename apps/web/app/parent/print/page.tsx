@@ -5,6 +5,8 @@ import { ArrowLeft, Printer } from "lucide-react";
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
 
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { useLanguage } from "@/components/language-provider";
 import {
   type ApiQuestion,
   getParentAccessToken,
@@ -13,12 +15,62 @@ import {
 
 type LoadState = "loading" | "ready" | "missing" | "error";
 
+type PrintablePage = {
+  questions: ApiQuestion[];
+};
+
+// The inner A4 height has to leave room for the title block and footer. Keep
+// handwriting deliberately conservative so a browser never splits its answer
+// lines across pages when parents print at 100% scale.
+const PAGE_CAPACITY = 54;
+
+function questionFootprint(question: ApiQuestion) {
+  if (question.type === "handwriting" || question.type === "photo") {
+    return 18;
+  }
+
+  if (question.options) {
+    return 8 + question.options.length * 2;
+  }
+
+  return 10;
+}
+
+function splitIntoPrintablePages(questions: ApiQuestion[]): PrintablePage[] {
+  const pages: PrintablePage[] = [];
+  let page: ApiQuestion[] = [];
+  let usedCapacity = 0;
+
+  for (const question of questions) {
+    const footprint = questionFootprint(question);
+    if (page.length > 0 && usedCapacity + footprint > PAGE_CAPACITY) {
+      pages.push({ questions: page });
+      page = [];
+      usedCapacity = 0;
+    }
+    page.push(question);
+    usedCapacity += footprint;
+  }
+
+  if (page.length > 0) {
+    pages.push({ questions: page });
+  }
+
+  return pages;
+}
+
+function answerLineCount(question: ApiQuestion) {
+  return question.type === "handwriting" || question.type === "photo" ? 4 : 2;
+}
+
 export default function PrintWorksheetPage() {
+  const { t } = useLanguage();
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [setCode, setSetCode] = useState("");
   const [title, setTitle] = useState("");
   const [questions, setQuestions] = useState<ApiQuestion[]>([]);
   const [loadState, setLoadState] = useState<LoadState>("loading");
+  const printablePages = splitIntoPrintablePages(questions);
 
   useEffect(() => {
     let active = true;
@@ -80,102 +132,116 @@ export default function PrintWorksheetPage() {
     <main className="print-preview">
       <header className="print-controls">
         <Link className="button ghost" href="/parent/create/">
-          <ArrowLeft /> Back
+          <ArrowLeft /> {t("print.back")}
         </Link>
-        <p>
-          Print on A4 at 100% scale. The QR code links scans to this assignment.
-        </p>
-        <button
-          className="button primary"
-          disabled={loadState !== "ready"}
-          onClick={() => window.print()}
-          type="button"
-        >
-          <Printer /> Print
-        </button>
+        <p>{t("print.instructions")}</p>
+        <div className="print-actions">
+          <LanguageSwitcher />
+          <button
+            className="button primary"
+            disabled={loadState !== "ready"}
+            onClick={() => window.print()}
+            type="button"
+          >
+            <Printer /> {t("print.action")}
+          </button>
+        </div>
       </header>
       {loadState === "loading" ? (
         <section className="a4-sheet">
-          <h1>Loading printable assignment…</h1>
-          <p>The worksheet will appear after its questions are loaded.</p>
+          <h1>{t("print.loadingTitle")}</h1>
+          <p>{t("print.loadingDescription")}</p>
         </section>
       ) : null}
       {loadState === "missing" ? (
         <section className="a4-sheet">
-          <h1>No printable assignment selected</h1>
-          <p>Open an assigned worksheet before using the print view.</p>
+          <h1>{t("print.missingTitle")}</h1>
+          <p>{t("print.missingDescription")}</p>
         </section>
       ) : null}
       {loadState === "error" ? (
         <section className="a4-sheet">
-          <h1>Printable assignment could not be loaded</h1>
-          <p>Return to the family workspace and try again.</p>
+          <h1>{t("print.errorTitle")}</h1>
+          <p>{t("print.errorDescription")}</p>
         </section>
       ) : null}
       {loadState === "ready" ? (
-        <article className="a4-sheet" data-template-version="a4-v1">
-          <div className="registration-mark top-left" />
-          <div className="registration-mark top-right" />
-          <header>
-            <div>
-              <p>LUMA FAMILY LEARNING</p>
-              <h1>{title}</h1>
-            </div>
-            <div
-              aria-label="Assignment QR code"
-              className="qr-placeholder"
-              role="img"
-              style={
-                qrCode
-                  ? {
-                      backgroundImage: `url(${qrCode})`,
-                      backgroundPosition: "center",
-                      backgroundRepeat: "no-repeat",
-                      backgroundSize: "contain",
-                    }
-                  : undefined
-              }
-            >
-              {qrCode ? null : "▦"}
-            </div>
-          </header>
-          <div className="paper-meta">
-            <span>Name: ____________________</span>
-            <span>Date: ____________________</span>
-          </div>
-          {questions.map((question) => (
-            <section
-              className="paper-question"
-              data-answer-region={question.id}
-              key={question.id}
-            >
-              <span>{question.position}</span>
+        printablePages.map((page, pageIndex) => (
+          <article
+            className="a4-sheet"
+            data-page-number={pageIndex + 1}
+            data-template-version="a4-v1"
+            key={`print-page-${pageIndex + 1}`}
+          >
+            <div className="registration-mark top-left" />
+            <div className="registration-mark top-right" />
+            <header>
               <div>
-                <h2>{question.prompt}</h2>
-                {question.options?.map((option, index) => (
-                  <p key={option}>
-                    ○ {String.fromCharCode(65 + index)} &nbsp; {option}
-                  </p>
-                ))}
-                {!question.options ? (
-                  <div className="paper-lines">
-                    {Array.from(
-                      {
-                        length: question.type === "handwriting" ? 4 : 2,
-                      },
-                      (_, index) => (
-                        <i key={index} />
-                      ),
-                    )}
-                  </div>
-                ) : null}
+                <p>{t("print.brand")}</p>
+                <h1>{title}</h1>
               </div>
-            </section>
-          ))}
-          <footer>Set {setCode} · Page 1 / 1 · Template a4-v1</footer>
-          <div className="registration-mark bottom-left" />
-          <div className="registration-mark bottom-right" />
-        </article>
+              <div
+                aria-label={t("print.qrCode")}
+                className="qr-placeholder"
+                role="img"
+                style={
+                  qrCode
+                    ? {
+                        backgroundImage: `url(${qrCode})`,
+                        backgroundPosition: "center",
+                        backgroundRepeat: "no-repeat",
+                        backgroundSize: "contain",
+                      }
+                    : undefined
+                }
+              >
+                {qrCode ? null : "▦"}
+              </div>
+            </header>
+            <div className="paper-meta">
+              <span>{t("print.name")}: ____________________</span>
+              <span>{t("print.date")}: ____________________</span>
+            </div>
+            {page.questions.map((question) => (
+              <section
+                className="paper-question"
+                data-answer-page={pageIndex + 1}
+                data-answer-region={question.id}
+                key={question.id}
+              >
+                <span>{question.position}</span>
+                <div>
+                  <h2>{question.prompt}</h2>
+                  {question.options?.map((option, index) => (
+                    <p key={option}>
+                      ○ {String.fromCharCode(65 + index)} &nbsp; {option}
+                    </p>
+                  ))}
+                  {!question.options ? (
+                    <div className="paper-lines">
+                      {Array.from(
+                        { length: answerLineCount(question) },
+                        (_, index) => (
+                          <i key={index} />
+                        ),
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+              </section>
+            ))}
+            <footer>
+              {t("print.pageFooter", {
+                set: setCode,
+                page: pageIndex + 1,
+                total: printablePages.length,
+                version: "a4-v1",
+              })}
+            </footer>
+            <div className="registration-mark bottom-left" />
+            <div className="registration-mark bottom-right" />
+          </article>
+        ))
       ) : null}
     </main>
   );

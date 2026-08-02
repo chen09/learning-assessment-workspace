@@ -261,7 +261,12 @@ test("parent reassigns a confirmed library set with an exam limit", async ({
   await expect(
     page.getByRole("link", { name: "Print A4 worksheet" }),
   ).toHaveAttribute("href", /\/parent\/print\/?\?assignmentId=/);
+  await page.getByRole("link", { name: "Print A4 worksheet" }).click();
+  await expect(page.getByRole("heading", { name: "Reusable algebra check" })).toBeVisible();
+  await expect(page.getByText(/Page 1 \/ 1/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Print" })).toBeEnabled();
 
+  await page.goto(`/parent/library/?familyId=${encodeURIComponent(family.id)}`);
   await page.getByRole("button", { name: "Submit to public review" }).click();
   await expect(
     page.getByRole("heading", { name: "Submit “Reusable algebra check”" }),

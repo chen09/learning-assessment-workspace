@@ -3964,6 +3964,12 @@ button {
   margin: 0 auto 1rem;
 }
 
+.print-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
 .print-controls p {
   color: #50545a;
   font-size: 0.7rem;
@@ -3977,6 +3983,13 @@ button {
   background: white;
   box-shadow: 0 12px 45px rgb(0 0 0 / 18%);
   padding: 17mm;
+  break-after: page;
+  page-break-after: always;
+}
+
+.a4-sheet:last-child {
+  break-after: auto;
+  page-break-after: auto;
 }
 
 .a4-sheet > header {
@@ -4025,6 +4038,8 @@ button {
   gap: 3mm;
   border-top: 1px solid #999;
   padding: 6mm 0;
+  break-inside: avoid;
+  page-break-inside: avoid;
 }
 
 .paper-question > span {
