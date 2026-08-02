@@ -93,6 +93,48 @@ describe("ChildResultsPage", () => {
     expect(mocks.getAttemptResults).toHaveBeenCalledTimes(2);
   });
 
+  it("clears a previous attempt before loading a different result", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/child/results/?attemptId=first-attempt",
+    );
+    mocks.getAttemptResults
+      .mockResolvedValueOnce({
+        complete: true,
+        results: [
+          {
+            id: "first-result",
+            question_id: "question-1",
+            outcome: "correct",
+            awarded_points: 1,
+            confidence: 1,
+            feedback: { summary: "First attempt feedback." },
+          },
+        ],
+      })
+      .mockReturnValueOnce(new Promise<never>(() => undefined));
+
+    const { rerender } = render(<ChildResultsPage />);
+
+    expect(
+      await screen.findByText("First attempt feedback."),
+    ).toBeInTheDocument();
+
+    window.history.replaceState(
+      {},
+      "",
+      "/child/results/?attemptId=second-attempt",
+    );
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    rerender(<ChildResultsPage />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Almost ready" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("First attempt feedback.")).not.toBeInTheDocument();
+  });
+
   it("shows result and correction states in Chinese", async () => {
     window.localStorage.setItem("luma-language:demo-child", "zh");
     window.history.replaceState(

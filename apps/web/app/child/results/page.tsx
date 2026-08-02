@@ -19,6 +19,10 @@ import {
 } from "@/lib/api-client";
 
 const subscribeToHydration = () => () => undefined;
+const subscribeToAttemptId = (notify: () => void) => {
+  window.addEventListener("popstate", notify);
+  return () => window.removeEventListener("popstate", notify);
+};
 const getRequestedAttemptId = () =>
   new URLSearchParams(window.location.search).get("attemptId");
 const getServerAttemptId = () => null;
@@ -39,7 +43,7 @@ function ChildResultsContent() {
     () => false,
   );
   const requestedAttemptId = useSyncExternalStore(
-    subscribeToHydration,
+    subscribeToAttemptId,
     getRequestedAttemptId,
     getServerAttemptId,
   );
@@ -121,10 +125,11 @@ function ChildResultsContent() {
   const correctionCount = results.filter(
     (result) => result.outcome !== "correct",
   ).length;
-  const visibleComplete = loadState === "ready";
+  const visibleComplete =
+    loadState === "ready" && attemptId === requestedAttemptId;
   const resultLoadFailed = loadState === "error";
   const correctionActionReady =
-    hydrated && loadState === "ready" && Boolean(attemptId);
+    hydrated && visibleComplete && Boolean(attemptId);
   const correctionButtonLabel =
     !correctionActionReady || correctionStatus === "working"
       ? t("results.preparingCorrections")
