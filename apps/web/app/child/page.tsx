@@ -246,6 +246,14 @@ function ChildHomeContent() {
                   ? t("childHome.refreshing")
                   : t("childHome.refresh")}
               </button>
+            ) : loadState === "error" ? (
+              <button
+                className="button primary"
+                onClick={() => void refreshPlan()}
+                type="button"
+              >
+                {t("worksheet.retryLoad")}
+              </button>
             ) : null}
           </div>
         </section>

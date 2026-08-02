@@ -157,4 +157,24 @@ describe("ChildHomePage", () => {
       screen.getByRole("heading", { name: "Algebra & English warm-up" }),
     ).toBeInTheDocument();
   });
+
+  it("lets a child retry a temporarily unavailable plan without reloading", async () => {
+    mocks.getChildAssignments
+      .mockRejectedValueOnce(new Error("network unavailable"))
+      .mockResolvedValueOnce([assignment]);
+
+    render(<ChildHomePage />);
+
+    expect(await screen.findByText("无法打开这份练习。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "重试" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "重试" }));
+
+    await waitFor(() => {
+      expect(mocks.getChildAssignments).toHaveBeenCalledTimes(2);
+    });
+    expect(
+      screen.getByRole("heading", { name: "Algebra & English warm-up" }),
+    ).toBeInTheDocument();
+  });
 });
