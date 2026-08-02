@@ -77,4 +77,27 @@ describe("private draft queue", () => {
 
     expect(onSynced).toHaveBeenCalledWith(request, 4);
   });
+
+  it("reports a rejected draft without discarding it", async () => {
+    const request = {
+      attemptId: "attempt-a",
+      questionId: "question-1",
+      payload: {
+        kind: "text" as const,
+        answer: { text: "goes" },
+        expected_version: 0,
+      },
+    };
+    await savePendingDraft("attempt-a:question-1", { text: "goes" }, request);
+    const conflict = new Error('{"detail":{"code":"response_version_conflict"}}');
+    mocks.saveAttemptResponse.mockRejectedValue(conflict);
+    const onRejected = vi.fn();
+
+    await expect(
+      syncPendingDrafts("child-token", undefined, undefined, onRejected),
+    ).resolves.toBe(0);
+
+    expect(onRejected).toHaveBeenCalledWith(request, conflict);
+    await expect(getPendingDraftsByPrefix("attempt-a:")).resolves.toHaveLength(1);
+  });
 });

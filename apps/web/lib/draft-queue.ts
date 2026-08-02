@@ -25,6 +25,11 @@ export type PendingDraftSyncedCallback = (
   responseVersion: number,
 ) => void;
 
+export type PendingDraftRejectedCallback = (
+  request: DraftSyncRequest,
+  error: unknown,
+) => void;
+
 const DATABASE_NAME = "luma-private-drafts";
 const STORE_NAME = "pending";
 
@@ -59,6 +64,7 @@ export async function syncPendingDrafts(
   childToken: string,
   now = new Date(),
   onSynced?: PendingDraftSyncedCallback,
+  onRejected?: PendingDraftRejectedCallback,
 ): Promise<number> {
   const db = await database();
   const drafts = (await db.getAll(STORE_NAME)) as PendingDraft[];
@@ -81,7 +87,8 @@ export async function syncPendingDrafts(
       await db.delete(STORE_NAME, draft.key);
       onSynced?.(draft.syncRequest, saved.version);
       synced += 1;
-    } catch {
+    } catch (error) {
+      onRejected?.(draft.syncRequest, error);
       // Keep the draft for the next online retry or explicit conflict handling.
     }
   }

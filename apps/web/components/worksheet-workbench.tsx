@@ -256,7 +256,7 @@ function WorksheetWorkbenchContent() {
     ApiQuestion["figure"]
   > | null>(null);
   const [saveStatus, setSaveStatus] = useState<
-    "idle" | "saving" | "saved" | "offline"
+    "idle" | "saving" | "saved" | "offline" | "conflict"
   >("idle");
   const [isSyncingSavedAnswer, setIsSyncingSavedAnswer] = useState(false);
   const [dirtyQuestion, setDirtyQuestion] = useState<DirtyQuestion | null>(
@@ -300,6 +300,13 @@ function WorksheetWorkbenchContent() {
         ...responseVersions.current,
         [request.questionId]: responseVersion,
       };
+    }, (_request, error) => {
+      if (
+        error instanceof Error &&
+        error.message.includes("response_version_conflict")
+      ) {
+        setSaveStatus("conflict");
+      }
     });
   }
 
@@ -1924,9 +1931,11 @@ function WorksheetWorkbenchContent() {
                 ? t("worksheet.saved")
                 : saveStatus === "offline"
                   ? t("worksheet.savedDevice")
+                  : saveStatus === "conflict"
+                    ? t("worksheet.syncConflict")
                   : t("worksheet.autoSave")}
           </span>
-          {saveStatus === "offline" ? (
+          {saveStatus === "offline" || saveStatus === "conflict" ? (
             <button
               className="button ghost save-sync-button"
               disabled={isSyncingSavedAnswer}
