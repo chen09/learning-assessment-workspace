@@ -2050,7 +2050,6 @@ test("child screens stay responsive across Chinese, Japanese, and English", asyn
 
       return {
         backgroundImage: cardStyle.backgroundImage,
-        backgroundSize: cardStyle.backgroundSize,
         eyebrowFontSize: Number.parseFloat(
           window.getComputedStyle(eyebrow!).fontSize,
         ),
@@ -2059,8 +2058,7 @@ test("child screens stay responsive across Chinese, Japanese, and English", asyn
         ),
       };
     });
-  expect(worksheetReadability.backgroundImage).toContain("0.08");
-  expect(worksheetReadability.backgroundSize).toContain("32px 32px");
+  expect(worksheetReadability.backgroundImage).toBe("none");
   expect(worksheetReadability.eyebrowFontSize).toBeGreaterThanOrEqual(13.5);
   expect(worksheetReadability.metaFontSize).toBeGreaterThanOrEqual(14);
   await expect(page.locator(".exam-toggle")).toHaveCSS(
