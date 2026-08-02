@@ -54,6 +54,17 @@ const CANVAS_WIDTH_STEP = 300;
 const CANVAS_HEIGHT_STEP = 280;
 const MAX_CANVAS_SIZE: CanvasSize = { width: 1800, height: 1260 };
 
+function strokeWidthAtPoint(stroke: Stroke, point: Point) {
+  if (stroke.eraser) {
+    return stroke.width;
+  }
+  // A mouse/finger normally reports 0.5, which preserves the selected pen
+  // width. Apple Pencil pressure ranges from 0 to 1, so make a light stroke
+  // readable without allowing a firm stroke to become disproportionate.
+  const pressure = Math.min(Math.max(point.pressure || 0.5, 0), 1);
+  return stroke.width * (0.5 + pressure);
+}
+
 function normalizeCanvasSize(size: CanvasSize): CanvasSize {
   return {
     width: Math.min(
@@ -113,13 +124,14 @@ export function HandwritingCanvas({
         ? "destination-out"
         : "source-over";
       context.strokeStyle = "#1f2833";
-      context.lineWidth = stroke.width;
-      context.beginPath();
-      context.moveTo(stroke.points[0].x, stroke.points[0].y);
-      for (const point of stroke.points.slice(1)) {
+      for (const [index, point] of stroke.points.slice(1).entries()) {
+        const previousPoint = stroke.points[index];
+        context.lineWidth = strokeWidthAtPoint(stroke, point);
+        context.beginPath();
+        context.moveTo(previousPoint.x, previousPoint.y);
         context.lineTo(point.x, point.y);
+        context.stroke();
       }
-      context.stroke();
       context.restore();
     }
   }, []);

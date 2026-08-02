@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -70,6 +70,58 @@ describe("HandwritingCanvas", () => {
     const canvas = screen.getByLabelText("Handwriting answer area");
     expect(canvas).toHaveAttribute("width", "1500");
     expect(canvas).toHaveAttribute("height", "980");
+  });
+
+  it("makes an Apple Pencil stroke visibly wider under higher pressure", async () => {
+    const lineWidths: number[] = [];
+    const context = {
+      beginPath: vi.fn(),
+      clearRect: vi.fn(),
+      lineCap: "round",
+      lineJoin: "round",
+      lineTo: vi.fn(),
+      moveTo: vi.fn(),
+      restore: vi.fn(),
+      save: vi.fn(),
+      set globalCompositeOperation(_value: GlobalCompositeOperation) {},
+      set lineWidth(value: number) {
+        lineWidths.push(value);
+      },
+      set strokeStyle(_value: string) {},
+      stroke: vi.fn(),
+    } as unknown as CanvasRenderingContext2D;
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+      context,
+    );
+
+    render(<HandwritingCanvas onChange={vi.fn()} />);
+
+    const canvas = screen.getByLabelText("Handwriting answer area");
+    fireEvent.pointerDown(canvas, {
+      clientX: 20,
+      clientY: 30,
+      pointerId: 1,
+      pointerType: "pen",
+      pressure: 0.2,
+    });
+    fireEvent.pointerMove(canvas, {
+      clientX: 80,
+      clientY: 90,
+      pointerId: 1,
+      pointerType: "pen",
+      pressure: 1,
+    });
+    fireEvent.pointerUp(canvas, {
+      clientX: 80,
+      clientY: 90,
+      pointerId: 1,
+      pointerType: "pen",
+      pressure: 1,
+    });
+
+    await waitFor(() => {
+      expect(lineWidths).toContain(3.75);
+    });
   });
 
   it("uses an in-page confirmation before clearing handwriting", () => {
