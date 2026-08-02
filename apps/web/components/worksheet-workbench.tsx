@@ -55,7 +55,11 @@ import {
   submitQuestion,
   uploadToSignedUrl,
 } from "@/lib/api-client";
-import { getAvailableWordOrderTokens } from "@/lib/word-order";
+import {
+  getAvailableWordOrderTokens,
+  moveWordOrderToken,
+  removeWordOrderToken,
+} from "@/lib/word-order";
 import { type CropBounds, cropAnswerImage } from "@/lib/photo-crop";
 import { rotateAnswerImage } from "@/lib/photo-rotation";
 
@@ -910,24 +914,75 @@ function WorksheetWorkbenchContent() {
       return (
         <div className="typed-answer">
           <label>{t("worksheet.buildSentence")}</label>
-          <p>
-            {selectedTokens.join(" ") || t("worksheet.chooseWords")}
-          </p>
-          <div className="header-actions">
-            {available.map((token, index) => (
-                <button
-                  className="button ghost"
-                  key={`${token}-${index}`}
-                  onClick={() =>
-                    updateAnswer(question.id, {
-                      tokens: [...selectedTokens, token],
-                    })
-                  }
-                  type="button"
-                >
-                  {token}
-                </button>
+          {selectedTokens.length > 0 ? (
+            <ol
+              aria-label={t("worksheet.selectedWords")}
+              className="word-order-selected"
+            >
+              {selectedTokens.map((token, index) => (
+                <li className="word-order-token" key={`${token}-${index}`}>
+                  <span>{token}</span>
+                  <span className="word-order-token-actions">
+                    <button
+                      aria-label={t("worksheet.moveTokenEarlier", { token })}
+                      className="word-order-token-button"
+                      disabled={index === 0}
+                      onClick={() =>
+                        updateAnswer(question.id, {
+                          tokens: moveWordOrderToken(selectedTokens, index, "left"),
+                        })
+                      }
+                      type="button"
+                    >
+                      <ArrowLeft aria-hidden="true" size={16} />
+                    </button>
+                    <button
+                      aria-label={t("worksheet.moveTokenLater", { token })}
+                      className="word-order-token-button"
+                      disabled={index === selectedTokens.length - 1}
+                      onClick={() =>
+                        updateAnswer(question.id, {
+                          tokens: moveWordOrderToken(selectedTokens, index, "right"),
+                        })
+                      }
+                      type="button"
+                    >
+                      <ArrowRight aria-hidden="true" size={16} />
+                    </button>
+                    <button
+                      aria-label={t("worksheet.removeToken", { token })}
+                      className="word-order-token-button"
+                      onClick={() =>
+                        updateAnswer(question.id, {
+                          tokens: removeWordOrderToken(selectedTokens, index),
+                        })
+                      }
+                      type="button"
+                    >
+                      <Trash2 aria-hidden="true" size={15} />
+                    </button>
+                  </span>
+                </li>
               ))}
+            </ol>
+          ) : (
+            <p>{t("worksheet.chooseWords")}</p>
+          )}
+          <div className="word-order-options">
+            {available.map((token, index) => (
+              <button
+                className="button ghost"
+                key={`${token}-${index}`}
+                onClick={() =>
+                  updateAnswer(question.id, {
+                    tokens: [...selectedTokens, token],
+                  })
+                }
+                type="button"
+              >
+                {token}
+              </button>
+            ))}
             <button
               className="quiet-link"
               onClick={() => updateAnswer(question.id, { tokens: [] })}

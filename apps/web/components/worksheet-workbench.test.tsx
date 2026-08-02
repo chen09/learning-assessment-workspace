@@ -252,6 +252,53 @@ describe("WorksheetWorkbench", () => {
     ).toBeInTheDocument();
   });
 
+  it("lets a child reorder or remove selected sentence words before saving", async () => {
+    mocks.startAssignment.mockResolvedValueOnce({
+      ...assignmentWork,
+      questions: [
+        {
+          id: "word-order",
+          position: 1,
+          type: "word_order" as const,
+          prompt: "Put the words in order.",
+          options: ["She", "school.", "walks", "to"],
+          points: 1,
+        },
+      ],
+    });
+
+    render(<WorksheetWorkbench />);
+
+    await screen.findByRole("heading", { name: "Put the words in order." });
+    for (const token of ["She", "school.", "walks", "to"]) {
+      fireEvent.click(screen.getByRole("button", { name: token }));
+    }
+
+    fireEvent.click(screen.getByRole("button", { name: "Move school. earlier" }));
+    await waitFor(() => {
+      expect(mocks.saveAttemptResponse).toHaveBeenLastCalledWith(
+        "attempt-1",
+        "word-order",
+        expect.objectContaining({
+          answer: { tokens: ["school.", "She", "walks", "to"] },
+        }),
+        "child-token",
+      );
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove school." }));
+    await waitFor(() => {
+      expect(mocks.saveAttemptResponse).toHaveBeenLastCalledWith(
+        "attempt-1",
+        "word-order",
+        expect.objectContaining({
+          answer: { tokens: ["She", "walks", "to"] },
+        }),
+        "child-token",
+      );
+    });
+  });
+
   it("typesets imported mathematics in the child question surface", async () => {
     mocks.startAssignment.mockResolvedValueOnce({
       ...assignmentWork,

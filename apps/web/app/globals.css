@@ -1162,6 +1162,65 @@ button {
   line-height: 1.55;
 }
 
+.word-order-selected,
+.word-order-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin: 0.15rem 0 0.9rem;
+  padding: 0;
+}
+
+.word-order-selected {
+  min-height: 3.5rem;
+  align-items: center;
+  border: 1px solid #ccd3ef;
+  border-radius: 1rem;
+  background: rgb(255 255 255 / 78%);
+  padding: 0.65rem;
+  list-style: none;
+}
+
+.word-order-token {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid #b9c8ff;
+  border-radius: 0.8rem;
+  background: #edf1ff;
+  color: var(--ink);
+  font-weight: 800;
+  padding: 0.32rem 0.35rem 0.32rem 0.65rem;
+}
+
+.word-order-token-actions {
+  display: inline-flex;
+  gap: 0.12rem;
+}
+
+.word-order-token-button {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border: 0;
+  border-radius: 0.55rem;
+  background: white;
+  color: var(--blue);
+  cursor: pointer;
+}
+
+.word-order-token-button:disabled {
+  color: #abb3c4;
+  cursor: not-allowed;
+}
+
+.word-order-token-button:not(:disabled):hover,
+.word-order-token-button:not(:disabled):focus-visible {
+  background: var(--blue);
+  color: white;
+}
+
 .photo-answer {
   display: grid;
   min-height: 15rem;

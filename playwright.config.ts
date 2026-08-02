@@ -60,7 +60,7 @@ export default defineConfig({
       name: "ipad-webkit",
       testMatch: "core-flow.spec.ts",
       grep:
-        /(parent creation reaches child grading and correction through the API|listening audio stays private until a child starts an allowed playback)/,
+        /(parent creation reaches child grading and correction through the API|listening audio stays private until a child starts an allowed playback|a child can correct a word-order answer in place without resetting it)/,
       use: { ...devices["iPad (gen 7)"], browserName: "webkit" },
     },
   ],

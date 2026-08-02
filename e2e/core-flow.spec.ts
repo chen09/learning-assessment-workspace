@@ -1448,6 +1448,98 @@ test("parent collects several manual questions into one assigned practice", asyn
   await expect(page.getByText("已结束", { exact: true })).toBeVisible();
 });
 
+test("a child can correct a word-order answer in place without resetting it", async ({
+  page,
+  request,
+}, testInfo) => {
+  test.skip(
+    !["desktop", "ipad-webkit"].includes(testInfo.project.name),
+    "The inline word controls are covered on desktop and iPad WebKit.",
+  );
+  const apiBaseUrl = "http://127.0.0.1:8017";
+  const fixtureKey = `e2e-word-order-edit-${testInfo.workerIndex}`;
+  const parentHeaders = { Authorization: "Bearer parent-fixture" };
+  const family = (await (
+    await request.post(`${apiBaseUrl}/v1/families`, {
+      headers: { ...parentHeaders, "Idempotency-Key": `${fixtureKey}-family` },
+      data: { name: "Word order edit family" },
+    })
+  ).json()) as { id: string };
+  const child = (await (
+    await request.post(`${apiBaseUrl}/v1/families/${family.id}/children`, {
+      headers: { ...parentHeaders, "Idempotency-Key": `${fixtureKey}-child` },
+      data: {
+        nickname: "Word order child",
+        grade_stage: "Junior high 1",
+        ui_language: "en",
+        pin: "123456",
+      },
+    })
+  ).json()) as { id: string };
+  const imported = (await (
+    await request.post(`${apiBaseUrl}/v1/question-sets/imports/structured`, {
+      headers: { ...parentHeaders, "Idempotency-Key": `${fixtureKey}-import` },
+      data: {
+        family_id: family.id,
+        child_id: child.id,
+        source_name: "word-order-edit.json",
+        assignment_mode: "practice",
+        time_limit_seconds: null,
+        parent_note: null,
+        document: {
+          schema_version: "1.0",
+          question_set: {
+            title: "Word order edit",
+            subject: "English",
+            locale: "en",
+            difficulty: "standard",
+            source_mode: "manual",
+            estimated_minutes: 2,
+          },
+          knowledge_tags: [{ code: "word-order", label: "Word order" }],
+          questions: [
+            {
+              position: 1,
+              type: "word_order",
+              prompt: "Put the words in order.",
+              options: ["She", "school.", "walks", "to"],
+              answer_key: { tokens: ["She", "walks", "to", "school."] },
+              rubric: { grading_mode: "exact" },
+              points: 1,
+              knowledge_code: "word-order",
+            },
+          ],
+        },
+      },
+    })
+  ).json()) as { assignment_id: string };
+
+  await page.goto(
+    `/child/login/?childId=${encodeURIComponent(child.id)}&assignmentId=${encodeURIComponent(imported.assignment_id)}`,
+  );
+  for (const digit of ["1", "2", "3", "4", "5", "6"]) {
+    await page.getByRole("button", { name: digit, exact: true }).click();
+  }
+  await page.getByRole("button", { name: "Open my work" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Put the words in order." }),
+  ).toBeVisible();
+
+  for (const token of ["She", "school.", "walks", "to"]) {
+    await page.getByRole("button", { name: token, exact: true }).click();
+  }
+  await page.getByRole("button", { name: "Move school. earlier" }).click();
+  await expect(
+    page.getByRole("list", { name: "Selected words" }).getByRole("listitem"),
+  ).toHaveText(["school.", "She", "walks", "to"]);
+
+  await page.getByRole("button", { name: "Remove school." }).click();
+  await expect(
+    page.getByRole("list", { name: "Selected words" }).getByRole("listitem"),
+  ).toHaveText(["She", "walks", "to"]);
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+});
+
 test("parent can return to an imported question-set review from its recovery link", async ({
   page,
   request,
