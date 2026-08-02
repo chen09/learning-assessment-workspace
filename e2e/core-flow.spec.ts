@@ -83,7 +83,9 @@ test("authenticated parent legacy link is cleaned and remains responsive in all 
   await expect(
     page.getByRole("heading", { name: "Set up your family workspace" }),
   ).toBeVisible();
-  await page.getByLabel("Language").selectOption("zh");
+  // The accessible label follows the persisted UI language, so it may already
+  // be Japanese or Chinese when this shared browser context reaches history.
+  await page.locator(".language-picker select").selectOption("zh");
 
   await page.getByRole("link", { name: "进入家庭设置" }).click();
   await expect(page.getByText("家庭学习空间", { exact: true })).toBeVisible();
