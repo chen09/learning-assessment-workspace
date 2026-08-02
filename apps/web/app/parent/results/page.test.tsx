@@ -310,6 +310,43 @@ describe("ParentResultsPage", () => {
     expect(screen.queryByTestId("red-pencil-mark")).not.toBeInTheDocument();
   });
 
+  it("opens a completed PDF privately instead of treating it as a photo preview", async () => {
+    const completeReview = await mocks.getParentAttemptReview();
+    mocks.getParentAttemptReview.mockReset().mockResolvedValue({
+      ...completeReview,
+      reviews: [
+        {
+          ...completeReview.reviews[0],
+          question_type: "photo",
+          response_kind: "photo",
+          response_answer: {
+            paths: ["family-id/attempt-id/factorisation-paper.pdf"],
+          },
+          photo_urls: [
+            "https://storage.example.test/signed/factorisation-paper.pdf?token=short-lived",
+          ],
+          automated_feedback: {
+            summary: "符号を確認",
+            action: "保護者が確認してください。",
+          },
+        },
+      ],
+    });
+
+    render(<ParentResultsPage />);
+
+    const originalPdf = await screen.findByRole("link", {
+      name: "打开原始 PDF：factorisation-paper.pdf",
+    });
+    expect(originalPdf).toHaveAttribute(
+      "href",
+      "https://storage.example.test/signed/factorisation-paper.pdf?token=short-lived",
+    );
+    expect(
+      screen.queryByRole("img", { name: "已上传的答案照片 1" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("downloads a separate red-pencil overlay without changing the original paper photo", async () => {
     const completeReview = await mocks.getParentAttemptReview();
     mocks.getParentAttemptReview.mockReset().mockResolvedValue({

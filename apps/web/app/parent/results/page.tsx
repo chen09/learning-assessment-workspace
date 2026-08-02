@@ -5,6 +5,7 @@ import {
   Check,
   CircleHelp,
   Download,
+  FileText,
   History,
   Image as ImageIcon,
   PenLine,
@@ -205,89 +206,106 @@ function PhotoPreview({
         <div className="photo-answer-grid">
           {photoUrls.map((url, index) => {
             const pageAnnotations = annotationsForPage(index);
+            const sourcePath = paths[index];
+            const filename = sourcePath?.split("/").at(-1) ?? `${index + 1}`;
+            const isPdf = /\.pdf$/i.test(filename);
             return (
               <figure className="annotated-photo" key={url}>
-                <div className="photo-answer-image-frame">
-                  <Image
-                    alt={`${label} ${index + 1}`}
-                    height={1_600}
-                    src={url}
-                    unoptimized
-                    width={1_200}
-                  />
-                  {showAnnotations && pageAnnotations.length ? (
-                    <svg
-                      aria-hidden="true"
-                      className="grading-annotation-layer photo-grading-annotation-layer"
-                      preserveAspectRatio="none"
-                      viewBox="0 0 1 1"
-                    >
-                      {pageAnnotations.map((annotation, annotationIndex) => {
-                        const commonProps = {
-                          "data-grading-annotation": annotation.kind,
-                          "data-testid": "red-pencil-mark",
-                          vectorEffect: "non-scaling-stroke" as const,
-                        };
-                        if (annotation.kind === "underline") {
-                          return (
-                            <line
-                              {...commonProps}
-                              key={`${annotation.kind}-${annotationIndex}`}
-                              x1={annotation.x}
-                              x2={annotation.x + annotation.width}
-                              y1={annotation.y + annotation.height}
-                              y2={annotation.y + annotation.height}
-                            />
-                          );
-                        }
-                        if (annotation.kind === "cross") {
-                          return (
-                            <g
-                              data-grading-annotation={annotation.kind}
-                              data-testid="red-pencil-mark"
-                              key={`${annotation.kind}-${annotationIndex}`}
-                            >
-                              <line
-                                vectorEffect="non-scaling-stroke"
-                                x1={annotation.x}
-                                x2={annotation.x + annotation.width}
-                                y1={annotation.y}
-                                y2={annotation.y + annotation.height}
+                {isPdf ? (
+                  <a
+                    aria-label={t("parentResults.openOriginalPdf", { filename })}
+                    className="photo-answer-pdf"
+                    href={url}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    <FileText aria-hidden="true" />
+                    <span>{filename}</span>
+                    <small>{t("parentResults.openOriginalPdfAction")}</small>
+                  </a>
+                ) : (
+                  <>
+                    <div className="photo-answer-image-frame">
+                      <Image
+                        alt={`${label} ${index + 1}`}
+                        height={1_600}
+                        src={url}
+                        unoptimized
+                        width={1_200}
+                      />
+                      {showAnnotations && pageAnnotations.length ? (
+                        <svg
+                          aria-hidden="true"
+                          className="grading-annotation-layer photo-grading-annotation-layer"
+                          preserveAspectRatio="none"
+                          viewBox="0 0 1 1"
+                        >
+                          {pageAnnotations.map((annotation, annotationIndex) => {
+                            const commonProps = {
+                              "data-grading-annotation": annotation.kind,
+                              "data-testid": "red-pencil-mark",
+                              vectorEffect: "non-scaling-stroke" as const,
+                            };
+                            if (annotation.kind === "underline") {
+                              return (
+                                <line
+                                  {...commonProps}
+                                  key={`${annotation.kind}-${annotationIndex}`}
+                                  x1={annotation.x}
+                                  x2={annotation.x + annotation.width}
+                                  y1={annotation.y + annotation.height}
+                                  y2={annotation.y + annotation.height}
+                                />
+                              );
+                            }
+                            if (annotation.kind === "cross") {
+                              return (
+                                <g
+                                  data-grading-annotation={annotation.kind}
+                                  data-testid="red-pencil-mark"
+                                  key={`${annotation.kind}-${annotationIndex}`}
+                                >
+                                  <line
+                                    vectorEffect="non-scaling-stroke"
+                                    x1={annotation.x}
+                                    x2={annotation.x + annotation.width}
+                                    y1={annotation.y}
+                                    y2={annotation.y + annotation.height}
+                                  />
+                                  <line
+                                    vectorEffect="non-scaling-stroke"
+                                    x1={annotation.x + annotation.width}
+                                    x2={annotation.x}
+                                    y1={annotation.y}
+                                    y2={annotation.y + annotation.height}
+                                  />
+                                </g>
+                              );
+                            }
+                            return (
+                              <rect
+                                {...commonProps}
+                                height={annotation.height}
+                                key={`${annotation.kind}-${annotationIndex}`}
+                                rx={0.01}
+                                width={annotation.width}
+                                x={annotation.x}
+                                y={annotation.y}
                               />
-                              <line
-                                vectorEffect="non-scaling-stroke"
-                                x1={annotation.x + annotation.width}
-                                x2={annotation.x}
-                                y1={annotation.y}
-                                y2={annotation.y + annotation.height}
-                              />
-                            </g>
-                          );
-                        }
-                        return (
-                          <rect
-                            {...commonProps}
-                            height={annotation.height}
-                            key={`${annotation.kind}-${annotationIndex}`}
-                            rx={0.01}
-                            width={annotation.width}
-                            x={annotation.x}
-                            y={annotation.y}
-                          />
-                        );
-                      })}
-                    </svg>
-                  ) : null}
-                </div>
-                <figcaption>
-                  {paths[index]?.split("/").at(-1) ?? `${index + 1}`}
-                </figcaption>
+                            );
+                          })}
+                        </svg>
+                      ) : null}
+                    </div>
+                    <figcaption>{filename}</figcaption>
+                  </>
+                )}
                 {pageAnnotations.length ? (
                   <button
                     className="button ghost red-pencil-download"
                     onClick={() =>
                       downloadAnnotationOverlay(
-                        paths[index],
+                        sourcePath,
                         index,
                         pageAnnotations,
                       )
