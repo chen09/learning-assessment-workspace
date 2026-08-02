@@ -24,6 +24,44 @@ const workFor = (attemptId: string, prompt: string) => ({
   submitted_question_ids: [],
 });
 
+const parentReviewFor = (attemptId: string, prompt: string) => ({
+  attempt_id: attemptId,
+  child_nickname: "Navigation child",
+  title:
+    attemptId === "parent-review-first"
+      ? "First parent review"
+      : "Second parent review",
+  source_material_title: null,
+  source_material_subject: null,
+  complete: true,
+  awarded_points: 0,
+  available_points: 1,
+  correct_count: 0,
+  correction_count: 0,
+  pending_review_count: 1,
+  response_revisions: [],
+  reviews: [
+    {
+      result_id: `${attemptId}-result`,
+      question_id: `${attemptId}-question`,
+      question_position: 1,
+      question_prompt: prompt,
+      question_type: "handwriting",
+      question_points: 1,
+      response_kind: "strokes",
+      response_answer: {
+        canvas_size: { width: 900, height: 420 },
+        strokes: [],
+      },
+      automated_outcome: "needs_parent_review",
+      automated_feedback: {
+        summary: "A parent needs to review this response.",
+        action: "Mark the answer correct or incorrect.",
+      },
+    },
+  ],
+});
+
 test("browser navigation hides the previous practice until the requested attempt loads", async ({
   page,
 }, testInfo) => {
@@ -236,5 +274,69 @@ test("browser navigation clears a stale printable worksheet before loading anoth
   releaseSecondPrint?.();
   await expect(
     page.getByRole("heading", { name: "Second printable practice" }),
+  ).toBeVisible();
+});
+
+test("browser navigation clears an open parent review before another review loads", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "A single desktop browser regression covers parent review navigation.",
+  );
+
+  await page.addInitScript(() => {
+    window.localStorage.setItem("luma-language:demo-parent", "en");
+  });
+  await page.route(
+    "**/v1/grading-results/attempts/parent-review-first",
+    async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify(
+          parentReviewFor("parent-review-first", "First parent review question."),
+        ),
+      });
+    },
+  );
+  let releaseSecondReview: (() => void) | undefined;
+  const secondReviewGate = new Promise<void>((resolve) => {
+    releaseSecondReview = resolve;
+  });
+  await page.route(
+    "**/v1/grading-results/attempts/parent-review-second",
+    async (route) => {
+      await secondReviewGate;
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify(
+          parentReviewFor("parent-review-second", "Second parent review question."),
+        ),
+      });
+    },
+  );
+
+  await page.goto("/parent/results/?attemptId=parent-review-first");
+  await expect(
+    page.getByRole("heading", { name: "First parent review question." }),
+  ).toBeVisible();
+
+  await page.evaluate(() => {
+    window.history.pushState(
+      {},
+      "",
+      "/parent/results/?attemptId=parent-review-second",
+    );
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  });
+
+  await expect(page.getByRole("status")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "First parent review question." }),
+  ).toHaveCount(0);
+
+  releaseSecondReview?.();
+  await expect(
+    page.getByRole("heading", { name: "Second parent review question." }),
   ).toBeVisible();
 });

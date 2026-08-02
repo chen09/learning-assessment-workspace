@@ -239,6 +239,59 @@ describe("ParentResultsPage", () => {
     expect(mocks.getParentAttemptReview).toHaveBeenCalledTimes(2);
   });
 
+  it("replaces an already-open parent review after browser history changes", async () => {
+    const firstReview = await mocks.getParentAttemptReview();
+    const secondReview = {
+      ...firstReview,
+      attempt_id: "attempt-2",
+      child_nickname: "Bea",
+      title: "几何练习",
+      reviews: [
+        {
+          ...firstReview.reviews[0],
+          result_id: "result-2",
+          question_id: "question-8",
+          question_position: 8,
+          question_prompt: "请证明三角形内角和为 180°。",
+        },
+      ],
+    };
+    let releaseSecondReview: ((value: typeof secondReview) => void) | undefined;
+    const secondReviewGate = new Promise<typeof secondReview>((resolve) => {
+      releaseSecondReview = resolve;
+    });
+    mocks.getParentAttemptReview.mockReset().mockImplementation((attemptId) =>
+      attemptId === "attempt-2"
+        ? secondReviewGate
+        : Promise.resolve(firstReview),
+    );
+
+    render(<ParentResultsPage />);
+
+    expect(
+      await screen.findByText("请写出平方差公式的推导过程。"),
+    ).toBeInTheDocument();
+
+    await act(async () => {
+      window.history.pushState({}, "", "/parent/results/?attemptId=attempt-2");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    expect(
+      screen.queryByText("请写出平方差公式的推导过程。"),
+    ).not.toBeInTheDocument();
+
+    releaseSecondReview?.(secondReview);
+
+    expect(
+      await screen.findByText("请证明三角形内角和为 180°。"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("请写出平方差公式的推导过程。"),
+    ).not.toBeInTheDocument();
+  });
+
   it("renders short-lived photo previews for a parent", async () => {
     const completeReview = await mocks.getParentAttemptReview();
     mocks.getParentAttemptReview.mockReset().mockResolvedValue({

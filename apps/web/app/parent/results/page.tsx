@@ -42,7 +42,10 @@ type Stroke = {
 };
 
 const REVIEW_POLL_INTERVAL_MS = 2_000;
-const subscribeToHydration = () => () => undefined;
+const subscribeToAttemptId = (notify: () => void) => {
+  window.addEventListener("popstate", notify);
+  return () => window.removeEventListener("popstate", notify);
+};
 const getRequestedAttemptId = () =>
   new URLSearchParams(window.location.search).get("attemptId");
 const getServerAttemptId = () => null;
@@ -393,11 +396,12 @@ export default function ParentResultsPage() {
 function ParentResultsContent() {
   const { language, t } = useLanguage();
   const attemptId = useSyncExternalStore(
-    subscribeToHydration,
+    subscribeToAttemptId,
     getRequestedAttemptId,
     getServerAttemptId,
   );
-  const [review, setReview] = useState<ParentAttemptReview | null>(null);
+  const [loadedReview, setLoadedReview] =
+    useState<ParentAttemptReview | null>(null);
   const [loadState, setLoadState] = useState<
     "loading" | "ready" | "error"
   >("loading");
@@ -415,6 +419,29 @@ function ParentResultsContent() {
   const [partialEntryId, setPartialEntryId] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [decisionErrorId, setDecisionErrorId] = useState<string | null>(null);
+  const review =
+    loadState === "ready" && loadedReview?.attempt_id === attemptId
+      ? loadedReview
+      : null;
+
+  useEffect(() => {
+    const reloadReviewFromHistory = () => {
+      setLoadedReview(null);
+      setLoadState("loading");
+      setDecisions({});
+      setDecisionComments({});
+      setSavedComments({});
+      setPartialPoints({});
+      setPartialEntryId(null);
+      setSavingId(null);
+      setDecisionErrorId(null);
+      setReviewReloadVersion((current) => current + 1);
+    };
+
+    window.addEventListener("popstate", reloadReviewFromHistory);
+    return () =>
+      window.removeEventListener("popstate", reloadReviewFromHistory);
+  }, []);
 
   useEffect(() => {
     if (!attemptId) {
@@ -434,7 +461,7 @@ function ParentResultsContent() {
         if (cancelled) {
           return;
         }
-        setReview(payload);
+        setLoadedReview(payload);
         setLoadState("ready");
         if (!payload.complete) {
           retryTimer = setTimeout(() => {
@@ -458,7 +485,7 @@ function ParentResultsContent() {
   }, [attemptId, reviewReloadVersion]);
 
   const retryReview = () => {
-    setReview(null);
+    setLoadedReview(null);
     setLoadState("loading");
     setReviewReloadVersion((current) => current + 1);
   };
@@ -498,7 +525,7 @@ function ParentResultsContent() {
           [item.result_id]: comment,
         }));
       }
-      setReview((current) =>
+      setLoadedReview((current) =>
         current
           ? {
               ...current,
