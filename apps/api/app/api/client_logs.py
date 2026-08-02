@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal, cast
+from typing import Annotated, Literal, cast
 
 from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
@@ -10,16 +10,29 @@ from app.services.client_logs import ClientLogWriter
 router = APIRouter(prefix="/v1/client-logs", tags=["client-logs"])
 
 
-class ClientLogRequest(BaseModel):
+class ClientLogBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    event: Literal["api_request_failed"]
     page: str = Field(pattern=r"^/[A-Za-z0-9_./-]*$", max_length=300)
+    error_code: str = Field(pattern=r"^[a-z0-9_:-]+$", max_length=80)
+    occurred_at: datetime
+
+
+class ApiRequestFailedLog(ClientLogBase):
+    event: Literal["api_request_failed"]
     request_method: Literal["GET", "POST", "PUT", "PATCH", "DELETE"]
     request_path: str = Field(pattern=r"^/v1/[A-Za-z0-9_./-]*$", max_length=300)
     status_code: int = Field(ge=400, le=599)
-    error_code: str = Field(pattern=r"^[a-z0-9_:-]+$", max_length=80)
-    occurred_at: datetime
+
+
+class RuntimeErrorLog(ClientLogBase):
+    event: Literal["client_runtime_error", "client_unhandled_rejection"]
+
+
+ClientLogRequest = Annotated[
+    ApiRequestFailedLog | RuntimeErrorLog,
+    Field(discriminator="event"),
+]
 
 
 @router.post("", status_code=status.HTTP_202_ACCEPTED)
