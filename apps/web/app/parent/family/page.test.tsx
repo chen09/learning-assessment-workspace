@@ -53,6 +53,25 @@ describe("FamilySettingsPage", () => {
     expect(screen.queryByText("Family workspace")).not.toBeInTheDocument();
   });
 
+  it("lets a parent retry a temporary family workspace loading failure", async () => {
+    mocks.getFamilies
+      .mockRejectedValueOnce(new Error("network unavailable"))
+      .mockResolvedValueOnce([]);
+
+    render(<FamilySettingsPage />);
+
+    expect(
+      await screen.findByText("无法加载家庭空间，请检查网络后重试。"),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "重试" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "创建您的家庭" }),
+    ).toBeInTheDocument();
+    expect(mocks.getFamilies).toHaveBeenCalledTimes(2);
+  });
+
   it("lets a parent choose the child's default UI language", async () => {
     mocks.getFamilies.mockResolvedValue([
       { id: "family-1", name: "肉肉如意" },
@@ -132,5 +151,36 @@ describe("FamilySettingsPage", () => {
       );
     });
     expect(screen.getByLabelText("Alex 的界面语言")).toHaveValue("zh");
+  });
+
+  it("does not keep the prior family's children visible after a failed switch", async () => {
+    mocks.getFamilies.mockResolvedValue([
+      { id: "family-1", name: "肉肉如意" },
+      { id: "family-2", name: "另一家庭" },
+    ]);
+    mocks.getChildren
+      .mockResolvedValueOnce([
+        {
+          id: "child-1",
+          family_id: "family-1",
+          nickname: "Alex",
+          grade_stage: "初一",
+          ui_language: "zh",
+        },
+      ])
+      .mockRejectedValueOnce(new Error("network unavailable"));
+
+    render(<FamilySettingsPage />);
+
+    await screen.findByText("Alex");
+    fireEvent.change(screen.getByLabelText("当前家庭"), {
+      target: { value: "family-2" },
+    });
+
+    expect(
+      await screen.findByText("无法保存更改。请检查填写内容后重试。"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Alex")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("当前家庭")).toHaveValue("family-1");
   });
 });

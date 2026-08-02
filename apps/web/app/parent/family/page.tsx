@@ -73,46 +73,91 @@ function FamilySettingsContent() {
   const [managementUnlock, setManagementUnlock] = useState<string | null>(null);
   const [managementPinConfigured, setManagementPinConfigured] = useState(false);
   const [status, setStatus] = useState<"idle" | "working" | "error">("idle");
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "error">(
+    "loading",
+  );
+  const [loadRequest, setLoadRequest] = useState(0);
 
   useEffect(() => {
-    void getParentAccessToken().then(async (parentToken) => {
-      if (!parentToken) {
-        window.location.replace("/login/");
-        return;
-      }
-      const loadedFamilies = await getFamilies(parentToken);
-      setPendingInvitations(await getPendingInvitations(parentToken));
-      setToken(parentToken);
-      setFamilies(loadedFamilies);
-      const requestedFamily = new URLSearchParams(window.location.search).get(
-        "familyId",
-      );
-      const selected =
-        loadedFamilies.find((family) => family.id === requestedFamily) ??
-        loadedFamilies[0];
-      if (selected) {
-        setFamilyId(selected.id);
-        setChildren(await getChildren(selected.id, parentToken));
-        const pinStatus = await getManagementPinStatus(
-          selected.id,
-          parentToken,
+    let cancelled = false;
+
+    const loadFamilyWorkspace = async () => {
+      try {
+        const parentToken = await getParentAccessToken();
+        if (!parentToken) {
+          window.location.replace("/login/");
+          return;
+        }
+        const loadedFamilies = await getFamilies(parentToken);
+        const invitations = await getPendingInvitations(parentToken);
+        const requestedFamily = new URLSearchParams(window.location.search).get(
+          "familyId",
         );
+        const selected =
+          loadedFamilies.find((family) => family.id === requestedFamily) ??
+          loadedFamilies[0];
+        const loadedChildren = selected
+          ? await getChildren(selected.id, parentToken)
+          : [];
+        const pinStatus = selected
+          ? await getManagementPinStatus(selected.id, parentToken)
+          : { configured: false };
+        if (cancelled) {
+          return;
+        }
+        setToken(parentToken);
+        setFamilies(loadedFamilies);
+        setPendingInvitations(invitations);
+        setFamilyId(selected?.id ?? null);
+        setChildren(loadedChildren);
         setManagementPinConfigured(pinStatus.configured);
-      } else {
+        setLoadState("ready");
+      } catch {
+        if (cancelled) {
+          return;
+        }
+        setToken(null);
+        setFamilies([]);
+        setPendingInvitations([]);
+        setFamilyId(null);
         setChildren([]);
+        setManagementPinConfigured(false);
+        setLoadState("error");
       }
-    });
-  }, []);
+    };
+
+    void loadFamilyWorkspace();
+    return () => {
+      cancelled = true;
+    };
+  }, [loadRequest]);
+
+  const retryLoadingFamilyWorkspace = () => {
+    setLoadState("loading");
+    setLoadRequest((current) => current + 1);
+  };
 
   const selectFamily = async (nextFamilyId: string) => {
+    const previousFamilyId = familyId;
     setFamilyId(nextFamilyId);
+    setChildren([]);
     setManagementUnlock(null);
     setManagementPinValue("");
     setManagementPinConfigured(false);
     if (token) {
-      setChildren(await getChildren(nextFamilyId, token));
-      const pinStatus = await getManagementPinStatus(nextFamilyId, token);
-      setManagementPinConfigured(pinStatus.configured);
+      setStatus("working");
+      try {
+        const nextChildren = await getChildren(nextFamilyId, token);
+        const pinStatus = await getManagementPinStatus(nextFamilyId, token);
+        setChildren(nextChildren);
+        setManagementPinConfigured(pinStatus.configured);
+        setStatus("idle");
+      } catch {
+        setFamilyId(previousFamilyId);
+        setChildren([]);
+        setManagementPinConfigured(false);
+        setStatus("error");
+      }
     }
   };
 
@@ -299,8 +344,23 @@ function FamilySettingsContent() {
         <LanguageSwitcher />
       </header>
 
-      {token ? (
+      {loadState === "error" ? (
+        <section className="continue-card">
+          <div className="continue-copy" role="alert">
+            <p className="form-error">{t("family.loadError")}</p>
+            <button
+              className="button primary"
+              onClick={retryLoadingFamilyWorkspace}
+              type="button"
+            >
+              {t("history.retry")}
+            </button>
+          </div>
+        </section>
+      ) : (
         <>
+          {token ? (
+            <>
           <section
             className="filter-row"
             aria-label={t("family.switcherLabel")}
@@ -349,10 +409,10 @@ function FamilySettingsContent() {
               </button>
             </section>
           ))}
-        </>
-      ) : null}
+            </>
+          ) : null}
 
-      <div className="settings-grid">
+          <div className="settings-grid">
         <section className="settings-card">
           <div className="settings-heading">
             <UserRoundPlus />
@@ -595,15 +655,17 @@ function FamilySettingsContent() {
             </div>
           ) : null}
         </section>
-      </div>
-      {status === "error" ? (
-        <p className="form-error" role="alert">
-          {t("family.saveError")}
-        </p>
-      ) : null}
-      <Link className="button ghost account-link" href="/parent/account/">
-        {t("family.accountSettings")}
-      </Link>
+          </div>
+          {status === "error" ? (
+            <p className="form-error" role="alert">
+              {t("family.saveError")}
+            </p>
+          ) : null}
+          <Link className="button ghost account-link" href="/parent/account/">
+            {t("family.accountSettings")}
+          </Link>
+        </>
+      )}
     </>
   );
 }

@@ -222,6 +222,8 @@ const messages = {
     "family.eyebrow": "Family workspace",
     "family.createTitle": "Create your family",
     "family.loadingTitle": "Loading your workspace…",
+    "family.loadError":
+      "Your family workspace could not be loaded. Check your connection and try again.",
     "family.description":
       "Parents share one family. Each member keeps an independent language preference.",
     "family.switcherLabel": "Family switcher",
@@ -1004,6 +1006,8 @@ const messages = {
     "family.eyebrow": "家族の学習スペース",
     "family.createTitle": "家族を作成",
     "family.loadingTitle": "学習スペースを読み込み中…",
+    "family.loadError":
+      "家族の学習スペースを読み込めませんでした。接続を確認してもう一度お試しください。",
     "family.description":
       "保護者は一つの家族を共有し、各メンバーは表示言語を個別に選べます。",
     "family.switcherLabel": "家族の切り替え",
@@ -1778,6 +1782,7 @@ const messages = {
     "family.eyebrow": "家庭学习空间",
     "family.createTitle": "创建您的家庭",
     "family.loadingTitle": "正在加载家庭空间…",
+    "family.loadError": "无法加载家庭空间，请检查网络后重试。",
     "family.description":
       "家长共用一个家庭空间，每位成员都可以独立选择界面语言。",
     "family.switcherLabel": "切换家庭",
