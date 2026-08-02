@@ -635,6 +635,60 @@ def test_structured_import_rejects_a_question_figure_not_owned_by_the_family() -
     assert "figure" in imported.json()["detail"].lower()
 
 
+def test_question_set_with_private_figure_cannot_enter_public_library() -> None:
+    client = TestClient(create_app())
+    fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+    figure_intent = client.post(
+        "/v1/uploads/intents",
+        headers={
+            **PARENT_HEADERS,
+            "Idempotency-Key": "library-question-figure-upload",
+        },
+        json={
+            "family_id": fixture["family"]["id"],
+            "bucket": "sources",
+            "object_id": "d4f53bbc-f4cb-42e5-8baf-bcb9ffcb3d4c",
+            "filename": "private-diagram.png",
+            "content_type": "image/png",
+        },
+    )
+    assert figure_intent.status_code == 201
+    document = _structured_question_set()
+    questions = document["questions"]
+    assert isinstance(questions, list)
+    questions[0]["figure"] = {
+        "image_path": figure_intent.json()["path"],
+        "alt_text": "Private diagram",
+    }
+    imported = client.post(
+        "/v1/question-sets/imports/structured",
+        headers={**PARENT_HEADERS, "Idempotency-Key": "library-figure-import"},
+        json={
+            "family_id": fixture["family"]["id"],
+            "child_id": fixture["child"]["id"],
+            "source_name": "private-figure.json",
+            "document": document,
+        },
+    )
+    assert imported.status_code == 201
+
+    submitted = client.post(
+        "/v1/library/submissions",
+        headers={**PARENT_HEADERS, "Idempotency-Key": "share-private-figure"},
+        json={
+            "family_id": fixture["family"]["id"],
+            "question_set_id": imported.json()["question_set_id"],
+            "rights_confirmed": True,
+            "privacy_confirmed": True,
+        },
+    )
+
+    assert submitted.status_code == 409
+    assert submitted.json()["detail"]["code"] == (
+        "library_submission_contains_private_figure"
+    )
+
+
 def test_listening_question_set_cannot_copy_private_audio_into_public_library() -> None:
     client = TestClient(create_app())
     fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()

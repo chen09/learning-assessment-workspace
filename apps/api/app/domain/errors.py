@@ -54,3 +54,9 @@ class LibrarySubmissionContainsPrivateAudio(DomainError):
     """Audio cannot enter the public library until asset sharing is explicit."""
 
     pass
+
+
+class LibrarySubmissionContainsPrivateFigure(DomainError):
+    """Question figures stay private until asset sharing is explicit."""
+
+    pass

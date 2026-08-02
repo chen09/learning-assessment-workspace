@@ -6,6 +6,7 @@ from app.api.dependencies import Repository, get_repository, require_parent
 from app.config import get_settings
 from app.domain.errors import (
     LibrarySubmissionContainsPrivateAudio,
+    LibrarySubmissionContainsPrivateFigure,
     LibrarySubmissionStatusConflict,
     NotFoundError,
 )
@@ -190,6 +191,11 @@ async def create_library_submission(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={"code": "library_submission_contains_private_audio"},
+        ) from error
+    except LibrarySubmissionContainsPrivateFigure as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "library_submission_contains_private_figure"},
         ) from error
     except NotFoundError as error:
         raise HTTPException(

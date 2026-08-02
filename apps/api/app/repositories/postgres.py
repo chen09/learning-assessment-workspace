@@ -18,6 +18,7 @@ from app.domain.errors import (
     AssignmentStatusConflict,
     FamilyParentLimitReached,
     LibrarySubmissionContainsPrivateAudio,
+    LibrarySubmissionContainsPrivateFigure,
     LibrarySubmissionStatusConflict,
     ListeningReplayLimitReached,
     NotFoundError,
@@ -4504,6 +4505,23 @@ class PostgresRepository:
                 )
                 if bool(contains_audio_result.scalar_one()):
                     raise LibrarySubmissionContainsPrivateAudio
+                contains_figure_result = await connection.execute(
+                    text(
+                        """
+                        select exists (
+                          select 1
+                          from public.question_assets question_asset
+                          join public.questions question
+                            on question.id = question_asset.question_id
+                          where question.question_set_id = :question_set_id
+                            and question_asset.purpose = 'figure'
+                        )
+                        """
+                    ),
+                    {"question_set_id": request.question_set_id},
+                )
+                if bool(contains_figure_result.scalar_one()):
+                    raise LibrarySubmissionContainsPrivateFigure
                 existing_pending = await connection.execute(
                     text(
                         """

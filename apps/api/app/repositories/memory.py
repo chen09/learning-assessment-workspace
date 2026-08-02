@@ -9,6 +9,7 @@ from app.domain.errors import (
     AssignmentStatusConflict,
     FamilyParentLimitReached,
     LibrarySubmissionContainsPrivateAudio,
+    LibrarySubmissionContainsPrivateFigure,
     LibrarySubmissionStatusConflict,
     ListeningReplayLimitReached,
     NotFoundError,
@@ -2331,6 +2332,11 @@ class MemoryRepository:
             for question in self.questions.values()
         ):
             raise LibrarySubmissionContainsPrivateAudio
+        if any(
+            question.question_set_id == question_set.id and question.figure is not None
+            for question in self.questions.values()
+        ):
+            raise LibrarySubmissionContainsPrivateFigure
         record_key = (str(request.family_id), idempotency_key)
         existing_id = self.library_idempotency.get(record_key)
         if existing_id is not None:
