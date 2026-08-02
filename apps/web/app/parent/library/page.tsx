@@ -219,6 +219,7 @@ function LibraryContent() {
   const [submissionStatus, setSubmissionStatus] = useState<
     "idle" | "submitting" | "success" | "error"
   >("idle");
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -407,6 +408,7 @@ function LibraryContent() {
     setRightsConfirmed(false);
     setPrivacyConfirmed(false);
     setSubmissionStatus("idle");
+    setSubmissionError(null);
   };
 
   const submitForReview = async () => {
@@ -414,6 +416,7 @@ function LibraryContent() {
       return;
     }
     setSubmissionStatus("submitting");
+    setSubmissionError(null);
     const token = await getParentAccessToken();
     if (!token) {
       setSubmissionStatus("error");
@@ -436,8 +439,14 @@ function LibraryContent() {
           : [...current, submission],
       );
       setSubmissionStatus("success");
-    } catch {
+    } catch (error) {
       setSubmissionStatus("error");
+      setSubmissionError(
+        error instanceof Error &&
+          error.message.includes("library_submission_contains_private_figure")
+          ? t("librarySubmission.privateFigureError")
+          : t("librarySubmission.error"),
+      );
     }
   };
 
@@ -871,7 +880,7 @@ function LibraryContent() {
               </p>
             ) : null}
             {submissionStatus === "error" ? (
-              <p role="alert">{t("librarySubmission.error")}</p>
+              <p role="alert">{submissionError ?? t("librarySubmission.error")}</p>
             ) : null}
             <div className="library-assignment-actions">
               <button

@@ -742,6 +742,8 @@ const messages = {
     "librarySubmission.submitting": "Submitting…",
     "librarySubmission.success": "Submitted for public-library review.",
     "librarySubmission.error": "The review request could not be submitted. Please retry.",
+    "librarySubmission.privateFigureError":
+      "Question figures are private family material and cannot be submitted to the public library. Remove the figure before submitting.",
     "librarySubmission.pending": "Awaiting review",
     "librarySubmission.withdraw": "Withdraw submission",
     "librarySubmission.withdrawing": "Withdrawing…",
@@ -1589,6 +1591,8 @@ const messages = {
     "librarySubmission.submitting": "提出中…",
     "librarySubmission.success": "公開問題ライブラリのレビューに提出しました。",
     "librarySubmission.error": "レビュー申請を提出できませんでした。もう一度お試しください。",
+    "librarySubmission.privateFigureError":
+      "問題の図は家族の非公開資料のため、公開問題ライブラリには提出できません。図を削除してから提出してください。",
     "librarySubmission.pending": "審査待ち",
     "librarySubmission.withdraw": "提出を取り消す",
     "librarySubmission.withdrawing": "取り消し中…",
@@ -2408,6 +2412,8 @@ const messages = {
     "librarySubmission.submitting": "正在提交…",
     "librarySubmission.success": "已提交到公共题库，等待审核。",
     "librarySubmission.error": "无法提交审核申请，请重试。",
+    "librarySubmission.privateFigureError":
+      "题图属于家庭私有资料，不能提交到公共题库。请移除题图后再提交。",
     "librarySubmission.pending": "等待审核",
     "librarySubmission.withdraw": "撤回投稿",
     "librarySubmission.withdrawing": "正在撤回…",

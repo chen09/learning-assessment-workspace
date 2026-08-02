@@ -425,6 +425,43 @@ describe("LibraryPage", () => {
     expect(submit).toBeDisabled();
   });
 
+  it("explains that a question set with a private figure must stay private", async () => {
+    mocks.getFamilyQuestionSets.mockResolvedValueOnce([
+      {
+        id: "set-with-figure",
+        family_id: "family-1",
+        title: "Diagram practice",
+        subject: "Mathematics",
+        status: "confirmed",
+        question_count: 4,
+        source_summary: {},
+      },
+    ]);
+    mocks.createLibrarySubmission.mockRejectedValueOnce(
+      new Error(
+        JSON.stringify({
+          detail: { code: "library_submission_contains_private_figure" },
+        }),
+      ),
+    );
+
+    render(<LibraryPage />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "提交到公共题库审核" }),
+    );
+    fireEvent.click(
+      screen.getByLabelText("我确认拥有分享这份生成题单的权利。"),
+    );
+    fireEvent.click(
+      screen.getByLabelText("我确认题单不包含孩子作答、个人信息或私有原始资料。"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "提交审核" }));
+
+    expect(
+      await screen.findByRole("alert"),
+    ).toHaveTextContent("题图属于家庭私有资料，不能提交到公共题库。请移除题图后再提交。");
+  });
+
   it("keeps a submitted set visibly awaiting review after the page reloads", async () => {
     mocks.getFamilyQuestionSets.mockResolvedValueOnce([
       {
