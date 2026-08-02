@@ -162,7 +162,9 @@ export function HandwritingCanvas({
       y:
         (event.clientY - rect.top) *
         (event.currentTarget.height / Math.max(rect.height, 1)),
-      pressure: event.pressure || 0.5,
+      // `0` is a valid pen value when a stylus is easing off the page. Only
+      // missing/invalid pressure should fall back to the finger/mouse default.
+      pressure: Number.isFinite(event.pressure) ? event.pressure : 0.5,
     };
   };
 

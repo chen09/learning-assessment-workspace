@@ -167,6 +167,45 @@ describe("HandwritingCanvas", () => {
     });
   });
 
+  it("preserves zero pressure when saving a live Apple Pencil stroke", () => {
+    const onChange = vi.fn();
+    render(<HandwritingCanvas onChange={onChange} />);
+
+    const canvas = screen.getByLabelText("Handwriting answer area");
+    fireEvent.pointerDown(canvas, {
+      clientX: 20,
+      clientY: 30,
+      pointerId: 1,
+      pointerType: "pen",
+      pressure: 0.5,
+    });
+    fireEvent.pointerMove(canvas, {
+      clientX: 80,
+      clientY: 90,
+      pointerId: 1,
+      pointerType: "pen",
+      pressure: 0,
+    });
+    fireEvent.pointerUp(canvas, {
+      clientX: 80,
+      clientY: 90,
+      pointerId: 1,
+      pointerType: "pen",
+      pressure: 0,
+    });
+
+    expect(onChange).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          points: expect.arrayContaining([
+            expect.objectContaining({ pressure: 0 }),
+          ]),
+        }),
+      ],
+      expect.any(Object),
+    );
+  });
+
   it("uses an in-page confirmation before clearing handwriting", () => {
     const onChange = vi.fn();
 
