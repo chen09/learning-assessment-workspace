@@ -42,7 +42,7 @@ openai_api_key = ""
 
 [local_smtp]
 enabled = true
-port = 54324
+port = 55424
 
 [storage]
 enabled = true
