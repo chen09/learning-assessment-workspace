@@ -787,6 +787,7 @@ const messages = {
     "completedPaper.reviewDetails":
       "Confirm the reviewed question and answer regions. Only then will it create a submitted attempt and start grading.",
     "completedPaper.openResults": "Open grading results",
+    "completedPaper.printCleanCopy": "Print a clean A4 copy",
     "completedPaper.prepareLocal": "Prepare a local AI review JSON",
     "completedPaper.localDetails":
       "Attach the original pages to your local AI, copy this prompt, and save its JSON-only response. The prompt never asks for a storage path; this app adds the private paper reference itself.",
@@ -1653,6 +1654,7 @@ const messages = {
     "completedPaper.reviewDetails":
       "確認済みの問題と解答エリアを確定してください。その後で提出済みの解答を作成し、採点を始めます。",
     "completedPaper.openResults": "採点結果を開く",
+    "completedPaper.printCleanCopy": "筆跡のない A4 を印刷",
     "completedPaper.prepareLocal": "ローカル AI 用の確認 JSON を準備",
     "completedPaper.localDetails":
       "元のページをローカル AI に添付し、このプロンプトをコピーして JSON だけの回答を保存してください。プロンプトは保存先パスを求めず、このアプリが非公開のプリント参照を追加します。",
@@ -2491,6 +2493,7 @@ const messages = {
     "completedPaper.reviewDetails":
       "请确认审核后的题目和答题区域。确认后才会创建已提交的作答并开始批改。",
     "completedPaper.openResults": "打开批改结果",
+    "completedPaper.printCleanCopy": "打印不含笔迹的 A4 副本",
     "completedPaper.prepareLocal": "准备本地 AI 审核 JSON",
     "completedPaper.localDetails":
       "将原始页面附给本地 AI，复制此提示词，并保存它只含 JSON 的回答。提示词不会要求存储路径；应用会自行添加私密试卷引用。",

@@ -767,6 +767,7 @@ function CreateWorkspaceContent() {
         );
         setCompletedResponseFileNames(imported.filenames);
         setCompletedResponsePreviewUrls(imported.response_preview_urls ?? []);
+        setAssignmentId(imported.assignment_id);
         setCompletedAttemptId(imported.attempt_id);
         loadCompletedReviewDraft(
           imported.extraction,
@@ -2266,12 +2267,22 @@ function CreateWorkspaceContent() {
             </p>
           </div>
           {completedAttemptId ? (
-            <Link
-              className="button primary"
-              href={`/parent/results/?attemptId=${encodeURIComponent(completedAttemptId)}`}
-            >
-              {t("completedPaper.openResults")}
-            </Link>
+            <div className="button-row">
+              <Link
+                className="button primary"
+                href={`/parent/results/?attemptId=${encodeURIComponent(completedAttemptId)}`}
+              >
+                {t("completedPaper.openResults")}
+              </Link>
+              {assignmentId ? (
+                <Link
+                  className="button secondary"
+                  href={`/parent/print/?assignmentId=${encodeURIComponent(assignmentId)}`}
+                >
+                  <Printer size={17} /> {t("completedPaper.printCleanCopy")}
+                </Link>
+              ) : null}
+            </div>
           ) : completedWorksheetStatus === "needs_review" ? (
             <div className="stacked-form">
               {completedReviewSource === "ai" ? (

@@ -153,6 +153,36 @@ describe("CreateWorkspace", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("restores the clean A4 print link after a completed paper is graded", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/parent/create/?completedWorksheetId=completed-worksheet-1",
+    );
+    mocks.getCompletedWorksheetImport.mockResolvedValue({
+      id: "completed-worksheet-1",
+      status: "results_ready",
+      assignment_id: "assignment-1",
+      attempt_id: "attempt-1",
+      filenames: ["completed-paper.jpg"],
+      response_paths: ["family-1/responses/completed-paper.jpg"],
+      job: {
+        id: "grading-job-1",
+        status: "succeeded",
+        type: "grade_submission",
+      },
+    });
+
+    render(<CreateWorkspace />);
+
+    expect(
+      await screen.findByRole("link", { name: "Print a clean A4 copy" }),
+    ).toHaveAttribute("href", "/parent/print?assignmentId=assignment-1");
+    expect(
+      screen.getByRole("link", { name: "Open grading results" }),
+    ).toHaveAttribute("href", "/parent/results?attemptId=attempt-1");
+  });
+
   it("accepts review regions from the second page of one uploaded PDF", async () => {
     window.history.replaceState(
       {},
