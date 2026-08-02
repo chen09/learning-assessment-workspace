@@ -124,6 +124,49 @@ describe("HandwritingCanvas", () => {
     });
   });
 
+  it("keeps a zero-pressure Apple Pencil point as a light stroke", async () => {
+    const lineWidths: number[] = [];
+    const context = {
+      beginPath: vi.fn(),
+      clearRect: vi.fn(),
+      lineCap: "round",
+      lineJoin: "round",
+      lineTo: vi.fn(),
+      moveTo: vi.fn(),
+      restore: vi.fn(),
+      save: vi.fn(),
+      set globalCompositeOperation(_value: GlobalCompositeOperation) {},
+      set lineWidth(value: number) {
+        lineWidths.push(value);
+      },
+      set strokeStyle(_value: string) {},
+      stroke: vi.fn(),
+    } as unknown as CanvasRenderingContext2D;
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+      context,
+    );
+
+    render(
+      <HandwritingCanvas
+        initialStrokes={[
+          {
+            points: [
+              { x: 20, y: 30, pressure: 0.5 },
+              { x: 80, y: 90, pressure: 0 },
+            ],
+            width: 2.5,
+            eraser: false,
+          },
+        ]}
+        onChange={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(lineWidths).toContain(1.25);
+    });
+  });
+
   it("uses an in-page confirmation before clearing handwriting", () => {
     const onChange = vi.fn();
 

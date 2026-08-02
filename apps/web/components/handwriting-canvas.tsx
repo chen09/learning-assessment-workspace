@@ -61,7 +61,8 @@ function strokeWidthAtPoint(stroke: Stroke, point: Point) {
   // A mouse/finger normally reports 0.5, which preserves the selected pen
   // width. Apple Pencil pressure ranges from 0 to 1, so make a light stroke
   // readable without allowing a firm stroke to become disproportionate.
-  const pressure = Math.min(Math.max(point.pressure || 0.5, 0), 1);
+  const rawPressure = Number.isFinite(point.pressure) ? point.pressure : 0.5;
+  const pressure = Math.min(Math.max(rawPressure, 0), 1);
   return stroke.width * (0.5 + pressure);
 }
 
