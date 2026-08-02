@@ -955,6 +955,24 @@ button {
   line-height: 1.22;
 }
 
+.question-card h1 .math-text-inline {
+  display: inline;
+  white-space: nowrap;
+}
+
+.question-card h1 .math-text-display {
+  display: block;
+  margin: 0.6em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.15em 0.1em;
+}
+
+.question-card h1 .math-text-display .katex-display {
+  margin: 0;
+  text-align: left;
+}
+
 .question-figure {
   width: fit-content;
   max-width: min(100%, 48rem);

@@ -1007,7 +1007,7 @@ test("parent previews an AI JSON file before assigning its structured questions"
       {
         position: 1,
         type: "typed_text",
-        prompt: "What is 2 + 2?",
+        prompt: "Factorise \\(x^2 - 16\\).",
         options: [],
         answer_key: { text: "4" },
         rubric: { grading_mode: "exact" },
@@ -1043,7 +1043,7 @@ test("parent previews an AI JSON file before assigning its structured questions"
     page.getByRole("heading", { name: "Review before assigning" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "What is 2 + 2?" }),
+    page.getByRole("heading", { name: "Factorise \\(x^2 - 16\\)." }),
   ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Remove this extra extraction." }),
@@ -1051,7 +1051,7 @@ test("parent previews an AI JSON file before assigning its structured questions"
 
   await page.getByRole("button", { name: "Duplicate question 1" }).click();
   await expect(
-    page.getByRole("heading", { name: "What is 2 + 2? (copy)" }),
+    page.getByRole("heading", { name: "Factorise \\(x^2 - 16\\). (copy)" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Move question 3 up" }).click();
   await page.getByRole("button", { name: "Remove question 2" }).click();
@@ -1101,7 +1101,7 @@ test("parent previews an AI JSON file before assigning its structured questions"
         },
         {
           position: 2,
-          prompt: "What is 2 + 2? (copy)",
+          prompt: "Factorise \\(x^2 - 16\\). (copy)",
         },
       ],
     },
@@ -1143,6 +1143,10 @@ test("parent previews an AI JSON file before assigning its structured questions"
     page.getByRole("heading", { name: "What is 3 + 3?" }),
   ).toBeVisible();
   await expect(page.locator(".exam-toggle")).toContainText(/1[45]:/);
+
+  await page.getByRole("button", { name: "Next question" }).click();
+  await expect(page.locator(".question-card .math-text-inline .katex")).toBeVisible();
+  await page.getByRole("button", { name: "Previous" }).click();
 
   await page.getByRole("radio", { name: "6" }).check();
   const fullSubmission = page.waitForResponse(

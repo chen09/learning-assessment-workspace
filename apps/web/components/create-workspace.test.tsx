@@ -438,6 +438,9 @@ describe("CreateWorkspace", () => {
     expect(writeText.mock.calls[0]?.[0]).toContain(
       "Use photo for work written on paper",
     );
+    expect(writeText.mock.calls[0]?.[0]).toContain(
+      "use LaTeX wrapped in \\( ... \\) inline",
+    );
     expect(writeText.mock.calls[0]?.[0]).not.toContain("Fixture child");
   });
 

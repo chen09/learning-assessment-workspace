@@ -28,6 +28,7 @@ import {
   type Stroke,
 } from "@/components/handwriting-canvas";
 import { useLanguage } from "@/components/language-provider";
+import { MathText } from "@/components/math-text";
 import {
   type DraftSyncRequest,
   removePendingDraftsByPrefix,
@@ -1577,7 +1578,9 @@ function WorksheetWorkbenchContent() {
           </span>
         </div>
       </header>
-      <h1>{question.prompt}</h1>
+      <h1>
+        <MathText>{question.prompt}</MathText>
+      </h1>
       {question.figure ? (
         <figure className="question-figure">
           <button

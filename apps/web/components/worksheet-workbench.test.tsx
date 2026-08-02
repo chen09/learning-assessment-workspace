@@ -252,6 +252,23 @@ describe("WorksheetWorkbench", () => {
     ).toBeInTheDocument();
   });
 
+  it("typesets imported mathematics in the child question surface", async () => {
+    mocks.startAssignment.mockResolvedValueOnce({
+      ...assignmentWork,
+      questions: [
+        {
+          ...assignmentWork.questions[0],
+          prompt: "Factorise \\(x^2 - 16\\).",
+        },
+      ],
+    });
+
+    render(<WorksheetWorkbench />);
+
+    expect(await screen.findByText("Factorise", { exact: false })).toBeInTheDocument();
+    expect(document.querySelector(".question-card .math-text-inline .katex")).toBeInTheDocument();
+  });
+
   it("opens a private question figure at a readable size", async () => {
     mocks.startAssignment.mockResolvedValueOnce({
       ...assignmentWork,

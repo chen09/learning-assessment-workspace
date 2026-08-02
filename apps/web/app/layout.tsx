@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 
 import "@/app/globals.css";
+import "katex/dist/katex.min.css";
 import { ClientErrorReporter } from "@/components/client-error-reporter";
 import { LanguageProvider } from "@/components/language-provider";
 import { PwaRegistration } from "@/components/pwa-registration";
