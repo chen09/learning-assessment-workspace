@@ -57,6 +57,7 @@ type ManualQuestionType =
   | "single_choice"
   | "multiple_choice"
   | "typed_text"
+  | "word_order"
   | "handwriting"
   | "photo";
 type VariantDifficulty = StructuredQuestionSetDocument["question_set"]["difficulty"];
@@ -501,6 +502,9 @@ function CreateWorkspaceContent() {
   const [manualCorrectChoiceIndexes, setManualCorrectChoiceIndexes] = useState<
     number[]
   >([]);
+  const [manualWordOrderIndexes, setManualWordOrderIndexes] = useState<number[]>(
+    [],
+  );
   const [manualAnswer, setManualAnswer] = useState("");
   const [manualPoints, setManualPoints] = useState("1");
   const [manualDraftQuestions, setManualDraftQuestions] = useState<
@@ -1075,6 +1079,10 @@ function CreateWorkspaceContent() {
     (choice) =>
       Number.isInteger(choice) && choice >= 0 && choice < manualOptionList.length,
   );
+  const validManualWordOrderIndexes = manualWordOrderIndexes.filter(
+    (token) =>
+      Number.isInteger(token) && token >= 0 && token < manualOptionList.length,
+  );
   const manualQuestionIsReady =
     Boolean(manualQuestionPrompt.trim()) &&
     Number.isFinite(manualPointsValue) &&
@@ -1083,11 +1091,16 @@ function CreateWorkspaceContent() {
       ? manualOptionList.some((option) => option === manualAnswer.trim())
       : manualQuestionType === "multiple_choice"
         ? manualOptionList.length >= 2 && validManualCorrectChoiceIndexes.length > 0
+        : manualQuestionType === "word_order"
+          ? manualOptionList.length >= 2 &&
+            validManualWordOrderIndexes.length === manualOptionList.length &&
+            new Set(validManualWordOrderIndexes).size === manualOptionList.length
         : Boolean(manualAnswer.trim()));
   const manualQuestionHasContent = Boolean(
     manualQuestionPrompt.trim() ||
       manualOptions.trim() ||
       manualCorrectChoiceIndexes.length ||
+      manualWordOrderIndexes.length ||
       manualAnswer.trim(),
   );
   const manualDraftIsReady =
@@ -1138,13 +1151,22 @@ function CreateWorkspaceContent() {
       position,
       type: manualQuestionType,
       prompt: manualQuestionPrompt.trim(),
-      options: isChoiceQuestion(manualQuestionType) ? manualOptionList : [],
+      options:
+        isChoiceQuestion(manualQuestionType) || manualQuestionType === "word_order"
+          ? manualOptionList
+          : [],
       answer_key:
         manualQuestionType === "single_choice"
           ? { choice: manualOptionList.indexOf(answer) }
           : manualQuestionType === "multiple_choice"
             ? { choices: validManualCorrectChoiceIndexes }
-          : requiresParentReview(manualQuestionType)
+            : manualQuestionType === "word_order"
+              ? {
+                  tokens: validManualWordOrderIndexes.map(
+                    (tokenIndex) => manualOptionList[tokenIndex],
+                  ),
+                }
+            : requiresParentReview(manualQuestionType)
             ? { reference: answer }
             : { text: answer },
       rubric:
@@ -1168,6 +1190,7 @@ function CreateWorkspaceContent() {
     setManualQuestionPrompt("");
     setManualOptions("");
     setManualCorrectChoiceIndexes([]);
+    setManualWordOrderIndexes([]);
     setManualAnswer("");
     setManualPoints("1");
     setRequestStatus("idle");
@@ -1774,6 +1797,7 @@ function CreateWorkspaceContent() {
       question.type === "single_choice" ||
       question.type === "multiple_choice" ||
       question.type === "typed_text" ||
+      question.type === "word_order" ||
       question.type === "handwriting" ||
       question.type === "photo"
         ? question.type
@@ -1793,8 +1817,12 @@ function CreateWorkspaceContent() {
       typeof choice === "number" &&
       question.options?.[choice]
         ? question.options[choice]
-        : typeof question.answer_key.reference === "string"
+      : typeof question.answer_key.reference === "string"
           ? question.answer_key.reference
+          : type === "word_order" && Array.isArray(question.answer_key.tokens)
+            ? question.answer_key.tokens
+                .filter((token): token is string => typeof token === "string")
+                .join("\n")
           : typeof question.answer_key.text === "string"
             ? question.answer_key.text
             : "";
@@ -1844,6 +1872,17 @@ function CreateWorkspaceContent() {
       setEditError("A multiple-choice question needs at least two choices and one or more correct choices.");
       return;
     }
+    const wordOrderTokens = answer
+      .split("\n")
+      .map((token) => token.trim())
+      .filter(Boolean);
+    if (
+      editedQuestionType === "word_order" &&
+      (options.length < 2 || !hasSameTokenInventory(options, wordOrderTokens))
+    ) {
+      setEditError("A word-order question needs every available token exactly once.");
+      return;
+    }
     const question = draftQuestions.find((candidate) => candidate.id === questionId);
     if (!question) {
       setEditError("This draft question is no longer available.");
@@ -1854,7 +1893,9 @@ function CreateWorkspaceContent() {
         ? { choice: options.indexOf(answer) }
         : editedQuestionType === "multiple_choice"
           ? { choices: correctChoices }
-        : requiresParentReview(editedQuestionType)
+          : editedQuestionType === "word_order"
+            ? { tokens: wordOrderTokens }
+          : requiresParentReview(editedQuestionType)
           ? { reference: answer }
           : { text: answer };
     const rubric =
@@ -3135,13 +3176,17 @@ function CreateWorkspaceContent() {
                         <option value="multiple_choice">
                           {t("draftReview.typeMultipleChoice")}
                         </option>
+                        <option value="word_order">
+                          {t("draftReview.typeWordOrder")}
+                        </option>
                         <option value="handwriting">
                           {t("draftReview.typeHandwriting")}
                         </option>
                         <option value="photo">{t("draftReview.typePhoto")}</option>
                       </select>
                     </label>
-                    {isChoiceQuestion(editedQuestionType) ? (
+                    {isChoiceQuestion(editedQuestionType) ||
+                    editedQuestionType === "word_order" ? (
                       <label>
                         {t("draftReview.choices")}
                         <textarea
@@ -3186,12 +3231,16 @@ function CreateWorkspaceContent() {
                       </fieldset>
                     ) : (
                       <label>
-                        {requiresParentReview(editedQuestionType)
+                        {editedQuestionType === "word_order"
+                          ? t("draftReview.correctWordOrder")
+                          : requiresParentReview(editedQuestionType)
                           ? t("draftReview.referenceAnswer")
                           : t("draftReview.correctAnswer")}
                         <textarea
                           aria-label={
-                            requiresParentReview(editedQuestionType)
+                            editedQuestionType === "word_order"
+                              ? t("draftReview.correctWordOrder")
+                              : requiresParentReview(editedQuestionType)
                               ? t("draftReview.referenceAnswer")
                               : t("draftReview.correctAnswer")
                           }
@@ -3973,6 +4022,9 @@ function CreateWorkspaceContent() {
                     <option value="multiple_choice">
                       {t("manual.type.multipleChoice")}
                     </option>
+                    <option value="word_order">
+                      {t("manual.type.wordOrder")}
+                    </option>
                     <option value="handwriting">{t("manual.type.handwriting")}</option>
                     <option value="photo">{t("manual.type.photo")}</option>
                   </select>
@@ -3988,7 +4040,8 @@ function CreateWorkspaceContent() {
                   value={manualQuestionPrompt}
                 />
               </label>
-              {isChoiceQuestion(manualQuestionType) ? (
+              {isChoiceQuestion(manualQuestionType) ||
+              manualQuestionType === "word_order" ? (
                 <label className="field-label">
                   {t("manual.choices")}
                   <textarea
@@ -4028,6 +4081,76 @@ function CreateWorkspaceContent() {
                     ))
                   ) : (
                     <p>{t("manual.correctChoicesHelp")}</p>
+                  )}
+                </fieldset>
+              ) : manualQuestionType === "word_order" ? (
+                <fieldset className="manual-word-order-builder">
+                  <legend>{t("manual.correctWordOrder")}</legend>
+                  {manualOptionList.length > 0 ? (
+                    <>
+                      <div className="word-order-options">
+                        {manualOptionList.map((token, tokenIndex) => {
+                          const isUsed = validManualWordOrderIndexes.includes(tokenIndex);
+                          return (
+                            <button
+                              aria-label={t("manual.addWordOrderToken", { token })}
+                              className="choice-option"
+                              disabled={isUsed}
+                              key={`${token}-${tokenIndex}`}
+                              onClick={() =>
+                                setManualWordOrderIndexes((current) => [
+                                  ...current.filter(
+                                    (currentIndex) =>
+                                      currentIndex >= 0 &&
+                                      currentIndex < manualOptionList.length,
+                                  ),
+                                  tokenIndex,
+                                ])
+                              }
+                              type="button"
+                            >
+                              {token}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <ol className="word-order-selected">
+                        {validManualWordOrderIndexes.map((tokenIndex, orderIndex) => (
+                          <li
+                            className="word-order-token"
+                            key={`${tokenIndex}-${orderIndex}`}
+                          >
+                            <span>{manualOptionList[tokenIndex]}</span>
+                            <button
+                              aria-label={t("manual.removeWordOrderToken", {
+                                token: manualOptionList[tokenIndex],
+                              })}
+                              className="word-order-token-button"
+                              onClick={() =>
+                                setManualWordOrderIndexes((current) =>
+                                  current.filter(
+                                    (_currentIndex, index) => index !== orderIndex,
+                                  ),
+                                )
+                              }
+                              type="button"
+                            >
+                              ×
+                            </button>
+                          </li>
+                        ))}
+                      </ol>
+                      <button
+                        className="text-button"
+                        disabled={validManualWordOrderIndexes.length === 0}
+                        onClick={() => setManualWordOrderIndexes([])}
+                        type="button"
+                      >
+                        {t("manual.resetWordOrder")}
+                      </button>
+                    </>
+                  ) : (
+                    <p>{t("manual.correctWordOrderHelp")}</p>
                   )}
                 </fieldset>
               ) : (

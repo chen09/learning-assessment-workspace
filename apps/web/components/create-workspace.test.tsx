@@ -1490,6 +1490,71 @@ describe("CreateWorkspace", () => {
     });
   });
 
+  it("lets a parent author a word-order question from reusable tokens", async () => {
+    mocks.previewStructuredQuestionSet.mockResolvedValue({
+      title: "Time clauses",
+      subject: "English",
+      locale: "en",
+      question_count: 1,
+      total_points: 2,
+      estimated_minutes: 5,
+      knowledge_tag_count: 1,
+      answer_keys_present: true,
+      checksum: "manual-word-order",
+      source_summary: { source_kind: "manual" },
+      questions: [
+        {
+          position: 1,
+          type: "word_order",
+          prompt: "Put the words in the correct order.",
+          options: ["tomorrow", "We", "will", "travel"],
+          answer_key: { tokens: ["We", "will", "travel", "tomorrow"] },
+          rubric: { grading_mode: "exact" },
+          points: 2,
+          knowledge_code: "manual-practice",
+        },
+      ],
+    });
+
+    render(<CreateWorkspace />);
+    await screen.findByRole("combobox", { name: "Child" });
+    fireEvent.click(screen.getByRole("button", { name: "Start simple" }));
+    fireEvent.change(screen.getByLabelText("Practice title"), {
+      target: { value: "Time clauses" },
+    });
+    fireEvent.change(screen.getByLabelText("Response type"), {
+      target: { value: "word_order" },
+    });
+    fireEvent.change(screen.getByLabelText("Question"), {
+      target: { value: "Put the words in the correct order." },
+    });
+    fireEvent.change(screen.getByLabelText("Choices, one per line"), {
+      target: { value: "tomorrow\nWe\nwill\ntravel" },
+    });
+
+    for (const token of ["We", "will", "travel", "tomorrow"]) {
+      fireEvent.click(screen.getByRole("button", { name: `Add ${token}` }));
+    }
+    fireEvent.click(screen.getByRole("button", { name: "Create review draft" }));
+
+    await waitFor(() => {
+      expect(mocks.previewStructuredQuestionSet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          questions: [
+            expect.objectContaining({
+              type: "word_order",
+              options: ["tomorrow", "We", "will", "travel"],
+              answer_key: {
+                tokens: ["We", "will", "travel", "tomorrow"],
+              },
+            }),
+          ],
+        }),
+        "parent-token",
+      );
+    });
+  });
+
   it("keeps a parent-review guide when a parent creates a photo-answer question", async () => {
     mocks.previewStructuredQuestionSet.mockResolvedValue({
       title: "Paper calculation",
