@@ -56,11 +56,13 @@ type AssignmentMode = "practice" | "exam";
 type ManualQuestionType =
   | "single_choice"
   | "multiple_choice"
+  | "listening"
   | "typed_text"
   | "word_order"
   | "handwriting"
   | "photo";
 type VariantDifficulty = StructuredQuestionSetDocument["question_set"]["difficulty"];
+type ListeningTranscriptPolicy = "never" | "after_submission" | "always";
 type ManualDraftQuestion = StructuredQuestionSetDocument["questions"][number] & {
   id: string;
 };
@@ -71,7 +73,9 @@ const requiresParentReview = (type: ManualQuestionType) =>
   type === "handwriting" || type === "photo";
 
 const isChoiceQuestion = (type: ManualQuestionType) =>
-  type === "single_choice" || type === "multiple_choice";
+  type === "single_choice" ||
+  type === "multiple_choice" ||
+  type === "listening";
 
 type CompletedPaperAnswerRegion = {
   question_position: number;
@@ -506,6 +510,12 @@ function CreateWorkspaceContent() {
     [],
   );
   const [manualAnswer, setManualAnswer] = useState("");
+  const [manualListeningReplayLimit, setManualListeningReplayLimit] =
+    useState("2");
+  const [manualListeningTranscript, setManualListeningTranscript] =
+    useState("");
+  const [manualListeningTranscriptPolicy, setManualListeningTranscriptPolicy] =
+    useState<ListeningTranscriptPolicy>("never");
   const [manualPoints, setManualPoints] = useState("1");
   const [manualDraftQuestions, setManualDraftQuestions] = useState<
     ManualDraftQuestion[]
@@ -1075,6 +1085,11 @@ function CreateWorkspaceContent() {
     .map((option) => option.trim())
     .filter(Boolean);
   const manualPointsValue = Number(manualPoints);
+  const manualListeningReplayLimitValue = Number(manualListeningReplayLimit);
+  const hasValidManualListeningReplayLimit =
+    Number.isInteger(manualListeningReplayLimitValue) &&
+    manualListeningReplayLimitValue >= 0 &&
+    manualListeningReplayLimitValue <= 10;
   const validManualCorrectChoiceIndexes = manualCorrectChoiceIndexes.filter(
     (choice) =>
       Number.isInteger(choice) && choice >= 0 && choice < manualOptionList.length,
@@ -1087,7 +1102,7 @@ function CreateWorkspaceContent() {
     Boolean(manualQuestionPrompt.trim()) &&
     Number.isFinite(manualPointsValue) &&
     manualPointsValue > 0 &&
-    (manualQuestionType === "single_choice"
+    (manualQuestionType === "single_choice" || manualQuestionType === "listening"
       ? manualOptionList.some((option) => option === manualAnswer.trim())
       : manualQuestionType === "multiple_choice"
         ? manualOptionList.length >= 2 && validManualCorrectChoiceIndexes.length > 0
@@ -1095,13 +1110,19 @@ function CreateWorkspaceContent() {
           ? manualOptionList.length >= 2 &&
             validManualWordOrderIndexes.length === manualOptionList.length &&
             new Set(validManualWordOrderIndexes).size === manualOptionList.length
-        : Boolean(manualAnswer.trim()));
+        : Boolean(manualAnswer.trim())) &&
+    (manualQuestionType !== "listening" ||
+      hasValidManualListeningReplayLimit);
   const manualQuestionHasContent = Boolean(
     manualQuestionPrompt.trim() ||
       manualOptions.trim() ||
       manualCorrectChoiceIndexes.length ||
       manualWordOrderIndexes.length ||
-      manualAnswer.trim(),
+      manualAnswer.trim() ||
+      (manualQuestionType === "listening" &&
+        (manualListeningTranscript.trim() ||
+          manualListeningReplayLimit !== "2" ||
+          manualListeningTranscriptPolicy !== "never")),
   );
   const manualDraftIsReady =
     Boolean(manualTitle.trim()) &&
@@ -1156,7 +1177,7 @@ function CreateWorkspaceContent() {
           ? manualOptionList
           : [],
       answer_key:
-        manualQuestionType === "single_choice"
+        manualQuestionType === "single_choice" || manualQuestionType === "listening"
           ? { choice: manualOptionList.indexOf(answer) }
           : manualQuestionType === "multiple_choice"
             ? { choices: validManualCorrectChoiceIndexes }
@@ -1175,6 +1196,15 @@ function CreateWorkspaceContent() {
           : { grading_mode: "exact" },
       points: manualPointsValue,
       knowledge_code: "manual-practice",
+      ...(manualQuestionType === "listening"
+        ? {
+            listening: {
+              replay_limit: manualListeningReplayLimitValue,
+              transcript: manualListeningTranscript.trim() || null,
+              transcript_policy: manualListeningTranscriptPolicy,
+            },
+          }
+        : {}),
     };
   };
 
@@ -1192,6 +1222,9 @@ function CreateWorkspaceContent() {
     setManualCorrectChoiceIndexes([]);
     setManualWordOrderIndexes([]);
     setManualAnswer("");
+    setManualListeningReplayLimit("2");
+    setManualListeningTranscript("");
+    setManualListeningTranscriptPolicy("never");
     setManualPoints("1");
     setRequestStatus("idle");
   };
@@ -1417,6 +1450,7 @@ function CreateWorkspaceContent() {
           rubric: question.rubric,
           points: question.points,
           knowledge_code: question.knowledge_code,
+          listening: question.listening,
         })),
         ...(manualQuestionIsReady
           ? [buildManualQuestion(manualDraftQuestions.length + 1)]
@@ -1796,6 +1830,7 @@ function CreateWorkspaceContent() {
     const type: ManualQuestionType =
       question.type === "single_choice" ||
       question.type === "multiple_choice" ||
+      question.type === "listening" ||
       question.type === "typed_text" ||
       question.type === "word_order" ||
       question.type === "handwriting" ||
@@ -1813,7 +1848,7 @@ function CreateWorkspaceContent() {
         )
       : [];
     const answer =
-      type === "single_choice" &&
+      (type === "single_choice" || type === "listening") &&
       typeof choice === "number" &&
       question.options?.[choice]
         ? question.options[choice]
@@ -1859,7 +1894,8 @@ function CreateWorkspaceContent() {
       return;
     }
     if (
-      editedQuestionType === "single_choice" &&
+      (editedQuestionType === "single_choice" ||
+        editedQuestionType === "listening") &&
       (options.length < 2 || !options.includes(answer))
     ) {
       setEditError("A choice question needs at least two choices and a matching correct answer.");
@@ -1889,7 +1925,7 @@ function CreateWorkspaceContent() {
       return;
     }
     const answerKey =
-      editedQuestionType === "single_choice"
+      editedQuestionType === "single_choice" || editedQuestionType === "listening"
         ? { choice: options.indexOf(answer) }
         : editedQuestionType === "multiple_choice"
           ? { choices: correctChoices }
@@ -1912,6 +1948,14 @@ function CreateWorkspaceContent() {
               type: editedQuestionType,
               options: options.length > 0 ? options : null,
               answer_key: answerKey,
+              listening:
+                editedQuestionType === "listening"
+                  ? candidate.listening ?? {
+                      replay_limit: 2,
+                      transcript: null,
+                      transcript_policy: "never",
+                    }
+                  : candidate.listening,
             }
           : candidate,
       ),
@@ -1934,6 +1978,14 @@ function CreateWorkspaceContent() {
                         : [],
                     answer_key: answerKey,
                     rubric,
+                    listening:
+                      editedQuestionType === "listening"
+                        ? candidate.listening ?? {
+                            replay_limit: 2,
+                            transcript: null,
+                            transcript_policy: "never",
+                          }
+                        : candidate.listening,
                   }
                 : candidate,
             ),
@@ -3180,6 +3232,9 @@ function CreateWorkspaceContent() {
                         <option value="multiple_choice">
                           {t("draftReview.typeMultipleChoice")}
                         </option>
+                        <option value="listening">
+                          {t("manual.type.listening")}
+                        </option>
                         <option value="word_order">
                           {t("draftReview.typeWordOrder")}
                         </option>
@@ -4026,6 +4081,9 @@ function CreateWorkspaceContent() {
                     <option value="multiple_choice">
                       {t("manual.type.multipleChoice")}
                     </option>
+                    <option value="listening">
+                      {t("manual.type.listening")}
+                    </option>
                     <option value="word_order">
                       {t("manual.type.wordOrder")}
                     </option>
@@ -4056,6 +4114,62 @@ function CreateWorkspaceContent() {
                     value={manualOptions}
                   />
                 </label>
+              ) : null}
+              {manualQuestionType === "listening" ? (
+                <>
+                  <div className="creation-options">
+                    <label>
+                      {t("manual.listeningReplayLimit")}
+                      <input
+                        aria-label={t("manual.listeningReplayLimit")}
+                        max="10"
+                        min="0"
+                        onChange={(event) =>
+                          setManualListeningReplayLimit(event.target.value)
+                        }
+                        step="1"
+                        type="number"
+                        value={manualListeningReplayLimit}
+                      />
+                    </label>
+                    <label>
+                      {t("manual.listeningTranscriptPolicy")}
+                      <select
+                        aria-label={t("manual.listeningTranscriptPolicy")}
+                        onChange={(event) =>
+                          setManualListeningTranscriptPolicy(
+                            event.target.value as ListeningTranscriptPolicy,
+                          )
+                        }
+                        value={manualListeningTranscriptPolicy}
+                      >
+                        <option value="never">
+                          {t("manual.listeningTranscriptNever")}
+                        </option>
+                        <option value="after_submission">
+                          {t("manual.listeningTranscriptAfterSubmission")}
+                        </option>
+                        <option value="always">
+                          {t("manual.listeningTranscriptAlways")}
+                        </option>
+                      </select>
+                    </label>
+                  </div>
+                  <label className="field-label">
+                    {t("manual.listeningTranscript")}
+                    <textarea
+                      aria-label={t("manual.listeningTranscript")}
+                      onChange={(event) =>
+                        setManualListeningTranscript(event.target.value)
+                      }
+                      rows={3}
+                      value={manualListeningTranscript}
+                    />
+                  </label>
+                  <p className="manual-listening-help">
+                    {t("manual.listeningAudioHelp")}
+                  </p>
+                </>
               ) : null}
               {manualQuestionType === "multiple_choice" ? (
                 <fieldset className="choice-answer-list">
@@ -4168,7 +4282,8 @@ function CreateWorkspaceContent() {
                         ? manualQuestionType === "photo"
                           ? t("manual.photoPlaceholder")
                           : t("manual.handwritingPlaceholder")
-                        : manualQuestionType === "single_choice"
+                        : manualQuestionType === "single_choice" ||
+                            manualQuestionType === "listening"
                           ? t("manual.choicePlaceholder")
                           : t("manual.typedPlaceholder")
                     }
@@ -4214,6 +4329,10 @@ function CreateWorkspaceContent() {
                               ? t("manual.type.choice")
                               : question.type === "multiple_choice"
                                 ? t("manual.type.multipleChoice")
+                              : question.type === "listening"
+                                ? t("manual.type.listening")
+                              : question.type === "word_order"
+                                ? t("manual.type.wordOrder")
                               : question.type === "handwriting"
                                 ? t("manual.type.handwriting")
                                 : t("manual.type.photo")} · {t("manual.pointsSummary", { count: question.points })}

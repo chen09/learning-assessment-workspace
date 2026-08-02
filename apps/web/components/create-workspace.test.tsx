@@ -1803,6 +1803,133 @@ describe("CreateWorkspace", () => {
     });
   });
 
+  it("lets a parent author a listening choice and attach its private audio during review", async () => {
+    mocks.previewStructuredQuestionSet.mockResolvedValue({
+      title: "Morning announcement",
+      subject: "English",
+      locale: "en",
+      question_count: 1,
+      total_points: 1,
+      estimated_minutes: 5,
+      knowledge_tag_count: 1,
+      answer_keys_present: true,
+      checksum: "manual-listening-preview",
+      source_summary: { source_kind: "manual" },
+      questions: [
+        {
+          position: 1,
+          type: "listening",
+          prompt: "Listen and choose where the class will meet.",
+          options: ["The library", "The gym"],
+          answer_key: { choice: 0 },
+          rubric: { grading_mode: "exact" },
+          points: 1,
+          knowledge_code: "manual-practice",
+          listening: {
+            replay_limit: 2,
+            transcript: "Please meet in the library after school.",
+            transcript_policy: "after_submission",
+          },
+        },
+      ],
+    });
+    mocks.createUploadIntent.mockResolvedValue({
+      bucket: "audio",
+      path: "family-1/audio/morning-announcement.mp3",
+      upload_url: "fixture://audio-upload",
+      expires_in: 300,
+    });
+    mocks.uploadToSignedUrl.mockResolvedValue(undefined);
+    mocks.importStructuredQuestionSet.mockResolvedValue({
+      question_set_id: "manual-listening-set",
+      assignment_id: "manual-listening-assignment",
+      status: "confirmed",
+      reused_existing: false,
+    });
+
+    render(<CreateWorkspace />);
+
+    await screen.findByRole("combobox", { name: "Child" });
+    fireEvent.click(screen.getByRole("button", { name: "Start simple" }));
+    fireEvent.change(screen.getByLabelText("Practice title"), {
+      target: { value: "Morning announcement" },
+    });
+    fireEvent.change(screen.getByLabelText("Response type"), {
+      target: { value: "listening" },
+    });
+    fireEvent.change(screen.getByLabelText("Question"), {
+      target: { value: "Listen and choose where the class will meet." },
+    });
+    fireEvent.change(screen.getByLabelText("Choices, one per line"), {
+      target: { value: "The library\nThe gym" },
+    });
+    fireEvent.change(screen.getByLabelText("Answer or grading guide"), {
+      target: { value: "The library" },
+    });
+    fireEvent.change(screen.getByLabelText("Maximum replays"), {
+      target: { value: "2" },
+    });
+    fireEvent.change(screen.getByLabelText("Transcript (optional)"), {
+      target: { value: "Please meet in the library after school." },
+    });
+    fireEvent.change(screen.getByLabelText("When to show transcript"), {
+      target: { value: "after_submission" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create review draft" }));
+
+    await waitFor(() => {
+      expect(mocks.previewStructuredQuestionSet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          questions: [
+            expect.objectContaining({
+              type: "listening",
+              options: ["The library", "The gym"],
+              answer_key: { choice: 0 },
+              listening: {
+                replay_limit: 2,
+                transcript: "Please meet in the library after school.",
+                transcript_policy: "after_submission",
+              },
+            }),
+          ],
+        }),
+        "parent-token",
+      );
+    });
+    expect(
+      await screen.findByRole("heading", { name: "Review before assigning" }),
+    ).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Audio for question 1"), {
+      target: {
+        files: [
+          new File(["audio"], "morning-announcement.mp3", {
+            type: "audio/mpeg",
+          }),
+        ],
+      },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm and assign" }));
+
+    await waitFor(() => {
+      expect(mocks.importStructuredQuestionSet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          document: expect.objectContaining({
+            questions: [
+              expect.objectContaining({
+                type: "listening",
+                listening: expect.objectContaining({
+                  audio_path: "family-1/audio/morning-announcement.mp3",
+                }),
+              }),
+            ],
+          }),
+        }),
+        "parent-token",
+        expect.stringContaining("manual-"),
+      );
+    });
+  });
+
   it("uploads a private figure before assigning a question", async () => {
     const document = {
       schema_version: "1.0" as const,

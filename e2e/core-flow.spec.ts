@@ -1405,6 +1405,102 @@ test("parent authors a paper-photo question and assigns it through the reviewed 
   ).toBeVisible();
 });
 
+test("parent authors a listening question and keeps its audio private until assignment", async ({
+  page,
+  request,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "The shared fixture API import runs once; responsive UI is covered separately.",
+  );
+  const apiBaseUrl = "http://127.0.0.1:8017";
+  const fixtureKey = `e2e-manual-listening-${testInfo.workerIndex}`;
+  const family = (await (
+    await request.post(`${apiBaseUrl}/v1/families`, {
+      headers: {
+        Authorization: "Bearer parent-fixture",
+        "Idempotency-Key": `${fixtureKey}-family`,
+      },
+      data: { name: "Manual listening family" },
+    })
+  ).json()) as { id: string };
+  const child = (await (
+    await request.post(`${apiBaseUrl}/v1/families/${family.id}/children`, {
+      headers: {
+        Authorization: "Bearer parent-fixture",
+        "Idempotency-Key": `${fixtureKey}-child`,
+      },
+      data: {
+        nickname: "Manual listening child",
+        grade_stage: "Junior high 1",
+        ui_language: "en",
+        pin: "123456",
+      },
+    })
+  ).json()) as { id: string };
+
+  await page.goto(
+    `/parent/create/?familyId=${encodeURIComponent(family.id)}&childId=${encodeURIComponent(child.id)}`,
+  );
+  await page.getByRole("button", { name: "Start simple" }).click();
+  await page.getByLabel("Practice title").fill("Morning announcement");
+  await page.getByLabel("Response type").selectOption("listening");
+  await page
+    .getByRole("textbox", { name: "Question", exact: true })
+    .fill("Listen and choose where the class will meet.");
+  await page
+    .getByLabel("Choices, one per line")
+    .fill("The library\nThe gym");
+  await page
+    .getByLabel("Answer or grading guide")
+    .fill("The library");
+  await page.getByLabel("Maximum replays").fill("2");
+  await page
+    .getByLabel("Transcript (optional)")
+    .fill("Please meet in the library after school.");
+  await page
+    .getByLabel("When to show transcript")
+    .selectOption("after_submission");
+  await page.getByRole("button", { name: "Create review draft" }).click();
+  await expect(
+    page.getByRole("heading", {
+      name: "Listen and choose where the class will meet.",
+    }),
+  ).toBeVisible();
+  await page.getByLabel("Audio for question 1").setInputFiles({
+    name: "morning-announcement.mp3",
+    mimeType: "audio/mpeg",
+    buffer: Buffer.from("private listening audio"),
+  });
+
+  const importResponse = page.waitForResponse(
+    (response) =>
+      response.url() === `${apiBaseUrl}/v1/question-sets/imports/structured` &&
+      response.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "Confirm and assign" }).click();
+  const importedRequest = await importResponse;
+  expect(importedRequest.request().postDataJSON()).toMatchObject({
+    source_name: "Manual question",
+    document: {
+      question_set: { source_mode: "manual", title: "Morning announcement" },
+      questions: [
+        {
+          type: "listening",
+          options: ["The library", "The gym"],
+          answer_key: { choice: 0 },
+          listening: {
+            replay_limit: 2,
+            transcript: "Please meet in the library after school.",
+            transcript_policy: "after_submission",
+            audio_path: expect.stringContaining(`${family.id}/`),
+          },
+        },
+      ],
+    },
+  });
+});
+
 test("parent authors a multiple-choice question and the child is graded from every selected answer", async ({
   page,
   request,

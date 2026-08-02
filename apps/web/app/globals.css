@@ -3391,6 +3391,13 @@ button {
   padding: 0.7rem;
 }
 
+.manual-listening-help {
+  margin: -0.1rem 0 0.85rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
 .completed-paper-language {
   display: grid;
   gap: 0.4rem;
