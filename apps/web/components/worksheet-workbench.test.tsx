@@ -1278,6 +1278,57 @@ describe("WorksheetWorkbench", () => {
     );
   });
 
+  it("clears the previous practice while browser navigation opens another attempt", async () => {
+    let resolveSecondAttempt!: (work: typeof assignmentWork) => void;
+    const secondAttempt = {
+      ...assignmentWork,
+      title: "Second assigned practice",
+      attempt: { id: "attempt-2", started_at: new Date().toISOString() },
+      questions: [
+        {
+          ...assignmentWork.questions[1],
+          id: "second-fill",
+          prompt: "Complete: They ___ ready.",
+        },
+      ],
+    };
+    const secondAttemptRequest = new Promise<typeof assignmentWork>((resolve) => {
+      resolveSecondAttempt = resolve;
+    });
+    mocks.getAttemptWork.mockImplementation((attemptId: string) =>
+      attemptId === "attempt-2" ? secondAttemptRequest : Promise.resolve(assignmentWork),
+    );
+
+    render(<WorksheetWorkbench />);
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Choose the correct expansion of (a + b)(a − b).",
+      }),
+    ).toBeInTheDocument();
+
+    window.history.pushState({}, "", "/child/work/?attemptId=attempt-2");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Opening your assigned practice…",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", {
+        name: "Choose the correct expansion of (a + b)(a − b).",
+      }),
+    ).not.toBeInTheDocument();
+    expect(mocks.getAttemptWork).toHaveBeenCalledWith("attempt-2", "child-token");
+
+    resolveSecondAttempt(secondAttempt);
+
+    expect(
+      await screen.findByRole("heading", { name: "Complete: They ___ ready." }),
+    ).toBeInTheDocument();
+  });
+
   it("persists removing the final response photo as an empty photo answer", async () => {
     render(<WorksheetWorkbench />);
 

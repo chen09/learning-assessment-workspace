@@ -334,6 +334,34 @@ function WorksheetWorkbenchContent() {
   );
 
   useEffect(() => {
+    const reopenPracticeFromHistory = () => {
+      setLoadState("loading");
+      setTitle("");
+      setQuestions([]);
+      setAnswers({});
+      setPhotoPreviewUrls({});
+      setPhotoClarityWarnings({});
+      setCurrentIndex(0);
+      setSubmittedQuestionIds([]);
+      setQuestionResults({});
+      setGradingQuestionIds([]);
+      setSubmissionConfirmation(null);
+      setAttemptId(null);
+      setFamilyId(null);
+      setChildToken(null);
+      setExamMode(false);
+      setSecondsRemaining(10 * 60);
+      setSaveStatus("idle");
+      setIsRetryAttempt(false);
+      setLoadRequest((current) => current + 1);
+    };
+
+    window.addEventListener("popstate", reopenPracticeFromHistory);
+    return () =>
+      window.removeEventListener("popstate", reopenPracticeFromHistory);
+  }, []);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const assignmentId = params.get("assignmentId");
     const existingAttemptId = params.get("attemptId");
