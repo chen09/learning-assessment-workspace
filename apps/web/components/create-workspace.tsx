@@ -2447,27 +2447,24 @@ function CreateWorkspaceContent() {
     <>
       <header className="page-header">
         <div>
-          <p className="eyebrow">New question set</p>
-          <h1>What should we practise?</h1>
-          <p className="lede">
-            Start from a learning goal, a worksheet, textbook pages, or a small
-            set you write yourself.
-          </p>
+          <p className="eyebrow">{t("creation.eyebrow")}</p>
+          <h1>{t("creation.title")}</h1>
+          <p className="lede">{t("creation.description")}</p>
         </div>
         <LanguageSwitcher />
       </header>
 
       <section className="creation-card assignment-target-card">
         <div>
-          <p className="eyebrow">Assign to</p>
-          <h2>Choose the child who will receive this set</h2>
+          <p className="eyebrow">{t("creation.assignTo")}</p>
+          <h2>{t("creation.chooseChild")}</h2>
         </div>
         {families.length > 0 ? (
           <div className="assignment-target-fields">
             <label>
-              Family
+              {t("creation.family")}
               <select
-                aria-label="Family"
+                aria-label={t("creation.family")}
                 onChange={(event) => void selectFamily(event.target.value)}
                 value={selectedFamilyId}
               >
@@ -2479,9 +2476,9 @@ function CreateWorkspaceContent() {
               </select>
             </label>
             <label>
-              Child
+              {t("creation.child")}
               <select
-                aria-label="Child"
+                aria-label={t("creation.child")}
                 disabled={children.length === 0}
                 onChange={(event) => setSelectedChildId(event.target.value)}
                 value={selectedChildId}
@@ -2493,14 +2490,14 @@ function CreateWorkspaceContent() {
                     </option>
                   ))
                 ) : (
-                  <option value="">Add a child first</option>
+                  <option value="">{t("creation.addChildFirst")}</option>
                 )}
               </select>
             </label>
           </div>
         ) : (
           <Link className="button ghost" href="/parent/family/">
-            Add a family and child first
+            {t("creation.addFamilyChildFirst")}
           </Link>
         )}
       </section>
@@ -2805,18 +2802,14 @@ function CreateWorkspaceContent() {
                   <FileJson2 />
                 </span>
                 <div>
-                  <h2>Import an AI-structured question set</h2>
-                  <p>
-                    Select a schema 1.0 JSON file. It is validated and previewed
-                    here; it is never added to the application code or a pull
-                    request.
-                  </p>
+                  <h2>{t("structuredImport.heading")}</h2>
+                  <p>{t("structuredImport.description")}</p>
                 </div>
               </div>
               <label className="field-label">
-                Private source material (optional)
+                {t("structuredImport.privateSource")}
                 <select
-                  aria-label="Private source material"
+                  aria-label={t("structuredImport.privateSource")}
                   onChange={(event) => {
                     const material = availableSourceMaterials.find(
                       (candidate) => candidate.id === event.target.value,
@@ -2827,7 +2820,9 @@ function CreateWorkspaceContent() {
                   }}
                   value={sourceMaterialQuestionSetId ?? ""}
                 >
-                  <option value="">No linked source material</option>
+                  <option value="">
+                    {t("structuredImport.noLinkedSource")}
+                  </option>
                   {availableSourceMaterials.map((material) => (
                     <option key={material.id} value={material.id}>
                       {material.title} · {material.subject}
@@ -2835,14 +2830,13 @@ function CreateWorkspaceContent() {
                   ))}
                 </select>
                 <span>
-                  Links this JSON draft to a private textbook or reference without
-                  exposing its files to the child.
+                  {t("structuredImport.sourceHelp")}
                 </span>
               </label>
               <label className="drop-zone">
                 <input
                   accept=".json,application/json"
-                  aria-label="AI question JSON"
+                  aria-label={t("structuredImport.json")}
                   onChange={(event) => {
                     const file = event.target.files?.[0] ?? null;
                     setStructuredFile(file);
@@ -2853,11 +2847,10 @@ function CreateWorkspaceContent() {
                 />
                 <FileJson2 />
                 <strong>
-                  {structuredFile?.name || "Choose AI question JSON"}
+                  {structuredFile?.name || t("structuredImport.chooseJson")}
                 </strong>
                 <span>
-                  Preview does not write to the database. Questions are created
-                  and assigned only after your confirmation.
+                  {t("structuredImport.previewHelp")}
                 </span>
               </label>
             </>
@@ -3055,15 +3048,14 @@ function CreateWorkspaceContent() {
             {requestStatus === "working"
               ? "Preparing draft…"
               : mode === "structured"
-                ? "Preview questions"
+                ? t("structuredImport.preview")
                 : mode === "completed"
                   ? "Upload for review"
                   : "Create review draft"}
           </button>
           {requestStatus === "error" ? (
             <p className="form-error" role="alert">
-              The request could not be completed. Check your connection and
-              sign-in, then try again.
+              {t("creation.error")}
             </p>
           ) : null}
         </section>

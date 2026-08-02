@@ -557,7 +557,7 @@ describe("CreateWorkspace", () => {
     );
 
     const sourceSelector = await screen.findByRole("combobox", {
-      name: "Private source material",
+      name: "Private source material (optional)",
     });
     expect(sourceSelector).toHaveTextContent("Lesson 2 textbook photos");
     expect(sourceSelector).not.toHaveTextContent("Earlier practice");
@@ -1388,7 +1388,7 @@ describe("CreateWorkspace", () => {
 
     render(<CreateWorkspace />);
 
-    await screen.findByRole("combobox", { name: "Child" });
+    await screen.findByRole("combobox", { name: "孩子" });
     fireEvent.click(screen.getByRole("button", { name: "批改已完成的试卷" }));
 
     expect(

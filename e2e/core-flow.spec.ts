@@ -676,7 +676,7 @@ test("parent previews an AI JSON file before assigning its structured questions"
     page.getByRole("heading", { name: "What is 3 + 3?" }),
   ).toBeVisible();
 
-  await page.getByLabel("Exam mode").check();
+  await page.getByRole("radio", { name: "Timed exam" }).check();
   await page.getByLabel("Time limit").selectOption("15");
 
   const importResponse = page.waitForResponse(

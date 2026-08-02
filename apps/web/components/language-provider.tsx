@@ -45,6 +45,30 @@ const messages = {
     "sourceMaterial.copyPrompt": "Copy JSON generation prompt",
     "sourceMaterial.promptCopied": "Prompt copied",
     "sourceMaterial.importJson": "Import AI question JSON",
+    "creation.eyebrow": "New question set",
+    "creation.title": "What should we practise?",
+    "creation.description":
+      "Start from a learning goal, a worksheet, textbook pages, or a small set you write yourself.",
+    "creation.assignTo": "Assign to",
+    "creation.chooseChild": "Choose the child who will receive this set",
+    "creation.family": "Family",
+    "creation.child": "Child",
+    "creation.addChildFirst": "Add a child first",
+    "creation.addFamilyChildFirst": "Add a family and child first",
+    "structuredImport.heading": "Import an AI-structured question set",
+    "structuredImport.description":
+      "Select a schema 1.0 JSON file. It is validated and previewed here; it is never added to the application code or a pull request.",
+    "structuredImport.privateSource": "Private source material (optional)",
+    "structuredImport.noLinkedSource": "No linked source material",
+    "structuredImport.sourceHelp":
+      "Links this JSON draft to a private textbook or reference without exposing its files to the child.",
+    "structuredImport.json": "AI question JSON",
+    "structuredImport.chooseJson": "Choose AI question JSON",
+    "structuredImport.previewHelp":
+      "Preview does not write to the database. Questions are created and assigned only after your confirmation.",
+    "structuredImport.preview": "Preview questions",
+    "creation.error":
+      "The request could not be completed. Check your connection and sign-in, then try again.",
     "draftReview.back": "Back to source",
     "draftReview.eyebrow": "AI structured draft",
     "draftReview.title": "Review before assigning",
@@ -614,6 +638,30 @@ const messages = {
     "sourceMaterial.copyPrompt": "JSON 生成プロンプトをコピー",
     "sourceMaterial.promptCopied": "プロンプトをコピーしました",
     "sourceMaterial.importJson": "AI 問題 JSON を読み込む",
+    "creation.eyebrow": "新しい問題セット",
+    "creation.title": "何を練習しますか？",
+    "creation.description":
+      "学習目標、ワークシート、教科書のページ、または自分で作る小さなセットから始められます。",
+    "creation.assignTo": "割り当て先",
+    "creation.chooseChild": "このセットを受け取るお子さまを選択",
+    "creation.family": "家族",
+    "creation.child": "子ども",
+    "creation.addChildFirst": "先に子どもを追加",
+    "creation.addFamilyChildFirst": "先に家族と子どもを追加",
+    "structuredImport.heading": "AI 構造化問題セットを読み込む",
+    "structuredImport.description":
+      "schema 1.0 の JSON ファイルを選択してください。ここで検証・プレビューされ、アプリのコードやプルリクエストには追加されません。",
+    "structuredImport.privateSource": "非公開の教材素材（任意）",
+    "structuredImport.noLinkedSource": "関連付ける教材素材はありません",
+    "structuredImport.sourceHelp":
+      "子どもにファイルを見せずに、この JSON 下書きを非公開の教科書または参考資料に関連付けます。",
+    "structuredImport.json": "AI 問題 JSON",
+    "structuredImport.chooseJson": "AI 問題 JSON を選択",
+    "structuredImport.previewHelp":
+      "プレビューではデータベースに書き込みません。確認後にのみ問題を作成して割り当てます。",
+    "structuredImport.preview": "問題をプレビュー",
+    "creation.error":
+      "リクエストを完了できませんでした。接続とログイン状態を確認して、もう一度お試しください。",
     "draftReview.back": "教材に戻る",
     "draftReview.eyebrow": "AI 構造化下書き",
     "draftReview.title": "割り当て前に確認",
@@ -1180,6 +1228,30 @@ const messages = {
     "sourceMaterial.copyPrompt": "复制 JSON 生成提示词",
     "sourceMaterial.promptCopied": "已复制提示词",
     "sourceMaterial.importJson": "导入 AI 题目 JSON",
+    "creation.eyebrow": "新建题单",
+    "creation.title": "要练习什么？",
+    "creation.description":
+      "可以从学习目标、练习卷、教材页面，或自己编写的一小组题目开始。",
+    "creation.assignTo": "布置给",
+    "creation.chooseChild": "选择接收这份题单的孩子",
+    "creation.family": "家庭",
+    "creation.child": "孩子",
+    "creation.addChildFirst": "请先添加孩子",
+    "creation.addFamilyChildFirst": "请先添加家庭和孩子",
+    "structuredImport.heading": "导入 AI 结构化题单",
+    "structuredImport.description":
+      "选择 schema 1.0 JSON 文件。系统只会在这里验证和预览，不会把它加入应用代码或拉取请求。",
+    "structuredImport.privateSource": "私有教材素材（可选）",
+    "structuredImport.noLinkedSource": "不关联教材素材",
+    "structuredImport.sourceHelp":
+      "将 JSON 草稿关联到私有教材或参考资料，但不会向孩子公开其中的文件。",
+    "structuredImport.json": "AI 题目 JSON",
+    "structuredImport.chooseJson": "选择 AI 题目 JSON",
+    "structuredImport.previewHelp":
+      "预览不会写入数据库。只有确认后，题目才会创建并布置给孩子。",
+    "structuredImport.preview": "预览题目",
+    "creation.error":
+      "无法完成请求。请检查网络和登录状态后重试。",
     "draftReview.back": "返回教材",
     "draftReview.eyebrow": "AI 结构化草稿",
     "draftReview.title": "布置前审核",
