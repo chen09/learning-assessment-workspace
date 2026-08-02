@@ -733,6 +733,8 @@ const messages = {
     "completedPaper.originalPages": "Original completed pages",
     "completedPaper.originalPagesHelp":
       "These short-lived previews are visible only while you review this paper.",
+    "completedPaper.showAnswerRegions": "Show answer regions",
+    "completedPaper.hideAnswerRegions": "Hide answer regions",
     "completedPaper.pagePreview": "Completed worksheet page {page}",
     "completedPaper.answerRegionOnPage":
       "Answer area for question {position} on page {page}",
@@ -1497,6 +1499,8 @@ const messages = {
     "completedPaper.originalPages": "元の解答済みページ",
     "completedPaper.originalPagesHelp":
       "この短時間だけ有効なプレビューは、このプリントを確認中の保護者だけに表示されます。",
+    "completedPaper.showAnswerRegions": "解答範囲を表示",
+    "completedPaper.hideAnswerRegions": "解答範囲を隠す",
     "completedPaper.pagePreview": "解答済みプリント {page} ページ",
     "completedPaper.answerRegionOnPage":
       "問題 {position} の {page} ページの解答範囲",
@@ -2237,6 +2241,8 @@ const messages = {
     "completedPaper.originalPages": "原始已作答页面",
     "completedPaper.originalPagesHelp":
       "这些短时预览仅在您确认这份试卷时，对所属家长可见。",
+    "completedPaper.showAnswerRegions": "显示答题区域",
+    "completedPaper.hideAnswerRegions": "隐藏答题区域",
     "completedPaper.pagePreview": "已作答试卷第 {page} 页",
     "completedPaper.answerRegionOnPage": "第 {position} 题在第 {page} 页的答题区域",
     "completedPaper.openOriginal": "打开原始文件",

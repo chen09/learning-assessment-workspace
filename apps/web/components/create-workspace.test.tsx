@@ -1679,6 +1679,21 @@ describe("CreateWorkspace", () => {
     expect(
       screen.getByLabelText("Answer area for question 1 on page 1"),
     ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Hide answer regions" }),
+    );
+    expect(
+      screen.queryByLabelText("Answer area for question 1 on page 1"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Show answer regions" }),
+    ).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Show answer regions" }),
+    );
+    expect(
+      screen.getByLabelText("Answer area for question 1 on page 1"),
+    ).toBeInTheDocument();
     fireEvent.change(
       screen.getByLabelText("Question 1 wording"),
       { target: { value: "Factorise x² − 25." } },

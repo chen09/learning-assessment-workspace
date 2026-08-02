@@ -1540,6 +1540,14 @@ test("parent validates a local-AI completed-paper review before submitting it", 
   await expect(
     page.getByLabel("Answer area for question 1 on page 1"),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Hide answer regions" }).click();
+  await expect(
+    page.getByLabel("Answer area for question 1 on page 1"),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Show answer regions" }).click();
+  await expect(
+    page.getByLabel("Answer area for question 1 on page 1"),
+  ).toBeVisible();
   await page
     .getByLabel("Question 1 wording")
     .fill("Factorise x² - 25.");

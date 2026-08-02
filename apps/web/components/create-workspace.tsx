@@ -480,6 +480,8 @@ function CreateWorkspaceContent() {
   const [completedResponsePreviewUrls, setCompletedResponsePreviewUrls] = useState<
     string[]
   >([]);
+  const [showCompletedPaperRegions, setShowCompletedPaperRegions] =
+    useState(true);
   const [completedPromptCopied, setCompletedPromptCopied] = useState(false);
   const [completedAttemptId, setCompletedAttemptId] = useState<string | null>(
     null,
@@ -2443,6 +2445,22 @@ function CreateWorkspaceContent() {
                 {t("completedPaper.originalPages")}
               </h2>
               <p>{t("completedPaper.originalPagesHelp")}</p>
+              {completedReview?.answer_regions.some(
+                (answerRegion) => (answerRegion.regions?.length ?? 0) > 0,
+              ) ? (
+                <button
+                  aria-pressed={showCompletedPaperRegions}
+                  className="button ghost red-pencil-toggle"
+                  onClick={() =>
+                    setShowCompletedPaperRegions((visible) => !visible)
+                  }
+                  type="button"
+                >
+                  {showCompletedPaperRegions
+                    ? t("completedPaper.hideAnswerRegions")
+                    : t("completedPaper.showAnswerRegions")}
+                </button>
+              ) : null}
             </div>
             <div className="completed-paper-preview-pages">
               {completedResponsePreviewUrls.map((previewUrl, index) => {
@@ -2482,26 +2500,31 @@ function CreateWorkspaceContent() {
                         alt={t("completedPaper.pagePreview", { page })}
                         src={previewUrl}
                       />
-                      {answerRegions.map((region, regionIndex) => (
-                        <span
-                          aria-label={t("completedPaper.answerRegionOnPage", {
-                            page,
-                            position: region.position,
-                          })}
-                          className="completed-paper-answer-region"
-                          data-completed-paper-region={region.position}
-                          key={`${region.position}-${regionIndex}`}
-                          role="img"
-                          style={{
-                            height: `${region.height * 100}%`,
-                            left: `${region.x * 100}%`,
-                            top: `${region.y * 100}%`,
-                            width: `${region.width * 100}%`,
-                          }}
-                        >
-                          <span aria-hidden="true">{region.position}</span>
-                        </span>
-                      ))}
+                      {showCompletedPaperRegions
+                        ? answerRegions.map((region, regionIndex) => (
+                            <span
+                              aria-label={t(
+                                "completedPaper.answerRegionOnPage",
+                                {
+                                  page,
+                                  position: region.position,
+                                },
+                              )}
+                              className="completed-paper-answer-region"
+                              data-completed-paper-region={region.position}
+                              key={`${region.position}-${regionIndex}`}
+                              role="img"
+                              style={{
+                                height: `${region.height * 100}%`,
+                                left: `${region.x * 100}%`,
+                                top: `${region.y * 100}%`,
+                                width: `${region.width * 100}%`,
+                              }}
+                            >
+                              <span aria-hidden="true">{region.position}</span>
+                            </span>
+                          ))
+                        : null}
                     </div>
                     <figcaption>{filename || label}</figcaption>
                   </figure>
