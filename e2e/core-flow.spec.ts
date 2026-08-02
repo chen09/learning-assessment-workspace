@@ -131,6 +131,61 @@ test("parent dashboard switches families before showing another child's work", a
   await expect(page.getByText("First child", { exact: true })).toBeHidden();
 });
 
+test("a child refreshes an empty home after a parent assigns a practice", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "The refresh action is covered once at desktop size.",
+  );
+  let assignmentRequests = 0;
+  await page.addInitScript(() => {
+    window.localStorage.setItem("luma-child-session", "refresh-child-token");
+    window.localStorage.setItem(
+      "luma-child-profile",
+      JSON.stringify({
+        child_id: "refresh-child",
+        family_id: "refresh-family",
+        nickname: "Alex",
+        ui_language: "en",
+      }),
+    );
+  });
+  await page.route("**/v1/assignments", async (route) => {
+    assignmentRequests += 1;
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify(
+        assignmentRequests === 1
+          ? []
+          : [
+              {
+                id: "newly-assigned-practice",
+                title: "New fraction practice",
+                status: "assigned",
+                mode: "practice",
+                time_limit_seconds: null,
+                parent_note: null,
+                question_count: 4,
+                latest_attempt_id: null,
+              },
+            ],
+      ),
+    });
+  });
+  await page.route("**/v1/reviews/today", async (route) => {
+    await route.fulfill({ contentType: "application/json", body: "[]" });
+  });
+
+  await page.goto("/child/");
+  await expect(page.getByText("No assigned work is waiting.")).toBeVisible();
+  await page.getByRole("button", { name: "Refresh practice" }).click();
+  await expect(
+    page.getByRole("heading", { name: "New fraction practice" }),
+  ).toBeVisible();
+  expect(assignmentRequests).toBe(2);
+});
+
 test("parent history selects an authorized family when opened from the sidebar", async ({
   page,
 }) => {

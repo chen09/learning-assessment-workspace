@@ -136,4 +136,25 @@ describe("ChildHomePage", () => {
       screen.getByRole("heading", { name: "Algebra & English warm-up" }),
     ).toBeInTheDocument();
   });
+
+  it("lets a child refresh an empty plan after a parent assigns new work", async () => {
+    mocks.getChildAssignments
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([assignment]);
+
+    render(<ChildHomePage />);
+
+    expect(
+      await screen.findByText("目前没有待完成的练习。"),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "刷新练习" }));
+
+    await waitFor(() => {
+      expect(mocks.getChildAssignments).toHaveBeenCalledTimes(2);
+    });
+    expect(
+      screen.getByRole("heading", { name: "Algebra & English warm-up" }),
+    ).toBeInTheDocument();
+  });
 });

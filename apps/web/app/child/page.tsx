@@ -43,6 +43,7 @@ function ChildHomeContent() {
   const [loadState, setLoadState] = useState<
     "loading" | "ready" | "signed-out" | "error"
   >("loading");
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const latestPlanRequest = useRef(0);
 
   const refreshPlan = useCallback(async () => {
@@ -91,6 +92,15 @@ function ChildHomeContent() {
       window.removeEventListener("focus", refreshWhenReturning);
     };
   }, [refreshPlan]);
+
+  const refreshAfterAssignment = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshPlan();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const current = assignments[0];
   const additionalAssignments = assignments.slice(1);
@@ -224,6 +234,19 @@ function ChildHomeContent() {
                 ? t("childHome.parentCanAssign")
                 : t("worksheet.tryAgain")}
             </p>
+            {loadState === "ready" ? (
+              <button
+                aria-busy={isRefreshing}
+                className="button ghost"
+                disabled={isRefreshing}
+                onClick={() => void refreshAfterAssignment()}
+                type="button"
+              >
+                {isRefreshing
+                  ? t("childHome.refreshing")
+                  : t("childHome.refresh")}
+              </button>
+            ) : null}
           </div>
         </section>
       )}

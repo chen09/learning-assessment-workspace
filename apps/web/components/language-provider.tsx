@@ -370,6 +370,8 @@ const messages = {
     "childHome.noAssigned": "No assigned work is waiting.",
     "childHome.parentCanAssign":
       "A parent can assign the next practice from the family workspace.",
+    "childHome.refresh": "Refresh practice",
+    "childHome.refreshing": "Checking for new practice…",
     "childHome.todayReview": "Today's review",
     "childHome.shortQuestions": "{count} short questions",
     "childHome.reviewNote":
@@ -1140,6 +1142,8 @@ const messages = {
     "childHome.noAssigned": "待っている課題はありません。",
     "childHome.parentCanAssign":
       "次の練習は保護者が家族の学習スペースから割り当てられます。",
+    "childHome.refresh": "練習を更新",
+    "childHome.refreshing": "新しい練習を確認しています…",
     "childHome.todayReview": "今日の復習",
     "childHome.shortQuestions": "短い問題 {count} 問",
     "childHome.reviewNote":
@@ -1899,6 +1903,8 @@ const messages = {
     "childHome.allClear": "全部完成",
     "childHome.noAssigned": "目前没有待完成的练习。",
     "childHome.parentCanAssign": "家长可以从家庭学习空间安排下一份练习。",
+    "childHome.refresh": "刷新练习",
+    "childHome.refreshing": "正在检查新的练习…",
     "childHome.todayReview": "今日复习",
     "childHome.shortQuestions": "{count} 道短题",
     "childHome.reviewNote":
