@@ -2121,7 +2121,7 @@ function CreateWorkspaceContent() {
                 editingQuestionId === question.id ? (
                   <div className="draft-question-editor">
                     <label>
-                      Question wording
+                      {t("draftReview.questionWording")}
                       <textarea
                         aria-label="Question wording"
                         onChange={(event) =>
@@ -2132,7 +2132,7 @@ function CreateWorkspaceContent() {
                       />
                     </label>
                     <label>
-                      Points
+                      {t("draftReview.points")}
                       <input
                         aria-label="Points"
                         min="0.5"
@@ -2145,7 +2145,7 @@ function CreateWorkspaceContent() {
                       />
                     </label>
                     <label>
-                      Response type
+                      {t("draftReview.responseType")}
                       <select
                         aria-label="Response type"
                         onChange={(event) =>
@@ -2155,14 +2155,20 @@ function CreateWorkspaceContent() {
                         }
                         value={editedQuestionType}
                       >
-                        <option value="typed_text">Type an answer</option>
-                        <option value="single_choice">Choose one answer</option>
-                        <option value="handwriting">Write by hand</option>
+                        <option value="typed_text">
+                          {t("draftReview.typeTyped")}
+                        </option>
+                        <option value="single_choice">
+                          {t("draftReview.typeChoice")}
+                        </option>
+                        <option value="handwriting">
+                          {t("draftReview.typeHandwriting")}
+                        </option>
                       </select>
                     </label>
                     {editedQuestionType === "single_choice" ? (
                       <label>
-                        Choices, one per line
+                        {t("draftReview.choices")}
                         <textarea
                           aria-label="Choices, one per line"
                           onChange={(event) =>
@@ -2175,13 +2181,13 @@ function CreateWorkspaceContent() {
                     ) : null}
                     <label>
                       {editedQuestionType === "handwriting"
-                        ? "Reference answer or grading guide"
-                        : "Correct answer"}
+                        ? t("draftReview.referenceAnswer")
+                        : t("draftReview.correctAnswer")}
                       <textarea
                         aria-label={
                           editedQuestionType === "handwriting"
-                            ? "Reference answer or grading guide"
-                            : "Correct answer"
+                            ? t("draftReview.referenceAnswer")
+                            : t("draftReview.correctAnswer")
                         }
                         onChange={(event) =>
                           setEditedQuestionAnswer(event.target.value)
@@ -2191,8 +2197,7 @@ function CreateWorkspaceContent() {
                       />
                     </label>
                     <p>
-                      Handwritten answers go to parent review. Typed and choice
-                      answers use exact matching for now.
+                      {t("draftReview.handwritingNotice")}
                     </p>
                     {editError ? <p role="alert">{editError}</p> : null}
                     <div className="draft-question-editor-actions">
@@ -2201,7 +2206,7 @@ function CreateWorkspaceContent() {
                         onClick={() => saveStructuredQuestionEdit(question.id)}
                         type="button"
                       >
-                        Save question
+                        {t("draftReview.saveQuestion")}
                       </button>
                       <button
                         className="button ghost"
@@ -2211,7 +2216,7 @@ function CreateWorkspaceContent() {
                         }}
                         type="button"
                       >
-                        Cancel
+                        {t("draftReview.cancel")}
                       </button>
                     </div>
                   </div>
@@ -2229,7 +2234,7 @@ function CreateWorkspaceContent() {
                     </details>
                     {question.type === "listening" ? (
                       <label className="draft-listening-audio">
-                        Private audio file (MP3, M4A, or MP4)
+                        {t("draftReview.privateAudio")}
                         <input
                           accept="audio/mpeg,audio/mp4,.mp3,.m4a,.mp4"
                           aria-label={`Audio for question ${index + 1}`}
@@ -2248,8 +2253,8 @@ function CreateWorkspaceContent() {
                         <span>
                           {listeningAudioFiles[question.id]?.name ??
                             (question.listening?.audio_path
-                              ? "Private audio already attached"
-                              : "Audio is required before assigning")}
+                              ? t("draftReview.audioAttached")
+                              : t("draftReview.audioRequired"))}
                         </span>
                       </label>
                     ) : null}
@@ -2260,16 +2265,20 @@ function CreateWorkspaceContent() {
               editingQuestionId !== question.id ? (
                 <div className="draft-question-actions">
                   <button
-                    aria-label={`Move question ${index + 1} up`}
+                    aria-label={t("draftReview.moveUpAction", {
+                      number: index + 1,
+                    })}
                     className="quiet-link"
                     disabled={index === 0}
                     onClick={() => moveStructuredQuestion(question.id, -1)}
                     type="button"
                   >
-                    Move up
+                    {t("draftReview.moveUp")}
                   </button>
                   <button
-                    aria-label={`Move question ${index + 1} down`}
+                    aria-label={t("draftReview.moveDownAction", {
+                      number: index + 1,
+                    })}
                     className="quiet-link"
                     disabled={
                       index === draftQuestions.length - 1
@@ -2277,37 +2286,43 @@ function CreateWorkspaceContent() {
                     onClick={() => moveStructuredQuestion(question.id, 1)}
                     type="button"
                   >
-                    Move down
+                    {t("draftReview.moveDown")}
                   </button>
                   <button
-                    aria-label={`Duplicate question ${index + 1}`}
+                    aria-label={t("draftReview.duplicateAction", {
+                      number: index + 1,
+                    })}
                     className="quiet-link"
                     onClick={() => duplicateStructuredQuestion(question.id)}
                     type="button"
                   >
-                    Duplicate
+                    {t("draftReview.duplicate")}
                   </button>
                   <button
-                    aria-label={`Edit question ${index + 1}`}
+                    aria-label={t("draftReview.editQuestionAction", {
+                      number: index + 1,
+                    })}
                     className="quiet-link"
                     onClick={() => beginStructuredQuestionEdit(question)}
                     type="button"
                   >
-                    Edit question
+                    {t("draftReview.editQuestion")}
                   </button>
                   <button
-                    aria-label={`Remove question ${index + 1}`}
+                    aria-label={t("draftReview.removeAction", {
+                      number: index + 1,
+                    })}
                     className="quiet-link draft-question-remove"
                     disabled={draftQuestions.length <= 1}
                     onClick={() => removeStructuredQuestion(question.id)}
                     title={
                       draftQuestions.length <= 1
-                        ? "A practice set needs at least one question"
-                        : "Remove this question from the draft"
+                        ? t("draftReview.removeOnlyTitle")
+                        : t("draftReview.removeTitle")
                     }
                     type="button"
                   >
-                    Remove
+                    {t("draftReview.remove")}
                   </button>
                 </div>
               ) : null}
