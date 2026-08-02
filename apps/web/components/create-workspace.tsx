@@ -2547,12 +2547,12 @@ function CreateWorkspaceContent() {
               <div className="creation-heading">
                 <span><Sparkles /></span>
                 <div>
-                  <h2>Describe the learning goal</h2>
-                  <p>The generated questions always return here as a draft.</p>
+                  <h2>{t("generation.heading")}</h2>
+                  <p>{t("generation.description")}</p>
                 </div>
               </div>
               <label className="field-label">
-                What should the set cover?
+                {t("generation.prompt")}
                 <textarea
                   onChange={(event) => setPrompt(event.target.value)}
                   rows={5}
@@ -2567,18 +2567,15 @@ function CreateWorkspaceContent() {
               <div className="creation-heading">
                 <span><ImagePlus /></span>
                 <div>
-                  <h2>Import pages or an existing worksheet</h2>
-                  <p>
-                    PDF, PNG, and JPEG are supported. Multiple images keep their
-                    selected order.
-                  </p>
+                  <h2>{t("materialImport.heading")}</h2>
+                  <p>{t("materialImport.description")}</p>
                 </div>
               </div>
               <fieldset className="source-purpose-options">
-                <legend>How should these files be used?</legend>
+                <legend>{t("materialImport.purpose")}</legend>
                 <label>
                   <input
-                    aria-label="Generate new questions from textbook or exercises"
+                    aria-label={t("materialImport.generate")}
                     checked={importPurpose === "generate_similar"}
                     name="import-purpose"
                     onChange={() => setImportPurpose("generate_similar")}
@@ -2586,17 +2583,16 @@ function CreateWorkspaceContent() {
                   />
                   <span>
                     <strong>
-                      Generate new questions from textbook or exercises
+                      {t("materialImport.generate")}
                     </strong>
                     <small>
-                      AI extracts the unit, knowledge points, examples, and
-                      difficulty progression before drafting new questions.
+                      {t("materialImport.generateHelp")}
                     </small>
                   </span>
                 </label>
                 <label>
                   <input
-                    aria-label="Convert an existing worksheet into questions"
+                    aria-label={t("materialImport.convert")}
                     checked={importPurpose === "use_as_questions"}
                     name="import-purpose"
                     onChange={() => setImportPurpose("use_as_questions")}
@@ -2604,28 +2600,27 @@ function CreateWorkspaceContent() {
                   />
                   <span>
                     <strong>
-                      Convert an existing worksheet into questions
+                      {t("materialImport.convert")}
                     </strong>
                     <small>
-                      The uploaded exercises become the child&apos;s
-                      interactive question set after your review.
+                      {t("materialImport.convertHelp")}
                     </small>
                   </span>
                 </label>
               </fieldset>
               <div className="assignment-target-fields source-material-metadata">
                 <label>
-                  Source title
+                  {t("materialImport.title")}
                   <input
-                    aria-label="Source title"
+                    aria-label={t("materialImport.title")}
                     onChange={(event) => setImportTitle(event.target.value)}
                     value={importTitle}
                   />
                 </label>
                 <label>
-                  Source subject
+                  {t("materialImport.subject")}
                   <input
-                    aria-label="Source subject"
+                    aria-label={t("materialImport.subject")}
                     onChange={(event) => setImportSubject(event.target.value)}
                     value={importSubject}
                   />
@@ -2636,8 +2631,8 @@ function CreateWorkspaceContent() {
                   accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
                   aria-label={
                     importPurpose === "use_as_questions"
-                      ? "Question material"
-                      : "Learning material and exercises"
+                      ? t("materialImport.questionMaterial")
+                      : t("materialImport.learningMaterial")
                   }
                   multiple
                   onChange={(event) => {
@@ -2655,19 +2650,19 @@ function CreateWorkspaceContent() {
                 <strong>
                   {fileName ||
                     (importPurpose === "use_as_questions"
-                      ? "Choose worksheet PDF or photos"
-                      : "Choose textbook and exercise pages")}
+                      ? t("materialImport.chooseWorksheet")
+                      : t("materialImport.chooseTextbook"))}
                 </strong>
                 <span>
                   {importPurpose === "use_as_questions"
-                    ? "These pages become the questions children answer after your review."
-                    : "These private pages become the basis for a reusable unit and new AI-generated questions."}
+                    ? t("materialImport.worksheetHelp")
+                    : t("materialImport.textbookHelp")}
                 </span>
               </label>
               <label className="drop-zone">
                 <input
                   accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
-                  aria-label="Answer key (private)"
+                  aria-label={t("materialImport.answerKey")}
                   multiple
                   onChange={(event) => {
                     const selectedFiles = Array.from(
@@ -2681,13 +2676,13 @@ function CreateWorkspaceContent() {
                   type="file"
                 />
                 <Check />
-                <strong>{answerFileName || "Choose answer key"}</strong>
-                <span>Children never receive this file.</span>
+                <strong>{answerFileName || t("materialImport.chooseAnswerKey")}</strong>
+                <span>{t("materialImport.answerKeyHelp")}</span>
               </label>
               <label className="drop-zone">
                 <input
                   accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
-                  aria-label="Original material or examples (optional)"
+                  aria-label={t("materialImport.referenceMaterial")}
                   multiple
                   onChange={(event) => {
                     const selectedFiles = Array.from(
@@ -2702,11 +2697,10 @@ function CreateWorkspaceContent() {
                 />
                 <BookOpenText />
                 <strong>
-                  {referenceFileName || "Add original material or examples"}
+                  {referenceFileName || t("materialImport.addReferenceMaterial")}
                 </strong>
                 <span>
-                  Used privately to understand the learning goal and validate
-                  similar questions.
+                  {t("materialImport.referenceHelp")}
                 </span>
               </label>
             </>

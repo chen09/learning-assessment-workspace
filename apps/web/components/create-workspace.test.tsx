@@ -1405,6 +1405,24 @@ describe("CreateWorkspace", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows the learning-material import choices in the parent's selected language", async () => {
+    window.localStorage.setItem("luma-language:demo-parent", "zh");
+
+    render(<CreateWorkspace />);
+
+    await screen.findByRole("combobox", { name: "孩子" });
+    fireEvent.click(screen.getByRole("button", { name: "导入教材" }));
+
+    expect(
+      screen.getByRole("heading", { name: "导入教材或现有题单" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("radio", { name: "根据教材或练习生成新题目" }),
+    ).toBeChecked();
+    expect(screen.getByLabelText("教材标题")).toBeInTheDocument();
+    expect(screen.getByLabelText("教材与练习" )).toBeInTheDocument();
+  });
+
   it("translates the completed-paper entry in the parent's selected language", async () => {
     window.localStorage.setItem("luma-language:demo-parent", "zh");
 
