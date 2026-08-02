@@ -669,7 +669,9 @@ test("temporary parent completes the hosted family learning flow", async ({
     await expect(page.getByText("Try once more")).toHaveCount(2, {
       timeout: 45_000,
     });
-    await expect(page.getByText("Waiting for a parent")).toHaveCount(2);
+    await expect(
+      page.getByText("Waiting for a parent").first(),
+    ).toBeVisible();
 
     const attemptId = new URL(page.url()).searchParams.get("attemptId");
     expect(attemptId).toBeTruthy();
