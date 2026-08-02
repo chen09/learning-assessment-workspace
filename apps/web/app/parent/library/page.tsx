@@ -728,6 +728,14 @@ function LibraryContent() {
                     {text.printAssignment}
                   </Link>
                 ) : null}
+                {newAssignmentId && assignmentChildId ? (
+                  <Link
+                    className="button secondary"
+                    href={`/child/login/?childId=${encodeURIComponent(assignmentChildId)}&assignmentId=${encodeURIComponent(newAssignmentId)}`}
+                  >
+                    {t("draftReview.openChildSignIn")}
+                  </Link>
+                ) : null}
                 <button
                   className="button primary"
                   disabled={

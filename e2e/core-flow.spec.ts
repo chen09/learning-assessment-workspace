@@ -474,6 +474,14 @@ test("parent reassigns a confirmed library set with an exam limit", async ({
   await expect(
     page.getByRole("link", { name: "Print A4 worksheet" }),
   ).toHaveAttribute("href", /\/parent\/print\/?\?assignmentId=/);
+  await expect(
+    page.getByRole("link", { name: "Open child sign-in" }),
+  ).toHaveAttribute(
+    "href",
+    new RegExp(
+      `^/child/login/?\\?childId=${encodeURIComponent(child.id)}&assignmentId=`,
+    ),
+  );
   const printWorksheet = page.getByRole("link", {
     name: "Print A4 worksheet",
   });

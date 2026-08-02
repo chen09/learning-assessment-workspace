@@ -220,6 +220,10 @@ describe("LibraryPage", () => {
       "href",
       "/parent/print?assignmentId=assignment-1",
     );
+    expect(screen.getByRole("link", { name: "打开孩子登录页" })).toHaveAttribute(
+      "href",
+      "/child/login?childId=child-1&assignmentId=assignment-1",
+    );
   });
 
   it("keeps an optional exam time limit when assigning from the library", async () => {
