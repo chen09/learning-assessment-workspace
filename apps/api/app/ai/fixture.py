@@ -80,6 +80,11 @@ class FixtureAIAdapter:
         expected = request.question.answer_key.get("choice")
         actual = request.response.get("choices")
         correct = expected is not None and actual == [expected]
+        feedback = {
+            "en": {True: "Correct.", False: "Try again."},
+            "ja": {True: "正解です。", False: "もう一度解いてみましょう。"},
+            "zh": {True: "正确。", False: "请再试一次。"},
+        }[request.language][correct]
         return GradeResponseOutput(
             outcome=(
                 GradingOutcome.CORRECT if correct else GradingOutcome.INCORRECT
@@ -87,7 +92,7 @@ class FixtureAIAdapter:
             awarded_points=request.question.points if correct else 0,
             confidence=0.99,
             evidence=["Deterministic fixture comparison."],
-            feedback="Correct." if correct else "Try again.",
+            feedback=feedback,
         )
 
     def explain_correction(

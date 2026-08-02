@@ -20,6 +20,8 @@ class FixtureJobProcessor:
         if job.type == "analyze_completed_worksheet":
             self._grader.mark_succeeded(job)
             return self._repository.complete_completed_worksheet_analysis(job)
+        attempt = self._repository.attempts[str(job.subject_id)]
+        child = self._repository.children[str(attempt.child_id)]
         questions = self._repository.questions_for_attempt(str(job.subject_id))
         submitted_question_id = job.payload.get("question_id")
         if isinstance(submitted_question_id, str):
@@ -30,7 +32,12 @@ class FixtureJobProcessor:
             ]
         responses = self._repository.responses_for_attempt(str(job.subject_id))
         results = [
-            self._grader.grade(job, question, responses.get(str(question.id)))
+            self._grader.grade(
+                job,
+                question,
+                responses.get(str(question.id)),
+                feedback_language=child.ui_language,
+            )
             for question in questions
         ]
         self._grader.mark_succeeded(job)

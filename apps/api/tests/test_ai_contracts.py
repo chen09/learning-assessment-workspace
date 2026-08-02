@@ -79,6 +79,7 @@ def test_fixture_adapter_is_deterministic_and_reports_confidence() -> None:
     )
     grade = adapter.grade_response(
         GradeResponseInput(
+            language="zh",
             question=first.questions[0],
             response={"kind": "choice", "choices": [1]},
         )
@@ -89,6 +90,7 @@ def test_fixture_adapter_is_deterministic_and_reports_confidence() -> None:
     assert 0 <= extracted.confidence <= 1
     assert grade.outcome == "correct"
     assert grade.confidence >= 0.95
+    assert grade.feedback == "正确。"
 
 
 def test_handwriting_strokes_render_to_a_clean_png(tmp_path) -> None:

@@ -2064,6 +2064,30 @@ test("parent creation reaches child grading and correction through the API", asy
   await expect(page.getByText("0/3", { exact: true })).toBeVisible();
   await expect(page.getByText("今日练习")).toBeVisible();
 
+  const firstQuestionSubmission = page.waitForResponse(
+    (response) =>
+      response.url().includes("/questions/") &&
+      response.url().endsWith("/submit") &&
+      response.request().method() === "POST",
+  );
+  await page
+    .getByRole("radio", {
+      name: "She walks to school every day.",
+    })
+    .click();
+  await expect(page.getByText("已保存", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "只提交这一题批改" }).click();
+  await page.getByRole("button", { name: "确认只提交这一题" }).click();
+  expect((await firstQuestionSubmission).status()).toBe(202);
+  const firstProcessedResponse = await request.post(
+    `${apiBaseUrl}/v1/demo/jobs/process-next`,
+    { headers: parentHeaders },
+  );
+  expect(firstProcessedResponse.ok()).toBeTruthy();
+  await expect(page.getByText("正确。", { exact: true })).toBeVisible({
+    timeout: 30_000,
+  });
+
   const languageResponse = page.waitForResponse(
     (response) =>
       response.url() === `${apiBaseUrl}/v1/children/me/language` &&
@@ -2076,12 +2100,6 @@ test("parent creation reaches child grading and correction through the API", asy
   await expect(page.getByText("今日の練習")).toBeVisible();
   await page.getByLabel("言語").selectOption("en");
 
-  await page
-    .getByRole("radio", {
-      name: "She walks to school every day.",
-    })
-    .click();
-  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Next question" }).click();
   await page.getByLabel("Your answer").fill("play");
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();

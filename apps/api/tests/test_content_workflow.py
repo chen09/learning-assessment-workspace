@@ -395,6 +395,50 @@ def test_parent_can_confirm_structured_json_and_assign_it_without_exposing_answe
     assert "answer_key" not in work.json()["questions"][0]
 
 
+def test_fixture_grading_uses_the_childs_selected_feedback_language() -> None:
+    """The development worker must mirror production's child-language contract."""
+    client = TestClient(create_app())
+    fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+    language = client.put(
+        f"/v1/children/{fixture['child']['id']}/language",
+        headers=PARENT_HEADERS,
+        json={"ui_language": "zh"},
+    )
+    session = client.post(
+        f"/v1/children/{fixture['child']['id']}/sessions",
+        json={"pin": "123456"},
+    ).json()
+    child_headers = {"Authorization": f"Bearer {session['access_token']}"}
+    work = client.post(
+        f"/v1/assignments/{fixture['assignment']['id']}/start",
+        headers=child_headers,
+    ).json()
+    question = work["questions"][0]
+    saved = client.put(
+        f"/v1/attempts/{work['attempt']['id']}/responses/{question['id']}",
+        headers=child_headers,
+        json={"kind": "choice", "answer": {"choices": [0]}, "expected_version": 0},
+    )
+    submitted = client.post(
+        f"/v1/attempts/{work['attempt']['id']}/questions/{question['id']}/submit",
+        headers={**child_headers, "Idempotency-Key": "submit-zh-feedback"},
+    )
+    processed = client.post("/v1/demo/jobs/process-next", headers=PARENT_HEADERS)
+    results = client.get(
+        f"/v1/attempts/{work['attempt']['id']}/results",
+        headers=child_headers,
+    )
+
+    assert language.status_code == 200
+    assert saved.status_code == 200
+    assert submitted.status_code == 202
+    assert processed.status_code == 200
+    assert results.json()["results"][0]["feedback"] == {
+        "summary": "正确。",
+        "action": "继续做下一题。",
+    }
+
+
 def test_listening_question_uses_private_audio_and_hides_transcript_until_submission() -> None:
     """A child receives a private audio URL only after a permitted playback."""
     client = TestClient(create_app())
