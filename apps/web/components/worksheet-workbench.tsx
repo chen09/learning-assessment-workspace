@@ -1587,22 +1587,24 @@ function WorksheetWorkbenchContent() {
                     ? t("worksheet.regradingAnswer")
                     : t("worksheet.regradeAnswer")}
                 </button>
-                <button
-                  className="button ghost"
-                  disabled={
-                    retryingQuestionId !== null ||
-                    regradingQuestionId !== null
-                  }
-                  onClick={() => void redoQuestion(question)}
-                  type="button"
-                >
-                  {retryingQuestionId === question.id
-                    ? t("worksheet.preparingRedo")
-                    : t("worksheet.redoQuestion")}
-                </button>
               </div>
             </>
           ) : null}
+          <div className="question-grade-actions">
+            <button
+              className="button ghost"
+              disabled={
+                retryingQuestionId !== null ||
+                regradingQuestionId !== null
+              }
+              onClick={() => void redoQuestion(question)}
+              type="button"
+            >
+              {retryingQuestionId === question.id
+                ? t("worksheet.preparingRedo")
+                : t("worksheet.redoQuestion")}
+            </button>
+          </div>
         </div>
       ) : null}
     </article>
