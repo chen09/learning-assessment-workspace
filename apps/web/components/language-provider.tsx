@@ -62,6 +62,24 @@ const messages = {
     "sourceMaterial.copyPrompt": "Copy JSON generation prompt",
     "sourceMaterial.promptCopied": "Prompt copied",
     "sourceMaterial.importJson": "Import AI question JSON",
+    "sourceImport.back": "Back to creation",
+    "sourceImport.eyebrow": "Private source import",
+    "sourceImport.processingTitle": "Preparing your question draft",
+    "sourceImport.processingDescription":
+      "This private source is still being processed. This page will update when its review draft is ready.",
+    "sourceImport.processingCardTitle": "Source import in progress",
+    "sourceImport.processingCardDescription":
+      "You can keep this page open or return later using its recovery link.",
+    "sourceImport.failedTitle": "The source draft needs another try",
+    "sourceImport.failedDescription":
+      "No question draft was created. Your original private material has not changed.",
+    "sourceImport.failedCardTitle": "Ready to retry safely",
+    "sourceImport.failedCardDescription":
+      "Retry will reuse the same private source files without exposing them to a child or public library.",
+    "sourceImport.processing": "Processing…",
+    "sourceImport.retry": "Retry processing",
+    "sourceImport.retrying": "Retrying…",
+    "sourceImport.error": "The source could not be retried. Please try again.",
     "creation.eyebrow": "New question set",
     "creation.title": "What should we practise?",
     "creation.description":
@@ -748,6 +766,24 @@ const messages = {
     "sourceMaterial.copyPrompt": "JSON 生成プロンプトをコピー",
     "sourceMaterial.promptCopied": "プロンプトをコピーしました",
     "sourceMaterial.importJson": "AI 問題 JSON を読み込む",
+    "sourceImport.back": "作成に戻る",
+    "sourceImport.eyebrow": "非公開の教材取り込み",
+    "sourceImport.processingTitle": "問題案を準備しています",
+    "sourceImport.processingDescription":
+      "この非公開素材は処理中です。保護者レビュー用の問題案ができると、このページが更新されます。",
+    "sourceImport.processingCardTitle": "教材の取り込み中",
+    "sourceImport.processingCardDescription":
+      "このまま待つか、復帰リンクを使って後で戻れます。",
+    "sourceImport.failedTitle": "問題案をもう一度準備します",
+    "sourceImport.failedDescription":
+      "問題案はまだ作成されていません。元の非公開素材は変更されていません。",
+    "sourceImport.failedCardTitle": "安全に再試行できます",
+    "sourceImport.failedCardDescription":
+      "再試行しても、同じ非公開素材だけを使います。子どもや公開ライブラリには公開されません。",
+    "sourceImport.processing": "処理中…",
+    "sourceImport.retry": "処理を再試行",
+    "sourceImport.retrying": "再試行中…",
+    "sourceImport.error": "教材を再試行できませんでした。もう一度お試しください。",
     "creation.eyebrow": "新しい問題セット",
     "creation.title": "何を練習しますか？",
     "creation.description":
@@ -1428,6 +1464,24 @@ const messages = {
     "sourceMaterial.copyPrompt": "复制 JSON 生成提示词",
     "sourceMaterial.promptCopied": "已复制提示词",
     "sourceMaterial.importJson": "导入 AI 题目 JSON",
+    "sourceImport.back": "返回创建",
+    "sourceImport.eyebrow": "私有素材导入",
+    "sourceImport.processingTitle": "正在准备题目草稿",
+    "sourceImport.processingDescription":
+      "这份私有素材仍在处理中。可审核的题目草稿准备好后，此页面会自动更新。",
+    "sourceImport.processingCardTitle": "素材正在解析",
+    "sourceImport.processingCardDescription":
+      "可以保持此页面打开，也可以稍后通过恢复链接返回。",
+    "sourceImport.failedTitle": "题目草稿需要重新尝试",
+    "sourceImport.failedDescription":
+      "尚未创建题目草稿。原始私有素材没有任何变化。",
+    "sourceImport.failedCardTitle": "可以安全地重新解析",
+    "sourceImport.failedCardDescription":
+      "重新解析仍只会使用同一份私有素材，不会展示给孩子或公开题库。",
+    "sourceImport.processing": "处理中…",
+    "sourceImport.retry": "重新解析",
+    "sourceImport.retrying": "正在重新解析…",
+    "sourceImport.error": "无法重新解析素材，请再试一次。",
     "creation.eyebrow": "新建题单",
     "creation.title": "要练习什么？",
     "creation.description":

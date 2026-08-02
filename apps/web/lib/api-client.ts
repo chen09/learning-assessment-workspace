@@ -1336,7 +1336,11 @@ export async function getCompletedWorksheetImport(
 }
 
 export async function retryJob(jobId: string, parentToken: string) {
-  return apiRequest<{ id: string; status: string; type: string }>(
+  return apiRequest<{
+    id: string;
+    status: "queued" | "running" | "succeeded" | "failed";
+    type: string;
+  }>(
     `/v1/jobs/${encodeURIComponent(jobId)}/retry`,
     { method: "POST" },
     parentToken,
@@ -1422,7 +1426,18 @@ export async function getQuestionSetDraft(
   parentToken: string,
 ) {
   return apiRequest<{
-    question_set: { id: string; status: string };
+    question_set: {
+      id: string;
+      title: string;
+      subject: string;
+      status: string;
+      source_summary: Record<string, unknown>;
+    };
+    import_job: {
+      id: string;
+      status: "queued" | "running" | "succeeded" | "failed";
+      type: string;
+    } | null;
     questions: Array<
       ApiQuestion & {
         answer_key: Record<string, unknown>;

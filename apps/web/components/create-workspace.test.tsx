@@ -151,6 +151,92 @@ describe("CreateWorkspace", () => {
     expect(screen.getByText("Complete: They ___ ready.")).toBeInTheDocument();
   });
 
+  it("returns a material-only import to its private source workflow", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/parent/create/?questionSetId=source-material-set-1",
+    );
+    mocks.getQuestionSetDraft.mockResolvedValue({
+      question_set: {
+        id: "source-material-set-1",
+        title: "Lesson 2 textbook pages",
+        subject: "English",
+        status: "needs_review",
+        source_summary: { artifact_kind: "private_source_material" },
+      },
+      questions: [],
+    });
+
+    render(<CreateWorkspace />);
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Source material saved privately",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Lesson 2 textbook pages is stored only for this family/),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a failed source import and retries without exposing the source", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/parent/create/?questionSetId=failed-source-set-1",
+    );
+    const failedDraft = {
+      question_set: {
+        id: "failed-source-set-1",
+        title: "Private textbook pages",
+        subject: "English",
+        status: "processing",
+        source_summary: {},
+      },
+      import_job: {
+        id: "source-job-1",
+        status: "failed",
+        type: "extract_source",
+      },
+      questions: [],
+    };
+    mocks.getQuestionSetDraft
+      .mockResolvedValueOnce(failedDraft)
+      .mockResolvedValue({
+        ...failedDraft,
+        import_job: {
+          ...failedDraft.import_job,
+          status: "queued",
+        },
+      });
+    mocks.retryJob.mockResolvedValue({
+      id: "source-job-1",
+      status: "queued",
+      type: "extract_source",
+    });
+
+    render(<CreateWorkspace />);
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "The source draft needs another try",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Private textbook pages")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Retry processing" }));
+
+    await waitFor(() => {
+      expect(mocks.retryJob).toHaveBeenCalledWith(
+        "source-job-1",
+        "parent-token",
+      );
+    });
+    expect(
+      screen.getByRole("heading", { name: "Preparing your question draft" }),
+    ).toBeInTheDocument();
+  });
+
   it("retries a failed completed-paper analysis without creating a child task", async () => {
     window.history.replaceState(
       {},

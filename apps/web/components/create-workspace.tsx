@@ -44,12 +44,14 @@ import {
 
 type CreateMode = "generate" | "import" | "completed" | "structured" | "manual";
 type ImportPurpose = "generate_similar" | "use_as_questions";
-type Stage = "compose" | "review" | "source_ready";
+type Stage = "compose" | "review" | "source_ready" | "source_processing";
 type AssignmentMode = "practice" | "exam";
 type ManualQuestionType = "single_choice" | "typed_text" | "handwriting";
 type ManualDraftQuestion = StructuredQuestionSetDocument["questions"][number] & {
   id: string;
 };
+type QuestionSetDraft = Awaited<ReturnType<typeof getQuestionSetDraft>>;
+type SourceImportJob = NonNullable<QuestionSetDraft["import_job"]>;
 
 type CompletedPaperAnswerRegion = {
   question_position: number;
@@ -349,6 +351,8 @@ function CreateWorkspaceContent() {
     useState<string | null>(null);
   const [sourceMaterialTitle, setSourceMaterialTitle] = useState("");
   const [sourceMaterialSubject, setSourceMaterialSubject] = useState("");
+  const [sourceImportJob, setSourceImportJob] =
+    useState<SourceImportJob | null>(null);
   const [availableSourceMaterials, setAvailableSourceMaterials] = useState<
     FamilyQuestionSet[]
   >([]);
@@ -556,12 +560,38 @@ function CreateWorkspaceContent() {
       }
       try {
         const draft = await getQuestionSetDraft(setId, parentToken);
-        if (!active || draft.question_set.status !== "needs_review") {
+        if (!active) {
           return;
         }
         setMode("import");
         setQuestionSetId(draft.question_set.id);
+        if (
+          draft.question_set.status === "processing" &&
+          draft.import_job !== null
+        ) {
+          setSourceImportJob(draft.import_job);
+          setStage("source_processing");
+          setRequestStatus("idle");
+          return;
+        }
+        if (draft.question_set.status !== "needs_review") {
+          return;
+        }
         setDraftQuestions(draft.questions);
+        if (
+          draft.questions.length === 0 &&
+          draft.question_set.source_summary.artifact_kind ===
+            "private_source_material"
+        ) {
+          setSourceMaterialName(draft.question_set.title);
+          setSourceMaterialQuestionSetId(draft.question_set.id);
+          setSourceMaterialTitle(draft.question_set.title);
+          setSourceMaterialSubject(draft.question_set.subject);
+          setSourcePromptCopied(false);
+          setStage("source_ready");
+          setRequestStatus("idle");
+          return;
+        }
         setStage("review");
         setRequestStatus("idle");
       } catch {
@@ -574,6 +604,62 @@ function CreateWorkspaceContent() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (
+      stage !== "source_processing" ||
+      !questionSetId ||
+      sourceImportJob?.status === "failed"
+    ) {
+      return;
+    }
+
+    let active = true;
+    const refresh = async () => {
+      const parentToken = await getParentAccessToken();
+      if (!parentToken || !active) {
+        return;
+      }
+      try {
+        const draft = await getQuestionSetDraft(questionSetId, parentToken);
+        if (!active) {
+          return;
+        }
+        if (draft.import_job !== null) {
+          setSourceImportJob(draft.import_job);
+        }
+        if (draft.question_set.status !== "needs_review") {
+          return;
+        }
+        setDraftQuestions(draft.questions);
+        if (
+          draft.questions.length === 0 &&
+          draft.question_set.source_summary.artifact_kind ===
+            "private_source_material"
+        ) {
+          setSourceMaterialName(draft.question_set.title);
+          setSourceMaterialQuestionSetId(draft.question_set.id);
+          setSourceMaterialTitle(draft.question_set.title);
+          setSourceMaterialSubject(draft.question_set.subject);
+          setSourcePromptCopied(false);
+          setStage("source_ready");
+          return;
+        }
+        setStage("review");
+      } catch {
+        if (active) {
+          setRequestStatus("error");
+        }
+      }
+    };
+
+    void refresh();
+    const intervalId = window.setInterval(() => void refresh(), 2000);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
+  }, [questionSetId, sourceImportJob?.status, stage]);
 
   useEffect(() => {
     if (mode !== "structured" || !selectedFamilyId) {
@@ -1079,9 +1165,18 @@ function CreateWorkspaceContent() {
           if (draft.question_set.status === "needs_review") {
             break;
           }
+          if (draft.import_job?.status === "failed") {
+            setSourceImportJob(draft.import_job);
+            setStage("source_processing");
+            setRequestStatus("idle");
+            return;
+          }
           await new Promise((resolve) => window.setTimeout(resolve, 1000));
           if (attempt === 59) {
-            throw new Error("Draft processing timed out.");
+            setSourceImportJob(draft.import_job);
+            setStage("source_processing");
+            setRequestStatus("idle");
+            return;
           }
         }
       }
@@ -1557,6 +1652,26 @@ function CreateWorkspaceContent() {
       setRequestStatus("working");
       await retryJob(imported.job.id, parentToken);
       setCompletedWorksheetStatus("processing");
+      setRequestStatus("idle");
+    } catch {
+      setRequestStatus("error");
+    }
+  };
+
+  const retrySourceImport = async () => {
+    if (!sourceImportJob || sourceImportJob.status !== "failed") {
+      setRequestStatus("error");
+      return;
+    }
+    const parentToken = await getParentAccessToken();
+    if (!parentToken) {
+      setRequestStatus("error");
+      return;
+    }
+    setRequestStatus("working");
+    try {
+      const retried = await retryJob(sourceImportJob.id, parentToken);
+      setSourceImportJob(retried);
       setRequestStatus("idle");
     } catch {
       setRequestStatus("error");
@@ -2142,6 +2257,75 @@ function CreateWorkspaceContent() {
         {requestStatus === "error" ? (
           <p className="form-error" role="alert">
             {t("completedPaper.error")}
+          </p>
+        ) : null}
+      </>
+    );
+  }
+
+  if (stage === "source_processing") {
+    const sourceImportFailed = sourceImportJob?.status === "failed";
+    return (
+      <>
+        <header className="page-header">
+          <div>
+            <button
+              className="back-button"
+              onClick={() => setStage("compose")}
+              type="button"
+            >
+              <ArrowLeft size={16} /> {t("sourceImport.back")}
+            </button>
+            <p className="eyebrow">{t("sourceImport.eyebrow")}</p>
+            <h1>
+              {sourceImportFailed
+                ? t("sourceImport.failedTitle")
+                : t("sourceImport.processingTitle")}
+            </h1>
+            <p className="lede">
+              {sourceImportFailed
+                ? t("sourceImport.failedDescription")
+                : t("sourceImport.processingDescription")}
+            </p>
+          </div>
+          <LanguageSwitcher />
+        </header>
+        <section className="creation-card source-ready-card">
+          <div className="creation-heading">
+            <span><FileText /></span>
+            <div>
+              <h2>
+                {sourceImportFailed
+                  ? t("sourceImport.failedCardTitle")
+                  : t("sourceImport.processingCardTitle")}
+              </h2>
+              <p>
+                {sourceImportFailed
+                  ? t("sourceImport.failedCardDescription")
+                  : t("sourceImport.processingCardDescription")}
+              </p>
+            </div>
+          </div>
+          {sourceImportFailed ? (
+            <button
+              className="button primary"
+              disabled={requestStatus === "working"}
+              onClick={() => void retrySourceImport()}
+              type="button"
+            >
+              {requestStatus === "working"
+                ? t("sourceImport.retrying")
+                : t("sourceImport.retry")}
+            </button>
+          ) : (
+            <span className="status-pill warm">
+              {t("sourceImport.processing")}
+            </span>
+          )}
+        </section>
+        {requestStatus === "error" ? (
+          <p className="form-error" role="alert">
+            {t("sourceImport.error")}
           </p>
         ) : null}
       </>

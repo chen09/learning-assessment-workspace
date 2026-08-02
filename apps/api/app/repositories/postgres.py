@@ -1628,6 +1628,31 @@ class PostgresRepository:
                     ),
                     {"worksheet_id": row["subject_id"]},
                 )
+            elif row["type"] == "extract_source":
+                await connection.execute(
+                    text(
+                        """
+                        update public.question_set_imports
+                        set status = 'processing', updated_at = now()
+                        where id = :import_id
+                        """
+                    ),
+                    {"import_id": row["subject_id"]},
+                )
+                await connection.execute(
+                    text(
+                        """
+                        update public.question_sets
+                        set status = 'processing', updated_at = now()
+                        where id = (
+                          select question_set_id
+                          from public.question_set_imports
+                          where id = :import_id
+                        )
+                        """
+                    ),
+                    {"import_id": row["subject_id"]},
+                )
             return retried
 
     async def get_attempt_results(
@@ -3649,9 +3674,28 @@ class PostgresRepository:
                     {"question_set_id": _uuid(question_set_id)},
                 )
             ).mappings().all()
+            import_job_row = (
+                await connection.execute(
+                    text(
+                        """
+                        select j.id, j.family_id, j.subject_id, j.type, j.status,
+                               j.attempt_count, j.created_at, j.completed_at
+                        from public.question_set_imports i
+                        join public.jobs j
+                          on j.subject_id = i.id
+                         and j.type = 'extract_source'
+                        where i.question_set_id = :question_set_id
+                        order by j.created_at desc
+                        limit 1
+                        """
+                    ),
+                    {"question_set_id": _uuid(question_set_id)},
+                )
+            ).mappings().one_or_none()
         return QuestionSetDraft(
             question_set=_question_set(row),
             questions=[_question(question) for question in question_rows],
+            import_job=_job(import_job_row) if import_job_row is not None else None,
         )
 
     async def list_family_question_sets(

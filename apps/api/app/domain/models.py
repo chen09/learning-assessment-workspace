@@ -566,6 +566,7 @@ class CompletedWorksheetConfirmation(BaseModel):
 class QuestionSetDraft(BaseModel):
     question_set: QuestionSet
     questions: list[Question]
+    import_job: Job | None = None
 
 
 class FamilyLibraryQuestionSet(BaseModel):

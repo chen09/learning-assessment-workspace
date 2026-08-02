@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config import Settings, get_settings
-from app.domain.models import CompletedWorksheetStatus, JobStatus
+from app.domain.models import CompletedWorksheetStatus, Job, JobStatus, QuestionSetStatus
 from app.main import create_app
 
 PARENT_HEADERS = {"Authorization": "Bearer parent-fixture"}
@@ -601,6 +601,56 @@ def test_import_stays_in_review_then_can_be_confirmed_and_assigned() -> None:
     assert confirmed.json()["status"] == "confirmed"
     assert assigned.status_code == 201
     assert assigned.json()["status"] == "assigned"
+
+
+def test_parent_can_retry_a_failed_source_import_without_losing_the_source() -> None:
+    client = TestClient(create_app())
+    fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+    imported = client.post(
+        "/v1/question-sets/imports",
+        headers={**PARENT_HEADERS, "Idempotency-Key": "retry-source-import"},
+        json={
+            "family_id": fixture["family"]["id"],
+            "filenames": ["private-textbook.pdf"],
+            "purpose": "generate_similar",
+            "title": "Private textbook",
+            "subject": "English",
+        },
+    ).json()
+    repository = client.app.state.repository
+    question_set = repository.question_sets[imported["question_set_id"]]
+    source_import = repository.imports[imported["id"]]
+    question_set.status = QuestionSetStatus.PROCESSING
+    source_import.status = QuestionSetStatus.PROCESSING
+    failed_job = Job(
+        family_id=question_set.family_id,
+        subject_id=source_import.id,
+        type="extract_source",
+        status=JobStatus.FAILED,
+    )
+    repository.jobs[str(failed_job.id)] = failed_job
+
+    draft = client.get(
+        f"/v1/question-sets/{imported['question_set_id']}",
+        headers=PARENT_HEADERS,
+    )
+    retried = client.post(
+        f"/v1/jobs/{failed_job.id}/retry",
+        headers=PARENT_HEADERS,
+    )
+
+    assert draft.status_code == 200
+    assert draft.json()["question_set"]["status"] == "processing"
+    assert draft.json()["import_job"] is not None
+    assert draft.json()["import_job"]["id"] == str(failed_job.id)
+    assert draft.json()["import_job"]["type"] == "extract_source"
+    assert draft.json()["import_job"]["status"] == "failed"
+    assert retried.status_code == 200
+    assert retried.json()["status"] == "queued"
+    assert repository.question_sets[imported["question_set_id"]].status == (
+        QuestionSetStatus.PROCESSING
+    )
+    assert repository.imports[imported["id"]].status == QuestionSetStatus.PROCESSING
 
 
 def test_lesson_one_import_keeps_answer_key_private_and_creates_real_questions() -> None:

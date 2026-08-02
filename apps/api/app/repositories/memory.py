@@ -817,6 +817,17 @@ class MemoryRepository:
             if imported is not None:
                 imported.status = CompletedWorksheetStatus.PROCESSING
                 self.completed_worksheet_imports[str(imported.id)] = imported
+        elif job.type == "extract_source":
+            source_import = self.imports.get(str(job.subject_id))
+            if source_import is not None:
+                question_set = self.question_sets.get(
+                    str(source_import.question_set_id)
+                )
+                if question_set is not None:
+                    question_set.status = QuestionSetStatus.PROCESSING
+                    self.question_sets[str(question_set.id)] = question_set
+                source_import.status = QuestionSetStatus.PROCESSING
+                self.imports[str(source_import.id)] = source_import
         return job
 
     def next_queued_job(self) -> Job | None:
@@ -1810,7 +1821,11 @@ class MemoryRepository:
         parent_id: str,
     ) -> QuestionSetDraft:
         question_set = self.question_sets.get(question_set_id)
-        if question_set is None:
+        if (
+            question_set is None
+            or parent_id
+            not in self.family_parents.get(str(question_set.family_id), set())
+        ):
             raise NotFoundError
         questions = sorted(
             (
@@ -1820,7 +1835,29 @@ class MemoryRepository:
             ),
             key=lambda question: question.position,
         )
-        return QuestionSetDraft(question_set=question_set, questions=questions)
+        imported = next(
+            (
+                candidate
+                for candidate in self.imports.values()
+                if candidate.question_set_id == question_set.id
+            ),
+            None,
+        )
+        import_job = next(
+            (
+                candidate
+                for candidate in self.jobs.values()
+                if imported is not None
+                and candidate.type == "extract_source"
+                and candidate.subject_id == imported.id
+            ),
+            None,
+        )
+        return QuestionSetDraft(
+            question_set=question_set,
+            questions=questions,
+            import_job=import_job,
+        )
 
     async def list_family_question_sets(
         self,
