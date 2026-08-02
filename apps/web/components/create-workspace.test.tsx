@@ -1219,6 +1219,89 @@ describe("CreateWorkspace", () => {
     });
   });
 
+  it("keeps a reviewed word-order question as word order", async () => {
+    const document = {
+      schema_version: "1.0",
+      question_set: {
+        title: "Word order review",
+        subject: "English",
+        locale: "en",
+        difficulty: "standard",
+        source_mode: "convert",
+        estimated_minutes: 5,
+      },
+      knowledge_tags: [{ code: "word-order", label: "Word order" }],
+      questions: [
+        {
+          position: 1,
+          type: "word_order",
+          prompt: "Put the words in order.",
+          options: ["tomorrow", "We", "will", "travel"],
+          answer_key: { tokens: ["We", "will", "travel", "tomorrow"] },
+          rubric: { grading_mode: "exact" },
+          points: 1,
+          knowledge_code: "word-order",
+        },
+      ],
+    };
+    mocks.previewStructuredQuestionSet.mockResolvedValue({
+      title: "Word order review",
+      subject: "English",
+      locale: "en",
+      question_count: 1,
+      total_points: 1,
+      estimated_minutes: 5,
+      knowledge_tag_count: 1,
+      answer_keys_present: true,
+      checksum: "word-order-review",
+      source_summary: {},
+      questions: document.questions,
+    });
+    mocks.importStructuredQuestionSet.mockResolvedValue({
+      question_set_id: "word-order-set",
+      assignment_id: "word-order-assignment",
+      status: "confirmed",
+      reused_existing: false,
+    });
+
+    render(<CreateWorkspace />);
+    await screen.findByRole("combobox", { name: "Child" });
+    fireEvent.click(screen.getByRole("button", { name: "Import AI question JSON" }));
+    fireEvent.change(screen.getByLabelText("AI question JSON"), {
+      target: {
+        files: [new File([JSON.stringify(document)], "word-order.json", { type: "application/json" })],
+      },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Preview questions" }));
+    await screen.findByRole("heading", { name: "Put the words in order." });
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit question 1" }));
+    expect(screen.getByLabelText("Response type")).toHaveValue("word_order");
+    expect(
+      screen.getByLabelText("Correct word order, one token per line"),
+    ).toHaveValue("We\nwill\ntravel\ntomorrow");
+    fireEvent.click(screen.getByRole("button", { name: "Save question" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm and assign" }));
+
+    await waitFor(() => {
+      expect(mocks.importStructuredQuestionSet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          document: expect.objectContaining({
+            questions: [
+              expect.objectContaining({
+                type: "word_order",
+                options: ["tomorrow", "We", "will", "travel"],
+                answer_key: { tokens: ["We", "will", "travel", "tomorrow"] },
+              }),
+            ],
+          }),
+        }),
+        "parent-token",
+        expect.any(String),
+      );
+    });
+  });
+
   it("links a later AI JSON import back to an existing private source material", async () => {
     const document = {
       schema_version: "1.0",

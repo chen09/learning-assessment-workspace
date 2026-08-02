@@ -1927,7 +1927,11 @@ function CreateWorkspaceContent() {
                     prompt,
                     points,
                     type: editedQuestionType,
-                    options: isChoiceQuestion(editedQuestionType) ? options : [],
+                    options:
+                      isChoiceQuestion(editedQuestionType) ||
+                      editedQuestionType === "word_order"
+                        ? options
+                        : [],
                     answer_key: answerKey,
                     rubric,
                   }
