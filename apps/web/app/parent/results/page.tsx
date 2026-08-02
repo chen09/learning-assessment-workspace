@@ -171,7 +171,9 @@ function PhotoPreview({
 }) {
   const { t } = useLanguage();
   const [showAnnotations, setShowAnnotations] = useState(false);
-  const rawPaths = item.response_answer.paths;
+  const rawPaths = Array.isArray(item.response_answer.paths)
+    ? item.response_answer.paths
+    : item.response_answer.source_paths;
   const paths = Array.isArray(rawPaths)
     ? rawPaths.filter((path): path is string => typeof path === "string")
     : [];

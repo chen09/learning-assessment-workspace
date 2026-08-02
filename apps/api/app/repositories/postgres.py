@@ -130,10 +130,11 @@ def _photo_paths(kind: Any, answer: Any) -> list[str]:
         return []
     if not isinstance(answer, dict):
         return []
-    paths = answer.get("paths")
-    if not isinstance(paths, list):
-        return []
-    return [path for path in paths if isinstance(path, str)]
+    for field in ("paths", "source_paths"):
+        paths = answer.get(field)
+        if isinstance(paths, list):
+            return [path for path in paths if isinstance(path, str)]
+    return []
 
 
 def _photo_revision_change(
@@ -1910,16 +1911,11 @@ class PostgresRepository:
             ).mappings().all()
             requested_photo_paths: list[str] = []
             for row in result_rows:
-                if row["response_kind"] != "photo":
-                    continue
-                answer = row["response_answer"]
-                if not isinstance(answer, dict):
-                    continue
-                raw_paths = answer.get("paths")
-                if not isinstance(raw_paths, list):
-                    continue
                 requested_photo_paths.extend(
-                    path for path in raw_paths if isinstance(path, str)
+                    _photo_paths(
+                        row["response_kind"],
+                        row["response_answer"],
+                    )
                 )
             valid_photo_paths: set[str] = set()
             if requested_photo_paths:
@@ -2045,14 +2041,11 @@ class PostgresRepository:
                         ),
                         photo_urls=[
                             signed_photo_urls[path]
-                            for path in cast(
-                                dict[str, Any],
+                            for path in _photo_paths(
+                                row["response_kind"],
                                 row["response_answer"],
-                            ).get("paths", [])
-                            if (
-                                isinstance(path, str)
-                                and path in signed_photo_urls
                             )
+                            if path in signed_photo_urls
                         ]
                         if row["response_kind"] == "photo"
                         else [],

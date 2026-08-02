@@ -320,7 +320,7 @@ describe("ParentResultsPage", () => {
           question_type: "photo",
           response_kind: "photo",
           response_answer: {
-            paths: ["family-id/attempt-id/factorisation-paper.pdf"],
+            source_paths: ["family-id/attempt-id/factorisation-paper.pdf"],
           },
           photo_urls: [
             "https://storage.example.test/signed/factorisation-paper.pdf?token=short-lived",

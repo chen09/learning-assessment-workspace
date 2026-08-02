@@ -1,7 +1,23 @@
 import pytest
 
 from app.domain.models import CompletedWorksheetImport, Job
-from app.repositories.postgres import PostgresRepository
+from app.repositories.postgres import PostgresRepository, _photo_paths
+
+
+def test_completed_worksheet_source_paths_are_available_as_private_photo_pages() -> None:
+    """Confirmed external-paper answers retain their parent-only visual source."""
+    assert _photo_paths(
+        "photo",
+        {
+            "source_paths": [
+                "family-1/completed/page-1.jpg",
+                "family-1/completed/page-2.pdf",
+            ]
+        }
+    ) == [
+        "family-1/completed/page-1.jpg",
+        "family-1/completed/page-2.pdf",
+    ]
 
 
 @pytest.mark.asyncio
