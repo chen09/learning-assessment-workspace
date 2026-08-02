@@ -73,6 +73,44 @@ type CompletedPaperReview = {
   answer_regions: CompletedPaperAnswerRegion[];
 };
 
+type WorksheetUploadContentType =
+  | "application/pdf"
+  | "image/png"
+  | "image/jpeg";
+
+const MAX_COMPLETED_PAPER_FILE_BYTES = 15_000_000;
+
+const completedPaperContentType = (
+  file: File,
+): WorksheetUploadContentType | null => {
+  if (["application/pdf", "image/png", "image/jpeg"].includes(file.type)) {
+    return file.type as WorksheetUploadContentType;
+  }
+  const filename = file.name.toLowerCase();
+  if (filename.endsWith(".pdf")) {
+    return "application/pdf";
+  }
+  if (filename.endsWith(".png")) {
+    return "image/png";
+  }
+  if (filename.endsWith(".jpg") || filename.endsWith(".jpeg")) {
+    return "image/jpeg";
+  }
+  return null;
+};
+
+const completedPaperFileProblem = (
+  selectedFiles: File[],
+): "invalid_type" | "too_large" | null => {
+  if (selectedFiles.some((file) => completedPaperContentType(file) === null)) {
+    return "invalid_type";
+  }
+  if (selectedFiles.some((file) => file.size > MAX_COMPLETED_PAPER_FILE_BYTES)) {
+    return "too_large";
+  }
+  return null;
+};
+
 const LOCAL_COMPLETED_PAPER_REVIEW_PROMPT = `You are a careful school worksheet reviewer. Read the attached completed worksheet pages locally and return JSON only. Do not return Markdown, explanation, or an annotated image.
 
 Goal: turn the printed questions and the student's handwritten answers into a parent-reviewable learning record. Preserve the original wording. Do not invent an answer when print or handwriting is unclear.
@@ -621,6 +659,30 @@ function CreateWorkspaceContent() {
     "scan_too_many_pages",
   ].includes(completedPaperFailureCode ?? "");
 
+  const completedPaperFileProblemMessage = (
+    problem: ReturnType<typeof completedPaperFileProblem>,
+  ) =>
+    problem === "too_large"
+      ? t("completedPaper.fileTooLarge")
+      : t("completedPaper.invalidFile");
+
+  const selectCompletedPaperFiles = (
+    selectedFiles: File[],
+    assignFiles: (files: File[]) => void,
+    assignFilename: (filename: string) => void,
+  ) => {
+    const problem = completedPaperFileProblem(selectedFiles);
+    if (problem) {
+      assignFiles([]);
+      assignFilename("");
+      setCompletedPaperError(completedPaperFileProblemMessage(problem));
+      return;
+    }
+    assignFiles(selectedFiles);
+    assignFilename(selectedFiles.map((file) => file.name).join(", "));
+    setCompletedPaperError(null);
+  };
+
   useEffect(() => {
     let active = true;
     void getParentAccessToken().then(async (parentToken) => {
@@ -1096,6 +1158,16 @@ function CreateWorkspaceContent() {
         setRequestStatus("error");
         return;
       }
+      const fileProblem = completedPaperFileProblem([
+        ...files,
+        ...answerFiles,
+        ...referenceFiles,
+      ]);
+      if (fileProblem) {
+        setCompletedPaperError(completedPaperFileProblemMessage(fileProblem));
+        setRequestStatus("idle");
+        return;
+      }
       const feedbackLanguage =
         children.find((child) => child.id === childId)?.ui_language ?? "en";
       const parentToken = await getParentAccessToken();
@@ -1109,10 +1181,6 @@ function CreateWorkspaceContent() {
         const responsePaths: string[] = [];
         const answerSourcePaths: string[] = [];
         const referenceSourcePaths: string[] = [];
-        const uploadContentType = (file: File) =>
-          (["application/pdf", "image/png", "image/jpeg"].includes(file.type)
-            ? file.type
-            : "image/jpeg") as "application/pdf" | "image/png" | "image/jpeg";
         for (const [index, file] of files.entries()) {
           const intent = await createUploadIntent(
             {
@@ -1120,7 +1188,7 @@ function CreateWorkspaceContent() {
               bucket: "responses",
               object_id: uploadObjectId,
               filename: file.name,
-              content_type: uploadContentType(file),
+              content_type: completedPaperContentType(file)!,
             },
             parentToken,
             `completed-response-${uploadObjectId}-${index}`,
@@ -1140,7 +1208,7 @@ function CreateWorkspaceContent() {
                 bucket: "sources",
                 object_id: uploadObjectId,
                 filename: file.name,
-                content_type: uploadContentType(file),
+                content_type: completedPaperContentType(file)!,
               },
               parentToken,
               `completed-${role}-${uploadObjectId}-${index}`,
@@ -3610,9 +3678,11 @@ function CreateWorkspaceContent() {
                   aria-label={t("completedPaper.scans")}
                   multiple
                   onChange={(event) => {
-                    const selectedFiles = Array.from(event.target.files ?? []);
-                    setFiles(selectedFiles);
-                    setFileName(selectedFiles.map((file) => file.name).join(", "));
+                    selectCompletedPaperFiles(
+                      Array.from(event.target.files ?? []),
+                      setFiles,
+                      setFileName,
+                    );
                   }}
                   type="file"
                 />
@@ -3643,10 +3713,10 @@ function CreateWorkspaceContent() {
                   aria-label={t("completedPaper.answerKey")}
                   multiple
                   onChange={(event) => {
-                    const selectedFiles = Array.from(event.target.files ?? []);
-                    setAnswerFiles(selectedFiles);
-                    setAnswerFileName(
-                      selectedFiles.map((file) => file.name).join(", "),
+                    selectCompletedPaperFiles(
+                      Array.from(event.target.files ?? []),
+                      setAnswerFiles,
+                      setAnswerFileName,
                     );
                   }}
                   type="file"
@@ -3661,10 +3731,10 @@ function CreateWorkspaceContent() {
                   aria-label={t("completedPaper.referenceMaterial")}
                   multiple
                   onChange={(event) => {
-                    const selectedFiles = Array.from(event.target.files ?? []);
-                    setReferenceFiles(selectedFiles);
-                    setReferenceFileName(
-                      selectedFiles.map((file) => file.name).join(", "),
+                    selectCompletedPaperFiles(
+                      Array.from(event.target.files ?? []),
+                      setReferenceFiles,
+                      setReferenceFileName,
                     );
                   }}
                   type="file"
@@ -3675,6 +3745,11 @@ function CreateWorkspaceContent() {
                 </strong>
                 <span>{t("completedPaper.referenceMaterialHelp")}</span>
               </label>
+              {completedPaperError ? (
+                <p className="form-error" role="alert">
+                  {completedPaperError}
+                </p>
+              ) : null}
             </>
           ) : null}
 

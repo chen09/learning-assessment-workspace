@@ -655,6 +655,34 @@ describe("CreateWorkspace", () => {
     expect(window.location.search).not.toContain("completedWorksheetId");
   });
 
+  it("rejects a completed-paper file above the worker analysis limit before upload", async () => {
+    render(<CreateWorkspace />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Grade completed paper" }),
+    );
+    fireEvent.change(screen.getByLabelText("Completed worksheet scans"), {
+      target: {
+        files: [
+          new File(
+            [new Uint8Array(15_000_001)],
+            "too-large-paper.pdf",
+            { type: "application/pdf" },
+          ),
+        ],
+      },
+    });
+
+    expect(
+      screen.getByText(
+        "Each paper file must be 15 MB or smaller. Choose a smaller file before uploading.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Upload for review" }),
+    ).toBeDisabled();
+  });
+
   it("never substitutes sample questions when a structured preview unexpectedly returns an empty draft", async () => {
     const document = {
       schema_version: "1.0" as const,
