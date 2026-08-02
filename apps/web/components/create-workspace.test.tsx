@@ -117,6 +117,40 @@ describe("CreateWorkspace", () => {
     expect(screen.getByDisplayValue("Complete: She ___ to school.")).toBeInTheDocument();
   });
 
+  it("resumes an imported question-set review from its private recovery link", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/parent/create/?questionSetId=imported-question-set-1",
+    );
+    mocks.getQuestionSetDraft.mockResolvedValue({
+      question_set: { id: "imported-question-set-1", status: "needs_review" },
+      questions: [
+        {
+          id: "imported-question-1",
+          position: 1,
+          type: "typed_text",
+          prompt: "Complete: They ___ ready.",
+          options: null,
+          answer_key: { text: "are" },
+          points: 1,
+          listening: null,
+        },
+      ],
+    });
+
+    render(<CreateWorkspace />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Review before assigning" }),
+    ).toBeInTheDocument();
+    expect(mocks.getQuestionSetDraft).toHaveBeenCalledWith(
+      "imported-question-set-1",
+      "parent-token",
+    );
+    expect(screen.getByText("Complete: They ___ ready.")).toBeInTheDocument();
+  });
+
   it("retries a failed completed-paper analysis without creating a child task", async () => {
     window.history.replaceState(
       {},
@@ -389,6 +423,7 @@ describe("CreateWorkspace", () => {
     expect(
       await screen.findByRole("heading", { name: "Source material saved privately" }),
     ).toBeInTheDocument();
+    expect(window.location.search).toContain("questionSetId=question-set-1");
     expect(
       screen.getByText(
         "No questions were fabricated from this material. Prepare a structured question JSON with your approved AI workflow, then review it here before assigning it.",

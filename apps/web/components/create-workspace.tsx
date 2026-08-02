@@ -461,6 +461,12 @@ function CreateWorkspaceContent() {
     window.history.replaceState(window.history.state, "", url);
   };
 
+  const saveQuestionSetRecoveryLink = (setId: string) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("questionSetId", setId);
+    window.history.replaceState(window.history.state, "", url);
+  };
+
   useEffect(() => {
     let active = true;
     void getParentAccessToken().then(async (parentToken) => {
@@ -524,6 +530,40 @@ function CreateWorkspaceContent() {
         setCompletedResponsePaths(imported.response_paths);
         setCompletedAttemptId(imported.attempt_id);
         loadCompletedReviewDraft(imported.extraction);
+      } catch {
+        if (active) {
+          setRequestStatus("error");
+        }
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const setId = new URLSearchParams(window.location.search).get(
+      "questionSetId",
+    );
+    if (!setId) {
+      return;
+    }
+
+    let active = true;
+    void getParentAccessToken().then(async (parentToken) => {
+      if (!parentToken) {
+        return;
+      }
+      try {
+        const draft = await getQuestionSetDraft(setId, parentToken);
+        if (!active || draft.question_set.status !== "needs_review") {
+          return;
+        }
+        setMode("import");
+        setQuestionSetId(draft.question_set.id);
+        setDraftQuestions(draft.questions);
+        setStage("review");
+        setRequestStatus("idle");
       } catch {
         if (active) {
           setRequestStatus("error");
@@ -1025,6 +1065,7 @@ function CreateWorkspaceContent() {
         `import-${importObjectId}`,
       );
       setQuestionSetId(imported.question_set_id);
+      saveQuestionSetRecoveryLink(imported.question_set_id);
       let draft = await getQuestionSetDraft(
         imported.question_set_id,
         parentToken,

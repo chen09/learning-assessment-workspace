@@ -956,6 +956,67 @@ test("parent collects several manual questions into one assigned practice", asyn
   await expect(page.getByText("已结束", { exact: true })).toBeVisible();
 });
 
+test("parent can return to an imported question-set review from its recovery link", async ({
+  page,
+  request,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "The source-import recovery flow runs once; responsive UI is covered separately.",
+  );
+  const apiBaseUrl = "http://127.0.0.1:8017";
+  const fixtureKey = `e2e-source-recovery-${testInfo.workerIndex}`;
+  const parentHeaders = { Authorization: "Bearer parent-fixture" };
+  const family = (await (
+    await request.post(`${apiBaseUrl}/v1/families`, {
+      headers: { ...parentHeaders, "Idempotency-Key": `${fixtureKey}-family` },
+      data: { name: "Source recovery family" },
+    })
+  ).json()) as { id: string };
+  const child = (await (
+    await request.post(`${apiBaseUrl}/v1/families/${family.id}/children`, {
+      headers: { ...parentHeaders, "Idempotency-Key": `${fixtureKey}-child` },
+      data: {
+        nickname: "Source child",
+        grade_stage: "Junior high 1",
+        ui_language: "en",
+        pin: "123456",
+      },
+    })
+  ).json()) as { id: string };
+
+  await page.goto(
+    `/parent/create/?familyId=${encodeURIComponent(family.id)}&childId=${encodeURIComponent(child.id)}`,
+  );
+  await page.getByRole("button", { name: "Import material" }).click();
+  await page
+    .getByRole("radio", { name: "Convert an existing worksheet into questions" })
+    .check();
+  await page.getByLabel("Question material").setInputFiles({
+    name: "source-recovery.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("source-recovery"),
+  });
+  const importResponse = page.waitForResponse(
+    (response) =>
+      response.url() === `${apiBaseUrl}/v1/question-sets/imports` &&
+      response.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "Create review draft" }).click();
+  const imported = (await (await importResponse).json()) as {
+    question_set_id: string;
+  };
+  await expect(page).toHaveURL(
+    new RegExp(`questionSetId=${encodeURIComponent(imported.question_set_id)}`),
+  );
+  await request.post(`${apiBaseUrl}/v1/demo/jobs/process-next`, {
+    headers: parentHeaders,
+  });
+  await expect(
+    page.getByRole("heading", { name: "Review before assigning" }),
+  ).toBeVisible();
+});
+
 test("parent validates a local-AI completed-paper review before submitting it", async ({
   page,
   request,
