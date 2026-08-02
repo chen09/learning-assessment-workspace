@@ -1155,6 +1155,9 @@ test("parent authors a paper-photo question and assigns it through the reviewed 
     await page.getByRole("button", { name: digit, exact: true }).click();
   }
   await page.getByRole("button", { name: "Open my work" }).click();
+  await expect(page).toHaveURL(/\/child\/work\/\?attemptId=/);
+  const attemptId = new URL(page.url()).searchParams.get("attemptId");
+  expect(attemptId).toBeTruthy();
   await expect(
     page.getByRole("heading", {
       name: "Solve on paper, then take a clear photo of your work.",
@@ -1162,6 +1165,65 @@ test("parent authors a paper-photo question and assigns it through the reviewed 
   ).toBeVisible();
   await expect(
     page.getByLabel("Take a photo or choose images"),
+  ).toBeVisible();
+  const responseSave = page.waitForResponse(
+    (response) =>
+      response
+        .url()
+        .startsWith(`${apiBaseUrl}/v1/attempts/${attemptId}/responses/`) &&
+      response.request().method() === "PUT",
+  );
+  await page.getByLabel("Take a photo or choose images").setInputFiles({
+    name: "paper-answer.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("paper answer image"),
+  });
+  expect((await responseSave).ok()).toBeTruthy();
+  await expect(page.getByText("paper-answer.png")).toBeVisible();
+
+  await page.getByRole("button", { name: "Submit all answers" }).click();
+  await page
+    .getByRole("button", { name: "Confirm full submission" })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Your work is being checked" }),
+  ).toBeVisible();
+  const processed = await request.post(`${apiBaseUrl}/v1/demo/jobs/process-next`, {
+    headers: { Authorization: "Bearer parent-fixture" },
+  });
+  expect(processed.ok(), await processed.text()).toBeTruthy();
+  const resultsResponse = page.waitForResponse(
+    (response) =>
+      response.url().includes("/results") && response.status() === 200,
+  );
+  await page.getByRole("button", { name: "View results" }).click();
+  await resultsResponse;
+  await expect(
+    page.getByRole("heading", { name: "Waiting for a parent" }),
+  ).toBeVisible();
+
+  await page.goto(
+    `/parent/results/?attemptId=${encodeURIComponent(attemptId!)}`,
+  );
+  await expect(page.getByRole("heading", { name: "Review answers" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: "Solve on paper, then take a clear photo of your work.",
+    }),
+  ).toBeVisible();
+  await page
+    .getByLabel("Note for the child (optional)")
+    .fill("Your working is clear.");
+  await page.getByRole("button", { name: "Mark correct" }).click();
+  await expect(
+    page.getByText("A parent marked this answer correct."),
+  ).toBeVisible();
+
+  await page.goto(
+    `/child/results/?attemptId=${encodeURIComponent(attemptId!)}`,
+  );
+  await expect(
+    page.getByText("Note from your parent: Your working is clear."),
   ).toBeVisible();
 });
 
