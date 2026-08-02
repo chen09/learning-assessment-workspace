@@ -136,7 +136,7 @@ class QuestionInput(StrictModel):
             )
             if not has_single and not has_multiple:
                 raise ValueError("Typed-text questions need at least one accepted answer.")
-        if self.type == QuestionType.HANDWRITING:
+        if self.type in {QuestionType.HANDWRITING, QuestionType.PHOTO}:
             reference = self.answer_key.get("reference")
             if (
                 self.rubric.get("grading_mode") != "parent_review"
@@ -144,7 +144,7 @@ class QuestionInput(StrictModel):
                 or not reference.strip()
             ):
                 raise ValueError(
-                    "Handwriting questions need parent_review and a reference answer."
+                    "Handwriting and photo questions need parent_review and a reference answer."
                 )
         if self.type != QuestionType.LISTENING and self.listening is not None:
             raise ValueError("Only listening questions may include listening settings.")

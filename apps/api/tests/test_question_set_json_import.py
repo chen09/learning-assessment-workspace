@@ -176,3 +176,20 @@ def test_rejects_handwriting_question_without_parent_review_reference() -> None:
 
     with pytest.raises(ValidationError, match="parent_review"):
         parse_import_document(json.dumps(payload))
+
+
+def test_rejects_photo_question_without_parent_review_reference() -> None:
+    payload = _valid_payload()
+    questions = payload["questions"]
+    assert isinstance(questions, list)
+    questions[0].update(
+        {
+            "type": "photo",
+            "options": [],
+            "answer_key": {},
+            "rubric": {"grading_mode": "exact"},
+        }
+    )
+
+    with pytest.raises(ValidationError, match="parent_review"):
+        parse_import_document(json.dumps(payload))

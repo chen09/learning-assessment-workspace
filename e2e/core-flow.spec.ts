@@ -1070,7 +1070,7 @@ test("parent previews an AI JSON file before assigning its structured questions"
   await expect(page.locator(".exam-toggle")).toContainText(/1[45]:/);
 });
 
-test("parent authors one question and assigns it through the reviewed draft", async ({
+test("parent authors a paper-photo question and assigns it through the reviewed draft", async ({
   page,
   request,
 }, testInfo) => {
@@ -1108,16 +1108,17 @@ test("parent authors one question and assigns it through the reviewed draft", as
     `/parent/create/?familyId=${encodeURIComponent(family.id)}&childId=${encodeURIComponent(child.id)}`,
   );
   await page.getByRole("button", { name: "Start simple" }).click();
-  await page.getByLabel("Practice title").fill("Weather check");
+  await page.getByLabel("Practice title").fill("Paper calculation");
+  await page.getByLabel("Response type").selectOption("photo");
   await page
     .getByRole("textbox", { name: "Question", exact: true })
-    .fill("Complete: If it ___ tomorrow, we will stay home.");
-  await page.getByLabel("Answer or grading guide").fill("rains");
+    .fill("Solve on paper, then take a clear photo of your work.");
+  await page.getByLabel("Answer or grading guide").fill("x = 4");
   await page.getByLabel("Points").fill("2");
   await page.getByRole("button", { name: "Create review draft" }).click();
   await expect(
     page.getByRole("heading", {
-      name: "Complete: If it ___ tomorrow, we will stay home.",
+      name: "Solve on paper, then take a clear photo of your work.",
     }),
   ).toBeVisible();
 
@@ -1132,11 +1133,12 @@ test("parent authors one question and assigns it through the reviewed draft", as
   expect(importedRequest.request().postDataJSON()).toMatchObject({
     source_name: "Manual question",
     document: {
-      question_set: { source_mode: "manual", title: "Weather check" },
+      question_set: { source_mode: "manual", title: "Paper calculation" },
       questions: [
         {
-          type: "typed_text",
-          answer_key: { text: "rains" },
+          type: "photo",
+          answer_key: { reference: "x = 4" },
+          rubric: { grading_mode: "parent_review" },
           points: 2,
         },
       ],
@@ -1155,8 +1157,11 @@ test("parent authors one question and assigns it through the reviewed draft", as
   await page.getByRole("button", { name: "Open my work" }).click();
   await expect(
     page.getByRole("heading", {
-      name: "Complete: If it ___ tomorrow, we will stay home.",
+      name: "Solve on paper, then take a clear photo of your work.",
     }),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel("Take a photo or choose images"),
   ).toBeVisible();
 });
 

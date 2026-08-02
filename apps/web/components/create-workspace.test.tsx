@@ -1340,6 +1340,71 @@ describe("CreateWorkspace", () => {
     });
   });
 
+  it("keeps a parent-review guide when a parent creates a photo-answer question", async () => {
+    mocks.previewStructuredQuestionSet.mockResolvedValue({
+      title: "Paper calculation",
+      subject: "Mathematics",
+      locale: "en",
+      question_count: 1,
+      total_points: 2,
+      estimated_minutes: 5,
+      knowledge_tag_count: 1,
+      answer_keys_present: true,
+      checksum: "manual-photo-1234",
+      source_summary: { source_kind: "manual" },
+      questions: [
+        {
+          position: 1,
+          type: "photo",
+          prompt: "Solve on paper, then take a clear photo of your work.",
+          options: [],
+          answer_key: { reference: "x = 4" },
+          rubric: { grading_mode: "parent_review" },
+          points: 2,
+          knowledge_code: "manual-practice",
+        },
+      ],
+    });
+
+    render(<CreateWorkspace />);
+
+    await screen.findByRole("combobox", { name: "Child" });
+    fireEvent.click(screen.getByRole("button", { name: "Start simple" }));
+    fireEvent.change(screen.getByLabelText("Practice title"), {
+      target: { value: "Paper calculation" },
+    });
+    fireEvent.change(screen.getByLabelText("Response type"), {
+      target: { value: "photo" },
+    });
+    fireEvent.change(screen.getByLabelText("Question"), {
+      target: { value: "Solve on paper, then take a clear photo of your work." },
+    });
+    fireEvent.change(screen.getByLabelText("Answer or grading guide"), {
+      target: { value: "x = 4" },
+    });
+    fireEvent.change(screen.getByLabelText("Points"), {
+      target: { value: "2" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create review draft" }));
+
+    await waitFor(() => {
+      expect(mocks.previewStructuredQuestionSet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          questions: [
+            expect.objectContaining({
+              type: "photo",
+              options: [],
+              answer_key: { reference: "x = 4" },
+              rubric: { grading_mode: "parent_review" },
+              points: 2,
+            }),
+          ],
+        }),
+        "parent-token",
+      );
+    });
+  });
+
   it("uploads private audio before assigning a listening question", async () => {
     const document = {
       schema_version: "1.0" as const,

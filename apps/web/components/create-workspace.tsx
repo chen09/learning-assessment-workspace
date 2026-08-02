@@ -52,13 +52,20 @@ type Stage =
   | "source_processing"
   | "variant_ready";
 type AssignmentMode = "practice" | "exam";
-type ManualQuestionType = "single_choice" | "typed_text" | "handwriting";
+type ManualQuestionType =
+  | "single_choice"
+  | "typed_text"
+  | "handwriting"
+  | "photo";
 type VariantDifficulty = StructuredQuestionSetDocument["question_set"]["difficulty"];
 type ManualDraftQuestion = StructuredQuestionSetDocument["questions"][number] & {
   id: string;
 };
 type QuestionSetDraft = Awaited<ReturnType<typeof getQuestionSetDraft>>;
 type SourceImportJob = NonNullable<QuestionSetDraft["import_job"]>;
+
+const requiresParentReview = (type: ManualQuestionType) =>
+  type === "handwriting" || type === "photo";
 
 type CompletedPaperAnswerRegion = {
   question_position: number;
@@ -340,13 +347,13 @@ function parseCompletedPaperReview(
       }
     }
     if (
-      question.type === "handwriting" &&
+      (question.type === "handwriting" || question.type === "photo") &&
       (typeof question.answer_key.reference !== "string" ||
         !question.answer_key.reference.trim() ||
         !isRecord(question.rubric) ||
         question.rubric.grading_mode !== "parent_review")
     ) {
-      throw new Error("Handwriting questions need a private reference answer and parent review.");
+      throw new Error("Handwriting and photo questions need a private reference answer and parent review.");
     }
   }
   const answerRegions = parsed.answer_regions.map((candidate) => {
@@ -1116,11 +1123,11 @@ function CreateWorkspaceContent() {
       answer_key:
         manualQuestionType === "single_choice"
           ? { choice: manualOptionList.indexOf(answer) }
-          : manualQuestionType === "handwriting"
+          : requiresParentReview(manualQuestionType)
             ? { reference: answer }
             : { text: answer },
       rubric:
-        manualQuestionType === "handwriting"
+        requiresParentReview(manualQuestionType)
           ? { grading_mode: "parent_review" }
           : { grading_mode: "exact" },
       points: manualPointsValue,
@@ -1744,7 +1751,8 @@ function CreateWorkspaceContent() {
     const type: ManualQuestionType =
       question.type === "single_choice" ||
       question.type === "typed_text" ||
-      question.type === "handwriting"
+      question.type === "handwriting" ||
+      question.type === "photo"
         ? question.type
         : "typed_text";
     const choice = question.answer_key.choice;
@@ -1800,11 +1808,11 @@ function CreateWorkspaceContent() {
     const answerKey =
       editedQuestionType === "single_choice"
         ? { choice: options.indexOf(answer) }
-        : editedQuestionType === "handwriting"
+        : requiresParentReview(editedQuestionType)
           ? { reference: answer }
           : { text: answer };
     const rubric =
-      editedQuestionType === "handwriting"
+      requiresParentReview(editedQuestionType)
         ? { grading_mode: "parent_review" }
         : { grading_mode: "exact" };
     setDraftQuestions((current) =>
@@ -3081,6 +3089,7 @@ function CreateWorkspaceContent() {
                         <option value="handwriting">
                           {t("draftReview.typeHandwriting")}
                         </option>
+                        <option value="photo">{t("draftReview.typePhoto")}</option>
                       </select>
                     </label>
                     {editedQuestionType === "single_choice" ? (
@@ -3097,12 +3106,12 @@ function CreateWorkspaceContent() {
                       </label>
                     ) : null}
                     <label>
-                      {editedQuestionType === "handwriting"
+                      {requiresParentReview(editedQuestionType)
                         ? t("draftReview.referenceAnswer")
                         : t("draftReview.correctAnswer")}
                       <textarea
                         aria-label={
-                          editedQuestionType === "handwriting"
+                          requiresParentReview(editedQuestionType)
                             ? t("draftReview.referenceAnswer")
                             : t("draftReview.correctAnswer")
                         }
@@ -3879,6 +3888,7 @@ function CreateWorkspaceContent() {
                     <option value="typed_text">{t("manual.type.typed")}</option>
                     <option value="single_choice">{t("manual.type.choice")}</option>
                     <option value="handwriting">{t("manual.type.handwriting")}</option>
+                    <option value="photo">{t("manual.type.photo")}</option>
                   </select>
                 </label>
               </div>
@@ -3910,8 +3920,10 @@ function CreateWorkspaceContent() {
                   aria-label={t("manual.answerGuide")}
                   onChange={(event) => setManualAnswer(event.target.value)}
                   placeholder={
-                    manualQuestionType === "handwriting"
-                      ? t("manual.handwritingPlaceholder")
+                    requiresParentReview(manualQuestionType)
+                      ? manualQuestionType === "photo"
+                        ? t("manual.photoPlaceholder")
+                        : t("manual.handwritingPlaceholder")
                       : manualQuestionType === "single_choice"
                         ? t("manual.choicePlaceholder")
                         : t("manual.typedPlaceholder")
@@ -3955,7 +3967,9 @@ function CreateWorkspaceContent() {
                             ? t("manual.type.typed")
                             : question.type === "single_choice"
                               ? t("manual.type.choice")
-                              : t("manual.type.handwriting")} · {t("manual.pointsSummary", { count: question.points })}
+                              : question.type === "handwriting"
+                                ? t("manual.type.handwriting")
+                                : t("manual.type.photo")} · {t("manual.pointsSummary", { count: question.points })}
                         </span>
                         <p>{question.prompt}</p>
                       </div>
