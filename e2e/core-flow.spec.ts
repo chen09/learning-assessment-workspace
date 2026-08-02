@@ -2735,6 +2735,17 @@ test("a child restores an offline typed answer after reopening the same practice
   await page.getByLabel("Your answer").fill("goes");
   await expect(page.getByText("Saved on this device")).toBeVisible();
 
+  let submitRequests = 0;
+  await page.route("**/v1/attempts/*/submit", async (route) => {
+    submitRequests += 1;
+    await route.continue();
+  });
+  await page.getByRole("button", { name: "Submit all answers" }).click();
+  await page.getByRole("button", { name: "Confirm full submission" }).click();
+  await expect(page.getByText("Saved on this device")).toBeVisible();
+  await page.waitForTimeout(300);
+  expect(submitRequests).toBe(0);
+
   await page.reload();
   await expect(page.getByLabel("Your answer")).toHaveValue("goes");
   await expect(page.getByText("Saved on this device")).toBeVisible();

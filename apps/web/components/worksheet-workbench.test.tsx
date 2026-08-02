@@ -763,6 +763,44 @@ describe("WorksheetWorkbench", () => {
     });
   });
 
+  it("does not submit the whole practice while a device-only answer remains unsynced", async () => {
+    render(<WorksheetWorkbench />);
+
+    await screen.findByRole("heading", {
+      name: "Choose the correct expansion of (a + b)(a − b).",
+    });
+    mocks.syncPendingDrafts.mockResolvedValue(0);
+    mocks.getPendingDraftsByPrefix.mockResolvedValue([
+      {
+        key: "attempt-1:algebra-choice",
+        answer: { choices: [0] },
+        syncRequest: {
+          attemptId: "attempt-1",
+          questionId: "algebra-choice",
+          payload: {
+            kind: "choice",
+            answer: { choices: [0] },
+            expected_version: 0,
+          },
+        },
+        savedAt: "2026-08-03T00:00:00.000Z",
+        expiresAt: "2026-08-04T00:00:00.000Z",
+      },
+    ]);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Submit all answers" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirm full submission" }),
+    );
+
+    expect(
+      await screen.findByText("Saved on this device"),
+    ).toBeInTheDocument();
+    expect(mocks.submitAttempt).not.toHaveBeenCalled();
+  });
+
   it("keeps multiple response photos in the selected shooting order", async () => {
     render(<WorksheetWorkbench />);
 

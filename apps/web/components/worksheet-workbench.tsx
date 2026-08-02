@@ -681,6 +681,17 @@ function WorksheetWorkbenchContent() {
   async function submitAll(reason = "completed") {
     if (attemptId && childToken) {
       try {
+        await Promise.all(
+          [...saveChains.current.values()].map((pendingSave) =>
+            pendingSave.catch(() => undefined),
+          ),
+        );
+        await syncPendingDrafts(childToken);
+        const pendingDrafts = await getPendingDraftsByPrefix(`${attemptId}:`);
+        if (pendingDrafts.length > 0) {
+          setSaveStatus("offline");
+          return;
+        }
         await submitAttempt(
           attemptId,
           childToken,
