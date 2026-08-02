@@ -862,20 +862,24 @@ test("parent collects several manual questions into one assigned practice", asyn
   await page.goto(
     `/parent/create/?familyId=${encodeURIComponent(family.id)}&childId=${encodeURIComponent(child.id)}`,
   );
-  await page.getByRole("button", { name: "Start simple" }).click();
-  await page.getByLabel("Practice title").fill("Two question check");
+  await page.evaluate(() => {
+    window.localStorage.setItem("luma-language:demo-parent", "zh");
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "手工创建题单" }).click();
+  await page.getByLabel("练习名称").fill("Two question check");
   await page
-    .getByRole("textbox", { name: "Question", exact: true })
+    .getByRole("textbox", { name: "题目", exact: true })
     .fill("Complete: I ___ ready.");
-  await page.getByLabel("Answer or grading guide").fill("am");
-  await page.getByRole("button", { name: "Add question" }).click();
-  await expect(page.getByText("Question 1 ready")).toBeVisible();
+  await page.getByLabel("参考答案或评分提示").fill("am");
+  await page.getByRole("button", { name: "添加题目" }).click();
+  await expect(page.getByText("第 1 题已准备好")).toBeVisible();
 
   await page
-    .getByRole("textbox", { name: "Question", exact: true })
+    .getByRole("textbox", { name: "题目", exact: true })
     .fill("Complete: She ___ to school every day.");
-  await page.getByLabel("Answer or grading guide").fill("walks");
-  await page.getByRole("button", { name: "Create review draft" }).click();
+  await page.getByLabel("参考答案或评分提示").fill("walks");
+  await page.getByRole("button", { name: "创建审核草稿" }).click();
   await expect(
     page.getByRole("heading", { name: "Complete: I ___ ready." }),
   ).toBeVisible();
@@ -888,7 +892,7 @@ test("parent collects several manual questions into one assigned practice", asyn
       response.url() === `${apiBaseUrl}/v1/question-sets/imports/structured` &&
       response.request().method() === "POST",
   );
-  await page.getByRole("button", { name: "Confirm and assign" }).click();
+  await page.getByRole("button", { name: "确认并布置" }).click();
   const importedRequest = await importResponse;
   expect(importedRequest.request().postDataJSON()).toMatchObject({
     document: {
