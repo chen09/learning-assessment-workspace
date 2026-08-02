@@ -48,7 +48,7 @@ describe("ChildHistoryPage", () => {
       screen.getByText("已完成的练习、分数和订正记录。"),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", {
+      await screen.findByRole("heading", {
         name: "Lesson 2 同レベル変形練習（インタラクティブ版）",
       }),
     ).toBeInTheDocument();
