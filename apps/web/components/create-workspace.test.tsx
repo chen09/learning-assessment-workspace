@@ -79,6 +79,40 @@ describe("CreateWorkspace", () => {
     });
   });
 
+  it("opens a completed-paper recovery link after browser navigation", async () => {
+    mocks.getCompletedWorksheetImport.mockResolvedValue({
+      id: "completed-worksheet-2",
+      status: "needs_review",
+      assignment_id: null,
+      attempt_id: null,
+      filenames: ["completed-paper.jpg"],
+      response_paths: ["family-1/responses/completed-paper.jpg"],
+      job: {
+        id: "analysis-job-2",
+        status: "succeeded",
+        type: "analyze_completed_worksheet",
+      },
+    });
+
+    render(<CreateWorkspace />);
+
+    expect(await screen.findByRole("combobox", { name: "Family" })).toBeInTheDocument();
+    window.history.pushState(
+      {},
+      "",
+      "/parent/create/?completedWorksheetId=completed-worksheet-2",
+    );
+    window.dispatchEvent(new PopStateEvent("popstate"));
+
+    expect(
+      await screen.findByRole("heading", { name: "Preparing the review draft" }),
+    ).toBeInTheDocument();
+    expect(mocks.getCompletedWorksheetImport).toHaveBeenCalledWith(
+      "completed-worksheet-2",
+      "parent-token",
+    );
+  });
+
   it("resumes a completed-paper review from its private recovery link", async () => {
     window.history.replaceState(
       {},

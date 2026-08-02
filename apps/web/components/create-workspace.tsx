@@ -610,6 +610,7 @@ function CreateWorkspaceContent() {
   const [requestStatus, setRequestStatus] = useState<
     "idle" | "working" | "error"
   >("idle");
+  const [recoveryRouteVersion, setRecoveryRouteVersion] = useState(0);
 
   const assignmentTimeLimitSeconds =
     assignmentMode === "exam" ? Number(assignmentDurationMinutes) * 60 : null;
@@ -729,6 +730,34 @@ function CreateWorkspaceContent() {
   };
 
   useEffect(() => {
+    const reopenCreateRouteFromHistory = () => {
+      setMode("generate");
+      setStage("compose");
+      setQuestionSetId(null);
+      setSourceImportJob(null);
+      setDraftQuestions([]);
+      setVariantSource(null);
+      setCompletedWorksheetId(null);
+      setCompletedWorksheetStatus(null);
+      setCompletedPaperFailureCode(null);
+      setCompletedResponsePaths([]);
+      setCompletedResponsePageCount(0);
+      setCompletedResponseFileNames([]);
+      setCompletedResponsePreviewUrls([]);
+      setCompletedAttemptId(null);
+      setAssignmentId(null);
+      setCompletedReview(null);
+      setCompletedReviewSource(null);
+      setRequestStatus("idle");
+      setRecoveryRouteVersion((current) => current + 1);
+    };
+
+    window.addEventListener("popstate", reopenCreateRouteFromHistory);
+    return () =>
+      window.removeEventListener("popstate", reopenCreateRouteFromHistory);
+  }, []);
+
+  useEffect(() => {
     let active = true;
     void getParentAccessToken().then(async (parentToken) => {
       if (!parentToken) {
@@ -768,7 +797,7 @@ function CreateWorkspaceContent() {
     return () => {
       active = false;
     };
-  }, [assignmentTargetLoadRequest]);
+  }, [assignmentTargetLoadRequest, recoveryRouteVersion]);
 
   const retryAssignmentTargetLoad = () => {
     setFamilies([]);
@@ -830,7 +859,7 @@ function CreateWorkspaceContent() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [recoveryRouteVersion]);
 
   useEffect(() => {
     const setId = new URLSearchParams(window.location.search).get(
@@ -890,7 +919,7 @@ function CreateWorkspaceContent() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [recoveryRouteVersion]);
 
   useEffect(() => {
     const variantSetId = new URLSearchParams(window.location.search).get(
@@ -935,7 +964,7 @@ function CreateWorkspaceContent() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [recoveryRouteVersion]);
 
   useEffect(() => {
     if (

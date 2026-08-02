@@ -91,3 +91,72 @@ test("browser navigation hides the previous practice until the requested attempt
     page.getByRole("heading", { name: "Second attempt question." }),
   ).toBeVisible();
 });
+
+test("browser navigation opens a completed-paper review from the parent create page", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "A single desktop browser regression covers parent recovery navigation.",
+  );
+
+  await page.route("**/v1/families", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify([{ id: "family-1", name: "Navigation family" }]),
+    });
+  });
+  await page.route("**/v1/families/family-1/children", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          id: "child-1",
+          family_id: "family-1",
+          nickname: "Navigation child",
+          grade_stage: "Junior high 1",
+          ui_language: "en",
+        },
+      ]),
+    });
+  });
+  await page.route(
+    "**/v1/completed-worksheets/parent-navigation-paper",
+    async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: "parent-navigation-paper",
+          status: "needs_review",
+          assignment_id: null,
+          attempt_id: null,
+          filenames: ["completed-paper.jpg"],
+          response_paths: ["family-1/responses/completed-paper.jpg"],
+          job: {
+            id: "parent-navigation-job",
+            status: "succeeded",
+            type: "analyze_completed_worksheet",
+          },
+        }),
+      });
+    },
+  );
+
+  await page.goto("/parent/create/");
+  await expect(page.getByRole("combobox", { name: "Family" })).toHaveValue(
+    "family-1",
+  );
+
+  await page.evaluate(() => {
+    window.history.pushState(
+      {},
+      "",
+      "/parent/create/?completedWorksheetId=parent-navigation-paper",
+    );
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  });
+
+  await expect(
+    page.getByRole("heading", { name: "Preparing the review draft" }),
+  ).toBeVisible();
+});
