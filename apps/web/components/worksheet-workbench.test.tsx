@@ -692,6 +692,46 @@ describe("WorksheetWorkbench", () => {
     ).toBeInTheDocument();
   });
 
+  it("does not submit one answer for grading while its device-only draft remains unsynced", async () => {
+    mocks.saveAttemptResponse.mockRejectedValueOnce(new Error("offline"));
+    render(<WorksheetWorkbench />);
+
+    fireEvent.click(
+      await screen.findByRole("radio", { name: "a² − b²" }),
+    );
+    await screen.findByText("Saved on this device");
+    mocks.syncPendingDrafts.mockResolvedValue(0);
+    mocks.getPendingDraftsByPrefix.mockResolvedValue([
+      {
+        key: "attempt-1:algebra-choice",
+        answer: { choices: [0] },
+        syncRequest: {
+          attemptId: "attempt-1",
+          questionId: "algebra-choice",
+          payload: {
+            kind: "choice",
+            answer: { choices: [0] },
+            expected_version: 0,
+          },
+        },
+        savedAt: "2026-08-03T00:00:00.000Z",
+        expiresAt: "2026-08-04T00:00:00.000Z",
+      },
+    ]);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Submit this answer for grading" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirm single-answer submission" }),
+    );
+
+    expect(
+      await screen.findByText("Saved on this device"),
+    ).toBeInTheDocument();
+    expect(mocks.submitQuestion).not.toHaveBeenCalled();
+  });
+
   it("localizes the post-grading action instead of showing the API fallback language", async () => {
     window.localStorage.setItem("luma-language:demo-child", "ja");
     mocks.getAttemptResults.mockResolvedValue({

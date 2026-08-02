@@ -745,6 +745,19 @@ function WorksheetWorkbenchContent() {
     }
     const questionId = currentQuestion.id;
     try {
+      await Promise.all(
+        [...saveChains.current.values()].map((pendingSave) =>
+          pendingSave.catch(() => undefined),
+        ),
+      );
+      await syncPendingDrafts(childToken);
+      const pendingDrafts = await getPendingDraftsByPrefix(
+        `${attemptId}:${questionId}`,
+      );
+      if (pendingDrafts.length > 0) {
+        setSaveStatus("offline");
+        return;
+      }
       await submitQuestion(
         attemptId,
         questionId,
