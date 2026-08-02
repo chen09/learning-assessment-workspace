@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   LanguageProvider,
@@ -51,5 +51,18 @@ describe("LanguageProvider", () => {
 
     expect(screen.getByText("zh")).toBeInTheDocument();
     expect(document.documentElement.lang).toBe("zh");
+  });
+
+  it("notifies the signed-in member after persisting a manual language change", () => {
+    const persistPreference = vi.fn();
+    render(
+      <LanguageProvider onLanguageChange={persistPreference}>
+        <LanguageProbe />
+      </LanguageProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "日本語" }));
+
+    expect(persistPreference).toHaveBeenCalledWith("ja");
   });
 });

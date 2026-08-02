@@ -19,6 +19,7 @@ from app.api.history import router as history_router
 from app.api.invitations import router as invitations_router
 from app.api.jobs import router as jobs_router
 from app.api.library import router as library_router
+from app.api.profiles import router as profiles_router
 from app.api.question_sets import router as question_sets_router
 from app.api.reviews import router as reviews_router
 from app.api.uploads import router as uploads_router
@@ -105,6 +106,7 @@ def create_app() -> FastAPI:
     application.include_router(attempts_router)
     application.include_router(demo_router)
     application.include_router(question_sets_router)
+    application.include_router(profiles_router)
     application.include_router(uploads_router)
     application.include_router(library_router)
     application.include_router(grading_results_router)

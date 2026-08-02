@@ -67,6 +67,7 @@ from app.domain.models import (
     ParentDecision,
     ParentDecisionRequest,
     ParentHistoryItem,
+    ParentLanguagePreference,
     ParentReviewItem,
     PrintableAssignment,
     PublicLibraryCopy,
@@ -703,6 +704,52 @@ class PostgresRepository:
             )
             row = result.mappings().one()
         return Child(**dict(row))
+
+    async def get_parent_language(
+        self,
+        parent_id: str,
+    ) -> ParentLanguagePreference:
+        async with self._engine.connect() as connection:
+            result = await connection.execute(
+                text(
+                    """
+                    select ui_language
+                    from public.profiles
+                    where id = :parent_id
+                    """
+                ),
+                {"parent_id": _uuid(parent_id)},
+            )
+            row = result.mappings().one_or_none()
+        if row is None:
+            raise NotFoundError
+        return ParentLanguagePreference(**dict(row))
+
+    async def update_parent_language(
+        self,
+        parent_id: str,
+        ui_language: Literal["zh", "ja", "en"],
+    ) -> ParentLanguagePreference:
+        async with self._engine.begin() as connection:
+            result = await connection.execute(
+                text(
+                    """
+                    update public.profiles
+                    set ui_language = :ui_language,
+                        updated_at = now()
+                    where id = :parent_id
+                    returning ui_language
+                    """
+                ),
+                {
+                    "parent_id": _uuid(parent_id),
+                    "ui_language": ui_language,
+                },
+            )
+            row = result.mappings().one_or_none()
+        if row is None:
+            raise NotFoundError
+        return ParentLanguagePreference(**dict(row))
 
     async def set_management_pin(
         self,

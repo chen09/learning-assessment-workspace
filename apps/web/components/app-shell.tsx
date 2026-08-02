@@ -21,6 +21,9 @@ import { LanguageSwitcher } from "@/components/language-switcher";
 import {
   getActiveChildProfile,
   getChildAccessToken,
+  getOwnParentLanguage,
+  getParentAccessToken,
+  updateOwnParentLanguage,
   updateOwnChildLanguage,
 } from "@/lib/api-client";
 
@@ -46,8 +49,25 @@ type AppShellProps = {
 };
 
 export function AppShell({ children, role, currentPath }: AppShellProps) {
+  const persistLanguage = async (language: Language) => {
+    if (role === "child") {
+      const childToken = getChildAccessToken();
+      if (childToken) {
+        await updateOwnChildLanguage(language, childToken);
+      }
+      return;
+    }
+    const parentToken = await getParentAccessToken();
+    if (parentToken) {
+      await updateOwnParentLanguage(language, parentToken);
+    }
+  };
+
   return (
-    <LanguageProvider storageKey={`demo-${role}`}>
+    <LanguageProvider
+      onLanguageChange={persistLanguage}
+      storageKey={`demo-${role}`}
+    >
       <AppShellContent currentPath={currentPath} role={role}>
         {children}
       </AppShellContent>
@@ -56,7 +76,7 @@ export function AppShell({ children, role, currentPath }: AppShellProps) {
 }
 
 function AppShellContent({ children, role, currentPath }: AppShellProps) {
-  const { t } = useLanguage();
+  const { syncLanguage, t } = useLanguage();
   const [childName, setChildName] = useState<string | null>(null);
   const navigation = role === "parent" ? parentNavigation : childNavigation;
   const roleLabel = t(role === "parent" ? "role.parent" : "role.child");
@@ -78,12 +98,31 @@ function AppShellContent({ children, role, currentPath }: AppShellProps) {
     };
   }, [role]);
 
-  const persistChildLanguage = async (language: Language) => {
-    const childToken = getChildAccessToken();
-    if (childToken) {
-      await updateOwnChildLanguage(language, childToken);
+  useEffect(() => {
+    if (role !== "parent") {
+      return;
     }
-  };
+    let active = true;
+    void getParentAccessToken()
+      .then(async (parentToken) => {
+        if (!parentToken || !active) {
+          return;
+        }
+        const hasBrowserPreference =
+          window.localStorage.getItem("luma-language:demo-parent") !== null;
+        if (hasBrowserPreference) {
+          return;
+        }
+        const preference = await getOwnParentLanguage(parentToken);
+        if (active) {
+          syncLanguage(preference.ui_language);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [role, syncLanguage]);
 
   return (
     <div className={`app-frame ${role === "child" ? "child-frame" : ""}`}>
@@ -129,7 +168,7 @@ function AppShellContent({ children, role, currentPath }: AppShellProps) {
       <main className="app-main">
         {role === "child" ? (
           <div className="shell-tools">
-            <LanguageSwitcher onLanguageChange={persistChildLanguage} />
+            <LanguageSwitcher />
           </div>
         ) : null}
         {children}

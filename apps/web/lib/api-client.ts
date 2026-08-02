@@ -374,6 +374,32 @@ export async function getParentAccessToken() {
   return session?.data.session?.access_token ?? null;
 }
 
+export type ParentLanguagePreference = {
+  ui_language: "zh" | "ja" | "en";
+};
+
+export async function getOwnParentLanguage(parentToken: string) {
+  return apiRequest<ParentLanguagePreference>(
+    "/v1/profiles/me/language",
+    { method: "GET" },
+    parentToken,
+  );
+}
+
+export async function updateOwnParentLanguage(
+  uiLanguage: ParentLanguagePreference["ui_language"],
+  parentToken: string,
+) {
+  return apiRequest<ParentLanguagePreference>(
+    "/v1/profiles/me/language",
+    {
+      method: "PUT",
+      body: JSON.stringify({ ui_language: uiLanguage }),
+    },
+    parentToken,
+  );
+}
+
 export type Family = {
   id: string;
   name: string;

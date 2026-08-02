@@ -2,20 +2,27 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AppShell } from "@/components/app-shell";
+import { LanguageSwitcher } from "@/components/language-switcher";
 
 const mocks = vi.hoisted(() => ({
   getActiveChildProfile: vi.fn(),
   getChildAccessToken: vi.fn(),
+  getOwnParentLanguage: vi.fn(),
+  getParentAccessToken: vi.fn(),
+  updateOwnParentLanguage: vi.fn(),
   updateOwnChildLanguage: vi.fn(),
 }));
 
 vi.mock("@/lib/api-client", () => ({
   getActiveChildProfile: mocks.getActiveChildProfile,
   getChildAccessToken: mocks.getChildAccessToken,
+  getOwnParentLanguage: mocks.getOwnParentLanguage,
+  getParentAccessToken: mocks.getParentAccessToken,
+  updateOwnParentLanguage: mocks.updateOwnParentLanguage,
   updateOwnChildLanguage: mocks.updateOwnChildLanguage,
 }));
 
-describe("AppShell child language", () => {
+describe("AppShell language preferences", () => {
   beforeEach(() => {
     window.localStorage.clear();
     window.localStorage.setItem("luma-language:demo-child", "en");
@@ -36,6 +43,12 @@ describe("AppShell child language", () => {
       grade_stage: "Grade 5",
       ui_language: "zh",
     });
+    mocks.getParentAccessToken.mockReset();
+    mocks.getParentAccessToken.mockResolvedValue("parent-token");
+    mocks.getOwnParentLanguage.mockReset();
+    mocks.getOwnParentLanguage.mockResolvedValue({ ui_language: "ja" });
+    mocks.updateOwnParentLanguage.mockReset();
+    mocks.updateOwnParentLanguage.mockResolvedValue({ ui_language: "ja" });
   });
 
   it("lets the signed-in child switch and persist their own UI language", async () => {
@@ -75,5 +88,30 @@ describe("AppShell child language", () => {
 
     expect(screen.queryByText("Alex")).not.toBeInTheDocument();
     expect(screen.getAllByText("Child mode")).not.toHaveLength(0);
+  });
+
+  it("loads and saves the parent's own language preference", async () => {
+    window.localStorage.removeItem("luma-language:demo-parent");
+
+    render(
+      <AppShell currentPath="/parent/" role="parent">
+        <LanguageSwitcher />
+      </AppShell>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByRole("link", { name: "ホーム" })).toHaveLength(2);
+    });
+
+    fireEvent.change(screen.getByRole("combobox", { name: "言語" }), {
+      target: { value: "zh" },
+    });
+
+    await waitFor(() => {
+      expect(mocks.updateOwnParentLanguage).toHaveBeenCalledWith(
+        "zh",
+        "parent-token",
+      );
+    });
   });
 });

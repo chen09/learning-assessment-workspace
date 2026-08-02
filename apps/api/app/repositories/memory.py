@@ -57,6 +57,7 @@ from app.domain.models import (
     ParentDecision,
     ParentDecisionRequest,
     ParentHistoryItem,
+    ParentLanguagePreference,
     ParentReviewItem,
     PrintableAssignment,
     PublicLibraryCopy,
@@ -188,6 +189,7 @@ class MemoryRepository:
         self.deletion_requests: dict[str, DeletionRequestView] = {}
         self.deletion_idempotency: dict[tuple[str, str], str] = {}
         self.management_pin_hashes: dict[tuple[str, str], str] = {}
+        self.parent_languages: dict[str, Literal["zh", "ja", "en"]] = {}
         self._pin_hasher = PasswordHasher()
 
     async def bootstrap_demo(self) -> DemoBootstrap:
@@ -341,6 +343,22 @@ class MemoryRepository:
             raise NotFoundError
         child.ui_language = ui_language  # type: ignore[assignment]
         return child
+
+    async def get_parent_language(
+        self,
+        parent_id: str,
+    ) -> ParentLanguagePreference:
+        return ParentLanguagePreference(
+            ui_language=self.parent_languages.get(parent_id, "en"),
+        )
+
+    async def update_parent_language(
+        self,
+        parent_id: str,
+        ui_language: Literal["zh", "ja", "en"],
+    ) -> ParentLanguagePreference:
+        self.parent_languages[parent_id] = ui_language
+        return ParentLanguagePreference(ui_language=ui_language)
 
     async def set_management_pin(
         self,

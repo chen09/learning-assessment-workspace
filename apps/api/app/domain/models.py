@@ -110,6 +110,14 @@ class UpdateChildLanguageRequest(BaseModel):
     ui_language: Literal["zh", "ja", "en"]
 
 
+class ParentLanguagePreference(BaseModel):
+    ui_language: Literal["zh", "ja", "en"] = "en"
+
+
+class UpdateParentLanguageRequest(BaseModel):
+    ui_language: Literal["zh", "ja", "en"]
+
+
 class ManagementPinRequest(BaseModel):
     pin: str = Field(pattern=r"^\d{6}$")
 

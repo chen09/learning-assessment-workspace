@@ -2523,6 +2523,7 @@ type MessageValues = Record<string, string | number>;
 type LanguageContextValue = {
   language: Language;
   setLanguage: (language: Language) => void;
+  syncLanguage: (language: Language) => void;
   t: (key: MessageKey, values?: MessageValues) => string;
 };
 
@@ -2539,6 +2540,7 @@ function interpolate(message: string, values?: MessageValues) {
 const defaultLanguageContext: LanguageContextValue = {
   language: "en",
   setLanguage: () => undefined,
+  syncLanguage: () => undefined,
   t: (key, values) => interpolate(messages.en[key], values),
 };
 
@@ -2564,9 +2566,11 @@ function subscribeToLanguage(onChange: () => void) {
 
 export function LanguageProvider({
   children,
+  onLanguageChange,
   storageKey = "public",
 }: {
   children: ReactNode;
+  onLanguageChange?: (language: Language) => void | Promise<void>;
   storageKey?: string;
 }) {
   const language = useSyncExternalStore<Language>(
@@ -2580,19 +2584,28 @@ export function LanguageProvider({
   }, [language]);
 
   const value = useMemo<LanguageContextValue>(
-    () => ({
-      language,
-      setLanguage: (nextLanguage) => {
+    () => {
+      const writeLanguage = (nextLanguage: Language) => {
         window.localStorage.setItem(
           `luma-language:${storageKey}`,
           nextLanguage,
         );
         document.documentElement.lang = nextLanguage;
         window.dispatchEvent(new Event(languageEvent));
-      },
-      t: (key, values) => interpolate(messages[language][key], values),
-    }),
-    [language, storageKey],
+      };
+      return {
+        language,
+        setLanguage: (nextLanguage) => {
+          writeLanguage(nextLanguage);
+          void Promise.resolve(onLanguageChange?.(nextLanguage)).catch(
+            () => undefined,
+          );
+        },
+        syncLanguage: writeLanguage,
+        t: (key, values) => interpolate(messages[language][key], values),
+      };
+    },
+    [language, onLanguageChange, storageKey],
   );
 
   return (

@@ -2374,6 +2374,22 @@
         "title": "ParentHistoryItem",
         "type": "object"
       },
+      "ParentLanguagePreference": {
+        "properties": {
+          "ui_language": {
+            "default": "en",
+            "enum": [
+              "zh",
+              "ja",
+              "en"
+            ],
+            "title": "Ui Language",
+            "type": "string"
+          }
+        },
+        "title": "ParentLanguagePreference",
+        "type": "object"
+      },
       "ParentReviewItem": {
         "properties": {
           "automated_feedback": {
@@ -3687,6 +3703,24 @@
           "pin"
         ],
         "title": "UpdateChildPinRequest",
+        "type": "object"
+      },
+      "UpdateParentLanguageRequest": {
+        "properties": {
+          "ui_language": {
+            "enum": [
+              "zh",
+              "ja",
+              "en"
+            ],
+            "title": "Ui Language",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ui_language"
+        ],
+        "title": "UpdateParentLanguageRequest",
         "type": "object"
       },
       "UploadBucket": {
@@ -7166,6 +7200,112 @@
         "summary": "Withdraw Library Submission",
         "tags": [
           "library"
+        ]
+      }
+    },
+    "/v1/profiles/me/language": {
+      "get": {
+        "operationId": "get_own_parent_language_v1_profiles_me_language_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParentLanguagePreference"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Own Parent Language",
+        "tags": [
+          "profiles"
+        ]
+      },
+      "put": {
+        "operationId": "update_own_parent_language_v1_profiles_me_language_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateParentLanguageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParentLanguagePreference"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Own Parent Language",
+        "tags": [
+          "profiles"
         ]
       }
     },
