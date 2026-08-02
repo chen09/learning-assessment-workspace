@@ -766,6 +766,49 @@ export async function acceptFamilyInvitation(
   );
 }
 
+export type DeletionRequest = {
+  id: string;
+  family_id: string;
+  target_type: "family" | "child" | "asset";
+  target_id: string;
+  requested_at: string;
+  purge_after: string;
+  restored_at: string | null;
+};
+
+export async function createDeletionRequest(
+  familyId: string,
+  targetType: DeletionRequest["target_type"],
+  targetId: string,
+  parentToken: string,
+  idempotencyKey: string,
+) {
+  return apiRequest<DeletionRequest>(
+    "/v1/deletions",
+    {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify({
+        family_id: familyId,
+        target_type: targetType,
+        target_id: targetId,
+      }),
+    },
+    parentToken,
+  );
+}
+
+export async function restoreDeletionRequest(
+  deletionId: string,
+  parentToken: string,
+) {
+  return apiRequest<DeletionRequest>(
+    `/v1/deletions/${encodeURIComponent(deletionId)}/restore`,
+    { method: "POST" },
+    parentToken,
+  );
+}
+
 export async function startAssignment(
   assignmentId: string,
   childToken: string,

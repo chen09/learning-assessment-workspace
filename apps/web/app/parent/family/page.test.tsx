@@ -5,14 +5,19 @@ import FamilySettingsPage from "@/app/parent/family/page";
 
 const mocks = vi.hoisted(() => ({
   createChild: vi.fn(),
+  createDeletionRequest: vi.fn(),
   getChildren: vi.fn(),
   getFamilies: vi.fn(),
+  restoreDeletionRequest: vi.fn(),
+  setManagementPin: vi.fn(),
+  unlockFamilyManagement: vi.fn(),
   updateChildLanguage: vi.fn(),
 }));
 
 vi.mock("@/lib/api-client", () => ({
   acceptFamilyInvitation: vi.fn(),
   createChild: mocks.createChild,
+  createDeletionRequest: mocks.createDeletionRequest,
   createFamily: vi.fn(),
   createFamilyInvitation: vi.fn(),
   getChildren: mocks.getChildren,
@@ -20,8 +25,9 @@ vi.mock("@/lib/api-client", () => ({
   getManagementPinStatus: vi.fn().mockResolvedValue({ configured: false }),
   getParentAccessToken: vi.fn().mockResolvedValue("parent-token"),
   getPendingInvitations: vi.fn().mockResolvedValue([]),
-  setManagementPin: vi.fn(),
-  unlockFamilyManagement: vi.fn(),
+  setManagementPin: mocks.setManagementPin,
+  restoreDeletionRequest: mocks.restoreDeletionRequest,
+  unlockFamilyManagement: mocks.unlockFamilyManagement,
   updateChildLanguage: mocks.updateChildLanguage,
   updateChildPin: vi.fn(),
 }));
@@ -29,10 +35,20 @@ vi.mock("@/lib/api-client", () => ({
 describe("FamilySettingsPage", () => {
   beforeEach(() => {
     mocks.createChild.mockReset();
+    mocks.createDeletionRequest.mockReset();
     mocks.getChildren.mockReset();
     mocks.getChildren.mockResolvedValue([]);
     mocks.getFamilies.mockReset();
     mocks.getFamilies.mockResolvedValue([]);
+    mocks.restoreDeletionRequest.mockReset();
+    mocks.setManagementPin.mockReset();
+    mocks.unlockFamilyManagement.mockReset();
+    mocks.setManagementPin.mockResolvedValue(undefined);
+    mocks.unlockFamilyManagement.mockResolvedValue({
+      access_token: "management-unlock",
+      token_type: "bearer",
+      expires_in: 600,
+    });
     mocks.updateChildLanguage.mockReset();
     window.localStorage.clear();
     window.localStorage.setItem("luma-language:demo-parent", "zh");
@@ -182,5 +198,88 @@ describe("FamilySettingsPage", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText("Alex")).not.toBeInTheDocument();
     expect(screen.getByLabelText("当前家庭")).toHaveValue("family-1");
+  });
+
+  it("requires management unlock and explicit confirmation before removing a child, then offers a restore", async () => {
+    mocks.getFamilies.mockResolvedValue([
+      { id: "family-1", name: "肉肉如意" },
+    ]);
+    mocks.getChildren
+      .mockResolvedValueOnce([
+        {
+          id: "child-1",
+          family_id: "family-1",
+          nickname: "Alex",
+          grade_stage: "初一",
+          ui_language: "zh",
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: "child-1",
+          family_id: "family-1",
+          nickname: "Alex",
+          grade_stage: "初一",
+          ui_language: "zh",
+        },
+      ]);
+    mocks.createDeletionRequest.mockResolvedValue({
+      id: "deletion-1",
+      family_id: "family-1",
+      target_type: "child",
+      target_id: "child-1",
+      requested_at: "2026-08-03T00:00:00.000Z",
+      purge_after: "2026-09-02T00:00:00.000Z",
+      restored_at: null,
+    });
+    mocks.restoreDeletionRequest.mockResolvedValue({
+      id: "deletion-1",
+      family_id: "family-1",
+      target_type: "child",
+      target_id: "child-1",
+      requested_at: "2026-08-03T00:00:00.000Z",
+      purge_after: "2026-09-02T00:00:00.000Z",
+      restored_at: "2026-08-03T00:01:00.000Z",
+    });
+
+    render(<FamilySettingsPage />);
+
+    expect(await screen.findByText("Alex")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "移除 Alex" })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText("家长管理 PIN"), {
+      target: { value: "123456" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "设置管理 PIN" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "移除 Alex" })).toBeEnabled();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "移除 Alex" }));
+    expect(
+      screen.getByRole("button", { name: "确认移除 Alex" }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "确认移除 Alex" }));
+
+    await waitFor(() => {
+      expect(mocks.createDeletionRequest).toHaveBeenCalledWith(
+        "family-1",
+        "child",
+        "child-1",
+        "parent-token",
+        expect.stringMatching(/^delete-child-/),
+      );
+    });
+    expect(screen.queryByText("Alex")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "恢复 Alex" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "恢复 Alex" }));
+    await waitFor(() => {
+      expect(mocks.restoreDeletionRequest).toHaveBeenCalledWith(
+        "deletion-1",
+        "parent-token",
+      );
+    });
+    expect(await screen.findByText("Alex")).toBeInTheDocument();
   });
 });

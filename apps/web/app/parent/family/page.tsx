@@ -14,9 +14,11 @@ import {
   type ChildProfile,
   acceptFamilyInvitation,
   createChild,
+  createDeletionRequest,
   createFamily,
   createFamilyInvitation,
   type Family,
+  type DeletionRequest,
   getChildren,
   getFamilies,
   getManagementPinStatus,
@@ -24,6 +26,7 @@ import {
   type PendingInvitation,
   getParentAccessToken,
   setManagementPin,
+  restoreDeletionRequest,
   unlockFamilyManagement,
   updateChildLanguage,
   updateChildPin,
@@ -72,6 +75,13 @@ function FamilySettingsContent() {
   const [managementPin, setManagementPinValue] = useState("");
   const [managementUnlock, setManagementUnlock] = useState<string | null>(null);
   const [managementPinConfigured, setManagementPinConfigured] = useState(false);
+  const [deleteCandidate, setDeleteCandidate] = useState<ChildProfile | null>(
+    null,
+  );
+  const [pendingDeletion, setPendingDeletion] = useState<{
+    child: ChildProfile;
+    request: DeletionRequest;
+  } | null>(null);
   const [status, setStatus] = useState<"idle" | "working" | "error">("idle");
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">(
     "loading",
@@ -261,6 +271,46 @@ function FamilySettingsContent() {
       setChildren((current) =>
         current.map((child) => (child.id === childId ? updated : child)),
       );
+      setStatus("idle");
+    } catch {
+      setStatus("error");
+    }
+  };
+
+  const removeChild = async () => {
+    if (!token || !familyId || !managementUnlock || !deleteCandidate) {
+      return;
+    }
+    setStatus("working");
+    try {
+      const deletion = await createDeletionRequest(
+        familyId,
+        "child",
+        deleteCandidate.id,
+        token,
+        `delete-child-${familyId}-${deleteCandidate.id}`,
+      );
+      setChildren((current) =>
+        current.filter((child) => child.id !== deleteCandidate.id),
+      );
+      setPendingDeletion({ child: deleteCandidate, request: deletion });
+      setDeleteCandidate(null);
+      setStatus("idle");
+    } catch {
+      setStatus("error");
+    }
+  };
+
+  const restoreChild = async () => {
+    if (!token || !familyId || !pendingDeletion) {
+      return;
+    }
+    setStatus("working");
+    try {
+      await restoreDeletionRequest(pendingDeletion.request.id, token);
+      const restoredChildren = await getChildren(familyId, token);
+      setChildren(restoredChildren);
+      setPendingDeletion(null);
       setStatus("idle");
     } catch {
       setStatus("error");
@@ -546,8 +596,76 @@ function FamilySettingsContent() {
                   {t("family.managePin")}
                 </button>
               )}
+              <button
+                aria-label={t("family.removeChildFor", {
+                  name: child.nickname,
+                })}
+                className="quiet-link"
+                disabled={!managementUnlock || status === "working"}
+                onClick={() => setDeleteCandidate(child)}
+                type="button"
+              >
+                {t("family.removeChild")}
+              </button>
             </article>
           ))}
+          {deleteCandidate ? (
+            <section className="invite-ready" role="alert">
+              <Shield />
+              <div>
+                <strong>
+                  {t("family.confirmRemoveChild", {
+                    name: deleteCandidate.nickname,
+                  })}
+                </strong>
+                <p>{t("family.removeChildWarning")}</p>
+              </div>
+              <button
+                className="button ghost"
+                disabled={status === "working"}
+                onClick={() => setDeleteCandidate(null)}
+                type="button"
+              >
+                {t("draftReview.cancel")}
+              </button>
+              <button
+                className="button primary"
+                disabled={status === "working"}
+                onClick={() => void removeChild()}
+                type="button"
+              >
+                {t("family.confirmRemoveChild", {
+                  name: deleteCandidate.nickname,
+                })}
+              </button>
+            </section>
+          ) : null}
+          {pendingDeletion ? (
+            <section className="invite-ready" role="status">
+              <Shield />
+              <div>
+                <strong>
+                  {t("family.childRemoved", {
+                    name: pendingDeletion.child.nickname,
+                    date: new Intl.DateTimeFormat(languageLocales[language]).format(
+                      new Date(pendingDeletion.request.purge_after),
+                    ),
+                  })}
+                </strong>
+                <p>{t("family.removeChildWarning")}</p>
+              </div>
+              <button
+                className="button primary"
+                disabled={status === "working"}
+                onClick={() => void restoreChild()}
+                type="button"
+              >
+                {t("family.restoreChild", {
+                  name: pendingDeletion.child.nickname,
+                })}
+              </button>
+            </section>
+          ) : null}
           {token && familyId ? (
             <form className="invite-form" onSubmit={addChild}>
               <label>

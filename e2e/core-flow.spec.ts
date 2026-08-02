@@ -389,6 +389,75 @@ test("authenticated parent legacy link is cleaned and remains responsive in all 
   ).toBeVisible();
 });
 
+test("a parent can remove and restore a child only after management unlock", async ({
+  page,
+  request,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "The protected destructive action is covered once with the desktop flow.",
+  );
+  const apiBaseUrl = "http://127.0.0.1:8017";
+  const fixtureKey = `e2e-child-restore-${testInfo.workerIndex}`;
+  const parentHeaders = { Authorization: "Bearer parent-fixture" };
+  const family = (await (
+    await request.post(`${apiBaseUrl}/v1/families`, {
+      headers: { ...parentHeaders, "Idempotency-Key": `${fixtureKey}-family` },
+      data: { name: "Recoverable child family" },
+    })
+  ).json()) as { id: string };
+  const child = (await (
+    await request.post(`${apiBaseUrl}/v1/families/${family.id}/children`, {
+      headers: { ...parentHeaders, "Idempotency-Key": `${fixtureKey}-child` },
+      data: {
+        nickname: "Recoverable child",
+        grade_stage: "Junior high 1",
+        ui_language: "en",
+        pin: "123456",
+      },
+    })
+  ).json()) as { id: string };
+
+  await page.goto(`/parent/family/?familyId=${encodeURIComponent(family.id)}`);
+  await expect(page.getByText("Recoverable child", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Remove Recoverable child" })).toBeDisabled();
+
+  await page.getByLabel("Parent management PIN").fill("123456");
+  await page.getByRole("button", { name: "Set management PIN" }).click();
+  await expect(
+    page.getByRole("button", { name: "Remove Recoverable child" }),
+  ).toBeEnabled();
+  await page.getByRole("button", { name: "Remove Recoverable child" }).click();
+  await expect(
+    page.getByRole("button", { name: "Confirm removal of Recoverable child" }),
+  ).toBeVisible();
+  const removeResponse = page.waitForResponse(
+    (response) =>
+      response.url() === `${apiBaseUrl}/v1/deletions` &&
+      response.request().method() === "POST",
+  );
+  await page
+    .getByRole("button", { name: "Confirm removal of Recoverable child" })
+    .click();
+  expect((await removeResponse).ok()).toBeTruthy();
+  await expect(
+    page.getByRole("link", { name: "Child sign in" }),
+  ).toHaveCount(0);
+
+  const restoreResponse = page.waitForResponse(
+    (response) =>
+      /\/v1\/deletions\/[^/]+\/restore$/.test(response.url()) &&
+      response.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "Restore Recoverable child" }).click();
+  expect((await restoreResponse).ok()).toBeTruthy();
+  await expect(page.getByText("Recoverable child", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Child sign in" })).toHaveAttribute(
+    "href",
+    `/child/login/?childId=${child.id}`,
+  );
+});
+
 test("parent separates imported material and its private answer key", async ({
   page,
   request,
