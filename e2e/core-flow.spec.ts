@@ -1405,6 +1405,110 @@ test("parent authors a paper-photo question and assigns it through the reviewed 
   ).toBeVisible();
 });
 
+test("parent authors a multiple-choice question and the child is graded from every selected answer", async ({
+  page,
+  request,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "The shared fixture API import runs once; responsive checkbox answering is covered separately.",
+  );
+  const apiBaseUrl = "http://127.0.0.1:8017";
+  const fixtureKey = `e2e-manual-multiple-choice-${testInfo.workerIndex}`;
+  const family = (await (
+    await request.post(`${apiBaseUrl}/v1/families`, {
+      headers: {
+        Authorization: "Bearer parent-fixture",
+        "Idempotency-Key": `${fixtureKey}-family`,
+      },
+      data: { name: "Manual multiple-choice family" },
+    })
+  ).json()) as { id: string };
+  const child = (await (
+    await request.post(`${apiBaseUrl}/v1/families/${family.id}/children`, {
+      headers: {
+        Authorization: "Bearer parent-fixture",
+        "Idempotency-Key": `${fixtureKey}-child`,
+      },
+      data: {
+        nickname: "Manual multiple-choice child",
+        grade_stage: "Junior high 1",
+        ui_language: "en",
+        pin: "123456",
+      },
+    })
+  ).json()) as { id: string };
+
+  await page.goto(
+    `/parent/create/?familyId=${encodeURIComponent(family.id)}&childId=${encodeURIComponent(child.id)}`,
+  );
+  await page.getByRole("button", { name: "Start simple" }).click();
+  await page.getByLabel("Practice title").fill("Weekend plans");
+  await page.getByLabel("Response type").selectOption("multiple_choice");
+  await page
+    .getByRole("textbox", { name: "Question", exact: true })
+    .fill("Choose every sentence about a weekend plan.");
+  await page.getByLabel("Choices, one per line").fill(
+    "I am going camping.\nShe goes to school every day.\nWe will visit a museum.",
+  );
+  await page.getByRole("checkbox", { name: "I am going camping." }).check();
+  await page.getByRole("checkbox", { name: "We will visit a museum." }).check();
+  await page.getByLabel("Points").fill("2");
+  await page.getByRole("button", { name: "Create review draft" }).click();
+  await expect(
+    page.getByRole("heading", {
+      name: "Choose every sentence about a weekend plan.",
+    }),
+  ).toBeVisible();
+
+  const importResponse = page.waitForResponse(
+    (response) =>
+      response.url() === `${apiBaseUrl}/v1/question-sets/imports/structured` &&
+      response.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "Confirm and assign" }).click();
+  const importedRequest = await importResponse;
+  expect(importedRequest.request().postDataJSON()).toMatchObject({
+    source_name: "Manual question",
+    document: {
+      question_set: { source_mode: "manual", title: "Weekend plans" },
+      questions: [
+        {
+          type: "multiple_choice",
+          answer_key: { choices: [0, 2] },
+          rubric: { grading_mode: "exact" },
+          points: 2,
+        },
+      ],
+    },
+  });
+  const assignmentId = (await importedRequest.json() as {
+    assignment_id: string;
+  }).assignment_id;
+
+  await page.goto(
+    `/child/login/?childId=${encodeURIComponent(child.id)}&assignmentId=${encodeURIComponent(assignmentId)}`,
+  );
+  for (const digit of ["1", "2", "3", "4", "5", "6"]) {
+    await page.getByRole("button", { name: digit, exact: true }).click();
+  }
+  await page.getByRole("button", { name: "Open my work" }).click();
+  await expect(page.getByText("0/1", { exact: true })).toBeVisible();
+  await page.getByRole("checkbox", { name: "I am going camping." }).check();
+  await page.getByRole("checkbox", { name: "We will visit a museum." }).check();
+  await page.getByRole("button", { name: "Submit all answers" }).click();
+  await page.getByRole("button", { name: "Confirm full submission" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Your work is being checked" }),
+  ).toBeVisible();
+  const processed = await request.post(`${apiBaseUrl}/v1/demo/jobs/process-next`, {
+    headers: { Authorization: "Bearer parent-fixture" },
+  });
+  expect(processed.ok(), await processed.text()).toBeTruthy();
+  await page.getByRole("button", { name: "View results" }).click();
+  await expect(page.getByRole("heading", { name: "Correct" })).toBeVisible();
+});
+
 test("parent collects several manual questions into one assigned practice", async ({
   page,
   request,

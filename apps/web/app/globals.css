@@ -3284,6 +3284,43 @@ button {
   margin: 0;
 }
 
+.choice-answer-list {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.choice-answer-list legend,
+.choice-answer-list > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.choice-answer-list label {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 2.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0.55rem 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.choice-answer-list input {
+  width: 1rem;
+  min-width: 1rem;
+  min-height: 1rem;
+  margin: 0;
+}
+
 .completed-paper-review-list input,
 .completed-paper-review-list textarea,
 .completed-paper-review-list select {

@@ -55,6 +55,7 @@ type Stage =
 type AssignmentMode = "practice" | "exam";
 type ManualQuestionType =
   | "single_choice"
+  | "multiple_choice"
   | "typed_text"
   | "handwriting"
   | "photo";
@@ -67,6 +68,9 @@ type SourceImportJob = NonNullable<QuestionSetDraft["import_job"]>;
 
 const requiresParentReview = (type: ManualQuestionType) =>
   type === "handwriting" || type === "photo";
+
+const isChoiceQuestion = (type: ManualQuestionType) =>
+  type === "single_choice" || type === "multiple_choice";
 
 type CompletedPaperAnswerRegion = {
   question_position: number;
@@ -494,6 +498,9 @@ function CreateWorkspaceContent() {
   const [assignmentNote, setAssignmentNote] = useState("");
   const [manualQuestionPrompt, setManualQuestionPrompt] = useState("");
   const [manualOptions, setManualOptions] = useState("");
+  const [manualCorrectChoiceIndexes, setManualCorrectChoiceIndexes] = useState<
+    number[]
+  >([]);
   const [manualAnswer, setManualAnswer] = useState("");
   const [manualPoints, setManualPoints] = useState("1");
   const [manualDraftQuestions, setManualDraftQuestions] = useState<
@@ -569,6 +576,9 @@ function CreateWorkspaceContent() {
   const [editedQuestionType, setEditedQuestionType] =
     useState<ManualQuestionType>("typed_text");
   const [editedQuestionOptions, setEditedQuestionOptions] = useState("");
+  const [editedCorrectChoiceIndexes, setEditedCorrectChoiceIndexes] = useState<
+    number[]
+  >([]);
   const [editedQuestionAnswer, setEditedQuestionAnswer] = useState("");
   const [editError, setEditError] = useState("");
   const [requestStatus, setRequestStatus] = useState<
@@ -1061,16 +1071,24 @@ function CreateWorkspaceContent() {
     .map((option) => option.trim())
     .filter(Boolean);
   const manualPointsValue = Number(manualPoints);
+  const validManualCorrectChoiceIndexes = manualCorrectChoiceIndexes.filter(
+    (choice) =>
+      Number.isInteger(choice) && choice >= 0 && choice < manualOptionList.length,
+  );
   const manualQuestionIsReady =
-    Boolean(
-      manualQuestionPrompt.trim() && manualAnswer.trim(),
-    ) &&
+    Boolean(manualQuestionPrompt.trim()) &&
     Number.isFinite(manualPointsValue) &&
     manualPointsValue > 0 &&
-    (manualQuestionType !== "single_choice" ||
-      manualOptionList.some((option) => option === manualAnswer.trim()));
+    (manualQuestionType === "single_choice"
+      ? manualOptionList.some((option) => option === manualAnswer.trim())
+      : manualQuestionType === "multiple_choice"
+        ? manualOptionList.length >= 2 && validManualCorrectChoiceIndexes.length > 0
+        : Boolean(manualAnswer.trim()));
   const manualQuestionHasContent = Boolean(
-    manualQuestionPrompt.trim() || manualOptions.trim() || manualAnswer.trim(),
+    manualQuestionPrompt.trim() ||
+      manualOptions.trim() ||
+      manualCorrectChoiceIndexes.length ||
+      manualAnswer.trim(),
   );
   const manualDraftIsReady =
     Boolean(manualTitle.trim()) &&
@@ -1120,11 +1138,12 @@ function CreateWorkspaceContent() {
       position,
       type: manualQuestionType,
       prompt: manualQuestionPrompt.trim(),
-      options:
-        manualQuestionType === "single_choice" ? manualOptionList : [],
+      options: isChoiceQuestion(manualQuestionType) ? manualOptionList : [],
       answer_key:
         manualQuestionType === "single_choice"
           ? { choice: manualOptionList.indexOf(answer) }
+          : manualQuestionType === "multiple_choice"
+            ? { choices: validManualCorrectChoiceIndexes }
           : requiresParentReview(manualQuestionType)
             ? { reference: answer }
             : { text: answer },
@@ -1148,6 +1167,7 @@ function CreateWorkspaceContent() {
     ]);
     setManualQuestionPrompt("");
     setManualOptions("");
+    setManualCorrectChoiceIndexes([]);
     setManualAnswer("");
     setManualPoints("1");
     setRequestStatus("idle");
@@ -1752,12 +1772,22 @@ function CreateWorkspaceContent() {
   ) => {
     const type: ManualQuestionType =
       question.type === "single_choice" ||
+      question.type === "multiple_choice" ||
       question.type === "typed_text" ||
       question.type === "handwriting" ||
       question.type === "photo"
         ? question.type
         : "typed_text";
     const choice = question.answer_key.choice;
+    const choices = Array.isArray(question.answer_key.choices)
+      ? question.answer_key.choices.filter(
+          (candidate): candidate is number =>
+            typeof candidate === "number" &&
+            Number.isInteger(candidate) &&
+            candidate >= 0 &&
+            candidate < (question.options?.length ?? 0),
+        )
+      : [];
     const answer =
       type === "single_choice" &&
       typeof choice === "number" &&
@@ -1773,6 +1803,7 @@ function CreateWorkspaceContent() {
     setEditedQuestionPoints(String(question.points));
     setEditedQuestionType(type);
     setEditedQuestionOptions((question.options ?? []).join("\n"));
+    setEditedCorrectChoiceIndexes(type === "multiple_choice" ? choices : []);
     setEditedQuestionAnswer(answer);
     setEditError("");
   };
@@ -1785,12 +1816,16 @@ function CreateWorkspaceContent() {
       .split("\n")
       .map((option) => option.trim())
       .filter(Boolean);
+    const correctChoices = editedCorrectChoiceIndexes.filter(
+      (choice) =>
+        Number.isInteger(choice) && choice >= 0 && choice < options.length,
+    );
     if (
       !structuredDocument ||
       !prompt ||
-      !answer ||
       !Number.isFinite(points) ||
-      points <= 0
+      points <= 0 ||
+      (editedQuestionType !== "multiple_choice" && !answer)
     ) {
       setEditError("Add wording, an answer or grading guide, and a positive point value.");
       return;
@@ -1802,6 +1837,13 @@ function CreateWorkspaceContent() {
       setEditError("A choice question needs at least two choices and a matching correct answer.");
       return;
     }
+    if (
+      editedQuestionType === "multiple_choice" &&
+      (options.length < 2 || correctChoices.length === 0)
+    ) {
+      setEditError("A multiple-choice question needs at least two choices and one or more correct choices.");
+      return;
+    }
     const question = draftQuestions.find((candidate) => candidate.id === questionId);
     if (!question) {
       setEditError("This draft question is no longer available.");
@@ -1810,6 +1852,8 @@ function CreateWorkspaceContent() {
     const answerKey =
       editedQuestionType === "single_choice"
         ? { choice: options.indexOf(answer) }
+        : editedQuestionType === "multiple_choice"
+          ? { choices: correctChoices }
         : requiresParentReview(editedQuestionType)
           ? { reference: answer }
           : { text: answer };
@@ -1842,7 +1886,7 @@ function CreateWorkspaceContent() {
                     prompt,
                     points,
                     type: editedQuestionType,
-                    options: editedQuestionType === "single_choice" ? options : [],
+                    options: isChoiceQuestion(editedQuestionType) ? options : [],
                     answer_key: answerKey,
                     rubric,
                   }
@@ -3088,13 +3132,16 @@ function CreateWorkspaceContent() {
                         <option value="single_choice">
                           {t("draftReview.typeChoice")}
                         </option>
+                        <option value="multiple_choice">
+                          {t("draftReview.typeMultipleChoice")}
+                        </option>
                         <option value="handwriting">
                           {t("draftReview.typeHandwriting")}
                         </option>
                         <option value="photo">{t("draftReview.typePhoto")}</option>
                       </select>
                     </label>
-                    {editedQuestionType === "single_choice" ? (
+                    {isChoiceQuestion(editedQuestionType) ? (
                       <label>
                         {t("draftReview.choices")}
                         <textarea
@@ -3107,23 +3154,55 @@ function CreateWorkspaceContent() {
                         />
                       </label>
                     ) : null}
-                    <label>
-                      {requiresParentReview(editedQuestionType)
-                        ? t("draftReview.referenceAnswer")
-                        : t("draftReview.correctAnswer")}
-                      <textarea
-                        aria-label={
-                          requiresParentReview(editedQuestionType)
-                            ? t("draftReview.referenceAnswer")
-                            : t("draftReview.correctAnswer")
-                        }
-                        onChange={(event) =>
-                          setEditedQuestionAnswer(event.target.value)
-                        }
-                        rows={3}
-                        value={editedQuestionAnswer}
-                      />
-                    </label>
+                    {editedQuestionType === "multiple_choice" ? (
+                      <fieldset className="choice-answer-list">
+                        <legend>{t("draftReview.correctChoices")}</legend>
+                        {editedQuestionOptions
+                          .split("\n")
+                          .map((option) => option.trim())
+                          .filter(Boolean)
+                          .map((option, optionIndex) => (
+                            <label key={`${option}-${optionIndex}`}>
+                              <input
+                                checked={editedCorrectChoiceIndexes.includes(
+                                  optionIndex,
+                                )}
+                                onChange={() =>
+                                  setEditedCorrectChoiceIndexes((current) =>
+                                    current.includes(optionIndex)
+                                      ? current.filter(
+                                          (choice) => choice !== optionIndex,
+                                        )
+                                      : [...current, optionIndex].sort(
+                                          (left, right) => left - right,
+                                        ),
+                                  )
+                                }
+                                type="checkbox"
+                              />
+                              {option}
+                            </label>
+                          ))}
+                      </fieldset>
+                    ) : (
+                      <label>
+                        {requiresParentReview(editedQuestionType)
+                          ? t("draftReview.referenceAnswer")
+                          : t("draftReview.correctAnswer")}
+                        <textarea
+                          aria-label={
+                            requiresParentReview(editedQuestionType)
+                              ? t("draftReview.referenceAnswer")
+                              : t("draftReview.correctAnswer")
+                          }
+                          onChange={(event) =>
+                            setEditedQuestionAnswer(event.target.value)
+                          }
+                          rows={3}
+                          value={editedQuestionAnswer}
+                        />
+                      </label>
+                    )}
                     <p>
                       {t("draftReview.handwritingNotice")}
                     </p>
@@ -3891,6 +3970,9 @@ function CreateWorkspaceContent() {
                   >
                     <option value="typed_text">{t("manual.type.typed")}</option>
                     <option value="single_choice">{t("manual.type.choice")}</option>
+                    <option value="multiple_choice">
+                      {t("manual.type.multipleChoice")}
+                    </option>
                     <option value="handwriting">{t("manual.type.handwriting")}</option>
                     <option value="photo">{t("manual.type.photo")}</option>
                   </select>
@@ -3906,7 +3988,7 @@ function CreateWorkspaceContent() {
                   value={manualQuestionPrompt}
                 />
               </label>
-              {manualQuestionType === "single_choice" ? (
+              {isChoiceQuestion(manualQuestionType) ? (
                 <label className="field-label">
                   {t("manual.choices")}
                   <textarea
@@ -3918,24 +4000,56 @@ function CreateWorkspaceContent() {
                   />
                 </label>
               ) : null}
-              <label className="field-label">
-                {t("manual.answerGuide")}
-                <textarea
-                  aria-label={t("manual.answerGuide")}
-                  onChange={(event) => setManualAnswer(event.target.value)}
-                  placeholder={
-                    requiresParentReview(manualQuestionType)
-                      ? manualQuestionType === "photo"
-                        ? t("manual.photoPlaceholder")
-                        : t("manual.handwritingPlaceholder")
-                      : manualQuestionType === "single_choice"
-                        ? t("manual.choicePlaceholder")
-                        : t("manual.typedPlaceholder")
-                  }
-                  rows={3}
-                  value={manualAnswer}
-                />
-              </label>
+              {manualQuestionType === "multiple_choice" ? (
+                <fieldset className="choice-answer-list">
+                  <legend>{t("manual.correctChoices")}</legend>
+                  {manualOptionList.length > 0 ? (
+                    manualOptionList.map((option, optionIndex) => (
+                      <label key={`${option}-${optionIndex}`}>
+                        <input
+                          checked={validManualCorrectChoiceIndexes.includes(
+                            optionIndex,
+                          )}
+                          onChange={() =>
+                            setManualCorrectChoiceIndexes((current) =>
+                              current.includes(optionIndex)
+                                ? current.filter(
+                                    (choice) => choice !== optionIndex,
+                                  )
+                                : [...current, optionIndex].sort(
+                                    (left, right) => left - right,
+                                  ),
+                            )
+                          }
+                          type="checkbox"
+                        />
+                        {option}
+                      </label>
+                    ))
+                  ) : (
+                    <p>{t("manual.correctChoicesHelp")}</p>
+                  )}
+                </fieldset>
+              ) : (
+                <label className="field-label">
+                  {t("manual.answerGuide")}
+                  <textarea
+                    aria-label={t("manual.answerGuide")}
+                    onChange={(event) => setManualAnswer(event.target.value)}
+                    placeholder={
+                      requiresParentReview(manualQuestionType)
+                        ? manualQuestionType === "photo"
+                          ? t("manual.photoPlaceholder")
+                          : t("manual.handwritingPlaceholder")
+                        : manualQuestionType === "single_choice"
+                          ? t("manual.choicePlaceholder")
+                          : t("manual.typedPlaceholder")
+                    }
+                    rows={3}
+                    value={manualAnswer}
+                  />
+                </label>
+              )}
               <label className="field-label manual-points-field">
                 {t("manual.points")}
                 <input
@@ -3971,6 +4085,8 @@ function CreateWorkspaceContent() {
                             ? t("manual.type.typed")
                             : question.type === "single_choice"
                               ? t("manual.type.choice")
+                              : question.type === "multiple_choice"
+                                ? t("manual.type.multipleChoice")
                               : question.type === "handwriting"
                                 ? t("manual.type.handwriting")
                                 : t("manual.type.photo")} · {t("manual.pointsSummary", { count: question.points })}

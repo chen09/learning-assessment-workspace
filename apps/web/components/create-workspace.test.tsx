@@ -1408,6 +1408,88 @@ describe("CreateWorkspace", () => {
     });
   });
 
+  it("lets a parent author a multiple-choice question with several correct choices", async () => {
+    mocks.previewStructuredQuestionSet.mockResolvedValue({
+      title: "Weekend plans",
+      subject: "English",
+      locale: "en",
+      question_count: 1,
+      total_points: 2,
+      estimated_minutes: 5,
+      knowledge_tag_count: 1,
+      answer_keys_present: true,
+      checksum: "manual-multiple-choice",
+      source_summary: { source_kind: "manual" },
+      questions: [
+        {
+          position: 1,
+          type: "multiple_choice",
+          prompt: "Choose every sentence about a weekend plan.",
+          options: [
+            "I am going camping.",
+            "She goes to school every day.",
+            "We will visit a museum.",
+          ],
+          answer_key: { choices: [0, 2] },
+          rubric: { grading_mode: "exact" },
+          points: 2,
+          knowledge_code: "manual-practice",
+        },
+      ],
+    });
+
+    render(<CreateWorkspace />);
+
+    await screen.findByRole("combobox", { name: "Child" });
+    fireEvent.click(screen.getByRole("button", { name: "Start simple" }));
+    fireEvent.change(screen.getByLabelText("Practice title"), {
+      target: { value: "Weekend plans" },
+    });
+    fireEvent.change(screen.getByLabelText("Response type"), {
+      target: { value: "multiple_choice" },
+    });
+    fireEvent.change(screen.getByLabelText("Question"), {
+      target: { value: "Choose every sentence about a weekend plan." },
+    });
+    fireEvent.change(screen.getByLabelText("Choices, one per line"), {
+      target: {
+        value:
+          "I am going camping.\nShe goes to school every day.\nWe will visit a museum.",
+      },
+    });
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "I am going camping." }),
+    );
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "We will visit a museum." }),
+    );
+    fireEvent.change(screen.getByLabelText("Points"), {
+      target: { value: "2" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create review draft" }));
+
+    await waitFor(() => {
+      expect(mocks.previewStructuredQuestionSet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          questions: [
+            expect.objectContaining({
+              type: "multiple_choice",
+              options: [
+                "I am going camping.",
+                "She goes to school every day.",
+                "We will visit a museum.",
+              ],
+              answer_key: { choices: [0, 2] },
+              rubric: { grading_mode: "exact" },
+              points: 2,
+            }),
+          ],
+        }),
+        "parent-token",
+      );
+    });
+  });
+
   it("keeps a parent-review guide when a parent creates a photo-answer question", async () => {
     mocks.previewStructuredQuestionSet.mockResolvedValue({
       title: "Paper calculation",
