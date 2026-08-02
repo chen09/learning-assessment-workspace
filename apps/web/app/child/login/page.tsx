@@ -24,6 +24,7 @@ function ChildLoginContent() {
   const { t } = useLanguage();
   const [pin, setPin] = useState("");
   const [status, setStatus] = useState<"idle" | "opening" | "error">("idle");
+  const [entryLocked, setEntryLocked] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
   const ready = pin.length === 6;
 
@@ -77,10 +78,26 @@ function ChildLoginContent() {
           ? `/child/work/?assignmentId=${encodeURIComponent(assignmentId)}`
           : "/child/",
       );
-    } catch {
+    } catch (error) {
+      const locked =
+        error instanceof Error &&
+        error.message.includes("Child entry is temporarily locked.");
       setPin("");
+      setEntryLocked(locked);
       setStatus("error");
     }
+  };
+
+  const updatePin = (nextPin: string) => {
+    setPin(nextPin);
+    setEntryLocked(false);
+    setStatus("idle");
+  };
+
+  const appendPinDigit = (digit: string) => {
+    setPin((current) => `${current}${digit}`);
+    setEntryLocked(false);
+    setStatus("idle");
   };
 
   return (
@@ -114,7 +131,7 @@ function ChildLoginContent() {
             <button
               disabled={ready}
               key={digit}
-              onClick={() => setPin((current) => `${current}${digit}`)}
+              onClick={() => appendPinDigit(String(digit))}
               type="button"
             >
               {digit}
@@ -123,14 +140,14 @@ function ChildLoginContent() {
           <span />
           <button
             disabled={ready}
-            onClick={() => setPin((current) => `${current}0`)}
+            onClick={() => appendPinDigit("0")}
             type="button"
           >
             0
           </button>
           <button
             aria-label={t("childLogin.deleteDigit")}
-            onClick={() => setPin((current) => current.slice(0, -1))}
+            onClick={() => updatePin(pin.slice(0, -1))}
             type="button"
           >
             <Delete />
@@ -151,7 +168,7 @@ function ChildLoginContent() {
         ) : null}
         {status === "error" ? (
           <p className="form-error" role="alert">
-            {t("childLogin.error")}
+            {entryLocked ? t("childLogin.locked") : t("childLogin.error")}
           </p>
         ) : null}
         <Link className="quiet-link parent-return" href="/parent/">

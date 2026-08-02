@@ -339,6 +339,8 @@ const messages = {
     "childLogin.opening": "Opening…",
     "childLogin.openWork": "Open my work",
     "childLogin.error": "That PIN did not work. Please try again.",
+    "childLogin.locked":
+      "Too many PIN attempts. Child entry is temporarily locked; please ask a parent to try again later.",
     "childLogin.expired":
       "Your child session expired. Enter the PIN again to continue.",
     "childLogin.returnParent": "Return to parent mode",
@@ -1121,6 +1123,8 @@ const messages = {
     "childLogin.opening": "開いています…",
     "childLogin.openWork": "学習を開く",
     "childLogin.error": "PIN が正しくありません。もう一度お試しください。",
+    "childLogin.locked":
+      "PIN の試行回数が多すぎます。子どもモードは一時的にロックされています。しばらくしてから保護者ともう一度お試しください。",
     "childLogin.expired":
       "子どもセッションの有効期限が切れました。PIN をもう一度入力してください。",
     "childLogin.returnParent": "保護者モードに戻る",
@@ -1894,6 +1898,8 @@ const messages = {
     "childLogin.opening": "正在打开…",
     "childLogin.openWork": "打开我的练习",
     "childLogin.error": "PIN 不正确，请重试。",
+    "childLogin.locked":
+      "PIN 尝试次数过多，孩子模式已暂时锁定。请稍后请家长再试。",
     "childLogin.expired": "孩子会话已过期，请重新输入 PIN 后继续。",
     "childLogin.returnParent": "返回家长模式",
     "childHome.today": "今天",

@@ -1,14 +1,17 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import ChildLoginPage from "@/app/child/login/page";
 
-vi.mock("@/lib/api-client", () => ({
+const mocks = vi.hoisted(() => ({
   createChildSession: vi.fn(),
 }));
 
+vi.mock("@/lib/api-client", () => mocks);
+
 describe("ChildLoginPage", () => {
   beforeEach(() => {
+    mocks.createChildSession.mockReset();
     window.localStorage.clear();
     window.localStorage.setItem("luma-language:demo-child", "zh");
     window.history.replaceState(
@@ -49,5 +52,24 @@ describe("ChildLoginPage", () => {
     expect(await screen.findByRole("status")).toHaveTextContent(
       "子どもセッションの有効期限が切れました。PIN をもう一度入力してください。",
     );
+  });
+
+  it("explains a temporary child PIN lock instead of reporting an ordinary wrong PIN", async () => {
+    window.localStorage.setItem("luma-language:demo-child", "en");
+    mocks.createChildSession.mockRejectedValue(
+      new Error('{"detail":"Child entry is temporarily locked."}'),
+    );
+
+    render(<ChildLoginPage />);
+
+    for (const digit of ["1", "2", "3", "4", "5", "6"]) {
+      fireEvent.click(screen.getByRole("button", { name: digit }));
+    }
+    fireEvent.click(screen.getByRole("button", { name: "Open my work" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Too many PIN attempts",
+    );
+    expect(screen.queryByText("That PIN did not work. Please try again.")).not.toBeInTheDocument();
   });
 });
