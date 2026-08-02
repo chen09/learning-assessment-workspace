@@ -103,7 +103,12 @@ export type UploadIntent = {
 
 export type CompletedWorksheetImport = {
   id: string;
-  status: "processing" | "needs_review" | "grading" | "results_ready";
+  status:
+    | "processing"
+    | "needs_review"
+    | "grading"
+    | "results_ready"
+    | "failed";
   assignment_id: string | null;
   attempt_id: string | null;
   response_paths: string[];
@@ -1326,6 +1331,14 @@ export async function getCompletedWorksheetImport(
   return apiRequest<CompletedWorksheetImport>(
     `/v1/completed-worksheets/${encodeURIComponent(worksheetId)}`,
     { method: "GET" },
+    parentToken,
+  );
+}
+
+export async function retryJob(jobId: string, parentToken: string) {
+  return apiRequest<{ id: string; status: string; type: string }>(
+    `/v1/jobs/${encodeURIComponent(jobId)}/retry`,
+    { method: "POST" },
     parentToken,
   );
 }

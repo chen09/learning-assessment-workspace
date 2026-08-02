@@ -1616,7 +1616,19 @@ class PostgresRepository:
                 ),
                 {"job_id": _uuid(job_id)},
             )
-            return _job(result.mappings().one())
+            retried = _job(result.mappings().one())
+            if row["type"] == "analyze_completed_worksheet":
+                await connection.execute(
+                    text(
+                        """
+                        update public.completed_worksheet_imports
+                        set status = 'processing', updated_at = now()
+                        where id = :worksheet_id
+                        """
+                    ),
+                    {"worksheet_id": row["subject_id"]},
+                )
+            return retried
 
     async def get_attempt_results(
         self,

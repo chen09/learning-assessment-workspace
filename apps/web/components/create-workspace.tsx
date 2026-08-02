@@ -38,6 +38,7 @@ import {
   getQuestionSetDraft,
   importStructuredQuestionSet,
   previewStructuredQuestionSet,
+  retryJob,
   uploadToSignedUrl,
 } from "@/lib/api-client";
 
@@ -410,7 +411,12 @@ function CreateWorkspaceContent() {
     null,
   );
   const [completedWorksheetStatus, setCompletedWorksheetStatus] = useState<
-    "processing" | "needs_review" | "grading" | "results_ready" | null
+    | "processing"
+    | "needs_review"
+    | "grading"
+    | "results_ready"
+    | "failed"
+    | null
   >(null);
   const [draftQuestions, setDraftQuestions] = useState<ReviewDraftQuestion[]>(
     [],
@@ -449,6 +455,12 @@ function CreateWorkspaceContent() {
     }
   };
 
+  const saveCompletedWorksheetRecoveryLink = (worksheetId: string) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("completedWorksheetId", worksheetId);
+    window.history.replaceState(window.history.state, "", url);
+  };
+
   useEffect(() => {
     let active = true;
     void getParentAccessToken().then(async (parentToken) => {
@@ -475,6 +487,43 @@ function CreateWorkspaceContent() {
           setChildren(loadedChildren);
           setSelectedChildId(selectedChild?.id ?? "");
         }
+      } catch {
+        if (active) {
+          setRequestStatus("error");
+        }
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const worksheetId = new URLSearchParams(window.location.search).get(
+      "completedWorksheetId",
+    );
+    if (!worksheetId) {
+      return;
+    }
+
+    let active = true;
+    void getParentAccessToken().then(async (parentToken) => {
+      if (!parentToken) {
+        return;
+      }
+      try {
+        const imported = await getCompletedWorksheetImport(
+          worksheetId,
+          parentToken,
+        );
+        if (!active) {
+          return;
+        }
+        setCompletedWorksheetId(imported.id);
+        setCompletedWorksheetStatus(imported.status);
+        setCompletedResponsePaths(imported.response_paths);
+        setCompletedAttemptId(imported.attempt_id);
+        loadCompletedReviewDraft(imported.extraction);
       } catch {
         if (active) {
           setRequestStatus("error");
@@ -759,6 +808,7 @@ function CreateWorkspaceContent() {
           parentToken,
           `completed-worksheet-${uploadObjectId}`,
         );
+        saveCompletedWorksheetRecoveryLink(imported.id);
         setCompletedWorksheetId(imported.id);
         setCompletedWorksheetStatus(imported.status);
         setCompletedResponsePaths(imported.response_paths);
@@ -1444,6 +1494,34 @@ function CreateWorkspaceContent() {
     }
   };
 
+  const retryCompletedPaperAnalysis = async () => {
+    if (!completedWorksheetId) {
+      setRequestStatus("error");
+      return;
+    }
+    const parentToken = await getParentAccessToken();
+    if (!parentToken) {
+      setRequestStatus("error");
+      return;
+    }
+    try {
+      const imported = await getCompletedWorksheetImport(
+        completedWorksheetId,
+        parentToken,
+      );
+      if (imported.job.status !== "failed") {
+        setCompletedWorksheetStatus(imported.status);
+        return;
+      }
+      setRequestStatus("working");
+      await retryJob(imported.job.id, parentToken);
+      setCompletedWorksheetStatus("processing");
+      setRequestStatus("idle");
+    } catch {
+      setRequestStatus("error");
+    }
+  };
+
   const selectCompletedReview = async (file: File | null) => {
     setCompletedReviewFile(file);
     setCompletedReview(null);
@@ -1605,6 +1683,8 @@ function CreateWorkspaceContent() {
             <p className="eyebrow">
               {completedWorksheetStatus === "processing"
                 ? t("completedPaper.analysisProcessing")
+                : completedWorksheetStatus === "failed"
+                  ? t("completedPaper.analysisFailed")
                 : t("completedPaper.analysisReady")}
             </p>
             <h2>
@@ -1612,6 +1692,8 @@ function CreateWorkspaceContent() {
                 ? t("completedPaper.submitted")
                 : completedWorksheetStatus === "processing"
                   ? t("completedPaper.preparing")
+                  : completedWorksheetStatus === "failed"
+                    ? t("completedPaper.analysisFailedTitle")
                   : t("completedPaper.notAssigned")}
             </h2>
             <p>
@@ -1619,6 +1701,8 @@ function CreateWorkspaceContent() {
                 ? t("completedPaper.submittedDetails")
                 : completedWorksheetStatus === "processing"
                   ? t("completedPaper.preparingDetails")
+                  : completedWorksheetStatus === "failed"
+                    ? t("completedPaper.analysisFailedDetails")
                   : t("completedPaper.reviewDetails")}
             </p>
           </div>
@@ -1997,6 +2081,17 @@ function CreateWorkspaceContent() {
                   : t("completedPaper.confirm")}
               </button>
             </div>
+          ) : completedWorksheetStatus === "failed" ? (
+            <button
+              className="button primary"
+              disabled={requestStatus === "working"}
+              onClick={() => void retryCompletedPaperAnalysis()}
+              type="button"
+            >
+              {requestStatus === "working"
+                ? t("completedPaper.retrying")
+                : t("completedPaper.retry")}
+            </button>
           ) : (
             <span className="status-pill warm">
               {t("completedPaper.preparingReview")}

@@ -1108,6 +1108,9 @@ test("parent validates a local-AI completed-paper review before submitting it", 
     id: string;
     response_paths: string[];
   };
+  await expect(page).toHaveURL(
+    new RegExp(`completedWorksheetId=${encodeURIComponent(imported.id)}`),
+  );
   await request.post(`${apiBaseUrl}/v1/demo/jobs/process-next`, {
     headers: parentHeaders,
   });

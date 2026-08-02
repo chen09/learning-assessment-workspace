@@ -675,6 +675,15 @@ class DatabaseJobWorker:
                     job["id"],
                     str(error),
                 )
+                if job["type"] == "analyze_completed_worksheet":
+                    await connection.execute(
+                        """
+                        update public.completed_worksheet_imports
+                        set status = 'failed', updated_at = now()
+                        where id = $1
+                        """,
+                        job["subject_id"],
+                    )
                 self._logger.exception(
                     "job_failed",
                     job_id=str(job["id"]),

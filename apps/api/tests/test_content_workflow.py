@@ -2,6 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config import Settings, get_settings
+from app.domain.models import CompletedWorksheetStatus, JobStatus
 from app.main import create_app
 
 PARENT_HEADERS = {"Authorization": "Bearer parent-fixture"}
@@ -140,6 +141,53 @@ def test_parent_can_start_completed_worksheet_analysis_for_a_child() -> None:
     assert refreshed.status_code == 200
     assert refreshed.json()["status"] == "needs_review"
     assert refreshed.json()["job"]["status"] == "succeeded"
+
+
+def test_parent_can_retry_a_failed_completed_worksheet_analysis() -> None:
+    """Retry returns the private paper to a pollable processing state."""
+    application = create_app()
+    client = TestClient(application)
+    fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+    created = client.post(
+        "/v1/completed-worksheets",
+        headers={
+            **PARENT_HEADERS,
+            "Idempotency-Key": "retry-completed-paper-analysis",
+        },
+        json={
+            "family_id": fixture["family"]["id"],
+            "child_id": fixture["child"]["id"],
+            "title": "Retryable completed paper",
+            "subject": "Mathematics",
+            "document_language": "ja",
+            "feedback_language": "ja",
+            "filenames": ["retryable-paper.jpg"],
+            "response_paths": ["family/completed/retryable-paper.jpg"],
+        },
+    )
+    assert created.status_code == 202
+    worksheet_id = created.json()["id"]
+    job_id = created.json()["job"]["id"]
+    repository = application.state.repository
+    repository.jobs[job_id].status = JobStatus.FAILED
+    repository.completed_worksheet_imports[worksheet_id].status = (
+        CompletedWorksheetStatus.FAILED
+    )
+
+    retried = client.post(
+        f"/v1/jobs/{job_id}/retry",
+        headers=PARENT_HEADERS,
+    )
+    refreshed = client.get(
+        f"/v1/completed-worksheets/{worksheet_id}",
+        headers=PARENT_HEADERS,
+    )
+
+    assert retried.status_code == 200
+    assert retried.json()["status"] == "queued"
+    assert refreshed.status_code == 200
+    assert refreshed.json()["status"] == "processing"
+    assert refreshed.json()["job"]["status"] == "queued"
 
 
 def test_parent_confirmation_turns_completed_worksheet_into_submitted_attempt() -> None:

@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   getQuestionSetDraft: vi.fn(),
   importStructuredQuestionSet: vi.fn(),
   previewStructuredQuestionSet: vi.fn(),
+  retryJob: vi.fn(),
   uploadToSignedUrl: vi.fn(),
 }));
 
@@ -53,6 +54,118 @@ describe("CreateWorkspace", () => {
       "child-1",
     );
     expect(screen.getByText("Fixture child")).toBeInTheDocument();
+  });
+
+  it("resumes a completed-paper review from its private recovery link", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/parent/create/?completedWorksheetId=completed-worksheet-1",
+    );
+    mocks.getCompletedWorksheetImport.mockResolvedValue({
+      id: "completed-worksheet-1",
+      status: "needs_review",
+      assignment_id: null,
+      attempt_id: null,
+      response_paths: ["family-1/responses/completed-paper.jpg"],
+      extraction: {
+        schema_version: "1.0",
+        document: {
+          schema_version: "1.0",
+          question_set: {
+            title: "Recovered paper",
+            subject: "English",
+            locale: "en",
+            difficulty: "standard",
+            source_mode: "convert",
+            estimated_minutes: 10,
+          },
+          knowledge_tags: [{ code: "grammar", label: "Grammar" }],
+          questions: [
+            {
+              position: 1,
+              type: "typed_text",
+              prompt: "Complete: She ___ to school.",
+              options: [],
+              answer_key: { text: "goes" },
+              rubric: { grading_mode: "exact" },
+              points: 1,
+              knowledge_code: "grammar",
+            },
+          ],
+        },
+        answer_regions: [
+          { question_position: 1, page_numbers: [1], legibility: "clear" },
+        ],
+      },
+      job: {
+        id: "analysis-job-1",
+        status: "succeeded",
+        type: "analyze_completed_worksheet",
+      },
+    });
+
+    render(<CreateWorkspace />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Preparing the review draft" }),
+    ).toBeInTheDocument();
+    expect(mocks.getCompletedWorksheetImport).toHaveBeenCalledWith(
+      "completed-worksheet-1",
+      "parent-token",
+    );
+    expect(screen.getByDisplayValue("Complete: She ___ to school.")).toBeInTheDocument();
+  });
+
+  it("retries a failed completed-paper analysis without creating a child task", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/parent/create/?completedWorksheetId=completed-worksheet-1",
+    );
+    const failedImport = {
+      id: "completed-worksheet-1",
+      status: "failed",
+      assignment_id: null,
+      attempt_id: null,
+      response_paths: ["family-1/responses/completed-paper.jpg"],
+      job: {
+        id: "analysis-job-1",
+        status: "failed",
+        type: "analyze_completed_worksheet",
+      },
+    };
+    mocks.getCompletedWorksheetImport
+      .mockResolvedValueOnce(failedImport)
+      .mockResolvedValueOnce(failedImport)
+      .mockResolvedValue({ ...failedImport, status: "processing", job: {
+        ...failedImport.job,
+        status: "queued",
+      } });
+    mocks.retryJob.mockResolvedValue({
+      id: "analysis-job-1",
+      status: "queued",
+      type: "analyze_completed_worksheet",
+    });
+
+    render(<CreateWorkspace />);
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "The review draft needs another try",
+      }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Retry analysis" }));
+
+    await waitFor(() => {
+      expect(mocks.retryJob).toHaveBeenCalledWith(
+        "analysis-job-1",
+        "parent-token",
+      );
+    });
+    expect(
+      screen.getByRole("heading", { name: "Reading the paper" }),
+    ).toBeInTheDocument();
   });
 
   it("never substitutes sample questions when a structured preview unexpectedly returns an empty draft", async () => {

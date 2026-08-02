@@ -812,6 +812,11 @@ class MemoryRepository:
         job.attempt_count = 0
         job.completed_at = None
         self.jobs[job_id] = job
+        if job.type == "analyze_completed_worksheet":
+            imported = self.completed_worksheet_imports.get(str(job.subject_id))
+            if imported is not None:
+                imported.status = CompletedWorksheetStatus.PROCESSING
+                self.completed_worksheet_imports[str(imported.id)] = imported
         return job
 
     def next_queued_job(self) -> Job | None:
