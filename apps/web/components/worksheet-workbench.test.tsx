@@ -494,6 +494,21 @@ describe("WorksheetWorkbench", () => {
     });
   });
 
+  it("keeps the device-only state if background sync fails after reconnecting", async () => {
+    render(<WorksheetWorkbench />);
+
+    await screen.findByRole("heading", {
+      name: "Choose the correct expansion of (a + b)(a − b).",
+    });
+    mocks.syncPendingDrafts.mockRejectedValueOnce(new Error("offline"));
+
+    window.dispatchEvent(new Event("online"));
+
+    expect(
+      await screen.findByText("Saved on this device"),
+    ).toBeInTheDocument();
+  });
+
   it("retries loading the assigned work after a transient request failure", async () => {
     mocks.startAssignment
       .mockRejectedValueOnce(new Error("offline"))

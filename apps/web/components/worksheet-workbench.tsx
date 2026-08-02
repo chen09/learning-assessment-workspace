@@ -651,11 +651,13 @@ function WorksheetWorkbenchContent() {
       return;
     }
     const sync = () => {
-      void syncPendingDrafts(childToken).then((count) => {
-        if (count > 0) {
-          setSaveStatus("saved");
-        }
-      });
+      void syncPendingDrafts(childToken)
+        .then((count) => {
+          if (count > 0) {
+            setSaveStatus("saved");
+          }
+        })
+        .catch(() => setSaveStatus("offline"));
     };
     window.addEventListener("online", sync);
     return () => window.removeEventListener("online", sync);

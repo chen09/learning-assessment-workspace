@@ -50,11 +50,18 @@ export async function savePendingDraft(
   } satisfies PendingDraft);
 }
 
-export async function syncPendingDrafts(childToken: string): Promise<number> {
+export async function syncPendingDrafts(
+  childToken: string,
+  now = new Date(),
+): Promise<number> {
   const db = await database();
   const drafts = (await db.getAll(STORE_NAME)) as PendingDraft[];
   let synced = 0;
   for (const draft of drafts) {
+    if (new Date(draft.expiresAt) <= now) {
+      await db.delete(STORE_NAME, draft.key);
+      continue;
+    }
     if (!draft.syncRequest) {
       continue;
     }
