@@ -1,6 +1,67 @@
 {
   "components": {
     "schemas": {
+      "ApiRequestFailedLog": {
+        "additionalProperties": false,
+        "properties": {
+          "error_code": {
+            "maxLength": 80,
+            "pattern": "^[a-z0-9_:-]+$",
+            "title": "Error Code",
+            "type": "string"
+          },
+          "event": {
+            "const": "api_request_failed",
+            "title": "Event",
+            "type": "string"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "page": {
+            "maxLength": 300,
+            "pattern": "^/[A-Za-z0-9_./-]*$",
+            "title": "Page",
+            "type": "string"
+          },
+          "request_method": {
+            "enum": [
+              "GET",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE"
+            ],
+            "title": "Request Method",
+            "type": "string"
+          },
+          "request_path": {
+            "maxLength": 300,
+            "pattern": "^/v1/[A-Za-z0-9_./-]*$",
+            "title": "Request Path",
+            "type": "string"
+          },
+          "status_code": {
+            "maximum": 599.0,
+            "minimum": 400.0,
+            "title": "Status Code",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "page",
+          "error_code",
+          "occurred_at",
+          "event",
+          "request_method",
+          "request_path",
+          "status_code"
+        ],
+        "title": "ApiRequestFailedLog",
+        "type": "object"
+      },
       "Assignment": {
         "properties": {
           "child_id": {
@@ -372,67 +433,6 @@
           "ui_language"
         ],
         "title": "ChildSessionResponse",
-        "type": "object"
-      },
-      "ClientLogRequest": {
-        "additionalProperties": false,
-        "properties": {
-          "error_code": {
-            "maxLength": 80,
-            "pattern": "^[a-z0-9_:-]+$",
-            "title": "Error Code",
-            "type": "string"
-          },
-          "event": {
-            "const": "api_request_failed",
-            "title": "Event",
-            "type": "string"
-          },
-          "occurred_at": {
-            "format": "date-time",
-            "title": "Occurred At",
-            "type": "string"
-          },
-          "page": {
-            "maxLength": 300,
-            "pattern": "^/[A-Za-z0-9_./-]*$",
-            "title": "Page",
-            "type": "string"
-          },
-          "request_method": {
-            "enum": [
-              "GET",
-              "POST",
-              "PUT",
-              "PATCH",
-              "DELETE"
-            ],
-            "title": "Request Method",
-            "type": "string"
-          },
-          "request_path": {
-            "maxLength": 300,
-            "pattern": "^/v1/[A-Za-z0-9_./-]*$",
-            "title": "Request Path",
-            "type": "string"
-          },
-          "status_code": {
-            "maximum": 599.0,
-            "minimum": 400.0,
-            "title": "Status Code",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "event",
-          "page",
-          "request_method",
-          "request_path",
-          "status_code",
-          "error_code",
-          "occurred_at"
-        ],
-        "title": "ClientLogRequest",
         "type": "object"
       },
       "CompleteReviewRequest": {
@@ -3385,6 +3385,44 @@
         "title": "ReviewLibrarySubmissionRequest",
         "type": "object"
       },
+      "RuntimeErrorLog": {
+        "additionalProperties": false,
+        "properties": {
+          "error_code": {
+            "maxLength": 80,
+            "pattern": "^[a-z0-9_:-]+$",
+            "title": "Error Code",
+            "type": "string"
+          },
+          "event": {
+            "enum": [
+              "client_runtime_error",
+              "client_unhandled_rejection"
+            ],
+            "title": "Event",
+            "type": "string"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "page": {
+            "maxLength": 300,
+            "pattern": "^/[A-Za-z0-9_./-]*$",
+            "title": "Page",
+            "type": "string"
+          }
+        },
+        "required": [
+          "page",
+          "error_code",
+          "occurred_at",
+          "event"
+        ],
+        "title": "RuntimeErrorLog",
+        "type": "object"
+      },
       "SaveResponseRequest": {
         "properties": {
           "answer": {
@@ -5041,7 +5079,23 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ClientLogRequest"
+                "discriminator": {
+                  "mapping": {
+                    "api_request_failed": "#/components/schemas/ApiRequestFailedLog",
+                    "client_runtime_error": "#/components/schemas/RuntimeErrorLog",
+                    "client_unhandled_rejection": "#/components/schemas/RuntimeErrorLog"
+                  },
+                  "propertyName": "event"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ApiRequestFailedLog"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RuntimeErrorLog"
+                  }
+                ],
+                "title": "Report"
               }
             }
           },
