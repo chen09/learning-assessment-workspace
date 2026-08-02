@@ -108,8 +108,25 @@ function ChildHistoryContent() {
         {loadState === "ready" && items.length === 0 ? (
           <p className="form-notice">{t("history.empty")}</p>
         ) : null}
-        {loadState === "signed-out" || loadState === "error" ? (
-          <p className="form-error">{t("history.error")}</p>
+        {loadState === "signed-out" ? (
+          <p className="form-error" role="alert">
+            {t("history.signedOut")}
+          </p>
+        ) : null}
+        {loadState === "error" ? (
+          <div className="form-error" role="alert">
+            <p>{t("history.error")}</p>
+            <button
+              className="button ghost"
+              onClick={() => {
+                setLoadState("loading");
+                void refreshHistory();
+              }}
+              type="button"
+            >
+              {t("history.retry")}
+            </button>
+          </div>
         ) : null}
         {loadState === "ready"
           ? items.map((item) => {

@@ -132,4 +132,35 @@ describe("ChildHistoryPage", () => {
       screen.getByRole("heading", { name: "刚安排的练习" }),
     ).toBeInTheDocument();
   });
+
+  it("lets a child retry when a transient history request fails", async () => {
+    mocks.getChildHistory
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce([
+        {
+          assignment_id: "assignment-retried",
+          attempt_id: null,
+          child_id: "child-1",
+          child_nickname: "肉肉",
+          title: "重试后加载的练习",
+          status: "assigned",
+          submitted_at: null,
+          awarded_points: 0,
+          available_points: 20,
+          correction_count: 0,
+        },
+      ]);
+
+    render(<ChildHistoryPage />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "学习记录暂时无法加载，请检查网络后重试。",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "重试" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "重试后加载的练习" }),
+    ).toBeInTheDocument();
+    expect(mocks.getChildHistory).toHaveBeenCalledTimes(2);
+  });
 });
