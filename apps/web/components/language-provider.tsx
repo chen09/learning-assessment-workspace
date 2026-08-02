@@ -599,7 +599,10 @@ const messages = {
     "review.result.incorrect": "Not quite yet.",
     "review.parentReview":
       "This answer needs a parent or AI check before it can count toward review.",
+    "review.saveError":
+      "We could not save that review. Your answer is still here; try again.",
     "review.skip": "Skip for today",
+    "review.skipError": "We could not skip today's review. Please try again.",
     "history.eyebrow": "Your work",
     "history.title": "History",
     "history.description": "Finished sets, scores, and corrections.",
@@ -1367,7 +1370,11 @@ const messages = {
     "review.result.incorrect": "もう一度取り組みましょう。",
     "review.parentReview":
       "この答えは、復習として記録する前に保護者または AI の確認が必要です。",
+    "review.saveError":
+      "復習を保存できませんでした。答えは残っています。もう一度お試しください。",
     "review.skip": "今日はスキップ",
+    "review.skipError":
+      "今日の復習をスキップできませんでした。もう一度お試しください。",
     "history.eyebrow": "あなたの学習",
     "history.title": "学習履歴",
     "history.description": "完了した練習、得点、やり直しの記録です。",
@@ -2115,7 +2122,9 @@ const messages = {
     "review.result.correct": "回答正确。",
     "review.result.incorrect": "还差一点，再试一次。",
     "review.parentReview": "这类答案需由家长或 AI 确认后，才会计入复习记录。",
+    "review.saveError": "无法保存这道复习题。你的答案仍已保留，请重试。",
     "review.skip": "今天跳过",
+    "review.skipError": "无法跳过今天的复习，请重试。",
     "history.eyebrow": "你的练习",
     "history.title": "学习记录",
     "history.description": "已完成的练习、分数和订正记录。",

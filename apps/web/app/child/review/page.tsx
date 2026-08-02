@@ -20,6 +20,8 @@ type CompletedReview = {
   outcome?: "correct" | "incorrect";
 };
 
+type ReviewActionError = "save" | "skip";
+
 function getAvailableTokens(options: string[], selected: string[]) {
   const selectedCounts = new Map<string, number>();
   for (const token of selected) {
@@ -53,6 +55,9 @@ function ChildReviewContent() {
   const [loading, setLoading] = useState(true);
   const [skipping, setSkipping] = useState(false);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<ReviewActionError | null>(
+    null,
+  );
   const latestReviewRequest = useRef(0);
 
   const refreshReviews = useCallback(async () => {
@@ -109,6 +114,7 @@ function ChildReviewContent() {
     if (!childToken || submittingId === review.id) {
       return;
     }
+    setActionError(null);
     setSubmittingId(review.id);
     try {
       const result = await completeReview(
@@ -123,6 +129,8 @@ function ChildReviewContent() {
           outcome: result.outcome,
         },
       }));
+    } catch {
+      setActionError("save");
     } finally {
       setSubmittingId(null);
     }
@@ -133,6 +141,7 @@ function ChildReviewContent() {
     if (!childToken || skipping) {
       return;
     }
+    setActionError(null);
     setSkipping(true);
     try {
       const skipped = await skipTodayReviews(childToken);
@@ -142,6 +151,8 @@ function ChildReviewContent() {
           skipped.map((item) => [item.item_id, { nextDueOn: item.next_due_on }]),
         ),
       }));
+    } catch {
+      setActionError("skip");
     } finally {
       setSkipping(false);
     }
@@ -313,6 +324,16 @@ function ChildReviewContent() {
             </article>
           ))}
         </section>
+      ) : null}
+
+      {actionError ? (
+        <p className="form-error" role="alert">
+          {t(
+            actionError === "save"
+              ? "review.saveError"
+              : "review.skipError",
+          )}
+        </p>
       ) : null}
 
       <button

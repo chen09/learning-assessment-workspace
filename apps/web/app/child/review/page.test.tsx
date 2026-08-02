@@ -47,8 +47,22 @@ vi.mock("@/lib/api-client", async (importOriginal) => {
 
 describe("ChildReviewPage", () => {
   beforeEach(() => {
-    completeReview.mockClear();
-    skipTodayReviews.mockClear();
+    completeReview.mockReset();
+    completeReview.mockResolvedValue({
+      item_id: "review-1",
+      old_interval_days: 1,
+      new_interval_days: 3,
+      next_due_on: "2026-08-01",
+    });
+    skipTodayReviews.mockReset();
+    skipTodayReviews.mockResolvedValue([
+      {
+        item_id: "review-1",
+        old_interval_days: 1,
+        new_interval_days: 1,
+        next_due_on: "2026-08-02",
+      },
+    ]);
     getTodayReviews.mockReset();
     getTodayReviews.mockResolvedValue([
       {
@@ -101,6 +115,36 @@ describe("ChildReviewPage", () => {
 
     expect(await screen.findByText(/次の復習/)).toBeInTheDocument();
     expect(skipTodayReviews).toHaveBeenCalledWith("child-token");
+  });
+
+  it("keeps a child's answer and offers a retry when saving a review fails", async () => {
+    completeReview.mockRejectedValueOnce(new Error("offline"));
+
+    render(<ChildReviewPage />);
+
+    const answer = await screen.findByRole("textbox");
+    fireEvent.change(answer, { target: { value: "56" } });
+    fireEvent.click(screen.getByRole("button", { name: "答えを確認" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "復習を保存できませんでした。答えは残っています。もう一度お試しください。",
+    );
+    expect(answer).toHaveValue("56");
+    expect(screen.getByRole("button", { name: "答えを確認" })).toBeEnabled();
+  });
+
+  it("shows a retryable error when skipping today's reviews fails", async () => {
+    skipTodayReviews.mockRejectedValueOnce(new Error("offline"));
+
+    render(<ChildReviewPage />);
+
+    await screen.findByText("What is 7 × 8?");
+    fireEvent.click(screen.getByRole("button", { name: "今日はスキップ" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "今日の復習をスキップできませんでした。もう一度お試しください。",
+    );
+    expect(screen.getByRole("button", { name: "今日はスキップ" })).toBeEnabled();
   });
 
   it("refreshes today\u2019s review when the child returns to the page", async () => {
