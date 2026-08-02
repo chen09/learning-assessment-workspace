@@ -137,6 +137,26 @@ describe("ChildHomePage", () => {
     ).toBeInTheDocument();
   });
 
+  it("hides a stale assignment when a later plan refresh fails", async () => {
+    mocks.getChildAssignments
+      .mockResolvedValueOnce([assignment])
+      .mockRejectedValueOnce(new Error("network unavailable"));
+
+    render(<ChildHomePage />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Algebra & English warm-up" }),
+    ).toBeInTheDocument();
+
+    fireEvent.focus(window);
+
+    expect(await screen.findByText("无法打开这份练习。")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Algebra & English warm-up" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("0 份练习，0 道复习题。")).not.toBeInTheDocument();
+  });
+
   it("lets a child refresh an empty plan after a parent assigns new work", async () => {
     mocks.getChildAssignments
       .mockResolvedValueOnce([])

@@ -74,6 +74,8 @@ function ChildHomeContent() {
       if (latestPlanRequest.current !== request) {
         return;
       }
+      setAssignments([]);
+      setReviewCount(0);
       setLoadState("error");
     }
   }, []);
