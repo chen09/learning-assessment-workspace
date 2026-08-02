@@ -3693,6 +3693,35 @@ button {
   width: 100%;
 }
 
+.completed-paper-preview-image-frame {
+  position: relative;
+}
+
+.completed-paper-answer-region {
+  box-sizing: border-box;
+  position: absolute;
+  border: 2px solid #b7473d;
+  border-radius: 0.35rem;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 90%);
+  pointer-events: none;
+}
+
+.completed-paper-answer-region > span {
+  position: absolute;
+  top: -0.85rem;
+  left: -0.1rem;
+  display: grid;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  place-items: center;
+  border-radius: 50%;
+  background: #b7473d;
+  color: white;
+  font-size: 0.76rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
 .completed-paper-preview-pages figcaption {
   color: var(--muted, #657080);
   font-size: 0.85rem;

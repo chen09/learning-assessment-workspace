@@ -1351,6 +1351,33 @@ test("parent validates a local-AI completed-paper review before submitting it", 
   const apiBaseUrl = "http://127.0.0.1:8017";
   const fixtureKey = `e2e-completed-paper-${testInfo.workerIndex}`;
   const parentHeaders = { Authorization: "Bearer parent-fixture" };
+  let completedPaperId: string | undefined;
+  // The in-memory API deliberately does not mint Storage URLs.  This route
+  // models the short-lived, parent-authorized preview returned by PostgreSQL
+  // so this browser journey can still verify the review overlay.  The
+  // PostgreSQL journey separately verifies the real signed Storage URL.
+  await page.route("**/v1/completed-worksheets/*", async (route) => {
+    if (
+      route.request().method() !== "GET" ||
+      !completedPaperId ||
+      !route.request().url().endsWith(`/${completedPaperId}`)
+    ) {
+      await route.fallback();
+      return;
+    }
+
+    const response = await route.fetch();
+    const imported = (await response.json()) as Record<string, unknown>;
+    await route.fulfill({
+      response,
+      json: {
+        ...imported,
+        response_preview_urls: [
+          "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='1600'%3E%3Crect width='100%25' height='100%25' fill='%23fffdf8'/%3E%3C/svg%3E",
+        ],
+      },
+    });
+  });
   const family = (await (
     await request.post(`${apiBaseUrl}/v1/families`, {
       headers: { ...parentHeaders, "Idempotency-Key": `${fixtureKey}-family` },
@@ -1492,6 +1519,7 @@ test("parent validates a local-AI completed-paper review before submitting it", 
     id: string;
     response_paths: string[];
   };
+  completedPaperId = imported.id;
   await expect(page).toHaveURL(
     new RegExp(`completedWorksheetId=${encodeURIComponent(imported.id)}`),
   );
@@ -1508,6 +1536,9 @@ test("parent validates a local-AI completed-paper review before submitting it", 
   });
   await expect(
     page.getByText("Review ready · questions: 5 · answer regions: 5"),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel("Answer area for question 1 on page 1"),
   ).toBeVisible();
   await page
     .getByLabel("Question 1 wording")

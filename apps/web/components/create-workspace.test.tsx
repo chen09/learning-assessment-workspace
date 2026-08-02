@@ -1676,6 +1676,9 @@ describe("CreateWorkspace", () => {
     expect(
       screen.getByText("Review ready · questions: 5 · answer regions: 5"),
     ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Answer area for question 1 on page 1"),
+    ).toBeInTheDocument();
     fireEvent.change(
       screen.getByLabelText("Question 1 wording"),
       { target: { value: "Factorise x² − 25." } },

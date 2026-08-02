@@ -2400,6 +2400,15 @@ function CreateWorkspaceContent() {
                 const filename = completedResponseFileNames[index] ?? "";
                 const page = index + 1;
                 const label = t("completedPaper.page", { pages: page });
+                const answerRegions =
+                  completedReview?.answer_regions.flatMap((answerRegion) =>
+                    answerRegion.page_numbers.includes(page)
+                      ? (answerRegion.regions ?? []).map((region) => ({
+                          ...region,
+                          position: answerRegion.question_position,
+                        }))
+                      : [],
+                  ) ?? [];
                 if (/\.pdf$/i.test(filename)) {
                   return (
                     <a
@@ -2417,12 +2426,34 @@ function CreateWorkspaceContent() {
                 }
                 return (
                   <figure key={previewUrl}>
-                    {/* Signed private URLs cannot use the static image optimizer. */}
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      alt={t("completedPaper.pagePreview", { page })}
-                      src={previewUrl}
-                    />
+                    <div className="completed-paper-preview-image-frame">
+                      {/* Signed private URLs cannot use the static image optimizer. */}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        alt={t("completedPaper.pagePreview", { page })}
+                        src={previewUrl}
+                      />
+                      {answerRegions.map((region, regionIndex) => (
+                        <span
+                          aria-label={t("completedPaper.answerRegionOnPage", {
+                            page,
+                            position: region.position,
+                          })}
+                          className="completed-paper-answer-region"
+                          data-completed-paper-region={region.position}
+                          key={`${region.position}-${regionIndex}`}
+                          role="img"
+                          style={{
+                            height: `${region.height * 100}%`,
+                            left: `${region.x * 100}%`,
+                            top: `${region.y * 100}%`,
+                            width: `${region.width * 100}%`,
+                          }}
+                        >
+                          <span aria-hidden="true">{region.position}</span>
+                        </span>
+                      ))}
+                    </div>
                     <figcaption>{filename || label}</figcaption>
                   </figure>
                 );

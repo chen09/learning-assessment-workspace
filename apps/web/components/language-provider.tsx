@@ -734,6 +734,8 @@ const messages = {
     "completedPaper.originalPagesHelp":
       "These short-lived previews are visible only while you review this paper.",
     "completedPaper.pagePreview": "Completed worksheet page {page}",
+    "completedPaper.answerRegionOnPage":
+      "Answer area for question {position} on page {page}",
     "completedPaper.openOriginal": "Open original",
     "completedPaper.confirm": "Confirm and start grading",
     "completedPaper.confirming": "Confirming…",
@@ -1494,6 +1496,8 @@ const messages = {
     "completedPaper.originalPagesHelp":
       "この短時間だけ有効なプレビューは、このプリントを確認中の保護者だけに表示されます。",
     "completedPaper.pagePreview": "解答済みプリント {page} ページ",
+    "completedPaper.answerRegionOnPage":
+      "問題 {position} の {page} ページの解答範囲",
     "completedPaper.openOriginal": "元のファイルを開く",
     "completedPaper.confirm": "確認して採点を始める",
     "completedPaper.confirming": "確認中…",
@@ -2230,6 +2234,7 @@ const messages = {
     "completedPaper.originalPagesHelp":
       "这些短时预览仅在您确认这份试卷时，对所属家长可见。",
     "completedPaper.pagePreview": "已作答试卷第 {page} 页",
+    "completedPaper.answerRegionOnPage": "第 {position} 题在第 {page} 页的答题区域",
     "completedPaper.openOriginal": "打开原始文件",
     "completedPaper.confirm": "确认并开始批改",
     "completedPaper.confirming": "正在确认…",
