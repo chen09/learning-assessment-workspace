@@ -622,25 +622,38 @@ function WorksheetWorkbenchContent() {
     if (!examMode) {
       return;
     }
-    const submitForTimeLimit = () => {
+    const submitForTimeLimit = async () => {
       if (automaticSubmissionAttemptId.current === attemptId) {
         return;
       }
-      automaticSubmissionAttemptId.current = attemptId;
       if (attemptId && childToken) {
-        void submitAttempt(
-          attemptId,
-          childToken,
-          `submit-${attemptId}-time-limit`,
-        )
-          .then(() => removePendingDraftsByPrefix(`${attemptId}:`))
-          .finally(() =>
-            window.location.assign(
-              `/child/submitted/?reason=time-limit&attemptId=${encodeURIComponent(
-                attemptId,
-              )}`,
+        try {
+          await Promise.all(
+            [...saveChains.current.values()].map((pendingSave) =>
+              pendingSave.catch(() => undefined),
             ),
           );
+          await syncPendingDraftsWithVersions(childToken);
+          const pendingDrafts = await getPendingDraftsByPrefix(`${attemptId}:`);
+          if (pendingDrafts.length > 0) {
+            setSaveStatus("offline");
+            return;
+          }
+          automaticSubmissionAttemptId.current = attemptId;
+          await submitAttempt(
+            attemptId,
+            childToken,
+            `submit-${attemptId}-time-limit`,
+          );
+          await removePendingDraftsByPrefix(`${attemptId}:`);
+          window.location.assign(
+            `/child/submitted/?reason=time-limit&attemptId=${encodeURIComponent(
+              attemptId,
+            )}`,
+          );
+        } catch {
+          setSaveStatus("offline");
+        }
         return;
       }
       window.location.assign("/child/submitted/?reason=time-limit");
@@ -694,18 +707,28 @@ function WorksheetWorkbenchContent() {
     }
   }
 
+  async function flushAttemptDrafts(
+    activeAttemptId: string,
+    token: string,
+  ): Promise<boolean> {
+    await Promise.all(
+      [...saveChains.current.values()].map((pendingSave) =>
+        pendingSave.catch(() => undefined),
+      ),
+    );
+    await syncPendingDraftsWithVersions(token);
+    const pendingDrafts = await getPendingDraftsByPrefix(`${activeAttemptId}:`);
+    if (pendingDrafts.length > 0) {
+      setSaveStatus("offline");
+      return false;
+    }
+    return true;
+  }
+
   async function submitAll(reason = "completed") {
     if (attemptId && childToken) {
       try {
-        await Promise.all(
-          [...saveChains.current.values()].map((pendingSave) =>
-            pendingSave.catch(() => undefined),
-          ),
-        );
-        await syncPendingDraftsWithVersions(childToken);
-        const pendingDrafts = await getPendingDraftsByPrefix(`${attemptId}:`);
-        if (pendingDrafts.length > 0) {
-          setSaveStatus("offline");
+        if (!(await flushAttemptDrafts(attemptId, childToken))) {
           return;
         }
         await submitAttempt(

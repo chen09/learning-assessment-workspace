@@ -591,6 +591,35 @@ describe("WorksheetWorkbench", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("keeps an expired exam on this device when an answer is still unsynced", async () => {
+    mocks.startAssignment.mockResolvedValue({
+      ...assignmentWork,
+      assignment: {
+        ...assignmentWork.assignment,
+        mode: "exam",
+        time_limit_seconds: 1,
+      },
+      attempt: {
+        ...assignmentWork.attempt,
+        started_at: new Date(Date.now() - 10_000).toISOString(),
+      },
+    });
+    mocks.getPendingDraftsByPrefix.mockResolvedValue([
+      {
+        key: "attempt-1:algebra-choice",
+        answer: { choices: [0] },
+        savedAt: "2026-08-03T00:00:00.000Z",
+        expiresAt: "2026-08-04T00:00:00.000Z",
+      },
+    ]);
+
+    render(<WorksheetWorkbench />);
+
+    expect(await screen.findByText("Saved on this device")).toBeInTheDocument();
+    await new Promise((resolve) => window.setTimeout(resolve, 50));
+    expect(mocks.submitAttempt).not.toHaveBeenCalled();
+  });
+
   it("plays private listening audio only after the server records a replay", async () => {
     const play = vi
       .spyOn(HTMLMediaElement.prototype, "play")
