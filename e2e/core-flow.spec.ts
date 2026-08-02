@@ -205,6 +205,75 @@ test("a child refreshes an empty home after a parent assigns a practice", async 
   expect(assignmentRequests).toBe(2);
 });
 
+test("a child can correct a word-order review in place", async ({ page }) => {
+  let submittedAnswer: unknown;
+  await page.addInitScript(() => {
+    window.localStorage.setItem("luma-child-session", "review-child-token");
+    window.localStorage.setItem(
+      "luma-child-profile",
+      JSON.stringify({
+        child_id: "review-child",
+        family_id: "review-family",
+        nickname: "Alex",
+        ui_language: "en",
+      }),
+    );
+  });
+  await page.route("**/v1/reviews/today", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          id: "word-order-review",
+          source_question_id: "word-order-question",
+          prompt: "Build the sentence.",
+          type: "word_order",
+          options: ["She", "goes", "to", "school"],
+          answer_mode: "tokens",
+          due_on: "2026-08-03",
+          interval_days: 1,
+          level: "standard",
+        },
+      ]),
+    });
+  });
+  await page.route(
+    "**/v1/reviews/word-order-review/complete",
+    async (route) => {
+      submittedAnswer = route.request().postDataJSON();
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          item_id: "word-order-review",
+          old_interval_days: 1,
+          new_interval_days: 3,
+          next_due_on: "2026-08-06",
+          outcome: "correct",
+        }),
+      });
+    },
+  );
+
+  await page.goto("/child/review/");
+  await expect(
+    page.getByRole("heading", { name: "Build the sentence." }),
+  ).toBeVisible();
+  for (const token of ["She", "goes", "school", "to"]) {
+    await page.getByRole("button", { name: token, exact: true }).click();
+  }
+
+  await page.getByRole("button", { name: "Move to earlier" }).click();
+  await page.getByRole("button", { name: "Remove She" }).click();
+  await page.getByRole("button", { name: "She", exact: true }).click();
+  for (let index = 0; index < 3; index += 1) {
+    await page.getByRole("button", { name: "Move She earlier" }).click();
+  }
+  await page.getByRole("button", { name: "Check answer" }).click();
+
+  await expect(page.getByText(/Correct\. Next review:/)).toBeVisible();
+  expect(submittedAnswer).toEqual({ tokens: ["She", "goes", "to", "school"] });
+});
+
 test("parent history selects an authorized family when opened from the sidebar", async ({
   page,
 }) => {
