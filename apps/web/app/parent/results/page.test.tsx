@@ -201,6 +201,27 @@ describe("ParentResultsPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("lets a parent retry a temporary review-loading failure", async () => {
+    const completeReview = await mocks.getParentAttemptReview();
+    mocks.getParentAttemptReview
+      .mockReset()
+      .mockRejectedValueOnce(new Error("network unavailable"))
+      .mockResolvedValueOnce(completeReview);
+
+    render(<ParentResultsPage />);
+
+    expect(
+      await screen.findByText("无法加载结果，请返回学习记录后重试。"),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "重试" }));
+
+    expect(
+      await screen.findByText("请写出平方差公式的推导过程。"),
+    ).toBeInTheDocument();
+    expect(mocks.getParentAttemptReview).toHaveBeenCalledTimes(2);
+  });
+
   it("renders short-lived photo previews for a parent", async () => {
     const completeReview = await mocks.getParentAttemptReview();
     mocks.getParentAttemptReview.mockReset().mockResolvedValue({

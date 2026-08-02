@@ -380,6 +380,7 @@ function ParentResultsContent() {
   const [loadState, setLoadState] = useState<
     "loading" | "ready" | "error"
   >("loading");
+  const [reviewReloadVersion, setReviewReloadVersion] = useState(0);
   const [decisions, setDecisions] = useState<Record<string, SavedDecision>>({});
   const [decisionComments, setDecisionComments] = useState<
     Record<string, string>
@@ -433,7 +434,13 @@ function ParentResultsContent() {
         clearTimeout(retryTimer);
       }
     };
-  }, [attemptId]);
+  }, [attemptId, reviewReloadVersion]);
+
+  const retryReview = () => {
+    setReview(null);
+    setLoadState("loading");
+    setReviewReloadVersion((current) => current + 1);
+  };
 
   const decide = async (
     item: ParentReviewItem,
@@ -524,9 +531,14 @@ function ParentResultsContent() {
       {loadState === "loading" ? (
         <p role="status">{t("parentResults.loading")}</p>
       ) : loadState === "error" ? (
-        <p className="form-error" role="alert">
-          {t("parentResults.error")}
-        </p>
+        <div className="stacked-form">
+          <p className="form-error" role="alert">
+            {t("parentResults.error")}
+          </p>
+          <button className="button primary" onClick={retryReview} type="button">
+            {t("history.retry")}
+          </button>
+        </div>
       ) : !attemptId ? (
         <p className="empty-state">{t("parentResults.missingAttempt")}</p>
       ) : review && !review.complete ? (
