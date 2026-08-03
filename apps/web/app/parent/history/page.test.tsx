@@ -79,6 +79,36 @@ describe("ParentHistoryPage", () => {
     expect(screen.queryByText("Completed, grading, and archived work for every child in this family.")).not.toBeInTheDocument();
   });
 
+  it("formats submitted history dates in the parent's selected language", async () => {
+    window.localStorage.setItem("luma-language:demo-parent", "ja");
+    mocks.getFamilyHistory.mockResolvedValue([
+      {
+        assignment_id: "assignment-ja-date",
+        attempt_id: "attempt-ja-date",
+        child_id: "child-1",
+        child_nickname: "Maya",
+        title: "Japanese date practice",
+        status: "results_ready",
+        submitted_at: "2026-08-03T12:00:00Z",
+        awarded_points: 8,
+        available_points: 10,
+        correction_count: 0,
+      },
+    ]);
+
+    render(<ParentHistoryPage />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Japanese date practice" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        (_content, element) =>
+          element?.tagName === "P" && element.textContent === "Maya · 8月3日",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("links a reviewed paper scan to its real grading results", async () => {
     mocks.getFamilyHistory.mockResolvedValue([]);
     mocks.getCompletedWorksheetImports.mockResolvedValue([

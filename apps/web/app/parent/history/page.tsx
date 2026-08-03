@@ -44,7 +44,7 @@ export default function ParentHistoryPage() {
 }
 
 function ParentHistoryContent() {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const [items, setItems] = useState<ParentHistoryItem[]>([]);
   const [families, setFamilies] = useState<Family[]>([]);
   const [familyId, setFamilyId] = useState<string | null>(null);
@@ -241,6 +241,7 @@ function ParentHistoryContent() {
         status as keyof typeof statusTranslationKeys
       ] ?? "history.status.other",
     );
+  const dateLocale = { en: "en-US", ja: "ja-JP", zh: "zh-CN" }[language];
 
   return (
     <>
@@ -403,7 +404,7 @@ function ParentHistoryContent() {
                   <p>
                     {item.child_nickname} ·{" "}
                     {item.submitted_at
-                      ? new Intl.DateTimeFormat(undefined, {
+                      ? new Intl.DateTimeFormat(dateLocale, {
                           month: "short",
                           day: "numeric",
                         }).format(new Date(item.submitted_at))
