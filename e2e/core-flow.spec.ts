@@ -2079,9 +2079,14 @@ test("parent can return to an imported question-set review from its recovery lin
     .getByRole("radio", { name: "Convert an existing worksheet into questions" })
     .check();
   await page.getByLabel("Question material").setInputFiles({
-    name: "source-recovery.pdf",
+    name: "english_lesson1_similar_practice.pdf",
     mimeType: "application/pdf",
     buffer: Buffer.from("source-recovery"),
+  });
+  await page.getByLabel("Answer key (private)").setInputFiles({
+    name: "english_lesson1_similar_answer_key.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("source-recovery-answer-key"),
   });
   const importResponse = page.waitForResponse(
     (response) =>
@@ -2108,6 +2113,9 @@ test("parent can return to an imported question-set review from its recovery lin
   await page.getByRole("link", { name: "Continue question-set review" }).click();
   await expect(
     page.getByRole("heading", { name: "Review before assigning" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Knowledge points: and / but / or / so"),
   ).toBeVisible();
 });
 

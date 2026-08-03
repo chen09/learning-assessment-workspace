@@ -185,6 +185,21 @@ const reviewMediaUploadSignature = (
   file: File,
 ) => `${kind}:${questionId}:${file.name}:${file.size}:${file.lastModified}`;
 
+const knowledgePointsFromSourceSummary = (
+  sourceSummary: Record<string, unknown> | undefined,
+) =>
+  Array.from(
+    new Set(
+      (Array.isArray(sourceSummary?.knowledge_points)
+        ? sourceSummary.knowledge_points
+        : []
+      )
+        .filter((point): point is string => typeof point === "string")
+        .map((point) => point.trim())
+        .filter(Boolean),
+    ),
+  );
+
 const LOCAL_COMPLETED_PAPER_REVIEW_PROMPT = `You are a careful school worksheet reviewer. Read the attached completed worksheet pages locally and return JSON only. Do not return Markdown, explanation, or an annotated image.
 
 Goal: turn the printed questions and the student's handwritten answers into a parent-reviewable learning record. Preserve the original wording. Do not invent an answer when print or handwriting is unclear.
@@ -636,6 +651,9 @@ function CreateWorkspaceContent() {
   const [structuredFile, setStructuredFile] = useState<File | null>(null);
   const [structuredDocument, setStructuredDocument] =
     useState<StructuredQuestionSetDocument | null>(null);
+  const [recoveredKnowledgePoints, setRecoveredKnowledgePoints] = useState<
+    string[]
+  >([]);
   const [structuredChecksum, setStructuredChecksum] = useState("");
   const [structuredImportKey, setStructuredImportKey] = useState("");
   const [manualTitle, setManualTitle] = useState("New practice");
@@ -1183,6 +1201,10 @@ function CreateWorkspaceContent() {
         }
         setMode("import");
         setQuestionSetId(draft.question_set.id);
+        setStructuredDocument(null);
+        setRecoveredKnowledgePoints(
+          knowledgePointsFromSourceSummary(draft.question_set.source_summary),
+        );
         if (
           draft.question_set.status === "processing" &&
           draft.import_job !== null
@@ -1195,6 +1217,9 @@ function CreateWorkspaceContent() {
         if (draft.question_set.status !== "needs_review") {
           return;
         }
+        setRecoveredKnowledgePoints(
+          knowledgePointsFromSourceSummary(draft.question_set.source_summary),
+        );
         setDraftQuestions(draft.questions);
         if (
           draft.questions.length === 0 &&
@@ -1773,6 +1798,7 @@ function CreateWorkspaceContent() {
           document,
           parentToken,
         );
+        setRecoveredKnowledgePoints([]);
         setStructuredDocument(document);
         setStructuredChecksum(preview.checksum);
         setStructuredImportKey(crypto.randomUUID());
@@ -3622,13 +3648,15 @@ function CreateWorkspaceContent() {
   }
 
   if (stage === "review") {
-    const reviewKnowledgePoints = Array.from(
-      new Set(
-        (structuredDocument?.knowledge_tags ?? [])
-          .map((tag) => tag.label.trim())
-          .filter(Boolean),
-      ),
-    );
+    const reviewKnowledgePoints = structuredDocument
+      ? Array.from(
+          new Set(
+            structuredDocument.knowledge_tags
+              .map((tag) => tag.label.trim())
+              .filter(Boolean),
+          ),
+        )
+      : recoveredKnowledgePoints;
     return (
       <>
         <header className="page-header">

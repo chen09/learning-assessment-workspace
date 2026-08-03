@@ -481,7 +481,11 @@ describe("CreateWorkspace", () => {
       "/parent/create/?questionSetId=imported-question-set-1",
     );
     mocks.getQuestionSetDraft.mockResolvedValue({
-      question_set: { id: "imported-question-set-1", status: "needs_review" },
+      question_set: {
+        id: "imported-question-set-1",
+        status: "needs_review",
+        source_summary: { knowledge_points: ["present simple"] },
+      },
       questions: [
         {
           id: "imported-question-1",
@@ -506,6 +510,7 @@ describe("CreateWorkspace", () => {
       "parent-token",
     );
     expect(screen.getByText("Complete: They ___ ready.")).toBeInTheDocument();
+    expect(screen.getByText("Knowledge points: present simple")).toBeInTheDocument();
   });
 
   it("returns a material-only import to its private source workflow", async () => {
