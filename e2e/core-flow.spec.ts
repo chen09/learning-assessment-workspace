@@ -2242,12 +2242,48 @@ test("parent validates a local-AI completed-paper review before submitting it", 
   await expect(selectedPages.getByRole("listitem").first()).toContainText(
     "back.jpg",
   );
+  await page.getByLabel("Answer key (private, optional)").setInputFiles([
+    {
+      name: "answer-key-front.jpg",
+      mimeType: "image/jpeg",
+      buffer: Buffer.from("answer-key-front"),
+    },
+    {
+      name: "answer-key-back.jpg",
+      mimeType: "image/jpeg",
+      buffer: Buffer.from("answer-key-back"),
+    },
+  ]);
+  const selectedAnswerKeyPages = page.getByRole("list", {
+    name: "Answer key pages (upload order)",
+  });
+  await expect(
+    selectedAnswerKeyPages.getByRole("listitem").first(),
+  ).toContainText("answer-key-front.jpg");
+  await page
+    .getByRole("button", { name: "Move answer key page 2 earlier" })
+    .click();
+  await expect(
+    selectedAnswerKeyPages.getByRole("listitem").first(),
+  ).toContainText("answer-key-back.jpg");
+  const uploadRequest = page.waitForRequest(
+    (request) =>
+      request.url() === `${apiBaseUrl}/v1/completed-worksheets` &&
+      request.method() === "POST",
+  );
   const uploadResponse = page.waitForResponse(
     (response) =>
       response.url() === `${apiBaseUrl}/v1/completed-worksheets` &&
       response.request().method() === "POST",
   );
   await page.getByRole("button", { name: "Upload for review" }).click();
+  const uploadBody = JSON.parse((await uploadRequest).postData() ?? "{}") as {
+    answer_source_paths: string[];
+  };
+  expect(uploadBody.answer_source_paths.map((path) => path.split("/").at(-1))).toEqual([
+    "answer-key-back.jpg",
+    "answer-key-front.jpg",
+  ]);
   const imported = (await (await uploadResponse).json()) as {
     id: string;
     response_paths: string[];

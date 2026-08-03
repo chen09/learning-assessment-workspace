@@ -895,6 +895,91 @@ describe("CreateWorkspace", () => {
     ).toEqual(["front.jpg"]);
   });
 
+  it("keeps private answer-key pages in a reviewable upload order", async () => {
+    render(<CreateWorkspace />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Grade completed paper" }),
+    );
+    fireEvent.change(screen.getByLabelText("Answer key (private, optional)"), {
+      target: {
+        files: [
+          new File(["first"], "answer-front.jpg", { type: "image/jpeg" }),
+          new File(["second"], "answer-back.jpg", { type: "image/jpeg" }),
+        ],
+      },
+    });
+
+    const selectedAnswerPages = screen.getByRole("list", {
+      name: "Answer key pages (upload order)",
+    });
+    expect(
+      within(selectedAnswerPages)
+        .getAllByRole("listitem")
+        .map((item) => item.querySelector("span")?.textContent),
+    ).toEqual(["answer-front.jpg", "answer-back.jpg"]);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Move answer key page 2 earlier" }),
+    );
+    expect(
+      within(selectedAnswerPages)
+        .getAllByRole("listitem")
+        .map((item) => item.querySelector("span")?.textContent),
+    ).toEqual(["answer-back.jpg", "answer-front.jpg"]);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove answer key page 1" }),
+    );
+    expect(
+      within(selectedAnswerPages)
+        .getAllByRole("listitem")
+        .map((item) => item.querySelector("span")?.textContent),
+    ).toEqual(["answer-front.jpg"]);
+  });
+
+  it("keeps private original-material pages in a reviewable upload order", async () => {
+    render(<CreateWorkspace />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Grade completed paper" }),
+    );
+    fireEvent.change(
+      screen.getByLabelText("Original material or examples (private, optional)"),
+      {
+        target: {
+          files: [
+            new File(["first"], "lesson-front.jpg", { type: "image/jpeg" }),
+            new File(["second"], "lesson-back.jpg", { type: "image/jpeg" }),
+          ],
+        },
+      },
+    );
+
+    const selectedReferencePages = screen.getByRole("list", {
+      name: "Original material pages (upload order)",
+    });
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Move original material page 2 earlier",
+      }),
+    );
+    expect(
+      within(selectedReferencePages)
+        .getAllByRole("listitem")
+        .map((item) => item.querySelector("span")?.textContent),
+    ).toEqual(["lesson-back.jpg", "lesson-front.jpg"]);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove original material page 1" }),
+    );
+    expect(
+      within(selectedReferencePages)
+        .getAllByRole("listitem")
+        .map((item) => item.querySelector("span")?.textContent),
+    ).toEqual(["lesson-front.jpg"]);
+  });
+
   it("never substitutes sample questions when a structured preview unexpectedly returns an empty draft", async () => {
     const document = {
       schema_version: "1.0" as const,

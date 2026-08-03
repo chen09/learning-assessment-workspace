@@ -729,24 +729,37 @@ function CreateWorkspaceContent() {
     setCompletedPaperError(null);
   };
 
-  const moveCompletedPaperPage = (index: number, direction: -1 | 1) => {
+  const moveCompletedPaperUploadFile = (
+    selectedFiles: File[],
+    assignFiles: (files: File[]) => void,
+    assignFilename: (filename: string) => void,
+    index: number,
+    direction: -1 | 1,
+  ) => {
     const nextIndex = index + direction;
-    if (nextIndex < 0 || nextIndex >= files.length) {
+    if (nextIndex < 0 || nextIndex >= selectedFiles.length) {
       return;
     }
-    const reordered = [...files];
+    const reordered = [...selectedFiles];
     [reordered[index], reordered[nextIndex]] = [
       reordered[nextIndex],
       reordered[index],
     ];
-    setFiles(reordered);
-    setFileName(reordered.map((file) => file.name).join(", "));
+    assignFiles(reordered);
+    assignFilename(reordered.map((file) => file.name).join(", "));
   };
 
-  const removeCompletedPaperPage = (index: number) => {
-    const remaining = files.filter((_, fileIndex) => fileIndex !== index);
-    setFiles(remaining);
-    setFileName(remaining.map((file) => file.name).join(", "));
+  const removeCompletedPaperUploadFile = (
+    selectedFiles: File[],
+    assignFiles: (files: File[]) => void,
+    assignFilename: (filename: string) => void,
+    index: number,
+  ) => {
+    const remaining = selectedFiles.filter(
+      (_, fileIndex) => fileIndex !== index,
+    );
+    assignFiles(remaining);
+    assignFilename(remaining.map((file) => file.name).join(", "));
   };
 
   useEffect(() => {
@@ -4013,7 +4026,15 @@ function CreateWorkspaceContent() {
                                 page,
                               })}
                               className="text-button"
-                              onClick={() => moveCompletedPaperPage(index, -1)}
+                              onClick={() =>
+                                moveCompletedPaperUploadFile(
+                                  files,
+                                  setFiles,
+                                  setFileName,
+                                  index,
+                                  -1,
+                                )
+                              }
                               type="button"
                             >
                               ↑
@@ -4025,7 +4046,15 @@ function CreateWorkspaceContent() {
                                 page,
                               })}
                               className="text-button"
-                              onClick={() => moveCompletedPaperPage(index, 1)}
+                              onClick={() =>
+                                moveCompletedPaperUploadFile(
+                                  files,
+                                  setFiles,
+                                  setFileName,
+                                  index,
+                                  1,
+                                )
+                              }
                               type="button"
                             >
                               ↓
@@ -4036,7 +4065,14 @@ function CreateWorkspaceContent() {
                               page,
                             })}
                             className="text-button"
-                            onClick={() => removeCompletedPaperPage(index)}
+                            onClick={() =>
+                              removeCompletedPaperUploadFile(
+                                files,
+                                setFiles,
+                                setFileName,
+                                index,
+                              )
+                            }
                             type="button"
                           >
                             ×
@@ -4082,6 +4118,90 @@ function CreateWorkspaceContent() {
                 <strong>{answerFileName || t("completedPaper.chooseAnswerKey")}</strong>
                 <span>{t("completedPaper.answerKeyHelp")}</span>
               </label>
+              {answerFiles.length > 0 ? (
+                <ol
+                  aria-label={t("completedPaper.selectedAnswerKeyPages")}
+                  className="completed-paper-selected-pages"
+                >
+                  {answerFiles.map((file, index) => {
+                    const page = index + 1;
+                    return (
+                      <li key={`${file.name}-${file.lastModified}-${index}`}>
+                        <div>
+                          <strong>
+                            {t("completedPaper.answerKeyPage", {
+                              page,
+                              total: answerFiles.length,
+                            })}
+                          </strong>
+                          <span>{file.name}</span>
+                        </div>
+                        <div className="completed-paper-page-actions">
+                          {index > 0 ? (
+                            <button
+                              aria-label={t(
+                                "completedPaper.moveAnswerKeyPageEarlier",
+                                { page },
+                              )}
+                              className="text-button"
+                              onClick={() =>
+                                moveCompletedPaperUploadFile(
+                                  answerFiles,
+                                  setAnswerFiles,
+                                  setAnswerFileName,
+                                  index,
+                                  -1,
+                                )
+                              }
+                              type="button"
+                            >
+                              ↑
+                            </button>
+                          ) : null}
+                          {index < answerFiles.length - 1 ? (
+                            <button
+                              aria-label={t(
+                                "completedPaper.moveAnswerKeyPageLater",
+                                { page },
+                              )}
+                              className="text-button"
+                              onClick={() =>
+                                moveCompletedPaperUploadFile(
+                                  answerFiles,
+                                  setAnswerFiles,
+                                  setAnswerFileName,
+                                  index,
+                                  1,
+                                )
+                              }
+                              type="button"
+                            >
+                              ↓
+                            </button>
+                          ) : null}
+                          <button
+                            aria-label={t("completedPaper.removeAnswerKeyPage", {
+                              page,
+                            })}
+                            className="text-button"
+                            onClick={() =>
+                              removeCompletedPaperUploadFile(
+                                answerFiles,
+                                setAnswerFiles,
+                                setAnswerFileName,
+                                index,
+                              )
+                            }
+                            type="button"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ol>
+              ) : null}
               <label className="drop-zone completed-paper-private-file">
                 <input
                   accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
@@ -4102,6 +4222,90 @@ function CreateWorkspaceContent() {
                 </strong>
                 <span>{t("completedPaper.referenceMaterialHelp")}</span>
               </label>
+              {referenceFiles.length > 0 ? (
+                <ol
+                  aria-label={t("completedPaper.selectedReferencePages")}
+                  className="completed-paper-selected-pages"
+                >
+                  {referenceFiles.map((file, index) => {
+                    const page = index + 1;
+                    return (
+                      <li key={`${file.name}-${file.lastModified}-${index}`}>
+                        <div>
+                          <strong>
+                            {t("completedPaper.referencePage", {
+                              page,
+                              total: referenceFiles.length,
+                            })}
+                          </strong>
+                          <span>{file.name}</span>
+                        </div>
+                        <div className="completed-paper-page-actions">
+                          {index > 0 ? (
+                            <button
+                              aria-label={t(
+                                "completedPaper.moveReferencePageEarlier",
+                                { page },
+                              )}
+                              className="text-button"
+                              onClick={() =>
+                                moveCompletedPaperUploadFile(
+                                  referenceFiles,
+                                  setReferenceFiles,
+                                  setReferenceFileName,
+                                  index,
+                                  -1,
+                                )
+                              }
+                              type="button"
+                            >
+                              ↑
+                            </button>
+                          ) : null}
+                          {index < referenceFiles.length - 1 ? (
+                            <button
+                              aria-label={t(
+                                "completedPaper.moveReferencePageLater",
+                                { page },
+                              )}
+                              className="text-button"
+                              onClick={() =>
+                                moveCompletedPaperUploadFile(
+                                  referenceFiles,
+                                  setReferenceFiles,
+                                  setReferenceFileName,
+                                  index,
+                                  1,
+                                )
+                              }
+                              type="button"
+                            >
+                              ↓
+                            </button>
+                          ) : null}
+                          <button
+                            aria-label={t("completedPaper.removeReferencePage", {
+                              page,
+                            })}
+                            className="text-button"
+                            onClick={() =>
+                              removeCompletedPaperUploadFile(
+                                referenceFiles,
+                                setReferenceFiles,
+                                setReferenceFileName,
+                                index,
+                              )
+                            }
+                            type="button"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ol>
+              ) : null}
               {completedPaperError ? (
                 <p className="form-error" role="alert">
                   {completedPaperError}

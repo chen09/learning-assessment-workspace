@@ -915,6 +915,22 @@ const messages = {
     "completedPaper.movePageEarlier": "Move page {page} earlier",
     "completedPaper.movePageLater": "Move page {page} later",
     "completedPaper.removePage": "Remove page {page}",
+    "completedPaper.selectedAnswerKeyPages": "Answer key pages (upload order)",
+    "completedPaper.answerKeyPage": "Answer key page {page} of {total}",
+    "completedPaper.moveAnswerKeyPageEarlier":
+      "Move answer key page {page} earlier",
+    "completedPaper.moveAnswerKeyPageLater":
+      "Move answer key page {page} later",
+    "completedPaper.removeAnswerKeyPage": "Remove answer key page {page}",
+    "completedPaper.selectedReferencePages":
+      "Original material pages (upload order)",
+    "completedPaper.referencePage": "Original material page {page} of {total}",
+    "completedPaper.moveReferencePageEarlier":
+      "Move original material page {page} earlier",
+    "completedPaper.moveReferencePageLater":
+      "Move original material page {page} later",
+    "completedPaper.removeReferencePage":
+      "Remove original material page {page}",
     "childExit.eyebrow": "Parent check",
     "childExit.title": "Enter your management PIN",
     "childExit.help":
@@ -1831,6 +1847,22 @@ const messages = {
     "completedPaper.movePageEarlier": "{page} ページを前へ移動",
     "completedPaper.movePageLater": "{page} ページを後へ移動",
     "completedPaper.removePage": "{page} ページを削除",
+    "completedPaper.selectedAnswerKeyPages": "解答・採点基準のページ（アップロード順）",
+    "completedPaper.answerKeyPage": "解答・採点基準 {page}/{total} ページ",
+    "completedPaper.moveAnswerKeyPageEarlier":
+      "解答・採点基準の {page} ページを前へ移動",
+    "completedPaper.moveAnswerKeyPageLater":
+      "解答・採点基準の {page} ページを後へ移動",
+    "completedPaper.removeAnswerKeyPage":
+      "解答・採点基準の {page} ページを削除",
+    "completedPaper.selectedReferencePages": "元教材・例題のページ（アップロード順）",
+    "completedPaper.referencePage": "元教材・例題 {page}/{total} ページ",
+    "completedPaper.moveReferencePageEarlier":
+      "元教材・例題の {page} ページを前へ移動",
+    "completedPaper.moveReferencePageLater":
+      "元教材・例題の {page} ページを後へ移動",
+    "completedPaper.removeReferencePage":
+      "元教材・例題の {page} ページを削除",
     "childExit.eyebrow": "保護者の確認",
     "childExit.title": "保護者管理 PIN を入力",
     "childExit.help":
@@ -2718,6 +2750,18 @@ const messages = {
     "completedPaper.movePageEarlier": "将第 {page} 页前移",
     "completedPaper.movePageLater": "将第 {page} 页后移",
     "completedPaper.removePage": "移除第 {page} 页",
+    "completedPaper.selectedAnswerKeyPages": "答案与评分标准页面（上传顺序）",
+    "completedPaper.answerKeyPage": "答案与评分标准第 {page}/{total} 页",
+    "completedPaper.moveAnswerKeyPageEarlier":
+      "将答案与评分标准第 {page} 页前移",
+    "completedPaper.moveAnswerKeyPageLater":
+      "将答案与评分标准第 {page} 页后移",
+    "completedPaper.removeAnswerKeyPage": "移除答案与评分标准第 {page} 页",
+    "completedPaper.selectedReferencePages": "原教材或例题页面（上传顺序）",
+    "completedPaper.referencePage": "原教材或例题第 {page}/{total} 页",
+    "completedPaper.moveReferencePageEarlier": "将原教材或例题第 {page} 页前移",
+    "completedPaper.moveReferencePageLater": "将原教材或例题第 {page} 页后移",
+    "completedPaper.removeReferencePage": "移除原教材或例题第 {page} 页",
     "childExit.eyebrow": "家长确认",
     "childExit.title": "输入家长管理 PIN",
     "childExit.help":
