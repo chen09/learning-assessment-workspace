@@ -2050,7 +2050,9 @@ function WorksheetWorkbenchContent() {
     return (
       <HandwritingCanvas
         annotations={
-          questionResults[question.id]?.feedback.annotations
+          gradingQuestionIds.includes(question.id)
+            ? []
+            : questionResults[question.id]?.feedback.annotations
         }
         initialSize={answer.canvasSize}
         initialStrokes={answer.strokes}

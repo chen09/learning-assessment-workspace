@@ -2144,7 +2144,16 @@ describe("WorksheetWorkbench", () => {
           confidence: 0.72,
           feedback: {
             summary: "A parent review is needed.",
-            annotations: [],
+            annotations: [
+              {
+                kind: "box",
+                x: 0.3,
+                y: 0.3,
+                width: 0.2,
+                height: 0.16,
+                label: "Old mark",
+              },
+            ],
           },
         },
       ],
@@ -2159,6 +2168,7 @@ describe("WorksheetWorkbench", () => {
       name: "前往第 3 题",
     });
     fireEvent.click(questionThreeButton);
+    expect(await screen.findByText("Old mark")).toBeInTheDocument();
     fireEvent.click(
       screen.getByRole("button", {
         name: "保留答案并重新评判",
@@ -2173,6 +2183,7 @@ describe("WorksheetWorkbench", () => {
       questionThreeButton.querySelector(".question-index-state"),
     ).toHaveTextContent("…");
     expect(screen.getByText("批改中")).toHaveClass("sr-only");
+    expect(screen.queryByText("Old mark")).not.toBeInTheDocument();
   });
 
   it("clears one graded answer into a new attempt and can request review again", async () => {
