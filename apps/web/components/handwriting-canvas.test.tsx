@@ -5,6 +5,7 @@ import {
   HandwritingCanvas,
   type Stroke,
 } from "@/components/handwriting-canvas";
+import { LanguageProvider } from "@/components/language-provider";
 
 const initialStrokes: Stroke[] = [
   {
@@ -233,6 +234,33 @@ describe("HandwritingCanvas", () => {
       height: 420,
     });
   });
+
+  it.each([
+    ["ja", "手書きをすべて消す", "今すぐ消す"],
+    ["zh", "清除手写内容", "立即清除"],
+  ] as const)(
+    "keeps the destructive clear action labelled in %s",
+    (language, clearLabel, clearNowLabel) => {
+      const storageKey = `handwriting-${language}`;
+      window.localStorage.setItem(`luma-language:${storageKey}`, language);
+
+      render(
+        <LanguageProvider storageKey={storageKey}>
+          <HandwritingCanvas
+            initialStrokes={initialStrokes}
+            onChange={vi.fn()}
+          />
+        </LanguageProvider>,
+      );
+
+      const clearButton = screen.getByRole("button", { name: clearLabel });
+      expect(clearButton).toHaveTextContent(clearLabel);
+      fireEvent.click(clearButton);
+      expect(
+        screen.getByRole("button", { name: clearNowLabel }),
+      ).toBeVisible();
+    },
+  );
 
   it("opens the clear confirmation from an iPad touch action", () => {
     render(
