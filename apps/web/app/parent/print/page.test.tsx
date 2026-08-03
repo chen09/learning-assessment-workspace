@@ -6,6 +6,7 @@ import PrintWorksheetPage from "./page";
 const mocks = vi.hoisted(() => ({
   getParentAccessToken: vi.fn(),
   getPrintableAssignment: vi.fn(),
+  toDataURL: vi.fn(async () => "data:image/png;base64,fixture"),
 }));
 
 vi.mock("@/lib/api-client", async (importOriginal) => {
@@ -20,7 +21,7 @@ vi.mock("@/lib/api-client", async (importOriginal) => {
 
 vi.mock("qrcode", () => ({
   default: {
-    toDataURL: vi.fn(async () => "data:image/png;base64,fixture"),
+    toDataURL: mocks.toDataURL,
   },
 }));
 
@@ -37,6 +38,7 @@ describe("PrintWorksheetPage", () => {
     mocks.getPrintableAssignment.mockReturnValue(
       new Promise(() => undefined),
     );
+    mocks.toDataURL.mockClear();
   });
 
   afterEach(() => {
@@ -121,6 +123,46 @@ describe("PrintWorksheetPage", () => {
     ).toBeInTheDocument();
     await waitFor(() => {
       expect(mocks.getPrintableAssignment).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it("encodes a private completed-paper upload link for the assigned child", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/parent/print/?assignmentId=assignment-1",
+    );
+    mocks.getPrintableAssignment.mockResolvedValue({
+      assignment: {
+        id: "assignment-1",
+        family_id: "family-1",
+        child_id: "child-1",
+      },
+      title: "Printed practice",
+      template_version: "a4-v1",
+      questions: [
+        {
+          id: "question-1",
+          position: 1,
+          type: "typed_text" as const,
+          prompt: "Complete the sentence.",
+          options: null,
+          points: 1,
+        },
+      ],
+    });
+
+    renderPage();
+
+    await screen.findByRole("heading", { name: "Printed practice" });
+    await waitFor(() => {
+      expect(mocks.toDataURL).toHaveBeenCalledWith(
+        new URL(
+          "/parent/create/?mode=completed&paperAssignmentId=assignment-1&familyId=family-1&childId=child-1",
+          window.location.origin,
+        ).toString(),
+        expect.objectContaining({ errorCorrectionLevel: "M" }),
+      );
     });
   });
 

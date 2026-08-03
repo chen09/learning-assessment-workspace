@@ -880,7 +880,7 @@ export async function getPrintableAssignment(
   parentToken: string,
 ) {
   return apiRequest<{
-    assignment: { id: string };
+    assignment: { id: string; family_id: string; child_id: string };
     title: string;
     questions: ApiQuestion[];
     template_version: "a4-v1";

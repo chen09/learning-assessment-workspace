@@ -73,6 +73,28 @@ describe("CreateWorkspace", () => {
     expect(screen.getByText("Fixture child")).toBeInTheDocument();
   });
 
+  it("opens the completed-paper uploader from a scanned print QR link", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/parent/create/?mode=completed&paperAssignmentId=assignment-1&familyId=family-1&childId=child-1",
+    );
+
+    render(<CreateWorkspace />);
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Upload a paper the child has already completed",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Family" })).toHaveValue(
+      "family-1",
+    );
+    expect(screen.getByRole("combobox", { name: "Child" })).toHaveValue(
+      "child-1",
+    );
+  });
+
   it("retries loading the family and child assignment target in place", async () => {
     mocks.getFamilies
       .mockRejectedValueOnce(new Error("temporary network failure"))

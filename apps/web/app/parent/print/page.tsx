@@ -126,8 +126,25 @@ function PrintWorksheetContent() {
           assignmentId,
           parentToken,
         );
+        const completedPaperUploadUrl = new URL(
+          "/parent/create/",
+          window.location.origin,
+        );
+        completedPaperUploadUrl.searchParams.set("mode", "completed");
+        completedPaperUploadUrl.searchParams.set(
+          "paperAssignmentId",
+          printable.assignment.id,
+        );
+        completedPaperUploadUrl.searchParams.set(
+          "familyId",
+          printable.assignment.family_id,
+        );
+        completedPaperUploadUrl.searchParams.set(
+          "childId",
+          printable.assignment.child_id,
+        );
         const dataUrl = await QRCode.toDataURL(
-          `luma-assignment:${assignmentId}`,
+          completedPaperUploadUrl.toString(),
           {
             errorCorrectionLevel: "M",
             margin: 1,

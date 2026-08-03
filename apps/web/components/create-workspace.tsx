@@ -1140,7 +1140,11 @@ function CreateWorkspaceContent() {
 
   useEffect(() => {
     const reopenCreateRouteFromHistory = () => {
-      setMode("generate");
+      setMode(
+        new URLSearchParams(window.location.search).get("mode") === "completed"
+          ? "completed"
+          : "generate",
+      );
       setStage("compose");
       setQuestionSetId(null);
       setSourceImportJob(null);
@@ -1168,6 +1172,16 @@ function CreateWorkspaceContent() {
     return () =>
       window.removeEventListener("popstate", reopenCreateRouteFromHistory);
   }, []);
+
+  useEffect(() => {
+    if (
+      new URLSearchParams(window.location.search).get("mode") !== "completed"
+    ) {
+      return;
+    }
+    const timer = window.setTimeout(() => setMode("completed"), 0);
+    return () => window.clearTimeout(timer);
+  }, [recoveryRouteVersion]);
 
   useEffect(() => {
     let active = true;

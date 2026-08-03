@@ -102,6 +102,30 @@ test("parent dashboard offers the assigned child sign-in route", async ({
   );
 });
 
+test("a printed-paper QR route opens private completed-paper upload for its child", async ({
+  page,
+  request,
+}) => {
+  const bootstrap = await request.post("http://127.0.0.1:8017/v1/demo/bootstrap", {
+    headers: { Authorization: "Bearer parent-fixture" },
+  });
+  expect(bootstrap.ok()).toBeTruthy();
+  const fixture = await bootstrap.json();
+
+  await page.goto(
+    `/parent/create/?mode=completed&paperAssignmentId=${encodeURIComponent(fixture.assignment.id)}&familyId=${encodeURIComponent(fixture.family.id)}&childId=${encodeURIComponent(fixture.child.id)}`,
+  );
+
+  await expect(
+    page.getByRole("heading", {
+      name: "Upload a paper the child has already completed",
+    }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Family")).toHaveValue(fixture.family.id);
+  await expect(page.getByLabel("Child")).toHaveValue(fixture.child.id);
+  await expect(page.getByLabel("Completed worksheet scans")).toBeVisible();
+});
+
 test("parent dashboard switches families before showing another child's work", async ({
   page,
 }) => {

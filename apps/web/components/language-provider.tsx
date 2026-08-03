@@ -77,7 +77,7 @@ const messages = {
     "authCallback.requestNew": "Request a new sign-in link",
     "print.back": "Back",
     "print.instructions":
-      "Print on A4 at 100% scale. The QR code links scans to this assignment.",
+      "Print on A4 at 100% scale. Scan the QR code on a signed-in device to open private paper upload for this child.",
     "print.action": "Print",
     "print.loadingTitle": "Loading printable assignment…",
     "print.loadingDescription":
@@ -1059,7 +1059,7 @@ const messages = {
     "authCallback.requestNew": "新しいログインリンクを送る",
     "print.back": "戻る",
     "print.instructions":
-      "A4・100% の倍率で印刷してください。QR コードでスキャンをこの課題に紐付けます。",
+      "A4・100% の倍率で印刷してください。ログイン済みの端末で QR コードを読み取ると、この子どもの非公開プリント提出画面を開けます。",
     "print.action": "印刷",
     "print.loadingTitle": "印刷用の課題を読み込んでいます…",
     "print.loadingDescription": "問題を読み込むとワークシートが表示されます。",
@@ -2031,7 +2031,7 @@ const messages = {
     "authCallback.failed": "无法完成登录链接。",
     "authCallback.requestNew": "重新获取登录链接",
     "print.back": "返回",
-    "print.instructions": "请按 A4、100% 缩放打印。二维码会将扫描件关联到这份任务。",
+    "print.instructions": "请按 A4、100% 缩放打印。在已登录设备扫描二维码，即可打开这个孩子的私密纸质作答上传入口。",
     "print.action": "打印",
     "print.loadingTitle": "正在加载可打印题单…",
     "print.loadingDescription": "题目加载完成后将显示练习卷。",
