@@ -4039,10 +4039,17 @@ button {
 }
 
 .photo-answer-grid figcaption {
+  display: grid;
+  gap: 0.12rem;
   margin-top: 0.45rem;
   color: var(--muted);
   font-size: 0.68rem;
   overflow-wrap: anywhere;
+}
+
+.photo-answer-grid figcaption strong {
+  color: var(--ink);
+  font-size: 0.72rem;
 }
 
 .photo-answer-pdf {

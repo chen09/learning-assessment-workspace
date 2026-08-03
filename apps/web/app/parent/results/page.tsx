@@ -303,9 +303,17 @@ function PhotoPreview({
                         </svg>
                       ) : null}
                     </div>
-                    <figcaption>{filename}</figcaption>
                   </>
                 )}
+                <figcaption>
+                  <strong>
+                    {t("parentResults.photoPage", {
+                      page: index + 1,
+                      total: photoUrls.length,
+                    })}
+                  </strong>
+                  {!isPdf ? <span>{filename}</span> : null}
+                </figcaption>
                 {pageAnnotations.length ? (
                   <button
                     className="button ghost red-pencil-download"

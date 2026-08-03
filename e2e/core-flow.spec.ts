@@ -1455,6 +1455,10 @@ test("parent authors a paper-photo question and assigns it through the reviewed 
       name: "Solve on paper, then take a clear photo of your work.",
     }),
   ).toBeVisible();
+  await expect(page.getByText("Page 1 of 2")).toBeVisible();
+  await expect(page.getByText("Page 2 of 2")).toBeVisible();
+  await expect(page.getByText("paper-answer-first.png")).toBeVisible();
+  await expect(page.getByText("paper-answer-replacement.png")).toBeVisible();
   await page
     .getByLabel("Note for the child (optional)")
     .fill("Your working is clear.");

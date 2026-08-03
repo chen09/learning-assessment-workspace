@@ -322,6 +322,45 @@ describe("ParentResultsPage", () => {
     );
   });
 
+  it("labels each uploaded answer photo in its saved shooting order", async () => {
+    const completeReview = await mocks.getParentAttemptReview();
+    mocks.getParentAttemptReview.mockReset().mockResolvedValue({
+      ...completeReview,
+      reviews: [
+        {
+          ...completeReview.reviews[0],
+          question_type: "photo",
+          response_kind: "photo",
+          response_answer: {
+            paths: [
+              "family-id/attempt-id/first-page.png",
+              "family-id/attempt-id/second-page.png",
+            ],
+          },
+          photo_urls: [
+            "https://storage.example.test/signed/first-page.png?token=short-lived",
+            "https://storage.example.test/signed/second-page.png?token=short-lived",
+          ],
+        },
+      ],
+    });
+
+    render(<ParentResultsPage />);
+
+    expect(
+      await screen.findByText("第 1 页，共 2 页"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("第 2 页，共 2 页")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "已上传的答案照片 1" })).toHaveAttribute(
+      "src",
+      "https://storage.example.test/signed/first-page.png?token=short-lived",
+    );
+    expect(screen.getByRole("img", { name: "已上传的答案照片 2" })).toHaveAttribute(
+      "src",
+      "https://storage.example.test/signed/second-page.png?token=short-lived",
+    );
+  });
+
   it("keeps a paper photo unchanged until a parent chooses to reveal AI red-pencil marks", async () => {
     const completeReview = await mocks.getParentAttemptReview();
     mocks.getParentAttemptReview.mockReset().mockResolvedValue({
