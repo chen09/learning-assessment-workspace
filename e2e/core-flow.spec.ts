@@ -3643,6 +3643,14 @@ test("parent creation reaches child grading and correction through the API", asy
     .click();
   expect((await regradeResponse).status()).toBe(202);
   await expect(page.getByText("正在批改这一题…")).toBeVisible();
+  const gradingQuestion = page.locator(
+    ".question-index button.status-grading",
+  );
+  await expect(gradingQuestion).toHaveCount(1);
+  await expect(gradingQuestion.locator(".question-index-state")).toHaveText(
+    "…",
+  );
+  await expect(page.locator("[data-grading-annotation]")).toHaveCount(0);
   const regradeProcessedResponse = await request.post(
     `${apiBaseUrl}/v1/demo/jobs/process-next`,
     { headers: parentHeaders },
