@@ -1032,13 +1032,14 @@ test("parent previews an AI JSON file before assigning its structured questions"
   request,
 }, testInfo) => {
   test.skip(
-    testInfo.project.name !== "desktop",
-    "The shared fixture API import runs once; responsive UI is covered separately.",
+    !["desktop", "ipad-chrome", "ipad-webkit"].includes(testInfo.project.name),
+    "The structured import flow is exercised on desktop and iPad profiles.",
   );
   const apiBaseUrl = "http://127.0.0.1:8017";
+  const fixtureKey = `e2e-structured-${testInfo.project.name}-${testInfo.workerIndex}`;
   const parentHeaders = {
     Authorization: "Bearer parent-fixture",
-    "Idempotency-Key": "e2e-structured-family",
+    "Idempotency-Key": `${fixtureKey}-family`,
   };
   const family = (await (
     await request.post(`${apiBaseUrl}/v1/families`, {
@@ -1050,7 +1051,7 @@ test("parent previews an AI JSON file before assigning its structured questions"
     await request.post(`${apiBaseUrl}/v1/families/${family.id}/children`, {
       headers: {
         Authorization: "Bearer parent-fixture",
-        "Idempotency-Key": "e2e-structured-child",
+        "Idempotency-Key": `${fixtureKey}-child`,
       },
       data: {
         nickname: "JSON child",
