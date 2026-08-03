@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import LibraryPage from "@/app/parent/library/page";
@@ -120,6 +126,69 @@ describe("LibraryPage", () => {
     });
     expect(
       screen.getByRole("heading", { name: "Lesson 1 同レベル変形練習" }),
+    ).toBeInTheDocument();
+  });
+
+  it("clears the previous family library while browser navigation opens another family", async () => {
+    let releaseSecondFamily!: (value: unknown[]) => void;
+    const secondFamilySets = new Promise<unknown[]>((resolve) => {
+      releaseSecondFamily = resolve;
+    });
+    mocks.getFamilies.mockResolvedValue([
+      { id: "family-1", name: "肉肉如意" },
+      { id: "family-2", name: "第二个家庭" },
+    ]);
+    mocks.getFamilyQuestionSets.mockImplementation((familyId: string) =>
+      familyId === "family-1"
+        ? Promise.resolve([
+            {
+              id: "first-family-set",
+              family_id: "family-1",
+              title: "第一个家庭的题单",
+              subject: "English",
+              status: "confirmed",
+              question_count: 1,
+              source_summary: {},
+            },
+          ])
+        : secondFamilySets,
+    );
+
+    render(<LibraryPage />);
+
+    expect(
+      await screen.findByRole("heading", { name: "第一个家庭的题单" }),
+    ).toBeInTheDocument();
+
+    await act(async () => {
+      window.history.pushState(
+        {},
+        "",
+        "/parent/library/?familyId=family-2",
+      );
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+
+    expect(
+      screen.queryByRole("heading", { name: "第一个家庭的题单" }),
+    ).not.toBeInTheDocument();
+
+    await act(async () => {
+      releaseSecondFamily([
+        {
+          id: "second-family-set",
+          family_id: "family-2",
+          title: "第二个家庭的题单",
+          subject: "Mathematics",
+          status: "confirmed",
+          question_count: 1,
+          source_summary: {},
+        },
+      ]);
+    });
+
+    expect(
+      await screen.findByRole("heading", { name: "第二个家庭的题单" }),
     ).toBeInTheDocument();
   });
 

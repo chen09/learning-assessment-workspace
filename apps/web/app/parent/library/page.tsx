@@ -222,6 +222,40 @@ function LibraryContent() {
   const [submissionError, setSubmissionError] = useState<string | null>(null);
 
   useEffect(() => {
+    const reloadForLibraryNavigation = () => {
+      setStatus("loading");
+      setFamilies([]);
+      setFamilyId("");
+      setSets([]);
+      setPendingSubmissions([]);
+      setIsLibraryReviewer(false);
+      setWithdrawingSubmissionId(null);
+      setSubmissionMessage("");
+      setQuery("");
+      setAssignmentSet(null);
+      setChildren([]);
+      setAssignmentChildId("");
+      setAssignmentMode("practice");
+      setAssignmentMinutes(20);
+      setAssignmentNote("");
+      setAssignmentStatus("idle");
+      setAssignmentMessage("");
+      setNewAssignmentId(null);
+      setSubmissionSet(null);
+      setRightsConfirmed(false);
+      setPrivacyConfirmed(false);
+      setSubmissionStatus("idle");
+      setSubmissionError(null);
+      setLoadRequest((current) => current + 1);
+    };
+
+    window.addEventListener("popstate", reloadForLibraryNavigation);
+    return () => {
+      window.removeEventListener("popstate", reloadForLibraryNavigation);
+    };
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
 
     void (async () => {
@@ -314,27 +348,15 @@ function LibraryContent() {
     [pendingSubmissions],
   );
 
-  const switchFamily = async (nextFamilyId: string) => {
-    setFamilyId(nextFamilyId);
-    setStatus("loading");
-    setSets([]);
-    setPendingSubmissions([]);
-    const token = await getParentAccessToken();
-    if (!token) {
-      setStatus("error");
-      return;
-    }
-    try {
-      const [questionSets, pendingSubmissions] = await Promise.all([
-        getFamilyQuestionSets(nextFamilyId, token),
-        getFamilyLibrarySubmissions(nextFamilyId, token),
-      ]);
-      setSets(questionSets);
-      setPendingSubmissions(pendingSubmissions);
-      setStatus("ready");
-    } catch {
-      setStatus("error");
-    }
+  const switchFamily = (nextFamilyId: string) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("familyId", nextFamilyId);
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${url.pathname}${url.search}${url.hash}`,
+    );
+    window.dispatchEvent(new PopStateEvent("popstate"));
   };
 
   const loadAssignmentChildren = async (questionSet: FamilyQuestionSet) => {
@@ -484,7 +506,7 @@ function LibraryContent() {
           {families.length > 1 ? (
             <select
               aria-label={text.family}
-              onChange={(event) => void switchFamily(event.target.value)}
+              onChange={(event) => switchFamily(event.target.value)}
               value={familyId}
             >
               {families.map((family) => (

@@ -541,3 +541,100 @@ test("browser navigation clears parent history before another family loads", asy
     page.getByRole("heading", { name: "Second history navigation item" }),
   ).toBeVisible();
 });
+
+test("browser navigation clears the private library before another family loads", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "A single desktop browser regression covers private library navigation.",
+  );
+
+  await page.addInitScript(() => {
+    window.localStorage.setItem("luma-language:demo-parent", "en");
+  });
+  await page.route("**/v1/families", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify([
+        { id: "library-family-first", name: "First library family" },
+        { id: "library-family-second", name: "Second library family" },
+      ]),
+    });
+  });
+  await page.route("**/v1/library/review/access", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ is_reviewer: false }),
+    });
+  });
+  await page.route("**/v1/library/families/*/submissions", async (route) => {
+    await route.fulfill({ contentType: "application/json", body: "[]" });
+  });
+  await page.route(
+    "**/v1/library/families/library-family-first/question-sets",
+    async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            id: "library-set-first",
+            family_id: "library-family-first",
+            title: "First library navigation set",
+            subject: "English",
+            status: "confirmed",
+            question_count: 1,
+            source_summary: {},
+          },
+        ]),
+      });
+    },
+  );
+  let releaseSecondLibrary: (() => void) | undefined;
+  const secondLibraryGate = new Promise<void>((resolve) => {
+    releaseSecondLibrary = resolve;
+  });
+  await page.route(
+    "**/v1/library/families/library-family-second/question-sets",
+    async (route) => {
+      await secondLibraryGate;
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            id: "library-set-second",
+            family_id: "library-family-second",
+            title: "Second library navigation set",
+            subject: "Mathematics",
+            status: "confirmed",
+            question_count: 1,
+            source_summary: {},
+          },
+        ]),
+      });
+    },
+  );
+
+  await page.goto("/parent/library/?familyId=library-family-first");
+  await expect(
+    page.getByRole("heading", { name: "First library navigation set" }),
+  ).toBeVisible();
+
+  await page.evaluate(() => {
+    window.history.pushState(
+      {},
+      "",
+      "/parent/library/?familyId=library-family-second",
+    );
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  });
+
+  await expect(
+    page.getByRole("heading", { name: "First library navigation set" }),
+  ).toHaveCount(0);
+
+  releaseSecondLibrary?.();
+  await expect(
+    page.getByRole("heading", { name: "Second library navigation set" }),
+  ).toBeVisible();
+});
