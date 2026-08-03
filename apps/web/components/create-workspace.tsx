@@ -804,6 +804,9 @@ function CreateWorkspaceContent() {
 
   const assignmentTimeLimitSeconds =
     assignmentMode === "exam" ? Number(assignmentDurationMinutes) * 60 : null;
+  const paperSourceAssignmentId = new URLSearchParams(
+    typeof window === "undefined" ? "" : window.location.search,
+  ).get("paperAssignmentId");
 
   const loadCompletedReviewDraft = (
     extraction?: Record<string, unknown>,
@@ -1807,6 +1810,9 @@ function CreateWorkspaceContent() {
           {
             family_id: familyId,
             child_id: childId,
+            ...(paperSourceAssignmentId
+              ? { source_assignment_id: paperSourceAssignmentId }
+              : {}),
             title: fileName.slice(0, 160),
             subject: "Mixed practice",
             document_language: completedDocumentLanguage,

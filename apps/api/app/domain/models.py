@@ -546,6 +546,7 @@ class CreateCompletedWorksheetRequest(BaseModel):
 
     family_id: UUID
     child_id: UUID
+    source_assignment_id: UUID | None = None
     title: str = Field(min_length=1, max_length=160)
     subject: str = Field(min_length=1, max_length=80)
     document_language: Literal["en", "ja", "zh"]
@@ -560,6 +561,7 @@ class CompletedWorksheetImport(BaseModel):
     id: UUID = Field(default_factory=uuid4)
     family_id: UUID
     child_id: UUID
+    source_assignment_id: UUID | None = None
     title: str
     subject: str
     document_language: Literal["en", "ja", "zh"]
@@ -584,6 +586,7 @@ class FamilyCompletedWorksheetImport(BaseModel):
     id: UUID
     family_id: UUID
     child_id: UUID
+    source_assignment_id: UUID | None = None
     child_nickname: str
     title: str
     subject: str

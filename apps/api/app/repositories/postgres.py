@@ -3380,6 +3380,25 @@ class PostgresRepository:
             )
             if child_exists is None:
                 raise NotFoundError
+            if request.source_assignment_id is not None:
+                source_assignment_exists = await connection.scalar(
+                    text(
+                        """
+                        select 1
+                        from public.assignments
+                        where id = :assignment_id
+                          and family_id = :family_id
+                          and child_id = :child_id
+                        """
+                    ),
+                    {
+                        "assignment_id": request.source_assignment_id,
+                        "family_id": request.family_id,
+                        "child_id": request.child_id,
+                    },
+                )
+                if source_assignment_exists is None:
+                    raise NotFoundError
 
             existing_id = await self._idempotent_resource(
                 connection,
@@ -3396,7 +3415,8 @@ class PostgresRepository:
                             select id, family_id, child_id, title, subject,
                                    document_language, feedback_language, filenames,
                                    response_paths, answer_source_paths,
-                                   reference_source_paths, extraction, status, assignment_id,
+                                   reference_source_paths, extraction, status,
+                                   source_assignment_id, assignment_id,
                                    attempt_id, created_at
                             from public.completed_worksheet_imports
                             where id = :id
@@ -3434,18 +3454,19 @@ class PostgresRepository:
                           family_id, child_id, created_by, title, subject,
                           document_language, feedback_language, filenames,
                           response_paths, answer_source_paths,
-                          reference_source_paths
+                          reference_source_paths, source_assignment_id
                         ) values (
                           :family_id, :child_id, :parent_id, :title, :subject,
                           :document_language, :feedback_language, cast(:filenames as jsonb),
                           cast(:response_paths as jsonb),
                           cast(:answer_source_paths as jsonb),
-                          cast(:reference_source_paths as jsonb)
+                          cast(:reference_source_paths as jsonb), :source_assignment_id
                         )
                         returning id, family_id, child_id, title, subject,
                                   document_language, feedback_language, filenames,
                                   response_paths, answer_source_paths,
-                                  reference_source_paths, extraction, status, assignment_id,
+                                  reference_source_paths, extraction, status,
+                                  source_assignment_id, assignment_id,
                                   attempt_id, created_at
                         """
                     ),
@@ -3463,6 +3484,7 @@ class PostgresRepository:
                         "reference_source_paths": json.dumps(
                             request.reference_source_paths
                         ),
+                        "source_assignment_id": request.source_assignment_id,
                     },
                 )
             ).mappings().one()
@@ -3508,7 +3530,8 @@ class PostgresRepository:
                         select id, family_id, child_id, title, subject,
                                document_language, feedback_language, filenames,
                                response_paths, answer_source_paths,
-                               reference_source_paths, extraction, status, assignment_id,
+                               reference_source_paths, extraction, status,
+                               source_assignment_id, assignment_id,
                                attempt_id, created_at
                         from public.completed_worksheet_imports
                         where id = :id
@@ -3587,6 +3610,7 @@ class PostgresRepository:
                     select cwi.id, cwi.family_id, cwi.child_id,
                            c.nickname as child_nickname, cwi.title, cwi.subject,
                            cwi.status, latest_job.status as job_status,
+                           cwi.source_assignment_id,
                            cwi.assignment_id, cwi.attempt_id
                     from public.completed_worksheet_imports cwi
                     join public.children c on c.id = cwi.child_id

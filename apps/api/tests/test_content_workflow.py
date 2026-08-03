@@ -143,6 +143,89 @@ def test_parent_can_start_completed_worksheet_analysis_for_a_child() -> None:
     assert refreshed.json()["job"]["status"] == "succeeded"
 
 
+def test_completed_worksheet_keeps_a_private_link_to_its_source_assignment() -> None:
+    """A print-scan import can retain its original family assignment safely."""
+    client = TestClient(create_app())
+    fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+
+    created = client.post(
+        "/v1/completed-worksheets",
+        headers={
+            **PARENT_HEADERS,
+            "Idempotency-Key": "linked-completed-paper",
+        },
+        json={
+            "family_id": fixture["family"]["id"],
+            "child_id": fixture["child"]["id"],
+            "source_assignment_id": fixture["assignment"]["id"],
+            "title": "Printed original assignment",
+            "subject": "English",
+            "document_language": "ja",
+            "feedback_language": "zh",
+            "filenames": ["printed-original.jpg"],
+            "response_paths": ["family/completed/printed-original.jpg"],
+        },
+    )
+
+    assert created.status_code == 202
+    assert created.json()["source_assignment_id"] == fixture["assignment"]["id"]
+
+    recovered = client.get(
+        f"/v1/completed-worksheets/{created.json()['id']}",
+        headers=PARENT_HEADERS,
+    )
+    summaries = client.get(
+        f"/v1/completed-worksheets/families/{fixture['family']['id']}",
+        headers=PARENT_HEADERS,
+    )
+
+    assert recovered.status_code == 200
+    assert recovered.json()["source_assignment_id"] == fixture["assignment"]["id"]
+    assert summaries.status_code == 200
+    assert summaries.json()[0]["source_assignment_id"] == fixture["assignment"]["id"]
+
+
+def test_completed_worksheet_rejects_a_source_assignment_for_another_child() -> None:
+    """A query string cannot connect a paper scan to a sibling's assignment."""
+    client = TestClient(create_app())
+    fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+    sibling = client.post(
+        f"/v1/families/{fixture['family']['id']}/children",
+        headers={
+            **PARENT_HEADERS,
+            "Idempotency-Key": "completed-paper-sibling",
+        },
+        json={
+            "nickname": "Sibling",
+            "grade_stage": "Junior high 1",
+            "pin": "654321",
+            "ui_language": "ja",
+        },
+    )
+
+    rejected = client.post(
+        "/v1/completed-worksheets",
+        headers={
+            **PARENT_HEADERS,
+            "Idempotency-Key": "reject-sibling-source-assignment",
+        },
+        json={
+            "family_id": fixture["family"]["id"],
+            "child_id": sibling.json()["id"],
+            "source_assignment_id": fixture["assignment"]["id"],
+            "title": "Sibling cannot use this print QR",
+            "subject": "English",
+            "document_language": "ja",
+            "feedback_language": "zh",
+            "filenames": ["sibling-paper.jpg"],
+            "response_paths": ["family/completed/sibling-paper.jpg"],
+        },
+    )
+
+    assert sibling.status_code == 201
+    assert rejected.status_code == 404
+
+
 def test_parent_can_reopen_a_pending_completed_worksheet_from_the_family_list() -> None:
     """A parent must be able to recover a paper-analysis draft after leaving its page."""
     client = TestClient(create_app())
@@ -177,6 +260,7 @@ def test_parent_can_reopen_a_pending_completed_worksheet_from_the_family_list() 
             "id": created.json()["id"],
             "family_id": fixture["family"]["id"],
             "child_id": fixture["child"]["id"],
+            "source_assignment_id": None,
             "child_nickname": fixture["child"]["nickname"],
             "title": "Scanned algebra practice",
             "subject": "Mathematics",

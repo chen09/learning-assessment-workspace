@@ -1611,6 +1611,14 @@ class MemoryRepository:
             or child.family_id != request.family_id
         ):
             raise NotFoundError
+        if request.source_assignment_id is not None:
+            source_assignment = self.assignments.get(str(request.source_assignment_id))
+            if (
+                source_assignment is None
+                or source_assignment.family_id != request.family_id
+                or source_assignment.child_id != request.child_id
+            ):
+                raise NotFoundError
         record_key = (family_id, idempotency_key)
         existing_id = self.completed_worksheet_idempotency.get(record_key)
         if existing_id is not None:
@@ -1627,6 +1635,7 @@ class MemoryRepository:
             id=worksheet_id,
             family_id=request.family_id,
             child_id=request.child_id,
+            source_assignment_id=request.source_assignment_id,
             title=request.title,
             subject=request.subject,
             document_language=request.document_language,
@@ -1709,6 +1718,7 @@ class MemoryRepository:
                     id=imported.id,
                     family_id=imported.family_id,
                     child_id=imported.child_id,
+                    source_assignment_id=imported.source_assignment_id,
                     child_nickname=child.nickname,
                     title=imported.title,
                     subject=imported.subject,

@@ -661,6 +661,18 @@
             "title": "Response Preview Urls",
             "type": "array"
           },
+          "source_assignment_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Assignment Id"
+          },
           "status": {
             "$ref": "#/components/schemas/CompletedWorksheetStatus",
             "default": "processing"
@@ -977,6 +989,18 @@
             "minItems": 1,
             "title": "Response Paths",
             "type": "array"
+          },
+          "source_assignment_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Assignment Id"
           },
           "subject": {
             "maxLength": 80,
@@ -1390,6 +1414,18 @@
           },
           "job_status": {
             "$ref": "#/components/schemas/JobStatus"
+          },
+          "source_assignment_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Assignment Id"
           },
           "status": {
             "$ref": "#/components/schemas/CompletedWorksheetStatus"

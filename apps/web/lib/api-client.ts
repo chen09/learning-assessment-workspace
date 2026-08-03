@@ -117,6 +117,7 @@ export type CompletedWorksheetImport = {
     | "grading"
     | "results_ready"
     | "failed";
+  source_assignment_id: string | null;
   assignment_id: string | null;
   attempt_id: string | null;
   filenames: string[];
@@ -132,6 +133,7 @@ export type FamilyCompletedWorksheetImport = {
   id: string;
   family_id: string;
   child_id: string;
+  source_assignment_id: string | null;
   child_nickname: string;
   title: string;
   subject: string;
@@ -1407,6 +1409,7 @@ export async function createCompletedWorksheetImport(
   payload: {
     family_id: string;
     child_id: string;
+    source_assignment_id?: string;
     title: string;
     subject: string;
     document_language: "zh" | "ja" | "en";

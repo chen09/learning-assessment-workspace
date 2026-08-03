@@ -3296,6 +3296,11 @@ describe("CreateWorkspace", () => {
   });
 
   it("keeps a completed paper private until the reviewed JSON creates its submitted attempt", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/parent/create/?mode=completed&paperAssignmentId=assignment-from-print&familyId=family-1&childId=child-1",
+    );
     mocks.getChildren.mockResolvedValue([
       {
         id: "child-1",
@@ -3492,6 +3497,7 @@ describe("CreateWorkspace", () => {
       expect.objectContaining({
         family_id: "family-1",
         child_id: "child-1",
+        source_assignment_id: "assignment-from-print",
         document_language: "en",
         feedback_language: "zh",
         response_paths: ["family-1/completed-paper/responses-completed-paper.jpg"],
