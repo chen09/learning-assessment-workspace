@@ -41,6 +41,7 @@ import {
   importStructuredQuestionSet,
   previewStructuredQuestionSet,
   retryJob,
+  saveCompletedWorksheetReviewDraft,
   uploadToSignedUrl,
 } from "@/lib/api-client";
 
@@ -782,6 +783,9 @@ function CreateWorkspaceContent() {
     "idle" | "working" | "error"
   >("idle");
   const [recoveryRouteVersion, setRecoveryRouteVersion] = useState(0);
+  const completedReviewSaveTimerRef = useRef<number | null>(null);
+  const lastSavedCompletedReviewRef = useRef<string | null>(null);
+  const confirmingCompletedPaperRef = useRef(false);
 
   const assignmentTimeLimitSeconds =
     assignmentMode === "exam" ? Number(assignmentDurationMinutes) * 60 : null;
@@ -794,12 +798,12 @@ function CreateWorkspaceContent() {
       return;
     }
     try {
-      setCompletedReview(
-        parseCompletedPaperReview(
-          JSON.stringify(extraction),
-          uploadedPageCount,
-        ),
+      const parsed = parseCompletedPaperReview(
+        JSON.stringify(extraction),
+        uploadedPageCount,
       );
+      lastSavedCompletedReviewRef.current = JSON.stringify(parsed);
+      setCompletedReview(parsed);
       setCompletedReviewSource("ai");
       setCompletedReviewFile(null);
       setRequestStatus("idle");
@@ -807,6 +811,65 @@ function CreateWorkspaceContent() {
       // A fixture or incomplete AI response remains safely manual-review only.
     }
   };
+
+  useEffect(() => {
+    if (
+      !completedWorksheetId ||
+      completedWorksheetStatus !== "needs_review" ||
+      !completedReview ||
+      confirmingCompletedPaperRef.current
+    ) {
+      return;
+    }
+    let validatedReview: CompletedPaperReview;
+    try {
+      validatedReview = parseCompletedPaperReview(
+        JSON.stringify(completedReview),
+        completedResponsePageCount || completedResponsePaths.length,
+      );
+    } catch {
+      return;
+    }
+    const snapshot = JSON.stringify(validatedReview);
+    if (snapshot === lastSavedCompletedReviewRef.current) {
+      return;
+    }
+    if (completedReviewSaveTimerRef.current !== null) {
+      window.clearTimeout(completedReviewSaveTimerRef.current);
+    }
+    completedReviewSaveTimerRef.current = window.setTimeout(() => {
+      completedReviewSaveTimerRef.current = null;
+      void getParentAccessToken().then(async (parentToken) => {
+        if (!parentToken || confirmingCompletedPaperRef.current) {
+          return;
+        }
+        try {
+          await saveCompletedWorksheetReviewDraft(
+            completedWorksheetId,
+            validatedReview,
+            parentToken,
+          );
+          lastSavedCompletedReviewRef.current = snapshot;
+        } catch {
+          if (!confirmingCompletedPaperRef.current) {
+            setRequestStatus("error");
+          }
+        }
+      });
+    }, 350);
+    return () => {
+      if (completedReviewSaveTimerRef.current !== null) {
+        window.clearTimeout(completedReviewSaveTimerRef.current);
+        completedReviewSaveTimerRef.current = null;
+      }
+    };
+  }, [
+    completedReview,
+    completedResponsePageCount,
+    completedResponsePaths.length,
+    completedWorksheetId,
+    completedWorksheetStatus,
+  ]);
 
   const completedPaperPageCount = (
     extraction: Record<string, unknown> | undefined,
@@ -833,6 +896,11 @@ function CreateWorkspaceContent() {
   };
 
   const returnToCompletedPaperUpload = () => {
+    if (completedReviewSaveTimerRef.current !== null) {
+      window.clearTimeout(completedReviewSaveTimerRef.current);
+      completedReviewSaveTimerRef.current = null;
+    }
+    lastSavedCompletedReviewRef.current = null;
     const url = new URL(window.location.href);
     url.searchParams.delete("completedWorksheetId");
     window.history.replaceState(window.history.state, "", url);
@@ -2600,6 +2668,11 @@ function CreateWorkspaceContent() {
       setRequestStatus("error");
       return;
     }
+    if (completedReviewSaveTimerRef.current !== null) {
+      window.clearTimeout(completedReviewSaveTimerRef.current);
+      completedReviewSaveTimerRef.current = null;
+    }
+    confirmingCompletedPaperRef.current = true;
     setCompletedPaperError(null);
     setCompletedConfirmationRetryFailed(false);
     let validatedReview: CompletedPaperReview;
@@ -2620,11 +2693,13 @@ function CreateWorkspaceContent() {
         );
       }
       setRequestStatus("error");
+      confirmingCompletedPaperRef.current = false;
       return;
     }
     const parentToken = await getParentAccessToken();
     if (!parentToken) {
       setRequestStatus("error");
+      confirmingCompletedPaperRef.current = false;
       return;
     }
     setRequestStatus("working");
@@ -2657,6 +2732,7 @@ function CreateWorkspaceContent() {
     } catch {
       setCompletedConfirmationRetryFailed(true);
       setRequestStatus("error");
+      confirmingCompletedPaperRef.current = false;
     }
   };
 
@@ -2713,6 +2789,7 @@ function CreateWorkspaceContent() {
     setCompletedReviewFile(file);
     setCompletedReview(null);
     setCompletedReviewSource(null);
+    lastSavedCompletedReviewRef.current = null;
     setCompletedPromptCopied(false);
     if (!file) {
       return;

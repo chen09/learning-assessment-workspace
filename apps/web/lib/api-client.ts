@@ -1441,6 +1441,30 @@ export async function getCompletedWorksheetImport(
   );
 }
 
+export async function saveCompletedWorksheetReviewDraft(
+  worksheetId: string,
+  payload: {
+    document: StructuredQuestionSetDocument;
+    answer_regions: Array<{
+      question_position: number;
+      page_numbers: number[];
+      regions?: Array<{ x: number; y: number; width: number; height: number }>;
+      transcription?: string;
+      legibility?: "clear" | "uncertain" | "unreadable";
+    }>;
+  },
+  parentToken: string,
+) {
+  return apiRequest<CompletedWorksheetImport>(
+    `/v1/completed-worksheets/${encodeURIComponent(worksheetId)}/review-draft`,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    },
+    parentToken,
+  );
+}
+
 export async function getCompletedWorksheetImports(
   familyId: string,
   parentToken: string,

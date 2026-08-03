@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   importStructuredQuestionSet: vi.fn(),
   previewStructuredQuestionSet: vi.fn(),
   retryJob: vi.fn(),
+  saveCompletedWorksheetReviewDraft: vi.fn(),
   uploadToSignedUrl: vi.fn(),
 }));
 
@@ -472,6 +473,84 @@ describe("CreateWorkspace", () => {
         "confirm-completed-completed-pdf-1",
       );
     });
+  });
+
+  it("autosaves completed-paper review edits before parent confirmation", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/parent/create/?completedWorksheetId=completed-autosave-1",
+    );
+    mocks.getCompletedWorksheetImport.mockResolvedValue({
+      id: "completed-autosave-1",
+      status: "needs_review",
+      assignment_id: null,
+      attempt_id: null,
+      filenames: ["autosave-paper.jpg"],
+      response_paths: ["family-1/responses/autosave-paper.jpg"],
+      extraction: {
+        document: {
+          schema_version: "1.0",
+          question_set: {
+            title: "Autosaved review",
+            subject: "English",
+            locale: "en",
+            difficulty: "standard",
+            source_mode: "convert",
+            estimated_minutes: 10,
+          },
+          knowledge_tags: [{ code: "grammar", label: "Grammar" }],
+          questions: [
+            {
+              position: 1,
+              type: "typed_text",
+              prompt: "Complete: She ___ to school.",
+              options: [],
+              answer_key: { text: "goes" },
+              rubric: { grading_mode: "exact" },
+              points: 1,
+              knowledge_code: "grammar",
+            },
+          ],
+        },
+        answer_regions: [
+          { question_position: 1, page_numbers: [1], legibility: "clear" },
+        ],
+      },
+      job: {
+        id: "analysis-job-autosave-1",
+        status: "succeeded",
+        type: "analyze_completed_worksheet",
+      },
+    });
+    mocks.saveCompletedWorksheetReviewDraft.mockResolvedValue({
+      id: "completed-autosave-1",
+      status: "needs_review",
+    });
+
+    render(<CreateWorkspace />);
+
+    await screen.findByRole("heading", { name: "Preparing the review draft" });
+    fireEvent.change(screen.getByLabelText("Question 1 wording"), {
+      target: { value: "Parent-corrected wording." },
+    });
+
+    await waitFor(
+      () => {
+        expect(mocks.saveCompletedWorksheetReviewDraft).toHaveBeenCalledWith(
+          "completed-autosave-1",
+          expect.objectContaining({
+            document: expect.objectContaining({
+              questions: [
+                expect.objectContaining({ prompt: "Parent-corrected wording." }),
+              ],
+            }),
+          }),
+          "parent-token",
+        );
+      },
+      { timeout: 2000 },
+    );
   });
 
   it("resumes an imported question-set review from its private recovery link", async () => {

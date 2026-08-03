@@ -235,6 +235,68 @@ def test_parent_can_retry_a_failed_completed_worksheet_analysis() -> None:
     assert refreshed.json()["job"]["status"] == "queued"
 
 
+def test_parent_can_persist_a_completed_worksheet_review_draft() -> None:
+    """Reviewed extraction edits survive a fresh parent fetch before confirmation."""
+    client = TestClient(create_app())
+    fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+    created = client.post(
+        "/v1/completed-worksheets",
+        headers={
+            **PARENT_HEADERS,
+            "Idempotency-Key": "persist-completed-review-draft",
+        },
+        json={
+            "family_id": fixture["family"]["id"],
+            "child_id": fixture["child"]["id"],
+            "title": "Persisted review draft",
+            "subject": "English",
+            "document_language": "ja",
+            "feedback_language": "zh",
+            "filenames": ["persisted-paper.jpg"],
+            "response_paths": ["family/completed/persisted-paper.jpg"],
+        },
+    )
+    assert created.status_code == 202
+    worksheet_id = created.json()["id"]
+    client.post("/v1/demo/jobs/process-next", headers=PARENT_HEADERS)
+
+    document = _structured_question_set()
+    document["questions"][0]["prompt"] = "Parent-edited question wording."
+    saved = client.put(
+        f"/v1/completed-worksheets/{worksheet_id}/review-draft",
+        headers=PARENT_HEADERS,
+        json={
+            "document": document,
+            "answer_regions": [
+                {
+                    "question_position": 1,
+                    "page_numbers": [1],
+                    "transcription": "Student's handwritten answer",
+                    "legibility": "clear",
+                }
+            ],
+        },
+    )
+    refreshed = client.get(
+        f"/v1/completed-worksheets/{worksheet_id}",
+        headers=PARENT_HEADERS,
+    )
+
+    assert saved.status_code == 200
+    assert refreshed.status_code == 200
+    assert refreshed.json()["extraction"]["document"]["questions"][0]["prompt"] == (
+        "Parent-edited question wording."
+    )
+    assert refreshed.json()["extraction"]["answer_regions"] == [
+        {
+            "question_position": 1,
+            "page_numbers": [1],
+            "transcription": "Student's handwritten answer",
+            "legibility": "clear",
+        }
+    ]
+
+
 def test_parent_confirmation_turns_completed_worksheet_into_submitted_attempt() -> None:
     """A reviewed paper becomes one immutable submitted attempt, exactly once."""
     client = TestClient(create_app())

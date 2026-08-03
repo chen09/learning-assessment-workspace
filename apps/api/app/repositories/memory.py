@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID, uuid4
 
 from argon2 import PasswordHasher
@@ -1667,6 +1667,21 @@ class MemoryRepository:
         if job is None:
             raise NotFoundError
         imported.job = job
+        return imported
+
+    async def save_completed_worksheet_review_draft(
+        self,
+        worksheet_id: str,
+        *,
+        extraction: dict[str, Any],
+        parent_id: str,
+    ) -> CompletedWorksheetImport:
+        """Keep reviewed AI output private until the parent confirms it."""
+        imported = await self.get_completed_worksheet_import(worksheet_id, parent_id)
+        if imported.status != CompletedWorksheetStatus.NEEDS_REVIEW:
+            raise NotFoundError
+        imported.extraction = extraction
+        self.completed_worksheet_imports[str(imported.id)] = imported
         return imported
 
     async def list_completed_worksheet_imports(

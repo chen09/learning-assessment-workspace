@@ -2526,9 +2526,40 @@ test("parent validates a local-AI completed-paper review before submitting it", 
     .getByLabel("Reference answer for question 5")
     .fill("Show the two factors.");
   await page.getByLabel("Answer page numbers for question 1").fill("1");
+  const reviewDraftUrl = `${apiBaseUrl}/v1/completed-worksheets/${imported.id}/review-draft`;
+  const reviewDraftResponse = page.waitForResponse(
+    (response) =>
+      response.url() === reviewDraftUrl &&
+      response.request().method() === "PUT",
+  );
   await page
     .getByLabel("Answer transcription for question 1")
     .fill("(x - 5)(x + 5)");
+  const persistedDraftResponse = await reviewDraftResponse;
+  expect(
+    persistedDraftResponse.status(),
+    await persistedDraftResponse.text(),
+  ).toBe(200);
+
+  await page.reload();
+  await expect(page.getByLabel("Question 1 wording")).toHaveValue(
+    "Factorise x² - 25.",
+  );
+  await expect(page.getByLabel("Reference answer for question 1")).toHaveValue(
+    "(x - 5)(x + 5)",
+  );
+  await expect(page.getByLabel("Accepted answer for question 2")).toHaveValue(
+    "walks",
+  );
+  await expect(page.getByLabel("Correct choice for question 3")).toHaveValue("0");
+  await expect(page.getByLabel("Correct choice 2 for question 4")).toBeChecked();
+  await expect(page.getByLabel("Correct choice 3 for question 4")).toBeChecked();
+  await expect(page.getByLabel("Question 5 wording")).toHaveValue(
+    "Explain your factorisation.",
+  );
+  await expect(page.getByLabel("Answer transcription for question 1")).toHaveValue(
+    "(x - 5)(x + 5)",
+  );
 
   const confirmationUrl = `${apiBaseUrl}/v1/completed-worksheets/${imported.id}/confirm`;
   await page.route(confirmationUrl, async (route) => {

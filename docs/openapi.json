@@ -674,6 +674,73 @@
         "title": "CompletedWorksheetResponseInput",
         "type": "object"
       },
+      "CompletedWorksheetReviewRegion": {
+        "description": "A private answer location retained while the parent reviews a scan.",
+        "properties": {
+          "legibility": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legibility"
+          },
+          "page_numbers": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Page Numbers",
+            "type": "array"
+          },
+          "question_position": {
+            "exclusiveMinimum": 0.0,
+            "title": "Question Position",
+            "type": "integer"
+          },
+          "regions": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": {
+                    "type": "number"
+                  },
+                  "type": "object"
+                },
+                "maxItems": 100,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Regions"
+          },
+          "transcription": {
+            "anyOf": [
+              {
+                "maxLength": 5000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transcription"
+          }
+        },
+        "required": [
+          "question_position",
+          "page_numbers"
+        ],
+        "title": "CompletedWorksheetReviewRegion",
+        "type": "object"
+      },
       "CompletedWorksheetStatus": {
         "enum": [
           "processing",
@@ -3600,6 +3667,27 @@
         "title": "RuntimeErrorLog",
         "type": "object"
       },
+      "SaveCompletedWorksheetReviewRequest": {
+        "description": "The durable, but still private, parent review draft.",
+        "properties": {
+          "answer_regions": {
+            "items": {
+              "$ref": "#/components/schemas/CompletedWorksheetReviewRegion"
+            },
+            "title": "Answer Regions",
+            "type": "array"
+          },
+          "document": {
+            "$ref": "#/components/schemas/ImportDocument"
+          }
+        },
+        "required": [
+          "document",
+          "answer_regions"
+        ],
+        "title": "SaveCompletedWorksheetReviewRequest",
+        "type": "object"
+      },
       "SaveResponseRequest": {
         "properties": {
           "answer": {
@@ -5592,6 +5680,76 @@
           }
         },
         "summary": "Confirm Completed Worksheet Import",
+        "tags": [
+          "completed-worksheets"
+        ]
+      }
+    },
+    "/v1/completed-worksheets/{worksheet_id}/review-draft": {
+      "put": {
+        "description": "Autosave a parent's corrections without exposing the scan as an assignment.",
+        "operationId": "save_completed_worksheet_review_draft_v1_completed_worksheets__worksheet_id__review_draft_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "worksheet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Worksheet Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveCompletedWorksheetReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompletedWorksheetImport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Completed Worksheet Review Draft",
         "tags": [
           "completed-worksheets"
         ]

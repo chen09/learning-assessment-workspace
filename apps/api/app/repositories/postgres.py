@@ -3544,6 +3544,36 @@ class PostgresRepository:
             )
         return await self._with_completed_worksheet_previews(completed_import)
 
+    async def save_completed_worksheet_review_draft(
+        self,
+        worksheet_id: str,
+        *,
+        extraction: dict[str, Any],
+        parent_id: str,
+    ) -> CompletedWorksheetImport:
+        """Autosave a parent's reviewed extraction while it remains private."""
+        worksheet_uuid = _uuid(worksheet_id)
+        imported = await self.get_completed_worksheet_import(worksheet_id, parent_id)
+        if imported.status != CompletedWorksheetStatus.NEEDS_REVIEW:
+            raise NotFoundError
+        async with self._engine.begin() as connection:
+            updated = (
+                await connection.execute(
+                    text(
+                        """
+                        update public.completed_worksheet_imports
+                        set extraction = cast(:extraction as jsonb), updated_at = now()
+                        where id = :id and status = 'needs_review'
+                        returning id
+                        """
+                    ),
+                    {"id": worksheet_uuid, "extraction": json.dumps(extraction)},
+                )
+            ).scalar_one_or_none()
+            if updated is None:
+                raise NotFoundError
+        return await self.get_completed_worksheet_import(worksheet_id, parent_id)
+
     async def list_completed_worksheet_imports(
         self,
         family_id: UUID,
