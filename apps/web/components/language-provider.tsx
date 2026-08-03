@@ -568,6 +568,8 @@ const messages = {
     "worksheet.confirmAllBody":
       "{count} unanswered questions will be marked incorrect. No answer can be changed after the entire practice is submitted.",
     "worksheet.confirmAllAction": "Confirm full submission",
+    "worksheet.submitRetryFailed":
+      "Your work has not been submitted yet. It is saved on this device. Restore the connection, then choose Confirm full submission again.",
     "worksheet.cancel": "Cancel",
     "worksheet.grading": "Grading this answer…",
     "worksheet.gradingUnavailable":
@@ -1538,6 +1540,8 @@ const messages = {
     "worksheet.confirmAllBody":
       "未回答の {count} 問は不正解になります。全体を提出した後は、どの答えも変更できません。",
     "worksheet.confirmAllAction": "全体を提出する",
+    "worksheet.submitRetryFailed":
+      "まだ提出されていません。回答はこの端末に保存されています。接続を戻してから、もう一度「全体を提出する」を選んでください。",
     "worksheet.cancel": "キャンセル",
     "worksheet.grading": "この答えを採点中…",
     "worksheet.gradingUnavailable":
@@ -2494,6 +2498,8 @@ const messages = {
     "worksheet.confirmAllBody":
       "还有 {count} 题未作答，这些题会按错误处理。整份提交后，所有答案都不能再修改。",
     "worksheet.confirmAllAction": "确认提交整份",
+    "worksheet.submitRetryFailed":
+      "本次尚未提交成功。答案已保存在此设备；恢复网络后，请再次点击“确认提交整份”。",
     "worksheet.cancel": "取消",
     "worksheet.grading": "正在批改这一题…",
     "worksheet.gradingUnavailable":

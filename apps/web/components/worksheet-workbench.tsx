@@ -296,6 +296,7 @@ function WorksheetWorkbenchContent() {
   const [submissionConfirmation, setSubmissionConfirmation] = useState<
     "question" | "all" | null
   >(null);
+  const [submissionRetryFailed, setSubmissionRetryFailed] = useState(false);
   const [isRetryAttempt, setIsRetryAttempt] = useState(false);
   const [retryingQuestionId, setRetryingQuestionId] = useState<string | null>(
     null,
@@ -828,6 +829,7 @@ function WorksheetWorkbenchContent() {
     if (hasFailedPhotoTransfers) {
       return;
     }
+    setSubmissionRetryFailed(false);
     if (attemptId && childToken) {
       try {
         if (!(await flushAttemptDrafts(attemptId, childToken))) {
@@ -841,6 +843,7 @@ function WorksheetWorkbenchContent() {
         await removePendingDraftsByPrefix(`${attemptId}:`);
       } catch {
         setSaveStatus("offline");
+        setSubmissionRetryFailed(true);
         return;
       }
     } else {
@@ -2370,6 +2373,12 @@ function WorksheetWorkbenchContent() {
                 </button>
               </div>
             </section>
+          ) : null}
+
+          {submissionRetryFailed ? (
+            <p className="form-error" role="alert">
+              {t("worksheet.submitRetryFailed")}
+            </p>
           ) : null}
 
           <div className="grading-actions">

@@ -972,6 +972,24 @@ describe("WorksheetWorkbench", () => {
     });
   });
 
+  it("keeps the child on the worksheet and explains when full submission fails", async () => {
+    mocks.submitAttempt.mockRejectedValueOnce(new Error("temporary submission failure"));
+
+    render(<WorksheetWorkbench />);
+
+    await screen.findByRole("heading", {
+      name: "Choose the correct expansion of (a + b)(a − b).",
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Submit all answers" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm full submission" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Your work has not been submitted yet",
+    );
+    expect(screen.getByRole("button", { name: "Confirm full submission" })).toBeInTheDocument();
+    expect(screen.getByText("Saved on this device")).toBeInTheDocument();
+  });
+
   it("does not submit the whole practice while a device-only answer remains unsynced", async () => {
     render(<WorksheetWorkbench />);
 

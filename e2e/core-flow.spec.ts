@@ -1252,13 +1252,38 @@ test("parent previews an AI JSON file before assigning its structured questions"
   await page.getByRole("button", { name: "Previous" }).click();
 
   await page.getByRole("radio", { name: "6" }).check();
+  let interruptFirstSubmission = true;
+  await page.route(`${apiBaseUrl}/v1/attempts/${attemptId!}/submit`, async (route) => {
+    if (route.request().method() !== "POST" || !interruptFirstSubmission) {
+      await route.fallback();
+      return;
+    }
+    interruptFirstSubmission = false;
+    await route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ detail: "temporary submission failure" }),
+    });
+  });
+  await page.getByRole("button", { name: "Submit all answers" }).click();
+  await page
+    .getByRole("button", { name: "Confirm full submission" })
+    .click();
+  await expect(
+    page.getByText(
+      "Your work has not been submitted yet. It is saved on this device. Restore the connection, then choose Confirm full submission again.",
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Confirm full submission" }),
+  ).toBeVisible();
+
   const fullSubmission = page.waitForResponse(
     (response) =>
       response.url() === `${apiBaseUrl}/v1/attempts/${attemptId!}/submit` &&
       response.request().method() === "POST" &&
       response.status() === 202,
   );
-  await page.getByRole("button", { name: "Submit all answers" }).click();
   await page
     .getByRole("button", { name: "Confirm full submission" })
     .click();
