@@ -102,6 +102,74 @@ test("parent dashboard offers the assigned child sign-in route", async ({
   );
 });
 
+test("parent dashboard refreshes an assigned worksheet when a child starts work", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "The timed dashboard refresh is covered once at desktop size.",
+  );
+  let historyRequests = 0;
+  await page.route("**/v1/families", async (route) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify([{ id: "refresh-dashboard-family", name: "肉肉如意" }]),
+    });
+  });
+  await page.route(
+    "**/v1/families/refresh-dashboard-family/children",
+    async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            id: "refresh-dashboard-child",
+            family_id: "refresh-dashboard-family",
+            nickname: "肉肉",
+            grade_stage: "Junior high 1",
+            ui_language: "en",
+          },
+        ]),
+      });
+    },
+  );
+  await page.route(
+    "**/v1/history/families/refresh-dashboard-family",
+    async (route) => {
+      historyRequests += 1;
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            assignment_id: "refresh-dashboard-assignment",
+            attempt_id:
+              historyRequests === 1 ? null : "refresh-dashboard-attempt",
+            child_id: "refresh-dashboard-child",
+            child_nickname: "肉肉",
+            title: "Vocabulary practice",
+            status: historyRequests === 1 ? "assigned" : "in_progress",
+            submitted_at: null,
+            awarded_points: 0,
+            available_points: 10,
+            correction_count: 0,
+            source_material_title: null,
+            source_material_subject: null,
+          },
+        ]),
+      });
+    },
+  );
+
+  await page.goto("/parent/");
+  await expect(page.getByText("Assigned")).toBeVisible();
+  await expect.poll(() => historyRequests, { timeout: 7_000 }).toBeGreaterThan(1);
+  await expect(page.getByText("In progress")).toBeVisible();
+});
+
 test("a printed-paper QR route opens private completed-paper upload for its child", async ({
   page,
   request,
