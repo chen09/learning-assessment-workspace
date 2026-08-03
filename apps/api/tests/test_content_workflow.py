@@ -297,6 +297,70 @@ def test_parent_can_persist_a_completed_worksheet_review_draft() -> None:
     ]
 
 
+def test_completed_worksheet_review_draft_rejects_invalid_answer_geometry() -> None:
+    """A direct client cannot save answer regions outside the uploaded page."""
+    client = TestClient(create_app())
+    fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+    created = client.post(
+        "/v1/completed-worksheets",
+        headers={
+            **PARENT_HEADERS,
+            "Idempotency-Key": "reject-invalid-completed-review-region",
+        },
+        json={
+            "family_id": fixture["family"]["id"],
+            "child_id": fixture["child"]["id"],
+            "title": "Invalid review geometry",
+            "subject": "Mathematics",
+            "document_language": "ja",
+            "feedback_language": "zh",
+            "filenames": ["geometry-paper.jpg"],
+            "response_paths": ["family/completed/geometry-paper.jpg"],
+        },
+    )
+    assert created.status_code == 202
+    client.post("/v1/demo/jobs/process-next", headers=PARENT_HEADERS)
+
+    rejected = client.put(
+        f"/v1/completed-worksheets/{created.json()['id']}/review-draft",
+        headers=PARENT_HEADERS,
+        json={
+            "document": _structured_question_set(),
+            "answer_regions": [
+                {
+                    "question_position": 1,
+                    "page_numbers": [1],
+                    "regions": [
+                        {"x": 0.9, "y": 0.2, "width": 0.2, "height": 0.3}
+                    ],
+                    "legibility": "clear",
+                }
+            ],
+        },
+    )
+
+    assert rejected.status_code == 422
+    assert "within the page" in rejected.text
+
+    invalid_legibility = client.put(
+        f"/v1/completed-worksheets/{created.json()['id']}/review-draft",
+        headers=PARENT_HEADERS,
+        json={
+            "document": _structured_question_set(),
+            "answer_regions": [
+                {
+                    "question_position": 1,
+                    "page_numbers": [1],
+                    "legibility": "guess",
+                }
+            ],
+        },
+    )
+
+    assert invalid_legibility.status_code == 422
+    assert "legibility" in invalid_legibility.text
+
+
 def test_parent_confirmation_turns_completed_worksheet_into_submitted_attempt() -> None:
     """A reviewed paper becomes one immutable submitted attempt, exactly once."""
     client = TestClient(create_app())

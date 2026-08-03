@@ -1,8 +1,8 @@
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.api.dependencies import Repository, get_repository, require_parent
 from app.domain.errors import NotFoundError
@@ -43,14 +43,34 @@ class ConfirmCompletedWorksheetRequest(BaseModel):
         return self
 
 
+class CompletedWorksheetAnswerRectangle(BaseModel):
+    """A normalized rectangle that must stay entirely within one scan page."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    x: float = Field(ge=0, le=1)
+    y: float = Field(ge=0, le=1)
+    width: float = Field(gt=0, le=1)
+    height: float = Field(gt=0, le=1)
+
+    @model_validator(mode="after")
+    def validate_page_bounds(self) -> "CompletedWorksheetAnswerRectangle":
+        if self.x + self.width > 1 or self.y + self.height > 1:
+            raise ValueError("Answer region must stay within the page bounds.")
+        return self
+
+
 class CompletedWorksheetReviewRegion(BaseModel):
     """A private answer location retained while the parent reviews a scan."""
 
     question_position: int = Field(gt=0)
     page_numbers: list[int] = Field(min_length=1, max_length=100)
-    regions: list[dict[str, float]] | None = Field(default=None, max_length=100)
+    regions: list[CompletedWorksheetAnswerRectangle] | None = Field(
+        default=None,
+        max_length=100,
+    )
     transcription: str | None = Field(default=None, max_length=5000)
-    legibility: str | None = Field(default=None, max_length=40)
+    legibility: Literal["clear", "uncertain", "unreadable"] | None = None
 
 
 class SaveCompletedWorksheetReviewRequest(BaseModel):

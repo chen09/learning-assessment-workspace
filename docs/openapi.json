@@ -485,6 +485,44 @@
         "title": "CompleteReviewRequest",
         "type": "object"
       },
+      "CompletedWorksheetAnswerRectangle": {
+        "additionalProperties": false,
+        "description": "A normalized rectangle that must stay entirely within one scan page.",
+        "properties": {
+          "height": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 1.0,
+            "title": "Height",
+            "type": "number"
+          },
+          "width": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 1.0,
+            "title": "Width",
+            "type": "number"
+          },
+          "x": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "X",
+            "type": "number"
+          },
+          "y": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Y",
+            "type": "number"
+          }
+        },
+        "required": [
+          "x",
+          "y",
+          "width",
+          "height"
+        ],
+        "title": "CompletedWorksheetAnswerRectangle",
+        "type": "object"
+      },
       "CompletedWorksheetConfirmation": {
         "description": "The durable learning records created from a parent-confirmed scan.",
         "properties": {
@@ -680,7 +718,11 @@
           "legibility": {
             "anyOf": [
               {
-                "maxLength": 40,
+                "enum": [
+                  "clear",
+                  "uncertain",
+                  "unreadable"
+                ],
                 "type": "string"
               },
               {
@@ -707,10 +749,7 @@
             "anyOf": [
               {
                 "items": {
-                  "additionalProperties": {
-                    "type": "number"
-                  },
-                  "type": "object"
+                  "$ref": "#/components/schemas/CompletedWorksheetAnswerRectangle"
                 },
                 "maxItems": 100,
                 "type": "array"

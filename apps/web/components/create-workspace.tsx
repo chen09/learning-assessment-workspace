@@ -481,17 +481,28 @@ function parseCompletedPaperReview(
       regions !== undefined &&
       (!Array.isArray(regions) ||
         regions.some(
-          (region) =>
-            !isRecord(region) ||
-            ["x", "y", "width", "height"].some(
-              (key) =>
-                typeof region[key] !== "number" ||
-                (region[key] as number) < 0 ||
-                (region[key] as number) > 1,
-            ),
+          (region) => {
+            if (!isRecord(region)) return true;
+            const x = region.x;
+            const y = region.y;
+            const width = region.width;
+            const height = region.height;
+            return (
+              [x, y, width, height].some(
+                (value) =>
+                  typeof value !== "number" || value < 0 || value > 1,
+              ) ||
+              typeof width !== "number" ||
+              typeof height !== "number" ||
+              width <= 0 ||
+              height <= 0 ||
+              (x as number) + width > 1 ||
+              (y as number) + height > 1
+            );
+          },
         ))
     ) {
-      throw new Error("Answer region coordinates must be normalized between 0 and 1.");
+      throw new Error("Answer region coordinates must fit entirely within the normalized page.");
     }
     if (
       candidate.legibility !== undefined &&
