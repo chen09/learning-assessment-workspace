@@ -105,6 +105,11 @@ type SourceImportUploadRetrySession = {
   sourceSignature: string;
 };
 
+type ReviewMediaUploadRetrySession = {
+  objectId: string;
+  sourceSignature: string;
+};
+
 const MAX_COMPLETED_PAPER_FILE_BYTES = 15_000_000;
 
 const completedPaperContentType = (
@@ -173,6 +178,12 @@ const sourceImportUploadSignature = (
       ),
     )
     .join("|");
+
+const reviewMediaUploadSignature = (
+  kind: "audio" | "figure",
+  questionId: string,
+  file: File,
+) => `${kind}:${questionId}:${file.name}:${file.size}:${file.lastModified}`;
 
 const LOCAL_COMPLETED_PAPER_REVIEW_PROMPT = `You are a careful school worksheet reviewer. Read the attached completed worksheet pages locally and return JSON only. Do not return Markdown, explanation, or an annotated image.
 
@@ -723,6 +734,10 @@ function CreateWorkspaceContent() {
   const [questionFigureFiles, setQuestionFigureFiles] = useState<
     Record<string, File>
   >({});
+  const [reviewMediaUploadRetrySessions, setReviewMediaUploadRetrySessions] =
+    useState<Record<string, ReviewMediaUploadRetrySession>>({});
+  const [reviewMediaUploadRetryFailed, setReviewMediaUploadRetryFailed] =
+    useState(false);
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(
     null,
   );
@@ -2036,6 +2051,12 @@ function CreateWorkspaceContent() {
         return;
       }
       setRequestStatus("working");
+      setReviewMediaUploadRetryFailed(false);
+      let attemptedReviewMediaUpload = false;
+      const pendingReviewMediaUploadSessions: Record<
+        string,
+        ReviewMediaUploadRetrySession
+      > = {};
       try {
         const draftQuestionByPosition = new Map(
           draftQuestions.map((question) => [question.position, question]),
@@ -2052,6 +2073,7 @@ function CreateWorkspaceContent() {
                 : undefined;
               let questionWithPrivateMedia = question;
               if (figureFile) {
+                attemptedReviewMediaUpload = true;
                 const contentType =
                   figureFile.type === "image/png" ||
                   figureFile.name.toLowerCase().endsWith(".png")
@@ -2064,11 +2086,28 @@ function CreateWorkspaceContent() {
                 if (!contentType) {
                   throw new Error("Use a PNG or JPEG question figure.");
                 }
+                const mediaKey = `figure:${draftQuestion?.id ?? question.position}`;
+                const sourceSignature = reviewMediaUploadSignature(
+                  "figure",
+                  draftQuestion?.id ?? String(question.position),
+                  figureFile,
+                );
+                const existingSession = reviewMediaUploadRetrySessions[mediaKey];
+                const objectId =
+                  existingSession?.sourceSignature === sourceSignature
+                    ? existingSession.objectId
+                    : crypto.randomUUID();
+                if (existingSession?.sourceSignature !== sourceSignature) {
+                  pendingReviewMediaUploadSessions[mediaKey] = {
+                    objectId,
+                    sourceSignature,
+                  };
+                }
                 const intent = await createUploadIntent(
                   {
                     family_id: familyId,
                     bucket: "sources",
-                    object_id: crypto.randomUUID(),
+                    object_id: objectId,
                     filename: figureFile.name,
                     content_type: contentType,
                   },
@@ -2098,6 +2137,7 @@ function CreateWorkspaceContent() {
               if (!audioFile) {
                 return questionWithPrivateMedia;
               }
+              attemptedReviewMediaUpload = true;
               const contentType =
                 audioFile.type === "audio/mpeg" ||
                 audioFile.name.toLowerCase().endsWith(".mp3")
@@ -2111,11 +2151,28 @@ function CreateWorkspaceContent() {
               if (!contentType) {
                 throw new Error("Use an MP3, M4A, or MP4 audio file.");
               }
+              const mediaKey = `audio:${draftQuestion?.id ?? question.position}`;
+              const sourceSignature = reviewMediaUploadSignature(
+                "audio",
+                draftQuestion?.id ?? String(question.position),
+                audioFile,
+              );
+              const existingSession = reviewMediaUploadRetrySessions[mediaKey];
+              const objectId =
+                existingSession?.sourceSignature === sourceSignature
+                  ? existingSession.objectId
+                  : crypto.randomUUID();
+              if (existingSession?.sourceSignature !== sourceSignature) {
+                pendingReviewMediaUploadSessions[mediaKey] = {
+                  objectId,
+                  sourceSignature,
+                };
+              }
               const intent = await createUploadIntent(
                 {
                   family_id: familyId,
                   bucket: "audio",
-                  object_id: crypto.randomUUID(),
+                  object_id: objectId,
                   filename: audioFile.name,
                   content_type: contentType,
                 },
@@ -2149,8 +2206,17 @@ function CreateWorkspaceContent() {
         setQuestionSetId(imported.question_set_id);
         setAssignmentId(imported.assignment_id);
         setConfirmed(true);
+        setReviewMediaUploadRetrySessions({});
+        setReviewMediaUploadRetryFailed(false);
         setRequestStatus("idle");
       } catch {
+        if (attemptedReviewMediaUpload) {
+          setReviewMediaUploadRetrySessions((current) => ({
+            ...current,
+            ...pendingReviewMediaUploadSessions,
+          }));
+          setReviewMediaUploadRetryFailed(true);
+        }
         setRequestStatus("error");
       }
       return;
@@ -3756,6 +3822,12 @@ function CreateWorkspaceContent() {
                             if (!file) {
                               return;
                             }
+                            setReviewMediaUploadRetrySessions((current) => {
+                              const next = { ...current };
+                              delete next[`audio:${question.id}`];
+                              return next;
+                            });
+                            setReviewMediaUploadRetryFailed(false);
                             setListeningAudioFiles((current) => ({
                               ...current,
                               [question.id]: file,
@@ -3778,12 +3850,18 @@ function CreateWorkspaceContent() {
                         aria-label={t("draftReview.figureForQuestion", {
                           number: index + 1,
                         })}
-                        onChange={(event) => {
-                          const file = event.target.files?.[0];
-                          if (!file) {
-                            return;
-                          }
-                          setQuestionFigureFiles((current) => ({
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            if (!file) {
+                              return;
+                            }
+                            setReviewMediaUploadRetrySessions((current) => {
+                              const next = { ...current };
+                              delete next[`figure:${question.id}`];
+                              return next;
+                            });
+                            setReviewMediaUploadRetryFailed(false);
+                            setQuestionFigureFiles((current) => ({
                             ...current,
                             [question.id]: file,
                           }));
@@ -3960,7 +4038,9 @@ function CreateWorkspaceContent() {
           )}
           {requestStatus === "error" ? (
             <p className="form-error" role="alert">
-              {t("draftReview.error")}
+              {reviewMediaUploadRetryFailed
+                ? t("draftReview.uploadRetryFailed")
+                : t("draftReview.error")}
             </p>
           ) : null}
           <Link

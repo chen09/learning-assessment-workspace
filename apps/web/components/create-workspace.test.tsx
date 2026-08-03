@@ -2232,6 +2232,103 @@ describe("CreateWorkspace", () => {
     });
   });
 
+  it("reuses a private audio upload session when assigning fails and the parent retries", async () => {
+    const document = {
+      schema_version: "1.0" as const,
+      question_set: {
+        title: "Listening recovery",
+        subject: "English",
+        locale: "en" as const,
+        difficulty: "standard" as const,
+        source_mode: "convert" as const,
+        estimated_minutes: 5,
+      },
+      knowledge_tags: [{ code: "listening", label: "Listening" }],
+      questions: [
+        {
+          position: 1,
+          type: "listening" as const,
+          prompt: "Listen and choose.",
+          options: ["School", "Library"],
+          answer_key: { choice: 0 },
+          rubric: { grading_mode: "exact" },
+          points: 1,
+          knowledge_code: "listening",
+          listening: {
+            replay_limit: 1,
+            transcript: "I go to school.",
+            transcript_policy: "after_submission" as const,
+          },
+        },
+      ],
+    };
+    mocks.previewStructuredQuestionSet.mockResolvedValue({
+      title: "Listening recovery",
+      subject: "English",
+      locale: "en",
+      question_count: 1,
+      total_points: 1,
+      estimated_minutes: 5,
+      knowledge_tag_count: 1,
+      answer_keys_present: true,
+      checksum: "listening-recovery-preview",
+      source_summary: {},
+      questions: document.questions,
+    });
+    mocks.createUploadIntent.mockResolvedValue({
+      bucket: "audio",
+      path: "family-1/audio/listening-recovery.mp3",
+      upload_url: "fixture://audio-upload",
+      expires_in: 300,
+    });
+    mocks.uploadToSignedUrl
+      .mockRejectedValueOnce(new Error("temporary upload failure"))
+      .mockResolvedValueOnce(undefined);
+    mocks.importStructuredQuestionSet.mockResolvedValue({
+      question_set_id: "listening-recovery-set",
+      assignment_id: "listening-recovery-assignment",
+      status: "confirmed",
+      reused_existing: false,
+    });
+    window.history.replaceState(
+      {},
+      "",
+      "/parent/create/?familyId=family-1&childId=child-1",
+    );
+
+    render(<CreateWorkspace />);
+    await screen.findByRole("combobox", { name: "Child" });
+    fireEvent.click(screen.getByRole("button", { name: "Import AI question JSON" }));
+    fireEvent.change(screen.getByLabelText("AI question JSON"), {
+      target: { files: [new File([JSON.stringify(document)], "listening-recovery.json")] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Preview questions" }));
+    await screen.findByRole("heading", { name: "Review before assigning" });
+    const audio = new File(["audio"], "lesson.mp3", { type: "audio/mpeg" });
+    fireEvent.change(screen.getByLabelText("Audio for question 1"), {
+      target: { files: [audio] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm and assign" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The media upload paused",
+    );
+    expect(screen.getByText("lesson.mp3")).toBeInTheDocument();
+    expect(mocks.importStructuredQuestionSet).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Confirm and assign" }));
+
+    await waitFor(() => {
+      expect(mocks.importStructuredQuestionSet).toHaveBeenCalledTimes(1);
+    });
+    const [firstIntentRequest, , firstIdempotencyKey] =
+      mocks.createUploadIntent.mock.calls[0];
+    const [secondIntentRequest, , secondIdempotencyKey] =
+      mocks.createUploadIntent.mock.calls[1];
+    expect(secondIntentRequest.object_id).toBe(firstIntentRequest.object_id);
+    expect(secondIdempotencyKey).toBe(firstIdempotencyKey);
+  });
+
   it("lets a parent author a listening choice and attach its private audio during review", async () => {
     mocks.previewStructuredQuestionSet.mockResolvedValue({
       title: "Morning announcement",
@@ -2521,6 +2618,96 @@ describe("CreateWorkspace", () => {
         expect.any(String),
       );
     });
+  });
+
+  it("reuses a private figure upload session when assigning fails and the parent retries", async () => {
+    const document = {
+      schema_version: "1.0" as const,
+      question_set: {
+        title: "Figure recovery",
+        subject: "Mathematics",
+        locale: "en" as const,
+        difficulty: "standard" as const,
+        source_mode: "convert" as const,
+        estimated_minutes: 5,
+      },
+      knowledge_tags: [{ code: "diagram", label: "Diagram" }],
+      questions: [
+        {
+          position: 1,
+          type: "single_choice" as const,
+          prompt: "Choose the expression shown in the diagram.",
+          options: ["a² − b²", "a² + b²"],
+          answer_key: { choice: 0 },
+          rubric: { grading_mode: "exact" },
+          points: 1,
+          knowledge_code: "diagram",
+        },
+      ],
+    };
+    mocks.previewStructuredQuestionSet.mockResolvedValue({
+      title: "Figure recovery",
+      subject: "Mathematics",
+      locale: "en",
+      question_count: 1,
+      total_points: 1,
+      estimated_minutes: 5,
+      knowledge_tag_count: 1,
+      answer_keys_present: true,
+      checksum: "figure-recovery-preview",
+      source_summary: {},
+      questions: document.questions,
+    });
+    mocks.createUploadIntent.mockResolvedValue({
+      bucket: "sources",
+      path: "family-1/sources/figure-recovery.png",
+      upload_url: "fixture://figure-upload",
+      expires_in: 300,
+    });
+    mocks.uploadToSignedUrl
+      .mockRejectedValueOnce(new Error("temporary upload failure"))
+      .mockResolvedValueOnce(undefined);
+    mocks.importStructuredQuestionSet.mockResolvedValue({
+      question_set_id: "figure-recovery-set",
+      assignment_id: "figure-recovery-assignment",
+      status: "confirmed",
+      reused_existing: false,
+    });
+    window.history.replaceState(
+      {},
+      "",
+      "/parent/create/?familyId=family-1&childId=child-1",
+    );
+
+    render(<CreateWorkspace />);
+    await screen.findByRole("combobox", { name: "Child" });
+    fireEvent.click(screen.getByRole("button", { name: "Import AI question JSON" }));
+    fireEvent.change(screen.getByLabelText("AI question JSON"), {
+      target: { files: [new File([JSON.stringify(document)], "figure-recovery.json")] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Preview questions" }));
+    await screen.findByRole("heading", { name: "Review before assigning" });
+    fireEvent.change(screen.getByLabelText("Figure for question 1"), {
+      target: { files: [new File(["image"], "diagram.png", { type: "image/png" })] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm and assign" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The media upload paused",
+    );
+    expect(screen.getByText("diagram.png")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Confirm and assign" }));
+
+    await waitFor(() => {
+      expect(mocks.importStructuredQuestionSet).toHaveBeenCalledTimes(1);
+    });
+    const [firstIntentRequest, , firstIdempotencyKey] =
+      mocks.createUploadIntent.mock.calls[0];
+    const [secondIntentRequest, , secondIdempotencyKey] =
+      mocks.createUploadIntent.mock.calls[1];
+    expect(secondIntentRequest.object_id).toBe(firstIntentRequest.object_id);
+    expect(secondIdempotencyKey).toBe(firstIdempotencyKey);
   });
 
   it("lets a parent collect several authored questions before opening the review draft", async () => {
