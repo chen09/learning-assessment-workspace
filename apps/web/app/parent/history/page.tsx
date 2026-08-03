@@ -156,7 +156,11 @@ function ParentHistoryContent() {
   }, [familyId, reloadVersion]);
 
   const hasLiveProgress =
-    items.some((item) => ["submitted", "grading"].includes(item.status)) ||
+    items.some((item) =>
+      ["assigned", "in_progress", "submitted", "grading", "correcting"].includes(
+        item.status,
+      ),
+    ) ||
     completedWorksheetImports.some((item) =>
       ["processing", "grading"].includes(item.status),
     );

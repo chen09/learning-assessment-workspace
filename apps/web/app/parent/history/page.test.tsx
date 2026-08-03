@@ -144,6 +144,43 @@ describe("ParentHistoryPage", () => {
     expect(await screen.findByText("Results ready")).toBeInTheDocument();
   }, 10_000);
 
+  it("refreshes an assigned record when a child starts work on another device", async () => {
+    const assignedRecord = [
+      {
+        assignment_id: "assignment-active-poll",
+        attempt_id: null,
+        child_id: "child-1",
+        child_nickname: "Maya",
+        title: "Vocabulary practice",
+        status: "assigned",
+        submitted_at: null,
+        awarded_points: 0,
+        available_points: 10,
+        correction_count: 0,
+      },
+    ];
+    mocks.getFamilyHistory.mockResolvedValue(assignedRecord);
+
+    render(<ParentHistoryPage />);
+
+    expect(await screen.findByText("Assigned")).toBeInTheDocument();
+    const historyCallsBeforeRefresh = mocks.getFamilyHistory.mock.calls.length;
+    mocks.getFamilyHistory.mockResolvedValueOnce([
+      {
+        ...assignedRecord[0],
+        attempt_id: "attempt-active-poll",
+        status: "in_progress",
+      },
+    ]);
+
+    await new Promise((resolve) => window.setTimeout(resolve, 5_050));
+
+    expect(mocks.getFamilyHistory).toHaveBeenCalledTimes(
+      historyCallsBeforeRefresh + 1,
+    );
+    expect(await screen.findByText("In progress")).toBeInTheDocument();
+  }, 10_000);
+
   it("links a reviewed paper scan to its real grading results", async () => {
     mocks.getFamilyHistory.mockResolvedValue([]);
     mocks.getCompletedWorksheetImports.mockResolvedValue([
