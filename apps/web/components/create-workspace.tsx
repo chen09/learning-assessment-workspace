@@ -100,6 +100,11 @@ type CompletedUploadRetrySession = {
   sourceSignature: string;
 };
 
+type SourceImportUploadRetrySession = {
+  objectId: string;
+  sourceSignature: string;
+};
+
 const MAX_COMPLETED_PAPER_FILE_BYTES = 15_000_000;
 
 const completedPaperContentType = (
@@ -140,6 +145,24 @@ const completedPaperUploadSignature = (
 ) =>
   [
     ["response", responseFiles],
+    ["answer", answerKeyFiles],
+    ["reference", referenceMaterialFiles],
+  ]
+    .flatMap(([role, selectedFiles]) =>
+      (selectedFiles as File[]).map(
+        (file, index) =>
+          `${role}:${index}:${file.name}:${file.size}:${file.lastModified}`,
+      ),
+    )
+    .join("|");
+
+const sourceImportUploadSignature = (
+  questionFiles: File[],
+  answerKeyFiles: File[],
+  referenceMaterialFiles: File[],
+) =>
+  [
+    ["question", questionFiles],
     ["answer", answerKeyFiles],
     ["reference", referenceMaterialFiles],
   ]
@@ -663,6 +686,10 @@ function CreateWorkspaceContent() {
   const [completedUploadRetrySession, setCompletedUploadRetrySession] =
     useState<CompletedUploadRetrySession | null>(null);
   const [completedUploadRetryFailed, setCompletedUploadRetryFailed] =
+    useState(false);
+  const [sourceImportUploadRetrySession, setSourceImportUploadRetrySession] =
+    useState<SourceImportUploadRetrySession | null>(null);
+  const [sourceImportUploadRetryFailed, setSourceImportUploadRetryFailed] =
     useState(false);
   const [completedResponseFileNames, setCompletedResponseFileNames] = useState<
     string[]
@@ -1836,8 +1863,17 @@ function CreateWorkspaceContent() {
       return;
     }
     setRequestStatus("working");
+    setSourceImportUploadRetryFailed(false);
+    const sourceSignature =
+      mode === "import"
+        ? sourceImportUploadSignature(files, answerFiles, referenceFiles)
+        : null;
+    const importObjectId =
+      mode === "import" &&
+      sourceImportUploadRetrySession?.sourceSignature === sourceSignature
+        ? sourceImportUploadRetrySession.objectId
+        : crypto.randomUUID();
     try {
-      const importObjectId = crypto.randomUUID();
       const sourcePaths: string[] = [];
       const answerSourcePaths: string[] = [];
       const referenceSourcePaths: string[] = [];
@@ -1954,8 +1990,16 @@ function CreateWorkspaceContent() {
         setAssignmentDurationMinutes("45");
       }
       setStage("review");
+      setSourceImportUploadRetrySession(null);
       setRequestStatus("idle");
     } catch {
+      if (mode === "import" && sourceSignature) {
+        setSourceImportUploadRetrySession({
+          objectId: importObjectId,
+          sourceSignature,
+        });
+        setSourceImportUploadRetryFailed(true);
+      }
       setRequestStatus("error");
     }
   };
@@ -4155,6 +4199,8 @@ function CreateWorkspaceContent() {
                     const selectedFiles = Array.from(
                       event.target.files ?? [],
                     );
+                    setSourceImportUploadRetrySession(null);
+                    setSourceImportUploadRetryFailed(false);
                     setFiles(selectedFiles);
                     setFileName(
                       selectedFiles.map((file) => file.name).join(", "),
@@ -4184,6 +4230,8 @@ function CreateWorkspaceContent() {
                     const selectedFiles = Array.from(
                       event.target.files ?? [],
                     );
+                    setSourceImportUploadRetrySession(null);
+                    setSourceImportUploadRetryFailed(false);
                     setAnswerFiles(selectedFiles);
                     setAnswerFileName(
                       selectedFiles.map((file) => file.name).join(", "),
@@ -4204,6 +4252,8 @@ function CreateWorkspaceContent() {
                     const selectedFiles = Array.from(
                       event.target.files ?? [],
                     );
+                    setSourceImportUploadRetrySession(null);
+                    setSourceImportUploadRetryFailed(false);
                     setReferenceFiles(selectedFiles);
                     setReferenceFileName(
                       selectedFiles.map((file) => file.name).join(", "),
@@ -4873,6 +4923,8 @@ function CreateWorkspaceContent() {
             <p className="form-error" role="alert">
               {mode === "completed" && completedUploadRetryFailed
                 ? t("completedPaper.uploadRetryFailed")
+                : mode === "import" && sourceImportUploadRetryFailed
+                  ? t("materialImport.uploadRetryFailed")
                 : t("creation.error")}
             </p>
           ) : null}

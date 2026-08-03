@@ -911,6 +911,8 @@ const messages = {
       "The reviewed JSON must match every confirmed question and answer region. Nothing was assigned; correct it and try again.",
     "completedPaper.uploadRetryFailed":
       "The upload paused. Your selected pages are still here; choose Upload for review to retry safely.",
+    "materialImport.uploadRetryFailed":
+      "The upload paused. Your selected files are still here; choose Create review draft to retry safely.",
     "completedPaper.pageReferenceError":
       "This upload has {pages} page(s). Each answer page must be between 1 and {pages}.",
     "completedPaper.invalidFile":
@@ -1870,6 +1872,8 @@ const messages = {
       "確認用 JSON は、確定するすべての問題と解答エリアに対応する必要があります。割り当ては行われていません。修正してもう一度お試しください。",
     "completedPaper.uploadRetryFailed":
       "アップロードが中断されました。選択済みのページは残っています。「確認用にアップロード」を選んで安全に再試行できます。",
+    "materialImport.uploadRetryFailed":
+      "アップロードが中断されました。選択済みのファイルは残っています。「確認用の下書きを作成」を選んで安全に再試行できます。",
     "completedPaper.pageReferenceError":
       "このアップロードは {pages} ページです。解答ページ番号は 1 から {pages} の範囲にしてください。",
     "completedPaper.invalidFile":
@@ -2799,6 +2803,8 @@ const messages = {
       "审核 JSON 必须匹配每一道已确认题目和答题区域。尚未安排任何练习；请修正后重试。",
     "completedPaper.uploadRetryFailed":
       "上传已中断。你选择的页面仍保留在这里；点击“上传以供审核”即可安全重试。",
+    "materialImport.uploadRetryFailed":
+      "上传已中断。你选择的文件仍保留在这里；点击“创建审核草稿”即可安全重试。",
     "completedPaper.pageReferenceError":
       "这次上传共有 {pages} 页；每题的答题页码必须在 1 到 {pages} 之间。",
     "completedPaper.invalidFile":

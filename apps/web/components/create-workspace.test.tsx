@@ -1179,6 +1179,64 @@ describe("CreateWorkspace", () => {
     });
   });
 
+  it("keeps selected source material and reuses its private upload session after a failed upload", async () => {
+    mocks.createUploadIntent.mockImplementation((payload, _token, key) =>
+      Promise.resolve({
+        bucket: payload.bucket,
+        path: `family-1/${payload.bucket}/${payload.filename}`,
+        signed_url: `https://storage.example/${key}`,
+      }),
+    );
+    mocks.uploadToSignedUrl.mockRejectedValueOnce(new Error("offline"));
+    mocks.createQuestionSetImport.mockResolvedValue({
+      question_set_id: "question-set-retry",
+      job_id: "job-retry",
+      status: "needs_review",
+    });
+    mocks.getQuestionSetDraft.mockResolvedValue({
+      question_set: { status: "needs_review" },
+      questions: [],
+    });
+
+    render(<CreateWorkspace />);
+
+    await screen.findByRole("combobox", { name: "Child" });
+    fireEvent.click(screen.getByRole("button", { name: "Import material" }));
+    fireEvent.change(
+      screen.getByLabelText("Learning material and exercises"),
+      {
+        target: {
+          files: [
+            new File(["lesson"], "lesson.pdf", {
+              type: "application/pdf",
+            }),
+          ],
+        },
+      },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Create review draft" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The upload paused. Your selected files are still here",
+    );
+    expect(screen.getAllByText("lesson.pdf")).not.toHaveLength(0);
+    expect(mocks.createQuestionSetImport).not.toHaveBeenCalled();
+    const firstUploadKey = mocks.createUploadIntent.mock.calls[0][2] as string;
+
+    fireEvent.click(screen.getByRole("button", { name: "Create review draft" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Source material saved privately" }),
+    ).toBeInTheDocument();
+    const retryUploadKey = mocks.createUploadIntent.mock.calls[1][2] as string;
+    expect(retryUploadKey).toBe(firstUploadKey);
+    expect(mocks.createQuestionSetImport).toHaveBeenCalledWith(
+      expect.any(Object),
+      "parent-token",
+      `import-${firstUploadKey.replace("source-questions-", "").replace(/-0$/, "")}`,
+    );
+  });
+
   it("keeps question material and its private answer key separate", async () => {
     const structuredDocument = {
       schema_version: "1.0" as const,
