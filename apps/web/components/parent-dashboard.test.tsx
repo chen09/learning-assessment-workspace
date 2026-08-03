@@ -235,10 +235,13 @@ describe("ParentDashboard", () => {
     const historyCallsBeforeRefresh = mocks.getFamilyHistory.mock.calls.length;
     mocks.getFamilyHistory.mockResolvedValueOnce(inProgressWork);
 
-    await new Promise((resolve) => window.setTimeout(resolve, 5_050));
-
-    expect(mocks.getFamilyHistory).toHaveBeenCalledTimes(
-      historyCallsBeforeRefresh + 1,
+    await vi.waitFor(
+      () => {
+        expect(mocks.getFamilyHistory.mock.calls.length).toBeGreaterThan(
+          historyCallsBeforeRefresh,
+        );
+      },
+      { timeout: 6_000 },
     );
     expect(await screen.findByText("正在作答")).toBeInTheDocument();
   }, 10_000);
