@@ -190,6 +190,59 @@ describe("ParentDashboard", () => {
     expect(screen.getByText("有 1 道手写题等待您确认")).toBeInTheDocument();
   }, 10_000);
 
+  it("refreshes assigned work when a child starts answering on another device", async () => {
+    window.localStorage.setItem("luma-language:demo-parent", "zh");
+    mocks.getFamilies.mockResolvedValue([
+      { id: "family-1", name: "肉肉如意" },
+    ]);
+    mocks.getChildren.mockResolvedValue([
+      {
+        id: "child-1",
+        family_id: "family-1",
+        nickname: "肉肉",
+        grade_stage: "Junior high 1",
+        ui_language: "zh",
+      },
+    ]);
+    const assignedWork = [
+      {
+        assignment_id: "assignment-1",
+        attempt_id: null,
+        child_id: "child-1",
+        child_nickname: "肉肉",
+        title: "英语填空练习",
+        status: "assigned",
+        submitted_at: null,
+        awarded_points: 0,
+        available_points: 10,
+        correction_count: 0,
+        source_material_title: null,
+        source_material_subject: null,
+      },
+    ];
+    const inProgressWork = [
+      {
+        ...assignedWork[0],
+        attempt_id: "attempt-1",
+        status: "in_progress",
+      },
+    ];
+    mocks.getFamilyHistory.mockResolvedValue(assignedWork);
+
+    render(<ParentDashboard />);
+
+    expect(await screen.findByText("已布置")).toBeInTheDocument();
+    const historyCallsBeforeRefresh = mocks.getFamilyHistory.mock.calls.length;
+    mocks.getFamilyHistory.mockResolvedValueOnce(inProgressWork);
+
+    await new Promise((resolve) => window.setTimeout(resolve, 5_050));
+
+    expect(mocks.getFamilyHistory).toHaveBeenCalledTimes(
+      historyCallsBeforeRefresh + 1,
+    );
+    expect(await screen.findByText("正在作答")).toBeInTheDocument();
+  }, 10_000);
+
   it("opens child sign-in for an assigned worksheet that has not started", async () => {
     window.localStorage.setItem("luma-language:demo-parent", "zh");
     mocks.getFamilies.mockResolvedValue([

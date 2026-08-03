@@ -152,7 +152,9 @@ export function ParentDashboard() {
   }, [activeFamilyId, reloadKey, router]);
 
   const hasLiveProgress = familyHistory.some((work) =>
-    ["submitted", "grading"].includes(work.status),
+    ["assigned", "in_progress", "submitted", "grading", "correcting"].includes(
+      work.status,
+    ),
   );
 
   useEffect(() => {
