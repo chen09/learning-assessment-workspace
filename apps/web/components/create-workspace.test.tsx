@@ -551,6 +551,85 @@ describe("CreateWorkspace", () => {
       },
       { timeout: 2000 },
     );
+    expect(
+      screen.getByText("Private review draft saved"),
+    ).toBeInTheDocument();
+  });
+
+  it("lets a parent retry a failed completed-paper draft save", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/parent/create/?completedWorksheetId=completed-autosave-retry-1",
+    );
+    mocks.getCompletedWorksheetImport.mockResolvedValue({
+      id: "completed-autosave-retry-1",
+      status: "needs_review",
+      assignment_id: null,
+      attempt_id: null,
+      filenames: ["autosave-retry-paper.jpg"],
+      response_paths: ["family-1/responses/autosave-retry-paper.jpg"],
+      extraction: {
+        document: {
+          schema_version: "1.0",
+          question_set: {
+            title: "Retryable review",
+            subject: "English",
+            locale: "en",
+            difficulty: "standard",
+            source_mode: "convert",
+            estimated_minutes: 10,
+          },
+          knowledge_tags: [{ code: "grammar", label: "Grammar" }],
+          questions: [
+            {
+              position: 1,
+              type: "typed_text",
+              prompt: "Complete: She ___ to school.",
+              options: [],
+              answer_key: { text: "goes" },
+              rubric: { grading_mode: "exact" },
+              points: 1,
+              knowledge_code: "grammar",
+            },
+          ],
+        },
+        answer_regions: [
+          { question_position: 1, page_numbers: [1], legibility: "clear" },
+        ],
+      },
+      job: {
+        id: "analysis-job-autosave-retry-1",
+        status: "succeeded",
+        type: "analyze_completed_worksheet",
+      },
+    });
+    mocks.saveCompletedWorksheetReviewDraft
+      .mockRejectedValueOnce(new Error("temporary network failure"))
+      .mockResolvedValueOnce({
+        id: "completed-autosave-retry-1",
+        status: "needs_review",
+      });
+
+    render(<CreateWorkspace />);
+
+    await screen.findByRole("heading", { name: "Preparing the review draft" });
+    fireEvent.change(screen.getByLabelText("Question 1 wording"), {
+      target: { value: "Retry this saved wording." },
+    });
+
+    await screen.findByText("Could not save this review draft");
+    fireEvent.click(screen.getByRole("button", { name: "Retry save" }));
+
+    await waitFor(
+      () => {
+        expect(mocks.saveCompletedWorksheetReviewDraft).toHaveBeenCalledTimes(2);
+      },
+      { timeout: 2000 },
+    );
+    expect(
+      screen.getByText("Private review draft saved"),
+    ).toBeInTheDocument();
   });
 
   it("resumes an imported question-set review from its private recovery link", async () => {

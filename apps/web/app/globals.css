@@ -3292,6 +3292,13 @@ button {
   list-style: none;
 }
 
+.completed-paper-draft-save-status {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
 .completed-paper-review-list li {
   display: grid;
   gap: 0.7rem;

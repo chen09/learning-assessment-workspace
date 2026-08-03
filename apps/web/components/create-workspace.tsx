@@ -705,6 +705,10 @@ function CreateWorkspaceContent() {
   const [completedReviewSource, setCompletedReviewSource] = useState<
     "ai" | "file" | null
   >(null);
+  const [completedReviewSaveStatus, setCompletedReviewSaveStatus] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
+  const [completedReviewSaveRetry, setCompletedReviewSaveRetry] = useState(0);
   const [completedResponsePaths, setCompletedResponsePaths] = useState<string[]>(
     [],
   );
@@ -806,6 +810,7 @@ function CreateWorkspaceContent() {
       setCompletedReview(parsed);
       setCompletedReviewSource("ai");
       setCompletedReviewFile(null);
+      setCompletedReviewSaveStatus("saved");
       setRequestStatus("idle");
     } catch {
       // A fixture or incomplete AI response remains safely manual-review only.
@@ -834,6 +839,7 @@ function CreateWorkspaceContent() {
     if (snapshot === lastSavedCompletedReviewRef.current) {
       return;
     }
+    setCompletedReviewSaveStatus("saving");
     if (completedReviewSaveTimerRef.current !== null) {
       window.clearTimeout(completedReviewSaveTimerRef.current);
     }
@@ -850,9 +856,10 @@ function CreateWorkspaceContent() {
             parentToken,
           );
           lastSavedCompletedReviewRef.current = snapshot;
+          setCompletedReviewSaveStatus("saved");
         } catch {
           if (!confirmingCompletedPaperRef.current) {
-            setRequestStatus("error");
+            setCompletedReviewSaveStatus("error");
           }
         }
       });
@@ -869,6 +876,7 @@ function CreateWorkspaceContent() {
     completedResponsePaths.length,
     completedWorksheetId,
     completedWorksheetStatus,
+    completedReviewSaveRetry,
   ]);
 
   const completedPaperPageCount = (
@@ -901,6 +909,8 @@ function CreateWorkspaceContent() {
       completedReviewSaveTimerRef.current = null;
     }
     lastSavedCompletedReviewRef.current = null;
+    confirmingCompletedPaperRef.current = false;
+    setCompletedReviewSaveStatus("idle");
     const url = new URL(window.location.href);
     url.searchParams.delete("completedWorksheetId");
     window.history.replaceState(window.history.state, "", url);
@@ -1136,6 +1146,9 @@ function CreateWorkspaceContent() {
       setAssignmentId(null);
       setCompletedReview(null);
       setCompletedReviewSource(null);
+      lastSavedCompletedReviewRef.current = null;
+      confirmingCompletedPaperRef.current = false;
+      setCompletedReviewSaveStatus("idle");
       setRequestStatus("idle");
       setRecoveryRouteVersion((current) => current + 1);
     };
@@ -2790,6 +2803,7 @@ function CreateWorkspaceContent() {
     setCompletedReview(null);
     setCompletedReviewSource(null);
     lastSavedCompletedReviewRef.current = null;
+    setCompletedReviewSaveStatus("idle");
     setCompletedPromptCopied(false);
     if (!file) {
       return;
@@ -2802,6 +2816,7 @@ function CreateWorkspaceContent() {
         ),
       );
       setCompletedReviewSource("file");
+      setCompletedReviewSaveStatus("saving");
       setRequestStatus("idle");
     } catch {
       setRequestStatus("error");
@@ -3036,6 +3051,33 @@ function CreateWorkspaceContent() {
                       regions: completedReview.answer_regions.length,
                     })}
                   </p>
+                  {completedReviewSaveStatus !== "idle" ? (
+                    <div className="completed-paper-draft-save-status">
+                      <p
+                        aria-live="polite"
+                        className={`status-pill ${
+                          completedReviewSaveStatus === "error" ? "warm" : "cool"
+                        }`}
+                      >
+                        {completedReviewSaveStatus === "saving"
+                          ? t("completedPaper.draftSaving")
+                          : completedReviewSaveStatus === "saved"
+                            ? t("completedPaper.draftSaved")
+                            : t("completedPaper.draftSaveFailed")}
+                      </p>
+                      {completedReviewSaveStatus === "error" ? (
+                        <button
+                          className="text-button"
+                          onClick={() =>
+                            setCompletedReviewSaveRetry((current) => current + 1)
+                          }
+                          type="button"
+                        >
+                          {t("completedPaper.retryDraftSave")}
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
                   <details open>
                       <summary>{t("completedPaper.previewQuestions")}</summary>
                     <ol className="completed-paper-review-list">

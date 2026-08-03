@@ -874,6 +874,10 @@ const messages = {
     "completedPaper.jsonHelp":
       "The app validates question order and answer regions before creating a learning record.",
     "completedPaper.reviewReady": "Review ready · questions: {questions} · answer regions: {regions}",
+    "completedPaper.draftSaving": "Saving private review draft…",
+    "completedPaper.draftSaved": "Private review draft saved",
+    "completedPaper.draftSaveFailed": "Could not save this review draft",
+    "completedPaper.retryDraftSave": "Retry save",
     "completedPaper.previewQuestions": "Preview confirmed questions",
     "completedPaper.questionWording": "Question wording",
     "completedPaper.questionWordingFor": "Question {position} wording",
@@ -1844,6 +1848,10 @@ const messages = {
     "completedPaper.jsonHelp":
       "学習記録を作成する前に、問題の順序と解答エリアを検証します。",
     "completedPaper.reviewReady": "確認の準備完了 · 問題: {questions} · 解答エリア: {regions}",
+    "completedPaper.draftSaving": "非公開の確認下書きを保存中…",
+    "completedPaper.draftSaved": "非公開の確認下書きを保存しました",
+    "completedPaper.draftSaveFailed": "確認下書きを保存できませんでした",
+    "completedPaper.retryDraftSave": "保存を再試行",
     "completedPaper.previewQuestions": "確認済みの問題をプレビュー",
     "completedPaper.questionWording": "問題文",
     "completedPaper.questionWordingFor": "問題 {position} の問題文",
@@ -2785,6 +2793,10 @@ const messages = {
     "completedPaper.jsonHelp":
       "应用会在创建学习记录前验证题目顺序和答题区域。",
     "completedPaper.reviewReady": "审核准备就绪 · 题目：{questions} · 答题区域：{regions}",
+    "completedPaper.draftSaving": "正在保存私密审核草稿…",
+    "completedPaper.draftSaved": "私密审核草稿已保存",
+    "completedPaper.draftSaveFailed": "无法保存审核草稿",
+    "completedPaper.retryDraftSave": "重新保存",
     "completedPaper.previewQuestions": "预览已确认题目",
     "completedPaper.questionWording": "题目文字",
     "completedPaper.questionWordingFor": "第 {position} 题题目文字",
