@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import ChildLoginPage from "@/app/child/login/page";
@@ -71,5 +71,32 @@ describe("ChildLoginPage", () => {
       "Too many PIN attempts",
     );
     expect(screen.queryByText("That PIN did not work. Please try again.")).not.toBeInTheDocument();
+  });
+
+  it("clears an entered PIN and expired-session notice when browser navigation changes the child link", async () => {
+    window.localStorage.setItem("luma-language:demo-child", "en");
+    window.history.replaceState(
+      {},
+      "",
+      "/child/login/?childId=child-1&expired=1",
+    );
+
+    render(<ChildLoginPage />);
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Your child session expired. Enter the PIN again to continue.",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "1" }));
+    expect(screen.getByLabelText("1 of 6 digits entered")).toBeInTheDocument();
+
+    await act(async () => {
+      window.history.pushState({}, "", "/child/login/?childId=child-2");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+
+    expect(
+      screen.getByLabelText("0 of 6 digits entered"),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 });

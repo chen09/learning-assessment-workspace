@@ -30,15 +30,23 @@ function ChildLoginContent() {
 
   useEffect(() => {
     let active = true;
-    const expired =
+    const getExpiredState = () =>
       new URLSearchParams(window.location.search).get("expired") === "1";
     queueMicrotask(() => {
       if (active) {
-        setSessionExpired(expired);
+        setSessionExpired(getExpiredState());
       }
     });
+    const resetForLoginNavigation = () => {
+      setPin("");
+      setStatus("idle");
+      setEntryLocked(false);
+      setSessionExpired(getExpiredState());
+    };
+    window.addEventListener("popstate", resetForLoginNavigation);
     return () => {
       active = false;
+      window.removeEventListener("popstate", resetForLoginNavigation);
     };
   }, []);
 

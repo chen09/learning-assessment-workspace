@@ -638,3 +638,30 @@ test("browser navigation clears the private library before another family loads"
     page.getByRole("heading", { name: "Second library navigation set" }),
   ).toBeVisible();
 });
+
+test("browser navigation clears a child PIN before another child login link", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "A single desktop browser regression covers child PIN-link navigation.",
+  );
+
+  await page.addInitScript(() => {
+    window.localStorage.setItem("luma-language:demo-child", "en");
+  });
+  await page.goto("/child/login/?childId=pin-child-first&expired=1");
+  await expect(page.getByRole("status")).toHaveText(
+    "Your child session expired. Enter the PIN again to continue.",
+  );
+  await page.getByRole("button", { name: "1" }).click();
+  await expect(page.getByLabel("1 of 6 digits entered")).toBeVisible();
+
+  await page.evaluate(() => {
+    window.history.pushState({}, "", "/child/login/?childId=pin-child-second");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  });
+
+  await expect(page.getByLabel("0 of 6 digits entered")).toBeVisible();
+  await expect(page.getByRole("status")).toHaveCount(0);
+});
