@@ -361,6 +361,36 @@ describe("ParentResultsPage", () => {
     );
   });
 
+  it("keeps each answer page's saved order visible while photo previews are unavailable", async () => {
+    const completeReview = await mocks.getParentAttemptReview();
+    mocks.getParentAttemptReview.mockReset().mockResolvedValue({
+      ...completeReview,
+      reviews: [
+        {
+          ...completeReview.reviews[0],
+          question_type: "photo",
+          response_kind: "photo",
+          response_answer: {
+            paths: [
+              "family-id/attempt-id/first-page.png",
+              "family-id/attempt-id/second-page.png",
+            ],
+          },
+          photo_urls: [],
+        },
+      ],
+    });
+
+    render(<ParentResultsPage />);
+
+    expect(
+      await screen.findByText("第 1 页，共 2 页"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("第 2 页，共 2 页")).toBeInTheDocument();
+    expect(screen.getByText("first-page.png")).toBeInTheDocument();
+    expect(screen.getByText("second-page.png")).toBeInTheDocument();
+  });
+
   it("keeps a paper photo unchanged until a parent chooses to reveal AI red-pencil marks", async () => {
     const completeReview = await mocks.getParentAttemptReview();
     mocks.getParentAttemptReview.mockReset().mockResolvedValue({

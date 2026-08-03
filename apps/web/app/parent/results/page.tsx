@@ -339,8 +339,16 @@ function PhotoPreview({
           <ImageIcon aria-hidden="true" />
           {paths.length ? (
             <ol>
-              {paths.map((path) => (
-                <li key={path}>{path.split("/").at(-1)}</li>
+              {paths.map((path, index) => (
+                <li key={path}>
+                  <strong>
+                    {t("parentResults.photoPage", {
+                      page: index + 1,
+                      total: paths.length,
+                    })}
+                  </strong>
+                  <span>{path.split("/").at(-1)}</span>
+                </li>
               ))}
             </ol>
           ) : (
