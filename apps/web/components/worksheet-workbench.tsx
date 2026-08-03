@@ -1504,7 +1504,11 @@ function WorksheetWorkbenchContent() {
           <label className="photo-input-trigger">
             <input
               accept="image/jpeg,image/png"
-              aria-label={t("worksheet.photoInput")}
+              aria-label={
+                photoNames.length > 0
+                  ? t("worksheet.addMoreImages")
+                  : t("worksheet.photoInput")
+              }
               capture="environment"
               onChange={(event) => {
                 if (isSavingPhotoAnswer) {

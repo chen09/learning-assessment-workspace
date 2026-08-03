@@ -989,6 +989,9 @@ describe("WorksheetWorkbench", () => {
       screen.getByRole("img", { name: "Preview: draft-page.jpg" }),
     ).toBeInTheDocument();
     await screen.findByText("Saved");
+    expect(
+      screen.getByLabelText("Add more answer images"),
+    ).toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole("button", { name: "Move answer-page.jpg later" }),
