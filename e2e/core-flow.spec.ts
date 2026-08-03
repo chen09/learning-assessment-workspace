@@ -1345,20 +1345,85 @@ test("parent authors a paper-photo question and assigns it through the reviewed 
   await expect(
     page.getByLabel("Take a photo or choose images"),
   ).toBeVisible();
-  const responseSave = page.waitForResponse(
+  const initialResponseSave = page.waitForResponse(
     (response) =>
       response
         .url()
         .startsWith(`${apiBaseUrl}/v1/attempts/${attemptId}/responses/`) &&
       response.request().method() === "PUT",
   );
-  await page.getByLabel("Take a photo or choose images").setInputFiles({
-    name: "paper-answer.png",
-    mimeType: "image/png",
-    buffer: Buffer.from("paper answer image"),
+  await page.getByLabel("Take a photo or choose images").setInputFiles([
+    {
+      name: "paper-answer-first.png",
+      mimeType: "image/png",
+      buffer: Buffer.from("first paper answer image"),
+    },
+    {
+      name: "paper-answer-second.png",
+      mimeType: "image/png",
+      buffer: Buffer.from("second paper answer image"),
+    },
+  ]);
+  expect((await initialResponseSave).ok()).toBeTruthy();
+  const uploadedImages = page.getByRole("list", {
+    name: "Uploaded answer images",
   });
-  expect((await responseSave).ok()).toBeTruthy();
-  await expect(page.getByText("paper-answer.png")).toBeVisible();
+  await expect(uploadedImages.getByRole("listitem")).toHaveCount(2);
+  await expect(uploadedImages.getByRole("listitem").nth(0)).toContainText(
+    "1. paper-answer-first.png",
+  );
+  await expect(uploadedImages.getByRole("listitem").nth(1)).toContainText(
+    "2. paper-answer-second.png",
+  );
+
+  const reorderResponseSave = page.waitForResponse(
+    (response) =>
+      response
+        .url()
+        .startsWith(`${apiBaseUrl}/v1/attempts/${attemptId}/responses/`) &&
+      response.request().method() === "PUT",
+  );
+  await page
+    .getByRole("button", { name: "Move paper-answer-first.png later" })
+    .click();
+  expect((await reorderResponseSave).ok()).toBeTruthy();
+  await expect(uploadedImages.getByRole("listitem").nth(0)).toContainText(
+    "1. paper-answer-second.png",
+  );
+
+  const removalResponseSave = page.waitForResponse(
+    (response) =>
+      response
+        .url()
+        .startsWith(`${apiBaseUrl}/v1/attempts/${attemptId}/responses/`) &&
+      response.request().method() === "PUT",
+  );
+  await page
+    .getByRole("button", { name: "Remove paper-answer-second.png" })
+    .click();
+  expect((await removalResponseSave).ok()).toBeTruthy();
+  await expect(uploadedImages.getByRole("listitem")).toHaveCount(1);
+  await expect(uploadedImages.getByRole("listitem").nth(0)).toContainText(
+    "1. paper-answer-first.png",
+  );
+
+  const reuploadResponseSave = page.waitForResponse(
+    (response) =>
+      response
+        .url()
+        .startsWith(`${apiBaseUrl}/v1/attempts/${attemptId}/responses/`) &&
+      response.request().method() === "PUT",
+  );
+  await page.getByLabel("Add more answer images").setInputFiles({
+    name: "paper-answer-replacement.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("replacement paper answer image"),
+  });
+  expect((await reuploadResponseSave).ok()).toBeTruthy();
+  await expect(uploadedImages.getByRole("listitem")).toHaveCount(2);
+  await expect(uploadedImages.getByRole("listitem").nth(1)).toContainText(
+    "2. paper-answer-replacement.png",
+  );
 
   await page.getByRole("button", { name: "Submit all answers" }).click();
   await page
