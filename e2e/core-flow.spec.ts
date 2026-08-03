@@ -3227,10 +3227,23 @@ test("parent creation reaches child grading and correction through the API", asy
 
   const originalAttemptId = new URL(page.url()).searchParams.get("attemptId");
   expect(originalAttemptId).toBeTruthy();
-  const addChineseHandwritingFeedback = async (targetAttemptId: string) => {
+  const addChineseHandwritingFeedback = async (
+    targetAttemptId: string,
+    failFirstResultRead = false,
+  ) => {
+    let shouldFailResultRead = failFirstResultRead;
     await page.route(
       `${apiBaseUrl}/v1/attempts/${targetAttemptId}/results`,
       async (route) => {
+        if (shouldFailResultRead) {
+          shouldFailResultRead = false;
+          await route.fulfill({
+            status: 503,
+            contentType: "application/json",
+            body: JSON.stringify({ detail: "temporary result status failure" }),
+          });
+          return;
+        }
         const response = await route.fetch();
         const payload = (await response.json()) as {
           complete: boolean;
@@ -3274,16 +3287,7 @@ test("parent creation reaches child grading and correction through the API", asy
   };
 
   await page.getByLabel("Language").selectOption("zh");
-  await addChineseHandwritingFeedback(originalAttemptId!);
-  const originalResultsUrl =
-    `${apiBaseUrl}/v1/attempts/${originalAttemptId}/results`;
-  await page.route(originalResultsUrl, async (route) => {
-    await route.fulfill({
-      status: 503,
-      contentType: "application/json",
-      body: JSON.stringify({ detail: "temporary result status failure" }),
-    });
-  });
+  await addChineseHandwritingFeedback(originalAttemptId!, true);
   const originalQuestionSubmission = page.waitForResponse(
     (response) =>
       response
@@ -3302,7 +3306,6 @@ test("parent creation reaches child grading and correction through the API", asy
   await expect(
     page.getByText("暂时无法确认批改状态。已提交的答案已安全保存。"),
   ).toBeVisible();
-  await page.unroute(originalResultsUrl);
   await page.getByRole("button", { name: "刷新批改状态" }).click();
   const originalProcessedResponse = await request.post(
     `${apiBaseUrl}/v1/demo/jobs/process-next`,
