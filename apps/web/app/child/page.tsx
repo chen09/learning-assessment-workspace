@@ -13,6 +13,8 @@ import {
   getTodayReviews,
 } from "@/lib/api-client";
 
+const EMPTY_PLAN_POLL_MS = 10_000;
+
 function assignmentHref(assignment: ChildAssignmentSummary) {
   if (
     assignment.latest_attempt_id &&
@@ -94,6 +96,19 @@ function ChildHomeContent() {
       window.removeEventListener("focus", refreshWhenReturning);
     };
   }, [refreshPlan]);
+
+  useEffect(() => {
+    if (loadState !== "ready" || assignments.length > 0) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      void refreshPlan();
+    }, EMPTY_PLAN_POLL_MS);
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [assignments.length, loadState, refreshPlan]);
 
   const refreshAfterAssignment = async () => {
     setIsRefreshing(true);

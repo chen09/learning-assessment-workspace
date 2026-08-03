@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import ChildHomePage from "@/app/child/page";
@@ -176,6 +176,36 @@ describe("ChildHomePage", () => {
     expect(
       await screen.findByRole("heading", { name: "Algebra & English warm-up" }),
     ).toBeInTheDocument();
+  });
+
+  it("automatically refreshes an empty plan after a parent assigns new work", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mocks.getChildAssignments
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([assignment]);
+
+    try {
+      render(<ChildHomePage />);
+
+      expect(
+        await screen.findByText("目前没有待完成的练习。"),
+      ).toBeInTheDocument();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
+
+      await waitFor(() => {
+        expect(mocks.getChildAssignments).toHaveBeenCalledTimes(2);
+      });
+      expect(
+        await screen.findByRole("heading", {
+          name: "Algebra & English warm-up",
+        }),
+      ).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("lets a child retry a temporarily unavailable plan without reloading", async () => {
