@@ -21,6 +21,8 @@ import {
 
 type LoadState = "loading" | "ready" | "missing" | "error";
 
+const HISTORY_PROGRESS_POLL_MS = 5_000;
+
 const statusTranslationKeys = {
   draft: "history.status.draft",
   confirmed: "history.status.confirmed",
@@ -152,6 +154,47 @@ function ParentHistoryContent() {
       active = false;
     };
   }, [familyId, reloadVersion]);
+
+  const hasLiveProgress =
+    items.some((item) => ["submitted", "grading"].includes(item.status)) ||
+    completedWorksheetImports.some((item) =>
+      ["processing", "grading"].includes(item.status),
+    );
+
+  useEffect(() => {
+    if (!familyId || !hasLiveProgress) {
+      return;
+    }
+
+    let active = true;
+    const refreshProgress = async () => {
+      try {
+        const token = await getParentAccessToken();
+        if (!active || !token) {
+          return;
+        }
+        const [historyItems, paperImports] = await Promise.all([
+          getFamilyHistory(familyId, token),
+          getCompletedWorksheetImports(familyId, token),
+        ]);
+        if (!active) {
+          return;
+        }
+        setItems(historyItems);
+        setCompletedWorksheetImports(paperImports);
+      } catch {
+        // Preserve the visible records and retry on the next scheduled refresh.
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      void refreshProgress();
+    }, HISTORY_PROGRESS_POLL_MS);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
+  }, [familyId, hasLiveProgress]);
 
   const selectFamily = (nextFamilyId: string) => {
     const url = new URL(window.location.href);

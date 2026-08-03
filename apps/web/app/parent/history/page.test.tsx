@@ -109,6 +109,41 @@ describe("ParentHistoryPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("refreshes an in-progress grading record without reloading the family selector", async () => {
+    const gradingRecord = [
+      {
+        assignment_id: "assignment-poll",
+        attempt_id: "attempt-poll",
+        child_id: "child-1",
+        child_nickname: "Maya",
+        title: "Handwritten algebra",
+        status: "grading",
+        submitted_at: "2026-08-03T12:00:00Z",
+        awarded_points: 0,
+        available_points: 10,
+        correction_count: 0,
+      },
+    ];
+    mocks.getFamilyHistory.mockResolvedValue(gradingRecord);
+
+    render(<ParentHistoryPage />);
+
+    expect(await screen.findByText("Being checked")).toBeInTheDocument();
+    const historyCallsBeforeRefresh = mocks.getFamilyHistory.mock.calls.length;
+    const familyCallsBeforeRefresh = mocks.getFamilies.mock.calls.length;
+    mocks.getFamilyHistory.mockResolvedValueOnce([
+      { ...gradingRecord[0], status: "results_ready", awarded_points: 8 },
+    ]);
+
+    await new Promise((resolve) => window.setTimeout(resolve, 5_050));
+
+    expect(mocks.getFamilyHistory).toHaveBeenCalledTimes(
+      historyCallsBeforeRefresh + 1,
+    );
+    expect(mocks.getFamilies).toHaveBeenCalledTimes(familyCallsBeforeRefresh);
+    expect(await screen.findByText("Results ready")).toBeInTheDocument();
+  }, 10_000);
+
   it("links a reviewed paper scan to its real grading results", async () => {
     mocks.getFamilyHistory.mockResolvedValue([]);
     mocks.getCompletedWorksheetImports.mockResolvedValue([
