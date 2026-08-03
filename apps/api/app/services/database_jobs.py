@@ -62,6 +62,97 @@ def _localized_text(value: Any) -> str:
     return ""
 
 
+def _linked_assignment_review_draft(
+    question_rows: list[asyncpg.Record],
+    *,
+    source_assignment_id: object,
+    source_page_count: int,
+) -> dict[str, Any] | None:
+    """Create a reviewable paper map without reinterpreting the original set."""
+    if not question_rows:
+        return None
+    first = question_rows[0]
+    tags_by_code: dict[str, str] = {}
+    questions: list[dict[str, Any]] = []
+    for row in question_rows:
+        code = str(row["knowledge_code"] or "linked-assignment")
+        label = _localized_text(_json_value(row["knowledge_label"])) or code
+        tags_by_code.setdefault(code, label)
+        raw_options = _json_value(row["options"])
+        raw_answer_key = _json_value(row["answer_key"])
+        raw_rubric = _json_value(row["rubric"])
+        questions.append(
+            {
+                "position": row["position"],
+                "type": str(row["type"]),
+                "prompt": _localized_text(_json_value(row["prompt"])),
+                "options": (
+                    [str(option) for option in raw_options]
+                    if isinstance(raw_options, list)
+                    else []
+                ),
+                # These original values are parent-private and are reused by
+                # confirmation; scan extraction must never replace them.
+                "answer_key": (
+                    raw_answer_key if isinstance(raw_answer_key, dict) else {}
+                ),
+                "rubric": raw_rubric if isinstance(raw_rubric, dict) else {},
+                "points": float(row["points"]),
+                "knowledge_code": code,
+            }
+        )
+    locale = str(first["locale"])
+    if locale not in {"en", "ja", "zh"}:
+        locale = "en"
+    difficulty = str(first["difficulty"])
+    if difficulty not in {"reinforcement", "standard", "challenge", "adaptive"}:
+        difficulty = "standard"
+    page_numbers = list(range(1, max(source_page_count, 1) + 1))
+    return {
+        "schema_version": "1.0",
+        "status": "needs_parent_confirmation",
+        "artifact_kind": "completed_worksheet_scan",
+        "source_page_count": source_page_count,
+        "source_assignment_id": str(source_assignment_id),
+        "warnings": [
+            "The original questions and private answer keys were retained. "
+            "Confirm each answer area before grading."
+        ],
+        "document": {
+            "schema_version": "1.0",
+            "question_set": {
+                "title": str(first["title"]),
+                "subject": str(first["subject"]),
+                "locale": locale,
+                "difficulty": difficulty,
+                "source_mode": "convert",
+                "instructions": _localized_text(
+                    _json_value(first["instructions"])
+                )
+                or None,
+                "estimated_minutes": max(1, len(questions)),
+                "source_summary": {
+                    "source_kind": "printed_assignment",
+                    "source_assignment_id": str(source_assignment_id),
+                },
+            },
+            "knowledge_tags": [
+                {"code": code, "label": label}
+                for code, label in tags_by_code.items()
+            ],
+            "questions": questions,
+        },
+        "answer_regions": [
+            {
+                "question_position": question["position"],
+                "page_numbers": page_numbers,
+                "legibility": "uncertain",
+            }
+            for question in questions
+        ],
+    }
+
+
 def _response_photo_paths(response: SavedResponse | None) -> list[str]:
     """Return only persisted private photo paths, never signed viewer URLs."""
     if response is None or response.kind != ResponseKind.PHOTO:
@@ -194,7 +285,7 @@ async def fixture_job_handler(
     if job["type"] == "analyze_completed_worksheet":
         worksheet = await connection.fetchrow(
             """
-            select id, family_id, child_id, title, subject, document_language,
+            select id, family_id, child_id, source_assignment_id, title, subject, document_language,
                    feedback_language, filenames, response_paths,
                    answer_source_paths, reference_source_paths
             from public.completed_worksheet_imports
@@ -209,6 +300,29 @@ async def fixture_job_handler(
         reference_source_paths = list(
             _json_value(worksheet["reference_source_paths"])
         )
+        linked_review: dict[str, Any] | None = None
+        if worksheet["source_assignment_id"] is not None:
+            linked_question_rows = await connection.fetch(
+                """
+                select qs.title, qs.subject, qs.locale, qs.difficulty, qs.instructions,
+                       q.position, q.type, q.prompt, q.options, q.answer_key, q.rubric,
+                       q.points, kt.code as knowledge_code, kt.label as knowledge_label
+                from public.assignments a
+                join public.question_sets qs on qs.id = a.question_set_id
+                join public.questions q on q.question_set_id = qs.id
+                left join public.knowledge_tags kt on kt.id = q.primary_knowledge_tag_id
+                where a.id = $1 and a.family_id = $2 and a.child_id = $3
+                order by q.position
+                """,
+                worksheet["source_assignment_id"],
+                worksheet["family_id"],
+                worksheet["child_id"],
+            )
+            linked_review = _linked_assignment_review_draft(
+                list(linked_question_rows),
+                source_assignment_id=worksheet["source_assignment_id"],
+                source_page_count=len(response_paths),
+            )
         extraction: dict[str, Any] = {
             "schema_version": "1.0",
             "status": "needs_parent_confirmation",
@@ -219,6 +333,8 @@ async def fixture_job_handler(
                 "No question boundaries are final until a parent confirms them."
             ],
         }
+        if linked_review is not None:
+            extraction = linked_review
         adapter_name = "fixture-v1"
         worksheet_adapter = _visual_adapter_for_family(
             visual_adapter,
@@ -280,6 +396,26 @@ async def fixture_job_handler(
                     )
                     extraction = drafted.model_dump(mode="json")
                     extraction["source_page_count"] = len(response_images)
+                    if linked_review is not None:
+                        extraction = linked_review
+                        extraction["source_page_count"] = len(response_images)
+                        extraction["answer_regions"] = [
+                            region
+                            for region in drafted.model_dump(mode="json").get(
+                                "answer_regions", []
+                            )
+                            if isinstance(region, dict)
+                            and isinstance(region.get("question_position"), int)
+                            and 1
+                            <= region["question_position"]
+                            <= len(linked_review["document"]["questions"])
+                        ]
+                        if len(extraction["answer_regions"]) != len(
+                            linked_review["document"]["questions"]
+                        ):
+                            extraction["answer_regions"] = linked_review[
+                                "answer_regions"
+                            ]
                     adapter_name = worksheet_adapter.version
                 else:
                     extraction["warnings"].append(

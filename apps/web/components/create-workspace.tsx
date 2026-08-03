@@ -708,6 +708,9 @@ function CreateWorkspaceContent() {
   const [completedWorksheetId, setCompletedWorksheetId] = useState<string | null>(
     null,
   );
+  const [completedSourceAssignmentId, setCompletedSourceAssignmentId] = useState<
+    string | null
+  >(null);
   const [completedReviewFile, setCompletedReviewFile] = useState<File | null>(
     null,
   );
@@ -929,6 +932,7 @@ function CreateWorkspaceContent() {
     url.searchParams.delete("completedWorksheetId");
     window.history.replaceState(window.history.state, "", url);
     setCompletedWorksheetId(null);
+    setCompletedSourceAssignmentId(null);
     setCompletedWorksheetStatus(null);
     setCompletedPaperFailureCode(null);
     setCompletedResponsePaths([]);
@@ -1154,6 +1158,7 @@ function CreateWorkspaceContent() {
       setDraftQuestions([]);
       setVariantSource(null);
       setCompletedWorksheetId(null);
+      setCompletedSourceAssignmentId(null);
       setCompletedWorksheetStatus(null);
       setCompletedPaperFailureCode(null);
       setCompletedResponsePaths([]);
@@ -1259,6 +1264,7 @@ function CreateWorkspaceContent() {
           return;
         }
         setCompletedWorksheetId(imported.id);
+        setCompletedSourceAssignmentId(imported.source_assignment_id);
         setCompletedWorksheetStatus(imported.status);
         setCompletedPaperFailureCode(imported.job.error_code ?? null);
         setCompletedResponsePaths(imported.response_paths);
@@ -1524,6 +1530,7 @@ function CreateWorkspaceContent() {
         );
         if (active) {
           setCompletedWorksheetStatus(imported.status);
+          setCompletedSourceAssignmentId(imported.source_assignment_id);
           setCompletedPaperFailureCode(imported.job.error_code ?? null);
           setCompletedResponsePaths(imported.response_paths);
           setCompletedResponseFileNames(imported.filenames);
@@ -1837,6 +1844,7 @@ function CreateWorkspaceContent() {
         }
         saveCompletedWorksheetRecoveryLink(imported.id);
         setCompletedWorksheetId(imported.id);
+        setCompletedSourceAssignmentId(imported.source_assignment_id);
         setCompletedWorksheetStatus(imported.status);
         setCompletedResponsePaths(imported.response_paths);
         setCompletedResponsePageCount(
@@ -3047,9 +3055,16 @@ function CreateWorkspaceContent() {
           ) : completedWorksheetStatus === "needs_review" ? (
             <div className="stacked-form">
               {completedReviewSource === "ai" ? (
-                <p className="status-pill cool">
-                  {t("completedPaper.serverDraft")}
-                </p>
+                <>
+                  <p className="status-pill cool">
+                    {t("completedPaper.serverDraft")}
+                  </p>
+                  {completedSourceAssignmentId ? (
+                    <p className="status-pill cool">
+                      {t("completedPaper.sourceAssignmentDraft")}
+                    </p>
+                  ) : null}
+                </>
               ) : (
                 <details open>
                   <summary>{t("completedPaper.prepareLocal")}</summary>
@@ -3136,6 +3151,7 @@ function CreateWorkspaceContent() {
                                   prompt: event.target.value,
                                 }))
                               }
+                              disabled={Boolean(completedSourceAssignmentId)}
                               value={question.prompt}
                             />
                           </label>
@@ -3155,6 +3171,7 @@ function CreateWorkspaceContent() {
                                     },
                                   }))
                                 }
+                                disabled={Boolean(completedSourceAssignmentId)}
                                 value={
                                   typeof question.answer_key.reference === "string"
                                     ? question.answer_key.reference
@@ -3183,6 +3200,7 @@ function CreateWorkspaceContent() {
                                     };
                                   })
                                 }
+                                disabled={Boolean(completedSourceAssignmentId)}
                                 value={
                                   typeof question.answer_key.text === "string"
                                     ? question.answer_key.text
@@ -3212,6 +3230,7 @@ function CreateWorkspaceContent() {
                                     },
                                   }))
                                 }
+                                disabled={Boolean(completedSourceAssignmentId)}
                                 value={
                                   typeof question.answer_key.choice === "number"
                                     ? String(question.answer_key.choice)
@@ -3287,6 +3306,7 @@ function CreateWorkspaceContent() {
                                           },
                                         )
                                       }
+                                      disabled={Boolean(completedSourceAssignmentId)}
                                       type="checkbox"
                                     />
                                     <span>{option}</span>
@@ -3314,6 +3334,7 @@ function CreateWorkspaceContent() {
                                     },
                                   }))
                                 }
+                                disabled={Boolean(completedSourceAssignmentId)}
                                 value={
                                   Array.isArray(question.answer_key.tokens)
                                     ? question.answer_key.tokens
@@ -3411,7 +3432,10 @@ function CreateWorkspaceContent() {
                           ) : null}
                           <button
                             className="text-button completed-paper-remove-question"
-                            disabled={completedReview.document.questions.length <= 1}
+                            disabled={
+                              Boolean(completedSourceAssignmentId) ||
+                              completedReview.document.questions.length <= 1
+                            }
                             onClick={() => removeCompletedPaperQuestion(question.position)}
                             type="button"
                           >
@@ -3425,6 +3449,7 @@ function CreateWorkspaceContent() {
                     </ol>
                     <button
                       className="button secondary completed-paper-add-question"
+                      disabled={Boolean(completedSourceAssignmentId)}
                       onClick={addCompletedPaperHandwritingQuestion}
                       type="button"
                     >

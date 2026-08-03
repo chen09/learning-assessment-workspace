@@ -161,6 +161,7 @@ describe("CreateWorkspace", () => {
     mocks.getCompletedWorksheetImport.mockResolvedValue({
       id: "completed-worksheet-1",
       status: "needs_review",
+      source_assignment_id: "printed-assignment-1",
       assignment_id: null,
       attempt_id: null,
       filenames: ["completed-paper-front.jpg", "completed-paper-back.jpg"],
@@ -221,6 +222,15 @@ describe("CreateWorkspace", () => {
       "parent-token",
     );
     expect(screen.getByDisplayValue("Complete: She ___ to school.")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "This scan is linked to the printed assignment. Questions and scoring stay fixed; review answer pages and handwriting only.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "Question 1 wording" }),
+    ).toBeDisabled();
+    expect(screen.getByRole("textbox", { name: "Answer page numbers for question 1" })).not.toBeDisabled();
     expect(
       screen.getByRole("img", { name: "Completed worksheet page 1" }),
     ).toHaveAttribute(

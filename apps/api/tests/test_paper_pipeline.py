@@ -111,6 +111,7 @@ async def test_completed_paper_without_an_allowed_ai_adapter_stays_manual_review
                 "id": "worksheet-1",
                 "family_id": "family-1",
                 "child_id": "child-1",
+                "source_assignment_id": None,
                 "title": "Completed worksheet",
                 "subject": "English",
                 "document_language": "en",

@@ -347,6 +347,20 @@ async def test_postgres_vertical_flow_and_family_isolation() -> None:
         # Keep the shared single-worker queue in the same state expected by
         # the remaining assignment-grading assertions below.
         assert await worker.run_once() is True
+        reviewed_linked_paper = await repository.get_completed_worksheet_import(
+            str(linked_completed_paper.id),
+            str(parent_a),
+        )
+        linked_review_document = reviewed_linked_paper.extraction["document"]
+        assert linked_review_document["question_set"]["title"] == confirmed.title
+        assert len(linked_review_document["questions"]) == 3
+        assert linked_review_document["questions"][0]["answer_key"] == {
+            "choice": 1
+        }
+        assert [
+            region["question_position"]
+            for region in reviewed_linked_paper.extraction["answer_regions"]
+        ] == [1, 2, 3]
         linked_confirmation = await repository.confirm_completed_worksheet_import(
             str(linked_completed_paper.id),
             document=ImportDocument.model_validate(

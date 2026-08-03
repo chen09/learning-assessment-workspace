@@ -867,6 +867,8 @@ const messages = {
       "Attach the original pages to your local AI, copy this prompt, and save its JSON-only response. The prompt never asks for a storage path; this app adds the private paper reference itself.",
     "completedPaper.serverDraft":
       "A private AI draft is ready. Review every question and answer region before confirming.",
+    "completedPaper.sourceAssignmentDraft":
+      "This scan is linked to the printed assignment. Questions and scoring stay fixed; review answer pages and handwriting only.",
     "completedPaper.promptCopied": "Prompt copied",
     "completedPaper.copyPrompt": "Copy local AI prompt",
     "completedPaper.reviewJson": "Reviewed completed worksheet JSON",
@@ -1843,6 +1845,8 @@ const messages = {
       "元のページをローカル AI に添付し、このプロンプトをコピーして JSON だけの回答を保存してください。プロンプトは保存先パスを求めず、このアプリが非公開のプリント参照を追加します。",
     "completedPaper.serverDraft":
       "非公開 AI の下書きができました。確認前に、すべての問題と解答エリアを確認してください。",
+    "completedPaper.sourceAssignmentDraft":
+      "このスキャンは印刷した課題に紐づいています。問題と採点基準は固定です。解答ページと筆跡だけを確認してください。",
     "completedPaper.promptCopied": "プロンプトをコピーしました",
     "completedPaper.copyPrompt": "ローカル AI プロンプトをコピー",
     "completedPaper.reviewJson": "確認済みプリントの JSON",
@@ -2790,6 +2794,8 @@ const messages = {
       "将原始页面附给本地 AI，复制此提示词，并保存它只含 JSON 的回答。提示词不会要求存储路径；应用会自行添加私密试卷引用。",
     "completedPaper.serverDraft":
       "私密 AI 草稿已生成。确认前请逐题核对题目和答题区域。",
+    "completedPaper.sourceAssignmentDraft":
+      "这份扫描件关联到已打印题单。题目和评分标准已固定，请只核对答题页和手写内容。",
     "completedPaper.promptCopied": "提示词已复制",
     "completedPaper.copyPrompt": "复制本地 AI 提示词",
     "completedPaper.reviewJson": "已审核试卷 JSON",

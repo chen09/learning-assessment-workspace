@@ -624,6 +624,25 @@ def test_confirming_a_linked_print_scan_reuses_the_original_assignment() -> None
         },
     ]
 
+    incomplete = client.post(
+        f"/v1/completed-worksheets/{created.json()['id']}/confirm",
+        headers={
+            **PARENT_HEADERS,
+            "Idempotency-Key": "confirm-linked-print-scan-incomplete",
+        },
+        json={
+            "document": reviewed_document,
+            "responses": [
+                {
+                    "question_position": 1,
+                    "kind": "choice",
+                    "answer": {"choices": [0], "page_numbers": [1]},
+                },
+            ],
+        },
+    )
+    assert incomplete.status_code == 422
+
     confirmed = client.post(
         f"/v1/completed-worksheets/{created.json()['id']}/confirm",
         headers={
