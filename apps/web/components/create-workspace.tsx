@@ -743,6 +743,12 @@ function CreateWorkspaceContent() {
     setFileName(reordered.map((file) => file.name).join(", "));
   };
 
+  const removeCompletedPaperPage = (index: number) => {
+    const remaining = files.filter((_, fileIndex) => fileIndex !== index);
+    setFiles(remaining);
+    setFileName(remaining.map((file) => file.name).join(", "));
+  };
+
   useEffect(() => {
     const reopenCreateRouteFromHistory = () => {
       setMode("generate");
@@ -4025,6 +4031,16 @@ function CreateWorkspaceContent() {
                               ↓
                             </button>
                           ) : null}
+                          <button
+                            aria-label={t("completedPaper.removePage", {
+                              page,
+                            })}
+                            className="text-button"
+                            onClick={() => removeCompletedPaperPage(index)}
+                            type="button"
+                          >
+                            ×
+                          </button>
                         </div>
                       </li>
                     );

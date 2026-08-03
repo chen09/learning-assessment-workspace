@@ -914,6 +914,7 @@ const messages = {
     "completedPaper.selectedPages": "Selected pages (upload order)",
     "completedPaper.movePageEarlier": "Move page {page} earlier",
     "completedPaper.movePageLater": "Move page {page} later",
+    "completedPaper.removePage": "Remove page {page}",
     "childExit.eyebrow": "Parent check",
     "childExit.title": "Enter your management PIN",
     "childExit.help":
@@ -1829,6 +1830,7 @@ const messages = {
     "completedPaper.selectedPages": "選択したページ（アップロード順）",
     "completedPaper.movePageEarlier": "{page} ページを前へ移動",
     "completedPaper.movePageLater": "{page} ページを後へ移動",
+    "completedPaper.removePage": "{page} ページを削除",
     "childExit.eyebrow": "保護者の確認",
     "childExit.title": "保護者管理 PIN を入力",
     "childExit.help":
@@ -2715,6 +2717,7 @@ const messages = {
     "completedPaper.selectedPages": "已选页面（上传顺序）",
     "completedPaper.movePageEarlier": "将第 {page} 页前移",
     "completedPaper.movePageLater": "将第 {page} 页后移",
+    "completedPaper.removePage": "移除第 {page} 页",
     "childExit.eyebrow": "家长确认",
     "childExit.title": "输入家长管理 PIN",
     "childExit.help":

@@ -2223,6 +2223,11 @@ test("parent validates a local-AI completed-paper review before submitting it", 
       mimeType: "image/jpeg",
       buffer: Buffer.from("completed-paper-back"),
     },
+    {
+      name: "completed-paper-extra.jpg",
+      mimeType: "image/jpeg",
+      buffer: Buffer.from("completed-paper-extra"),
+    },
   ]);
   const selectedPages = page.getByRole("list", {
     name: "Selected pages (upload order)",
@@ -2230,6 +2235,9 @@ test("parent validates a local-AI completed-paper review before submitting it", 
   await expect(selectedPages.getByRole("listitem").first()).toContainText(
     "front.jpg",
   );
+  await page.getByRole("button", { name: "Remove page 3" }).click();
+  await expect(selectedPages.getByRole("listitem")).toHaveCount(2);
+  await expect(selectedPages).not.toContainText("extra.jpg");
   await page.getByRole("button", { name: "Move page 2 earlier" }).click();
   await expect(selectedPages.getByRole("listitem").first()).toContainText(
     "back.jpg",

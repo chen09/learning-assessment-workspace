@@ -885,6 +885,14 @@ describe("CreateWorkspace", () => {
         .getAllByRole("listitem")
         .map((item) => item.querySelector("span")?.textContent),
     ).toEqual(["back.jpg", "front.jpg"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove page 1" }));
+
+    expect(
+      within(selectedPages)
+        .getAllByRole("listitem")
+        .map((item) => item.querySelector("span")?.textContent),
+    ).toEqual(["front.jpg"]);
   });
 
   it("never substitutes sample questions when a structured preview unexpectedly returns an empty draft", async () => {
