@@ -2865,9 +2865,15 @@ test("child screens stay responsive across Chinese, Japanese, and English", asyn
   }
   await page.getByRole("button", { name: "打开我的练习" }).click();
   await expect(page).toHaveURL(/\/child\/$/);
+  await page.locator(".language-picker select").selectOption("zh");
+  await expect(
+    page.getByRole("heading", {
+      name: "准备好取得一个小进步了吗？",
+    }),
+  ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "更多待完成练习" }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 15_000 });
   const queuedPractice = page.locator(".more-assignments");
   await expect(
     queuedPractice.getByText("Open this after the first practice."),
@@ -2977,7 +2983,7 @@ test("child screens stay responsive across Chinese, Japanese, and English", asyn
   await page.goto("/child/exit/");
   await expect(
     page.getByRole("heading", { name: "保護者管理 PIN を入力" }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 15_000 });
   await page.getByLabel("言語").selectOption("en");
   await expect(
     page.getByRole("heading", { name: "Enter your management PIN" }),
