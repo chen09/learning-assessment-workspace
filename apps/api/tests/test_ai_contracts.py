@@ -282,6 +282,9 @@ def test_codex_cli_only_returns_a_parent_review_draft_for_completed_paper(
     def fake_runner(command: list[str], timeout_seconds: int) -> None:
         observed["command"] = command
         observed["timeout_seconds"] = timeout_seconds
+        schema_path = command[command.index("--output-schema") + 1]
+        with open(schema_path, encoding="utf-8") as schema_file:
+            observed["output_schema"] = json.load(schema_file)
         output_path = command[command.index("--output-last-message") + 1]
         with open(output_path, "w", encoding="utf-8") as output:
             output.write(
@@ -290,18 +293,13 @@ def test_codex_cli_only_returns_a_parent_review_draft_for_completed_paper(
                         "schema_version": "1.0",
                         "status": "needs_parent_confirmation",
                         "document": {
-                            "schema_version": "1.0",
                             "question_set": {
                                 "title": "Factorisation review",
                                 "subject": "Mathematics",
                                 "locale": "ja",
                                 "difficulty": "standard",
-                                "source_mode": "convert",
                                 "instructions": "Answer every question.",
                                 "estimated_minutes": 10,
-                                "source_summary": {
-                                    "source_kind": "completed_worksheet"
-                                },
                             },
                             "knowledge_tags": [
                                 {"code": "factorisation", "label": "Factorisation"}
@@ -351,6 +349,9 @@ def test_codex_cli_only_returns_a_parent_review_draft_for_completed_paper(
     )
     assert command.index(completed_prompt) < command.index("--image")
     assert "needs_parent_confirmation" in completed_prompt
+    output_schema = observed["output_schema"]
+    assert isinstance(output_schema, dict)
+    assert '"additionalProperties": true' not in json.dumps(output_schema)
     assert observed["timeout_seconds"] == 180
     assert result.status == "needs_parent_confirmation"
     assert result.document.questions[0].type == QuestionType.HANDWRITING
