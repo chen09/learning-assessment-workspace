@@ -3622,6 +3622,13 @@ function CreateWorkspaceContent() {
   }
 
   if (stage === "review") {
+    const reviewKnowledgePoints = Array.from(
+      new Set(
+        (structuredDocument?.knowledge_tags ?? [])
+          .map((tag) => tag.label.trim())
+          .filter(Boolean),
+      ),
+    );
     return (
       <>
         <header className="page-header">
@@ -3654,6 +3661,13 @@ function CreateWorkspaceContent() {
                 : t("draftReview.practice")}
           </span>
         </div>
+        {reviewKnowledgePoints.length > 0 ? (
+          <p className="draft-knowledge-points">
+            {t("draftReview.knowledgePoints", {
+              points: reviewKnowledgePoints.join(" · "),
+            })}
+          </p>
+        ) : null}
         <section className="draft-question-list">
           {draftQuestions.length === 0 ? (
             <div className="empty-state" role="status">

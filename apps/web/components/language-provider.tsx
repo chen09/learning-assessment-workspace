@@ -171,6 +171,7 @@ const messages = {
     "draftReview.description":
       "Check wording, answers, difficulty, and response type. Children cannot see this until you confirm it.",
     "draftReview.private": "Draft · not visible to children",
+    "draftReview.knowledgePoints": "Knowledge points: {points}",
     "draftReview.questions": "{count} questions",
     "draftReview.validated": "validated JSON · answers stay private",
     "draftReview.timed": "{minutes}-minute timed exam",
@@ -1146,6 +1147,7 @@ const messages = {
     "draftReview.description":
       "問題文、答え、難易度、解答形式を確認してください。確認するまで子どもには表示されません。",
     "draftReview.private": "下書き · 子どもには非表示",
+    "draftReview.knowledgePoints": "知識点：{points}",
     "draftReview.questions": "{count} 問",
     "draftReview.validated": "検証済み JSON · 答えは非公開のままです",
     "draftReview.timed": "{minutes}分の時間制限テスト",
@@ -2113,6 +2115,7 @@ const messages = {
     "draftReview.description":
       "请核对题目、答案、难度和作答形式。确认前孩子看不到这些内容。",
     "draftReview.private": "草稿 · 孩子不可见",
+    "draftReview.knowledgePoints": "知识点：{points}",
     "draftReview.questions": "{count} 道题",
     "draftReview.validated": "已验证 JSON · 答案保持私有",
     "draftReview.timed": "限时 {minutes} 分钟考试",

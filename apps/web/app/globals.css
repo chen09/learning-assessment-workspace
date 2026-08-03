@@ -3580,6 +3580,13 @@ button {
   font-size: 0.7rem;
 }
 
+.draft-knowledge-points {
+  margin: 0.7rem 0 0;
+  color: var(--blue-dark);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
 .draft-question-list {
   display: grid;
   gap: 0.7rem;

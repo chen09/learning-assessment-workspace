@@ -1113,6 +1113,7 @@ test("parent previews an AI JSON file before assigning its structured questions"
   await expect(
     page.getByRole("heading", { name: "Review before assigning" }),
   ).toBeVisible();
+  await expect(page.getByText("Knowledge points: Addition")).toBeVisible();
   await expect(
     page.locator(".draft-question-list h2").first(),
   ).toBeVisible();

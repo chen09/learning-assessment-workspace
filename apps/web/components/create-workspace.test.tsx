@@ -1501,6 +1501,7 @@ describe("CreateWorkspace", () => {
     expect(
       screen.getByRole("heading", { name: "___ it rains, stay home." }),
     ).toBeInTheDocument();
+    expect(screen.getByText("Knowledge points: if condition")).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Language"), {
       target: { value: "ja" },
@@ -1509,6 +1510,7 @@ describe("CreateWorkspace", () => {
       await screen.findByRole("heading", { name: "割り当て前に確認" }),
     ).toBeInTheDocument();
     expect(screen.getByText("AI 構造化下書き")).toBeInTheDocument();
+    expect(screen.getByText("知識点：if condition")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("radio", { name: "時間制限テスト" }));
     expect(screen.getByRole("option", { name: "10分" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("radio", { name: "練習" }));
