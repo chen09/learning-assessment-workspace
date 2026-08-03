@@ -46,6 +46,31 @@ const dashboardStatusKey = {
   stopped: "parentDashboard.status.stopped",
 } as const;
 
+const PARENT_PROGRESS_POLL_MS = 5_000;
+
+async function getPendingReviewCounts(
+  familyHistory: ParentHistoryItem[],
+  accessToken: string,
+) {
+  const reviewableAttempts = familyHistory.filter(
+    (work) =>
+      work.attempt_id !== null &&
+      ["results_ready", "correcting"].includes(work.status),
+  );
+  const reviewCounts = await Promise.allSettled(
+    reviewableAttempts.map(async (work) => {
+      const review = await getParentAttemptReview(work.attempt_id as string, accessToken);
+      return [work.attempt_id as string, review.pending_review_count] as const;
+    }),
+  );
+
+  return Object.fromEntries(
+    reviewCounts.flatMap((result) =>
+      result.status === "fulfilled" ? [result.value] : [],
+    ),
+  );
+}
+
 function getDashboardStatusKey(status: string) {
   return dashboardStatusKey[
     status as keyof typeof dashboardStatusKey
@@ -98,19 +123,9 @@ export function ParentDashboard() {
               getFamilyHistory(nextActiveFamily.id, accessToken),
             ])
           : [[], []];
-        const reviewableAttempts = nextFamilyHistory.filter(
-          (work) =>
-            work.attempt_id !== null &&
-            ["results_ready", "correcting"].includes(work.status),
-        );
-        const reviewCounts = await Promise.allSettled(
-          reviewableAttempts.map(async (work) => {
-            const review = await getParentAttemptReview(
-              work.attempt_id as string,
-              accessToken,
-            );
-            return [work.attempt_id as string, review.pending_review_count] as const;
-          }),
+        const pendingReviewCounts = await getPendingReviewCounts(
+          nextFamilyHistory,
+          accessToken,
         );
         if (!active) {
           return;
@@ -119,13 +134,7 @@ export function ParentDashboard() {
         setActiveFamilyId(nextActiveFamily?.id ?? null);
         setChildren(nextChildren);
         setFamilyHistory(nextFamilyHistory);
-        setPendingReviewCountByAttempt(
-          Object.fromEntries(
-            reviewCounts.flatMap((result) =>
-              result.status === "fulfilled" ? [result.value] : [],
-            ),
-          ),
-        );
+        setPendingReviewCountByAttempt(pendingReviewCounts);
       } catch {
         if (active && !hasParentSession) {
           router.replace("/login/");
@@ -141,6 +150,47 @@ export function ParentDashboard() {
       active = false;
     };
   }, [activeFamilyId, reloadKey, router]);
+
+  const hasLiveProgress = familyHistory.some((work) =>
+    ["submitted", "grading"].includes(work.status),
+  );
+
+  useEffect(() => {
+    if (!authenticated || !activeFamilyId || !hasLiveProgress) {
+      return;
+    }
+
+    let active = true;
+    const refreshProgress = async () => {
+      try {
+        const accessToken = await getParentAccessToken();
+        if (!active || !accessToken) {
+          return;
+        }
+        const nextFamilyHistory = await getFamilyHistory(activeFamilyId, accessToken);
+        const pendingReviewCounts = await getPendingReviewCounts(
+          nextFamilyHistory,
+          accessToken,
+        );
+        if (!active) {
+          return;
+        }
+        setFamilyHistory(nextFamilyHistory);
+        setPendingReviewCountByAttempt(pendingReviewCounts);
+      } catch {
+        // Keep the last known dashboard state visible while the next refresh retries.
+      }
+    };
+
+    const interval = window.setInterval(() => {
+      void refreshProgress();
+    }, PARENT_PROGRESS_POLL_MS);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [activeFamilyId, authenticated, hasLiveProgress]);
 
   if (!authenticated) {
     return null;

@@ -12,8 +12,10 @@ const mocks = vi.hoisted(() => ({
   replace: vi.fn(),
 }));
 
+const router = { replace: mocks.replace };
+
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace: mocks.replace }),
+  useRouter: () => router,
 }));
 
 vi.mock("@/lib/api-client", () => ({
@@ -128,6 +130,65 @@ describe("ParentDashboard", () => {
       "/parent/results?attemptId=attempt-1",
     );
   });
+
+  it("refreshes grading work without reloading the parent workspace", async () => {
+    window.localStorage.setItem("luma-language:demo-parent", "zh");
+    mocks.getFamilies.mockResolvedValue([
+      { id: "family-1", name: "肉肉如意" },
+    ]);
+    mocks.getChildren.mockResolvedValue([
+      {
+        id: "child-1",
+        family_id: "family-1",
+        nickname: "肉肉",
+        grade_stage: "Junior high 1",
+        ui_language: "zh",
+      },
+    ]);
+    const gradingWork = [
+      {
+        assignment_id: "assignment-1",
+        attempt_id: "attempt-1",
+        child_id: "child-1",
+        child_nickname: "肉肉",
+        title: "手写英文练习",
+        status: "grading",
+        submitted_at: "2026-08-02T00:00:00Z",
+        awarded_points: 0,
+        available_points: 10,
+        correction_count: 0,
+        source_material_title: null,
+        source_material_subject: null,
+      },
+    ];
+    const completedWork = [
+      {
+        ...gradingWork[0],
+        status: "results_ready",
+        awarded_points: 8,
+      },
+    ];
+    mocks.getFamilyHistory.mockResolvedValue(gradingWork);
+    mocks.getParentAttemptReview.mockResolvedValue({ pending_review_count: 1 });
+
+    render(<ParentDashboard />);
+
+    expect(await screen.findByText("正在批阅")).toBeInTheDocument();
+    const historyCallsBeforeRefresh = mocks.getFamilyHistory.mock.calls.length;
+    const familyCallsBeforeRefresh = mocks.getFamilies.mock.calls.length;
+    const childCallsBeforeRefresh = mocks.getChildren.mock.calls.length;
+    mocks.getFamilyHistory.mockResolvedValueOnce(completedWork);
+
+    await new Promise((resolve) => window.setTimeout(resolve, 5_050));
+
+    expect(mocks.getFamilyHistory).toHaveBeenCalledTimes(
+      historyCallsBeforeRefresh + 1,
+    );
+    expect(mocks.getFamilies).toHaveBeenCalledTimes(familyCallsBeforeRefresh);
+    expect(mocks.getChildren).toHaveBeenCalledTimes(childCallsBeforeRefresh);
+    expect(await screen.findByText("可查看结果")).toBeInTheDocument();
+    expect(screen.getByText("有 1 道手写题等待您确认")).toBeInTheDocument();
+  }, 10_000);
 
   it("opens child sign-in for an assigned worksheet that has not started", async () => {
     window.localStorage.setItem("luma-language:demo-parent", "zh");
