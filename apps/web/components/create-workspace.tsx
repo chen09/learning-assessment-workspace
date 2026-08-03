@@ -3835,13 +3835,11 @@ function CreateWorkspaceContent() {
                       }
                       value={assignmentDurationMinutes}
                     >
-                      <option value="10">10 minutes</option>
-                      <option value="15">15 minutes</option>
-                      <option value="30">30 minutes</option>
-                      <option value="45">45 minutes</option>
-                      <option value="60">60 minutes</option>
-                      <option value="90">90 minutes</option>
-                      <option value="120">120 minutes</option>
+                      {[10, 15, 30, 45, 60, 90, 120].map((minutes) => (
+                        <option key={minutes} value={minutes}>
+                          {t("draftReview.minutesOption", { minutes })}
+                        </option>
+                      ))}
                     </select>
                   </label>
                 ) : null}

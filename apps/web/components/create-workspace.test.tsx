@@ -1451,6 +1451,9 @@ describe("CreateWorkspace", () => {
       await screen.findByRole("heading", { name: "割り当て前に確認" }),
     ).toBeInTheDocument();
     expect(screen.getByText("AI 構造化下書き")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("radio", { name: "時間制限テスト" }));
+    expect(screen.getByRole("option", { name: "10分" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("radio", { name: "練習" }));
     fireEvent.click(screen.getByRole("button", { name: "問題 1 を編集" }));
     expect(screen.getByLabelText("問題文")).toBeInTheDocument();
     expect(screen.getByLabelText("解答形式")).toBeInTheDocument();
