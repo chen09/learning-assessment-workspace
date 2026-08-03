@@ -740,6 +740,8 @@ function CreateWorkspaceContent() {
     useState<Record<string, ReviewMediaUploadRetrySession>>({});
   const [reviewMediaUploadRetryFailed, setReviewMediaUploadRetryFailed] =
     useState(false);
+  const [reviewConfirmationRetryFailed, setReviewConfirmationRetryFailed] =
+    useState(false);
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(
     null,
   );
@@ -2054,6 +2056,7 @@ function CreateWorkspaceContent() {
       }
       setRequestStatus("working");
       setReviewMediaUploadRetryFailed(false);
+      setReviewConfirmationRetryFailed(false);
       let attemptedReviewMediaUpload = false;
       const pendingReviewMediaUploadSessions: Record<
         string,
@@ -2218,6 +2221,8 @@ function CreateWorkspaceContent() {
             ...pendingReviewMediaUploadSessions,
           }));
           setReviewMediaUploadRetryFailed(true);
+        } else {
+          setReviewConfirmationRetryFailed(true);
         }
         setRequestStatus("error");
       }
@@ -4047,7 +4052,9 @@ function CreateWorkspaceContent() {
             <p className="form-error" role="alert">
               {reviewMediaUploadRetryFailed
                 ? t("draftReview.uploadRetryFailed")
-                : t("draftReview.error")}
+                : reviewConfirmationRetryFailed
+                  ? t("draftReview.confirmRetryFailed")
+                  : t("draftReview.error")}
             </p>
           ) : null}
           <Link

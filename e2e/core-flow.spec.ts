@@ -1152,11 +1152,37 @@ test("parent previews an AI JSON file before assigning its structured questions"
   await page.getByRole("radio", { name: "Timed exam" }).check();
   await page.getByLabel("Time limit").selectOption("15");
 
+  const structuredImportUrl = `${apiBaseUrl}/v1/question-sets/imports/structured`;
+  let failNextStructuredImport = true;
+  const structuredImportIdempotencyKeys: Array<string | null> = [];
+  await page.route(structuredImportUrl, async (route) => {
+    structuredImportIdempotencyKeys.push(
+      await route.request().headerValue("Idempotency-Key"),
+    );
+    if (failNextStructuredImport) {
+      failNextStructuredImport = false;
+      await route.abort("failed");
+      return;
+    }
+    await route.fallback();
+  });
+  const failedImportRequest = page.waitForRequest(
+    (request) =>
+      request.url() === structuredImportUrl && request.method() === "POST",
+  );
+  await page.getByRole("button", { name: "Confirm and assign" }).click();
+  await failedImportRequest;
+  await expect(page.locator(".form-error[role=alert]")).toHaveText(
+    "Confirmation paused. Your reviewed questions and edits are still here; choose Confirm and assign to retry safely.",
+  );
+  await expect(
+    page.getByRole("heading", { name: "What is 3 + 3?" }),
+  ).toBeVisible();
+
   const importResponse = page.waitForResponse(
     (response) =>
-      response.url() ===
-        `${apiBaseUrl}/v1/question-sets/imports/structured` &&
-      response.request().method() === "POST",
+      response.url() === structuredImportUrl &&
+        response.request().method() === "POST",
   );
   await page.getByRole("button", { name: "Confirm and assign" }).click();
   const importedRequest = await importResponse;
@@ -1179,6 +1205,10 @@ test("parent previews an AI JSON file before assigning its structured questions"
       ],
     },
   });
+  expect(structuredImportIdempotencyKeys).toHaveLength(2);
+  expect(structuredImportIdempotencyKeys[0]).toBe(
+    structuredImportIdempotencyKeys[1],
+  );
   const assignmentId = (await importedRequest.json() as {
     assignment_id: string;
   }).assignment_id;

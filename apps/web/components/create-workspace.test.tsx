@@ -1548,6 +1548,18 @@ describe("CreateWorkspace", () => {
       target: { value: "Finish this independently first." },
     });
 
+    mocks.importStructuredQuestionSet.mockRejectedValueOnce(
+      new Error("temporary confirmation failure"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Confirm and assign" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Confirmation paused. Your reviewed questions and edits are still here; choose Confirm and assign to retry safely.",
+    );
+    expect(
+      screen.getByRole("heading", { name: "If it rains, stay home." }),
+    ).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole("button", { name: "Confirm and assign" }));
 
     await waitFor(() => {
@@ -1574,6 +1586,10 @@ describe("CreateWorkspace", () => {
         "structured-edited-import-key-child-1",
       );
     });
+    expect(mocks.importStructuredQuestionSet).toHaveBeenCalledTimes(2);
+    expect(mocks.importStructuredQuestionSet.mock.calls[0]?.[3]).toBe(
+      mocks.importStructuredQuestionSet.mock.calls[1]?.[3],
+    );
     randomUUID.mockRestore();
     expect(
       await screen.findByText("Confirmed and assigned"),

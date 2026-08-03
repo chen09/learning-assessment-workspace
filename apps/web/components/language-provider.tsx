@@ -196,6 +196,8 @@ const messages = {
       "The JSON could not be imported. Check that the family and child are still available, then try again.",
     "draftReview.uploadRetryFailed":
       "The media upload paused. Your selected files are still here; choose Confirm and assign to retry safely.",
+    "draftReview.confirmRetryFailed":
+      "Confirmation paused. Your reviewed questions and edits are still here; choose Confirm and assign to retry safely.",
     "draftReview.print": "Print A4 instead",
     "draftReview.openChildSignIn": "Open child sign-in",
     "draftReview.copyChildSignIn": "Copy child sign-in link",
@@ -1167,6 +1169,8 @@ const messages = {
       "JSON を読み込めませんでした。家族と子どもが利用できることを確認して、もう一度お試しください。",
     "draftReview.uploadRetryFailed":
       "メディアのアップロードが中断されました。選択したファイルは残っています。「確認して割り当て」を選ぶと安全に再試行できます。",
+    "draftReview.confirmRetryFailed":
+      "確認が中断されました。確認済みの問題と編集内容はそのまま残っています。「確認して割り当て」を選んで安全に再試行できます。",
     "draftReview.print": "代わりに A4 で印刷",
     "draftReview.openChildSignIn": "子どものログインを開く",
     "draftReview.copyChildSignIn": "子どものログインリンクをコピー",
@@ -2130,6 +2134,8 @@ const messages = {
       "无法导入 JSON。请确认家庭和孩子仍可使用后重试。",
     "draftReview.uploadRetryFailed":
       "媒体上传中断了。已选择的文件仍在这里；选择“确认并布置”即可安全重试。",
+    "draftReview.confirmRetryFailed":
+      "确认已中断。审核过的题目和编辑内容仍保留在这里；点击“确认并布置”即可安全重试。",
     "draftReview.print": "改用 A4 打印",
     "draftReview.openChildSignIn": "打开孩子登录页",
     "draftReview.copyChildSignIn": "复制孩子登录链接",
