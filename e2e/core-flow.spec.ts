@@ -2245,10 +2245,11 @@ test("parent validates a local-AI completed-paper review before submitting it", 
     name: "Preview of Page 1 of 3",
   });
   await expect(fullSizePreview).toBeVisible();
+  await expect(fullSizePreview).toBeFocused();
   await expect(
     fullSizePreview.getByRole("img", { name: "Preview of Page 1 of 3" }),
   ).toHaveAttribute("src", /^blob:/);
-  await page.getByRole("button", { name: "Close preview" }).click();
+  await page.keyboard.press("Escape");
   await expect(fullSizePreview).toBeHidden();
   await expect(selectedPages.getByRole("listitem").first()).toContainText(
     "front.jpg",

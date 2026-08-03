@@ -907,11 +907,15 @@ describe("CreateWorkspace", () => {
         name: "Open full-size preview of Page 1 of 2",
       }),
     );
-    expect(screen.getByRole("dialog", { name: "Preview of Page 1 of 2" })).toBeVisible();
+    const previewDialog = screen.getByRole("dialog", {
+      name: "Preview of Page 1 of 2",
+    });
+    expect(previewDialog).toBeVisible();
+    expect(previewDialog).toHaveFocus();
     expect(
-      screen.getByRole("dialog", { name: "Preview of Page 1 of 2" }).querySelector("img"),
+      previewDialog.querySelector("img"),
     ).toHaveAttribute("src", "blob:selected-front.jpg");
-    fireEvent.click(screen.getByRole("button", { name: "Close preview" }));
+    fireEvent.keyDown(previewDialog, { key: "Escape" });
     expect(
       screen.queryByRole("dialog", { name: "Preview of Page 1 of 2" }),
     ).not.toBeInTheDocument();

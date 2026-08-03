@@ -542,6 +542,12 @@ function CreateWorkspaceContent() {
     label: string;
     url: string;
   } | null>(null);
+  const expandedPaperPreviewDialogRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (expandedPaperPreview) {
+      expandedPaperPreviewDialogRef.current?.focus();
+    }
+  }, [expandedPaperPreview]);
   const {
     previews: completedPaperPreviews,
     updatePreviews: updateCompletedPaperPreviews,
@@ -4291,6 +4297,7 @@ function CreateWorkspaceContent() {
                       setExpandedPaperPreview(null);
                     }
                   }}
+                  ref={expandedPaperPreviewDialogRef}
                   role="dialog"
                   tabIndex={-1}
                 >
