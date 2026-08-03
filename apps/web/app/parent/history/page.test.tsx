@@ -108,6 +108,44 @@ describe("ParentHistoryPage", () => {
     );
   });
 
+  it("applies the child filter to pending and submitted paper scans", async () => {
+    mocks.getFamilyHistory.mockResolvedValue([]);
+    mocks.getCompletedWorksheetImports.mockResolvedValue([
+      {
+        id: "paper-child-1",
+        family_id: "family-1",
+        child_id: "child-1",
+        child_nickname: "Maya",
+        title: "Maya pending paper",
+        subject: "Mathematics",
+        status: "needs_review",
+        job_status: "succeeded",
+        assignment_id: null,
+        attempt_id: null,
+      },
+      {
+        id: "paper-child-2",
+        family_id: "family-1",
+        child_id: "child-2",
+        child_nickname: "Leo",
+        title: "Leo submitted paper",
+        subject: "English",
+        status: "results_ready",
+        job_status: "succeeded",
+        assignment_id: "assignment-2",
+        attempt_id: "attempt-2",
+      },
+    ]);
+
+    render(<ParentHistoryPage />);
+
+    await screen.findByRole("heading", { name: "Paper uploads to review" });
+    fireEvent.click(screen.getByRole("button", { name: "Maya" }));
+
+    expect(screen.getByRole("heading", { name: "Maya pending paper" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Leo submitted paper" })).not.toBeInTheDocument();
+  });
+
   it("opens the first family when history is opened from the sidebar", async () => {
     window.history.replaceState({}, "", "/parent/history/");
     mocks.getFamilies.mockResolvedValue([

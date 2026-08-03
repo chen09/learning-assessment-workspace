@@ -176,16 +176,25 @@ function ParentHistoryContent() {
   };
 
   const children = Array.from(
-    new Map(items.map((item) => [item.child_id, item.child_nickname])),
+    new Map(
+      [...items, ...completedWorksheetImports].map((item) => [
+        item.child_id,
+        item.child_nickname,
+      ]),
+    ),
   );
   const visibleItems =
     childFilter === "all"
       ? items
       : items.filter((item) => item.child_id === childFilter);
-  const recoverablePaperImports = completedWorksheetImports.filter((item) =>
+  const visiblePaperImports =
+    childFilter === "all"
+      ? completedWorksheetImports
+      : completedWorksheetImports.filter((item) => item.child_id === childFilter);
+  const recoverablePaperImports = visiblePaperImports.filter((item) =>
     ["processing", "needs_review", "failed"].includes(item.status),
   );
-  const submittedPaperImports = completedWorksheetImports.filter((item) =>
+  const submittedPaperImports = visiblePaperImports.filter((item) =>
     ["grading", "results_ready"].includes(item.status),
   );
   const paperImportStatusLabel = (status: string) =>
