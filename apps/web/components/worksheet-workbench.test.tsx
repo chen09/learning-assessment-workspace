@@ -256,6 +256,32 @@ describe("WorksheetWorkbench", () => {
     ).toBeInTheDocument();
   });
 
+  it("tells a child when a parent has ended an already-open practice", async () => {
+    render(<WorksheetWorkbench />);
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Choose the correct expansion of (a + b)(a − b).",
+      }),
+    ).toBeInTheDocument();
+    mocks.getAttemptWork.mockRejectedValueOnce(
+      new Error('{"detail":"The attempt is not available for work."}'),
+    );
+
+    window.dispatchEvent(new Event("focus"));
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "This practice has ended",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "A parent ended this practice. Any saved answer remains safe on this device.",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("keeps an autosave queued when the child moves to another question", async () => {
     render(<WorksheetWorkbench />);
 

@@ -113,6 +113,14 @@ type DirtyQuestion = {
 };
 
 const MINIMUM_PHOTO_FILE_BYTES = 100 * 1024;
+const ATTEMPT_AVAILABILITY_POLL_MS = 15_000;
+
+function isUnavailableAttemptError(error: unknown) {
+  return (
+    error instanceof Error &&
+    error.message.includes("The attempt is not available for work.")
+  );
+}
 
 function hasMeaningfulAnswer(answer: Answer | undefined) {
   return Boolean(
@@ -242,7 +250,7 @@ function WorksheetWorkbenchContent() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loadRequest, setLoadRequest] = useState(0);
   const [loadState, setLoadState] = useState<
-    "loading" | "ready" | "empty" | "signed-out" | "error"
+    "loading" | "ready" | "empty" | "signed-out" | "ended" | "error"
   >("loading");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [mode, setMode] = useState<"focus" | "sheet">("focus");
@@ -571,6 +579,33 @@ function WorksheetWorkbenchContent() {
       active = false;
     };
   }, [loadRequest]);
+
+  useEffect(() => {
+    if (!attemptId || !childToken || loadState !== "ready") {
+      return;
+    }
+
+    let active = true;
+    const checkAttemptAvailability = () => {
+      void getAttemptWork(attemptId, childToken).catch((error: unknown) => {
+        if (active && isUnavailableAttemptError(error)) {
+          setLoadState("ended");
+        }
+      });
+    };
+
+    window.addEventListener("focus", checkAttemptAvailability);
+    const intervalId = window.setInterval(
+      checkAttemptAvailability,
+      ATTEMPT_AVAILABILITY_POLL_MS,
+    );
+
+    return () => {
+      active = false;
+      window.removeEventListener("focus", checkAttemptAvailability);
+      window.clearInterval(intervalId);
+    };
+  }, [attemptId, childToken, loadState]);
 
   const scheduleAnswerSave = (
     questionId: string,
@@ -2221,6 +2256,7 @@ function WorksheetWorkbenchContent() {
   if (loadState !== "ready") {
     const isEmpty = loadState === "empty";
     const isLoading = loadState === "loading";
+    const isEnded = loadState === "ended";
     return (
       <section className="continue-card">
         <div className="continue-copy">
@@ -2229,6 +2265,8 @@ function WorksheetWorkbenchContent() {
               ? t("worksheet.loading")
               : isEmpty
                 ? t("childHome.allClear")
+                : isEnded
+                  ? t("worksheet.ended")
                 : t("worksheet.unavailable")}
           </span>
           <div role={loadState === "error" ? "alert" : undefined}>
@@ -2237,6 +2275,8 @@ function WorksheetWorkbenchContent() {
                 ? t("worksheet.loadingTitle")
                 : isEmpty
                   ? t("childHome.noAssigned")
+                  : isEnded
+                    ? t("worksheet.endedTitle")
                   : loadState === "signed-out"
                     ? t("worksheet.signInRequired")
                     : t("worksheet.loadError")}
@@ -2246,6 +2286,8 @@ function WorksheetWorkbenchContent() {
                 ? t("worksheet.loadingBody")
                 : isEmpty
                   ? t("childHome.parentCanAssign")
+                  : isEnded
+                    ? t("worksheet.endedBody")
                   : t("worksheet.tryAgain")}
             </p>
             {loadState === "error" ? (

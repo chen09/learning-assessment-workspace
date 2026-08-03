@@ -596,6 +596,10 @@ const messages = {
     "worksheet.loadingTitle": "Opening your assigned practice…",
     "worksheet.loadingBody": "This should only take a moment.",
     "worksheet.unavailable": "Unavailable",
+    "worksheet.ended": "Practice ended",
+    "worksheet.endedTitle": "This practice has ended",
+    "worksheet.endedBody":
+      "A parent ended this practice. Any saved answer remains safe on this device.",
     "worksheet.signInRequired": "Sign in as a child to open this practice.",
     "worksheet.loadError": "We could not open this practice.",
     "worksheet.tryAgain": "Return home, then try opening the practice again.",
@@ -1587,6 +1591,10 @@ const messages = {
     "worksheet.loadingTitle": "割り当てられた練習を開いています…",
     "worksheet.loadingBody": "まもなく表示されます。",
     "worksheet.unavailable": "利用できません",
+    "worksheet.ended": "練習は終了しました",
+    "worksheet.endedTitle": "この練習は終了しました",
+    "worksheet.endedBody":
+      "保護者がこの練習を終了しました。保存済みの答えはこの端末に残っています。",
     "worksheet.signInRequired": "子どもとしてログインして練習を開いてください。",
     "worksheet.loadError": "練習を開けませんでした。",
     "worksheet.tryAgain": "ホームに戻り、もう一度練習を開いてください。",
@@ -2561,6 +2569,10 @@ const messages = {
     "worksheet.loadingTitle": "正在打开已安排的练习…",
     "worksheet.loadingBody": "练习马上就会显示。",
     "worksheet.unavailable": "暂时无法使用",
+    "worksheet.ended": "练习已结束",
+    "worksheet.endedTitle": "这份练习已结束",
+    "worksheet.endedBody":
+      "家长已结束这份练习。已保存的答案仍安全保留在这台设备上。",
     "worksheet.signInRequired": "请先以孩子身份登录，再打开练习。",
     "worksheet.loadError": "无法打开这份练习。",
     "worksheet.tryAgain": "请返回首页，再重新打开练习。",
