@@ -194,6 +194,37 @@ test("verified parent completes the family assignment flow on PostgreSQL", async
     ).assignment_id;
     await expect(page.getByText("Confirmed and assigned")).toBeVisible();
 
+    // A printed copy is linked back to this exact assignment. Its scan review
+    // must retain the original private grading standard while letting a parent
+    // map where each handwritten answer appears on the page.
+    await page.goto(
+      `/parent/create/?mode=completed&paperAssignmentId=${encodeURIComponent(assignmentId)}&familyId=${encodeURIComponent(familyId)}&childId=${encodeURIComponent(childId)}`,
+    );
+    await page.getByLabel("Completed worksheet scans").setInputFiles({
+      name: "postgres-linked-printed-copy.png",
+      mimeType: "image/png",
+      buffer: nonPersonalAnswerPng,
+    });
+    await page.getByRole("button", { name: "Upload for review" }).click();
+    await expect(
+      page.getByText(
+        "This scan is linked to the printed assignment. Questions and scoring stay fixed; review answer pages and handwriting only.",
+      ),
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(
+      page.getByRole("textbox", { name: "Question 1 wording" }),
+    ).toHaveValue(
+      "Choose the sentence that uses the present simple correctly.",
+    );
+    await expect(
+      page.getByRole("textbox", { name: "Question 1 wording" }),
+    ).toBeDisabled();
+    await expect(
+      page.getByRole("textbox", {
+        name: "Answer page numbers for question 1",
+      }),
+    ).toBeEnabled();
+
     await page.goto(
       `/child/login/?childId=${encodeURIComponent(childId)}&assignmentId=${encodeURIComponent(assignmentId)}`,
     );
