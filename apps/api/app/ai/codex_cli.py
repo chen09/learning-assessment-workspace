@@ -3,6 +3,7 @@ import subprocess
 from collections.abc import Callable
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Any
 
 from app.ai.contracts import (
     CompletedWorksheetAnalysisInput,
@@ -13,6 +14,27 @@ from app.ai.contracts import (
 from app.ai.handwriting import render_strokes_png
 
 CommandRunner = Callable[[list[str], int], None]
+
+
+def _strict_output_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    """Make every object in a Pydantic schema acceptable to Codex output mode."""
+
+    def normalize(value: object) -> None:
+        if isinstance(value, dict):
+            properties = value.get("properties")
+            if isinstance(properties, dict):
+                # Codex requires every key in every object schema to be listed
+                # as required, including fields with application-level defaults.
+                value["required"] = list(properties)
+                value["additionalProperties"] = False
+            for child in value.values():
+                normalize(child)
+        elif isinstance(value, list):
+            for child in value:
+                normalize(child)
+
+    normalize(schema)
+    return schema
 
 
 def _run_command(command: list[str], timeout_seconds: int) -> None:
@@ -70,8 +92,9 @@ class CodexCLIGradingAdapter:
                         "Codex CLI photo grading received an unavailable image page."
                     )
             schema_path = workspace / "grade-schema.json"
-            output_schema = GradeResponseOutput.model_json_schema()
-            output_schema["required"] = list(output_schema["properties"])
+            output_schema = _strict_output_schema(
+                GradeResponseOutput.model_json_schema()
+            )
             schema_path.write_text(
                 json.dumps(output_schema),
                 encoding="utf-8",
@@ -97,11 +120,14 @@ class CodexCLIGradingAdapter:
                 "--output-last-message",
                 str(output_path),
             ]
-            for image_path in image_paths:
-                command.extend(["--image", str(image_path)])
             if self._model:
                 command.extend(["--model", self._model])
             command.append(self._prompt(request))
+            # `--image` accepts one or more paths. Keep the positional prompt
+            # before it, otherwise Codex treats the prompt as another image and
+            # waits for stdin instead of grading the response.
+            for image_path in image_paths:
+                command.extend(["--image", str(image_path)])
             self._runner(command, self._timeout_seconds)
             grade = GradeResponseOutput.model_validate_json(
                 output_path.read_text(encoding="utf-8")
@@ -129,8 +155,9 @@ class CodexCLIGradingAdapter:
         with TemporaryDirectory(prefix="luma-codex-paper-") as directory:
             workspace = Path(directory)
             schema_path = workspace / "completed-worksheet-schema.json"
-            output_schema = CompletedWorksheetAnalysisOutput.model_json_schema()
-            output_schema["required"] = list(output_schema["properties"])
+            output_schema = _strict_output_schema(
+                CompletedWorksheetAnalysisOutput.model_json_schema()
+            )
             schema_path.write_text(json.dumps(output_schema), encoding="utf-8")
             output_path = workspace / "completed-worksheet.json"
             command = [
@@ -149,12 +176,6 @@ class CodexCLIGradingAdapter:
                 "--cd",
                 str(workspace),
             ]
-            for image in [
-                *response_page_images,
-                *answer_key_images,
-                *reference_images,
-            ]:
-                command.extend(["--image", str(image)])
             command.extend(
                 [
                     "--output-schema",
@@ -173,6 +194,14 @@ class CodexCLIGradingAdapter:
                     reference_page_count=len(reference_images),
                 )
             )
+            # `--image` accepts one or more paths, so the prompt must precede
+            # the image list rather than being parsed as another image path.
+            for image in [
+                *response_page_images,
+                *answer_key_images,
+                *reference_images,
+            ]:
+                command.extend(["--image", str(image)])
             self._runner(command, self._timeout_seconds)
             return CompletedWorksheetAnalysisOutput.model_validate_json(
                 output_path.read_text(encoding="utf-8")

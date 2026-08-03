@@ -29,6 +29,10 @@ from app.services.database_jobs import _visual_adapter_for_family
 from app.services.grading import FixtureGrader, grade_response_with_ai
 
 
+def _grading_prompt_from_command(command: list[str]) -> str:
+    return next(value for value in command if value.startswith("Grade one anonymous"))
+
+
 def test_ai_contracts_forbid_unversioned_extra_fields() -> None:
     with pytest.raises(ValidationError):
         ExtractSourceInput.model_validate(
@@ -193,6 +197,15 @@ def test_codex_cli_grades_anonymous_handwriting_with_a_locked_down_command() -> 
     output_schema = observed["output_schema"]
     assert isinstance(output_schema, dict)
     assert set(output_schema["required"]) == set(output_schema["properties"])
+    assert set(output_schema["$defs"]["GradeAnnotation"]["required"]) == {
+        "kind",
+        "page_index",
+        "x",
+        "y",
+        "width",
+        "height",
+        "label",
+    }
     assert grade.outcome == "correct"
     assert grade.awarded_points == 2
     assert grade.confidence == 0.94
@@ -213,7 +226,7 @@ def test_codex_cli_grades_private_photo_pages_in_order(tmp_path) -> None:
             if value == "--image"
         ]
         observed["image_paths"] = image_paths
-        observed["prompt"] = command[-1]
+        observed["prompt"] = _grading_prompt_from_command(command)
         output_path = command[command.index("--output-last-message") + 1]
         with open(output_path, "w", encoding="utf-8") as output:
             output.write(
@@ -251,6 +264,9 @@ def test_codex_cli_grades_private_photo_pages_in_order(tmp_path) -> None:
     )
 
     assert observed["image_paths"] == [str(first_page), str(second_page)]
+    command = observed["command"]
+    assert isinstance(command, list)
+    assert command.index(str(observed["prompt"])) < command.index("--image")
     assert "photographed answer" in str(observed["prompt"])
     assert "page order" in str(observed["prompt"])
     assert grade.outcome == GradingOutcome.CORRECT
@@ -330,7 +346,11 @@ def test_codex_cli_only_returns_a_parent_review_draft_for_completed_paper(
     assert command[:2] == ["codex", "exec"]
     assert command[command.index("--sandbox") + 1] == "read-only"
     assert command.count("--image") == 1
-    assert "needs_parent_confirmation" in command[-1]
+    completed_prompt = next(
+        value for value in command if value.startswith("Read anonymous images")
+    )
+    assert command.index(completed_prompt) < command.index("--image")
+    assert "needs_parent_confirmation" in completed_prompt
     assert observed["timeout_seconds"] == 180
     assert result.status == "needs_parent_confirmation"
     assert result.document.questions[0].type == QuestionType.HANDWRITING
@@ -340,7 +360,7 @@ def test_codex_cli_requests_feedback_in_the_child_language() -> None:
     observed: dict[str, str] = {}
 
     def fake_runner(command: list[str], _timeout_seconds: int) -> None:
-        observed["prompt"] = command[-1]
+        observed["prompt"] = _grading_prompt_from_command(command)
         output_path = command[command.index("--output-last-message") + 1]
         with open(output_path, "w", encoding="utf-8") as output:
             output.write(
