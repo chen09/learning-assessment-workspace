@@ -23,9 +23,12 @@ The canonical MVP requirements are in [docs/mvp-spec.md](docs/mvp-spec.md).
 Production delivery uses `study.hypnochunk.com` for the static frontend and
 `api.study.hypnochunk.com` for the Docker API. CI uses the deterministic fixture
 adapter. A controlled private worker may instead use the Codex CLI adapter to
-grade an isolated, identity-free rendering of a handwriting response or create
-a parent-review draft from private PNG/JPEG/PDF completed-paper pages; other AI
-providers still integrate through the same typed API contracts.
+grade an isolated, identity-free rendering of a handwriting response, create a
+parent-review draft from private PNG/JPEG/PDF completed-paper pages, or extract
+knowledge-point metadata from private textbook/reference pages. For source
+materials, the database retains only extracted metadata and confidence, not the
+model's section transcription; other AI providers still integrate through the
+same typed API contracts.
 
 ## Local development
 
@@ -87,11 +90,14 @@ shared 8G VPS, behind the HTTPS-only `api.study.hypnochunk.com` virtual host.
 The worker image includes the pinned Codex CLI, but the adapter is enabled only
 after a private server-side device login, `AI_PROVIDER=codex_cli`, and an
 explicit family UUID allowlist in `CODEX_FAMILY_IDS`. An empty allowlist sends no
-learner response to Codex. For an allowed family, completed-paper PNG/JPEG scans
-or PDFs and optional private answer-key/reference images may produce an AI draft
-only. Private PDFs are rendered page-by-page in the worker's temporary directory
-(up to 100 pages) and are never made public; the parent must still confirm every
-question and answer region before an immutable attempt or grading job is created.
+learner response or source material to Codex. For an allowed family,
+completed-paper PNG/JPEG scans or PDFs and optional private answer-key/reference
+images may produce an AI draft only. A private textbook/reference import can
+also yield only its extracted knowledge-point metadata; the section
+transcription remains temporary and is not stored. Private PDFs are rendered
+page-by-page in the worker's temporary directory (up to 100 pages) and are
+never made public; the parent must still confirm every question and answer
+region before an immutable attempt or grading job is created.
 The host has persistent Swap and container memory limits. Field-limited browser
 API errors are stored under `/opt/learning-assessment/logs` with bounded file
 rotation; request bodies, credentials, PINs, and URL query strings are excluded.

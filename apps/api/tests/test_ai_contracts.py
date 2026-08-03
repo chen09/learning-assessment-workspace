@@ -272,6 +272,68 @@ def test_codex_cli_grades_private_photo_pages_in_order(tmp_path) -> None:
     assert grade.outcome == GradingOutcome.CORRECT
 
 
+def test_codex_cli_extracts_private_source_pages_without_storage_paths(tmp_path) -> None:
+    observed: dict[str, object] = {}
+    source_page = tmp_path / "source-page.png"
+    Image.new("RGB", (20, 20), "white").save(source_page)
+
+    def fake_runner(command: list[str], timeout_seconds: int) -> None:
+        observed["command"] = command
+        observed["timeout_seconds"] = timeout_seconds
+        schema_path = command[command.index("--output-schema") + 1]
+        with open(schema_path, encoding="utf-8") as schema_file:
+            observed["output_schema"] = json.load(schema_file)
+        output_path = command[command.index("--output-last-message") + 1]
+        with open(output_path, "w", encoding="utf-8") as output:
+            output.write(
+                json.dumps(
+                    {
+                        "schema_version": "1.0",
+                        "detected_language": "ja",
+                        "sections": [
+                            {
+                                "title": "Lesson 1",
+                                "text": "Private textbook wording.",
+                                "page_numbers": [1],
+                                "knowledge_points": [
+                                    "等位接続詞 and / but / or / so"
+                                ],
+                            }
+                        ],
+                        "confidence": 0.91,
+                        "warnings": [],
+                    }
+                )
+            )
+
+    result = CodexCLIGradingAdapter(runner=fake_runner).extract_source_material(
+        ExtractSourceInput(
+            requested_language="ja",
+            pages=[
+                SourcePageInput(
+                    page_number=1,
+                    media_type="image/jpeg",
+                    storage_path="family-id/sources/private-book-page.jpg",
+                )
+            ],
+        ),
+        source_page_images=[source_page],
+    )
+
+    command = observed["command"]
+    assert isinstance(command, list)
+    assert command[:2] == ["codex", "exec"]
+    assert command[command.index("--sandbox") + 1] == "read-only"
+    assert command.count("--image") == 1
+    prompt = next(value for value in command if value.startswith("Read anonymous"))
+    assert "family-id" not in prompt
+    assert "private-book-page" not in prompt
+    assert command.index(prompt) < command.index("--image")
+    assert observed["timeout_seconds"] == 180
+    assert result.detected_language == "ja"
+    assert result.sections[0].knowledge_points == ["等位接続詞 and / but / or / so"]
+
+
 def test_codex_cli_only_returns_a_parent_review_draft_for_completed_paper(
     tmp_path,
 ) -> None:

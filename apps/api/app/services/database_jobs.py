@@ -10,7 +10,11 @@ import httpx
 import structlog
 
 from app.ai.codex_cli import CodexCLIGradingAdapter
-from app.ai.contracts import CompletedWorksheetAnalysisInput
+from app.ai.contracts import (
+    CompletedWorksheetAnalysisInput,
+    ExtractSourceInput,
+    SourcePageInput,
+)
 from app.domain.models import Job, Question, ResponseKind, SavedResponse
 from app.fixtures.english_lesson_one import (
     lesson_one_question_specs,
@@ -442,7 +446,8 @@ async def fixture_job_handler(
         imported = await connection.fetchrow(
             """
             select i.id, i.family_id, i.question_set_id, i.filenames,
-                   i.answer_filenames, i.reference_filenames, qs.subject
+                   i.source_paths, i.answer_filenames, i.answer_source_paths,
+                   i.reference_filenames, i.reference_source_paths, qs.subject
             from public.question_set_imports i
             join public.question_sets qs on qs.id = i.question_set_id
             where i.id = $1
@@ -452,6 +457,54 @@ async def fixture_job_handler(
         if imported is None:
             raise RuntimeError("The source import no longer exists.")
         subject = str(imported["subject"])
+        source_extraction = None
+        source_adapter = _visual_adapter_for_family(
+            visual_adapter,
+            family_id=str(imported["family_id"]),
+            allowed_family_ids=allowed_visual_family_ids,
+        )
+        if (
+            isinstance(source_adapter, CodexCLIGradingAdapter)
+            and supabase_url
+            and supabase_service_role_key
+        ):
+            source_paths = [
+                path
+                for paths in (
+                    _json_value(imported["source_paths"]) or [],
+                    _json_value(imported["reference_source_paths"]) or [],
+                )
+                for path in paths
+                if isinstance(path, str)
+            ]
+            with TemporaryDirectory(prefix="luma-private-source-") as directory:
+                source_pages = await _download_private_analysis_pages(
+                    supabase_url=supabase_url,
+                    service_role_key=supabase_service_role_key,
+                    family_id=str(imported["family_id"]),
+                    bucket="sources",
+                    paths=source_paths,
+                    destination=Path(directory),
+                    prefix="source",
+                )
+                if source_pages:
+                    source_extraction = source_adapter.extract_source_material(
+                        ExtractSourceInput(
+                            pages=[
+                                SourcePageInput(
+                                    page_number=index,
+                                    media_type=(
+                                        "image/jpeg"
+                                        if page.suffix.lower() in {".jpg", ".jpeg"}
+                                        else "image/png"
+                                    ),
+                                    storage_path=f"analysis-source-page-{index}",
+                                )
+                                for index, page in enumerate(source_pages, start=1)
+                            ]
+                        ),
+                        source_page_images=source_pages,
+                    )
         is_lesson_one = matches_lesson_one_import(
             list(_json_value(imported["filenames"])),
             list(_json_value(imported["answer_filenames"])),
@@ -585,18 +638,53 @@ async def fixture_job_handler(
                     **(
                         {"knowledge_points": [f"{subject} foundations"]}
                         if allow_fixture_source_generation
-                        else {
-                            "generation_status": "awaiting_structured_draft",
-                            "source_file_count": len(
-                                list(_json_value(imported["filenames"]))
-                            ),
-                            "answer_key_file_count": len(
-                                list(_json_value(imported["answer_filenames"]))
-                            ),
-                        }
+                        else (
+                            {
+                                "generation_status": "source_extracted",
+                                "source_file_count": len(
+                                    list(_json_value(imported["filenames"]))
+                                ),
+                                "answer_key_file_count": len(
+                                    list(_json_value(imported["answer_filenames"]))
+                                ),
+                                "reference_file_count": len(
+                                    list(_json_value(imported["reference_filenames"]))
+                                ),
+                                "knowledge_points": list(
+                                    dict.fromkeys(
+                                        point
+                                        for section in source_extraction.sections
+                                        for point in section.knowledge_points
+                                        if point.strip()
+                                    )
+                                ),
+                                "extraction_confidence": source_extraction.confidence,
+                                "extraction_section_count": len(
+                                    source_extraction.sections
+                                ),
+                                "extraction_warnings": source_extraction.warnings,
+                            }
+                            if source_extraction is not None
+                            else {
+                                "generation_status": "awaiting_structured_draft",
+                                "source_file_count": len(
+                                    list(_json_value(imported["filenames"]))
+                                ),
+                                "answer_key_file_count": len(
+                                    list(_json_value(imported["answer_filenames"]))
+                                ),
+                            }
+                        )
                     ),
-                    "reference_file_count": len(
-                        list(_json_value(imported["reference_filenames"]))
+                    **(
+                        {}
+                        if source_extraction is not None
+                        or allow_fixture_source_generation
+                        else {
+                            "reference_file_count": len(
+                                list(_json_value(imported["reference_filenames"]))
+                            )
+                        }
                     ),
                 }
             ),
@@ -610,7 +698,11 @@ async def fixture_job_handler(
             imported["id"],
         )
         return {
-            "adapter": "fixture-v1",
+            "adapter": (
+                CodexCLIGradingAdapter.version
+                if source_extraction is not None
+                else "fixture-v1"
+            ),
             "job_type": job["type"],
             "schema_version": "1.0",
             "question_count": len(fixture_rows),
@@ -620,6 +712,8 @@ async def fixture_job_handler(
             "generation_status": (
                 "fixture_generated"
                 if allow_fixture_source_generation
+                else "source_extracted"
+                if source_extraction is not None
                 else "awaiting_structured_draft"
             ),
             "status": "needs_review",

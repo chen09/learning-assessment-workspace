@@ -1358,6 +1358,9 @@ function CreateWorkspaceContent() {
           draft.question_set.source_summary.artifact_kind ===
             "private_source_material"
         ) {
+          setRecoveredKnowledgePoints(
+            knowledgePointsFromSourceSummary(draft.question_set.source_summary),
+          );
           setSourceMaterialName(draft.question_set.title);
           setSourceMaterialQuestionSetId(draft.question_set.id);
           setSourceMaterialTitle(draft.question_set.title);
@@ -1451,6 +1454,9 @@ function CreateWorkspaceContent() {
         if (draft.question_set.status !== "needs_review") {
           return;
         }
+        setRecoveredKnowledgePoints(
+          knowledgePointsFromSourceSummary(draft.question_set.source_summary),
+        );
         setDraftQuestions(draft.questions);
         if (
           draft.questions.length === 0 &&
@@ -2154,6 +2160,9 @@ function CreateWorkspaceContent() {
       }
       setDraftQuestions(draft.questions);
       if (mode === "import" && draft.questions.length === 0) {
+        setRecoveredKnowledgePoints(
+          knowledgePointsFromSourceSummary(draft.question_set.source_summary),
+        );
         setSourceMaterialName(
           files.map((file) => file.name).join(", ") || "Source material",
         );
@@ -3766,6 +3775,13 @@ function CreateWorkspaceContent() {
             <li>{t("sourceMaterial.stepUse")}</li>
             <li>{t("sourceMaterial.stepImport")}</li>
           </ol>
+          {recoveredKnowledgePoints.length > 0 ? (
+            <p className="draft-knowledge-points">
+              {t("sourceMaterial.knowledgePoints", {
+                points: recoveredKnowledgePoints.join(" · "),
+              })}
+            </p>
+          ) : null}
           <div className="draft-actions">
             <button
               className="button secondary"

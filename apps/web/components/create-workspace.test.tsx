@@ -779,7 +779,10 @@ describe("CreateWorkspace", () => {
         title: "Lesson 2 textbook pages",
         subject: "English",
         status: "needs_review",
-        source_summary: { artifact_kind: "private_source_material" },
+        source_summary: {
+          artifact_kind: "private_source_material",
+          knowledge_points: ["等位接続詞", "命令文 + and / or"],
+        },
       },
       questions: [],
     });
@@ -793,6 +796,11 @@ describe("CreateWorkspace", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(/Lesson 2 textbook pages is stored only for this family/),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "Detected learning focus: 等位接続詞 · 命令文 + and / or",
+      ),
     ).toBeInTheDocument();
   });
 

@@ -105,6 +105,7 @@ const messages = {
       "Use it with the private source material in your approved AI workflow.",
     "sourceMaterial.stepImport":
       "Save the JSON response and import it for parent review.",
+    "sourceMaterial.knowledgePoints": "Detected learning focus: {points}",
     "sourceMaterial.copyPrompt": "Copy JSON generation prompt",
     "sourceMaterial.promptCopied": "Prompt copied",
     "sourceMaterial.importJson": "Import AI question JSON",
@@ -1102,6 +1103,7 @@ const messages = {
       "承認済みの AI ワークフローで、非公開の教材素材と一緒に使用します。",
     "sourceMaterial.stepImport":
       "JSON の回答を保存し、保護者レビュー用に読み込みます。",
+    "sourceMaterial.knowledgePoints": "検出した学習の焦点：{points}",
     "sourceMaterial.copyPrompt": "JSON 生成プロンプトをコピー",
     "sourceMaterial.promptCopied": "プロンプトをコピーしました",
     "sourceMaterial.importJson": "AI 問題 JSON を読み込む",
@@ -2091,6 +2093,7 @@ const messages = {
       "在获准的 AI 工作流中，连同私有教材素材一起使用。",
     "sourceMaterial.stepImport":
       "保存 JSON 结果，并导入以供家长审核。",
+    "sourceMaterial.knowledgePoints": "识别到的学习重点：{points}",
     "sourceMaterial.copyPrompt": "复制 JSON 生成提示词",
     "sourceMaterial.promptCopied": "已复制提示词",
     "sourceMaterial.importJson": "导入 AI 题目 JSON",
