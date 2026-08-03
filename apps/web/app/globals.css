@@ -1340,15 +1340,26 @@ button {
 }
 
 .photo-file-replace {
+  position: relative;
   display: grid;
   width: 1.85rem;
   height: 1.85rem;
+  overflow: hidden;
   place-items: center;
   border: 1px solid var(--line);
   border-radius: 0.45rem;
   background: white;
   color: var(--ink);
   cursor: pointer;
+}
+
+.photo-file-replace input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: inherit;
 }
 
 .photo-file-replace:has(input:disabled) {
