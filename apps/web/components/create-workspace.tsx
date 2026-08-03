@@ -439,11 +439,14 @@ function parseCompletedPaperReview(
   });
   if (
     answerRegions.length !== expectedPositions.length ||
-    answerRegions.some(
-      (region, index) => region.question_position !== expectedPositions[index],
+    new Set(answerRegions.map((region) => region.question_position)).size !==
+      expectedPositions.length ||
+    expectedPositions.some(
+      (position) =>
+        !answerRegions.some((region) => region.question_position === position),
     )
   ) {
-    throw new Error("Answer regions must match every confirmed question in order.");
+    throw new Error("Answer regions must match every confirmed question.");
   }
   return { document, answer_regions: answerRegions };
 }
@@ -2760,9 +2763,13 @@ function CreateWorkspaceContent() {
                     })}
                   </p>
                   <details open>
-                    <summary>{t("completedPaper.previewQuestions")}</summary>
+                      <summary>{t("completedPaper.previewQuestions")}</summary>
                     <ol className="completed-paper-review-list">
-                      {completedReview.document.questions.map((question, index) => (
+                      {completedReview.document.questions.map((question) => {
+                        const answerRegion = completedReview.answer_regions.find(
+                          (region) => region.question_position === question.position,
+                        );
+                        return (
                         <li key={question.position}>
                           <label>
                             <span>{t("completedPaper.questionWording")}</span>
@@ -2967,7 +2974,7 @@ function CreateWorkspaceContent() {
                               />
                             </label>
                           ) : null}
-                          {completedReview.answer_regions[index] ? (
+                          {answerRegion ? (
                             <div className="completed-paper-region-fields">
                               <label>
                                 <span>{t("completedPaper.answerPages")}</span>
@@ -2986,7 +2993,7 @@ function CreateWorkspaceContent() {
                                       }),
                                     )
                                   }
-                                  value={completedReview.answer_regions[index].page_numbers.join(", ")}
+                                  value={answerRegion.page_numbers.join(", ")}
                                 />
                               </label>
                               <label>
@@ -3005,7 +3012,7 @@ function CreateWorkspaceContent() {
                                     )
                                   }
                                   value={
-                                    completedReview.answer_regions[index].transcription ?? ""
+                                    answerRegion.transcription ?? ""
                                   }
                                 />
                               </label>
@@ -3025,7 +3032,7 @@ function CreateWorkspaceContent() {
                                     )
                                   }
                                   value={
-                                    completedReview.answer_regions[index].legibility ?? "clear"
+                                    answerRegion.legibility ?? "clear"
                                   }
                                 >
                                   <option value="clear">{t("completedPaper.legibility.clear")}</option>
@@ -3033,7 +3040,7 @@ function CreateWorkspaceContent() {
                                   <option value="unreadable">{t("completedPaper.legibility.unreadable")}</option>
                                 </select>
                               </label>
-                              {completedReview.answer_regions[index].regions?.length ? (
+                              {answerRegion.regions?.length ? (
                                 <button
                                   className="text-button"
                                   onClick={() =>
@@ -3060,7 +3067,8 @@ function CreateWorkspaceContent() {
                             })}
                           </button>
                         </li>
-                      ))}
+                        );
+                      })}
                     </ol>
                     <button
                       className="button secondary completed-paper-add-question"

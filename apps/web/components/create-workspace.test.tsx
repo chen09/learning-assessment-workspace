@@ -151,6 +151,7 @@ describe("CreateWorkspace", () => {
       ],
       extraction: {
         schema_version: "1.0",
+        status: "needs_parent_confirmation",
         source_page_count: 2,
         document: {
           schema_version: "1.0",
@@ -216,6 +217,51 @@ describe("CreateWorkspace", () => {
     expect(
       screen.queryByText("family-1/responses/completed-paper.jpg"),
     ).not.toBeInTheDocument();
+  });
+
+  it("matches completed-paper answer regions by question position", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/parent/create/?completedWorksheetId=completed-worksheet-out-of-order",
+    );
+    mocks.getCompletedWorksheetImport.mockResolvedValue({
+      id: "completed-worksheet-out-of-order",
+      status: "needs_review",
+      assignment_id: null,
+      attempt_id: null,
+      filenames: ["completed-paper.jpg"],
+      response_paths: ["family-1/responses/completed-paper.jpg"],
+      extraction: {
+        schema_version: "1.0",
+        source_page_count: 2,
+        document: {
+          schema_version: "1.0",
+          question_set: { title: "Recovered paper", subject: "English", locale: "en", difficulty: "standard", source_mode: "convert", estimated_minutes: 10 },
+          knowledge_tags: [{ code: "grammar", label: "Grammar" }],
+          questions: [
+            { position: 1, type: "typed_text", prompt: "First", options: [], answer_key: { text: "one" }, rubric: { grading_mode: "exact" }, points: 1, knowledge_code: "grammar" },
+            { position: 2, type: "typed_text", prompt: "Second", options: [], answer_key: { text: "two" }, rubric: { grading_mode: "exact" }, points: 1, knowledge_code: "grammar" },
+          ],
+        },
+        answer_regions: [
+          { question_position: 2, page_numbers: [1], legibility: "clear" },
+          { question_position: 1, page_numbers: [2], legibility: "clear" },
+        ],
+      },
+      job: { id: "analysis-job-out-of-order", status: "completed", type: "analyze_completed_worksheet" },
+    });
+
+    render(<CreateWorkspace />);
+
+    expect(await screen.findByDisplayValue("2")).toHaveAttribute(
+      "aria-label",
+      "Answer page numbers for question 1",
+    );
+    expect(screen.getByDisplayValue("1")).toHaveAttribute(
+      "aria-label",
+      "Answer page numbers for question 2",
+    );
   });
 
   it("refreshes the private paper preview when processing finishes", async () => {
