@@ -91,6 +91,21 @@ type CompletedPaperReview = {
   answer_regions: CompletedPaperAnswerRegion[];
 };
 
+const unverifiedReferenceAnswer = "parent confirmation required";
+
+const unverifiedCompletedPaperReferencePositions = (
+  review: CompletedPaperReview | null,
+) =>
+  review?.document.questions
+    .filter(
+      (question) =>
+        (question.type === "handwriting" || question.type === "photo") &&
+        typeof question.answer_key.reference === "string" &&
+        question.answer_key.reference.trim().toLocaleLowerCase() ===
+          unverifiedReferenceAnswer,
+    )
+    .map((question) => question.position) ?? [];
+
 type WorksheetUploadContentType =
   | "application/pdf"
   | "image/png"
@@ -810,6 +825,8 @@ function CreateWorkspaceContent() {
   const paperSourceAssignmentId = new URLSearchParams(
     typeof window === "undefined" ? "" : window.location.search,
   ).get("paperAssignmentId");
+  const completedPaperUnverifiedReferences =
+    unverifiedCompletedPaperReferencePositions(completedReview);
 
   const loadCompletedReviewDraft = (
     extraction?: Record<string, unknown>,
@@ -2720,6 +2737,15 @@ function CreateWorkspaceContent() {
       setRequestStatus("error");
       return;
     }
+    if (completedPaperUnverifiedReferences.length > 0) {
+      setCompletedPaperError(
+        t("completedPaper.unverifiedReference", {
+          questions: completedPaperUnverifiedReferences.join(", "),
+        }),
+      );
+      setRequestStatus("error");
+      return;
+    }
     if (completedReviewSaveTimerRef.current !== null) {
       window.clearTimeout(completedReviewSaveTimerRef.current);
       completedReviewSaveTimerRef.current = null;
@@ -3458,9 +3484,20 @@ function CreateWorkspaceContent() {
                   </details>
                 </>
               ) : null}
+              {completedPaperUnverifiedReferences.length > 0 ? (
+                <p className="error-message" role="alert">
+                  {t("completedPaper.unverifiedReference", {
+                    questions: completedPaperUnverifiedReferences.join(", "),
+                  })}
+                </p>
+              ) : null}
               <button
                 className="button primary"
-                disabled={!completedReview || requestStatus === "working"}
+                disabled={
+                  !completedReview ||
+                  requestStatus === "working" ||
+                  completedPaperUnverifiedReferences.length > 0
+                }
                 onClick={() => void confirmCompletedPaper()}
                 type="button"
               >

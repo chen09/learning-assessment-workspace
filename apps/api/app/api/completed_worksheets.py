@@ -25,6 +25,8 @@ IdempotencyKey = Annotated[
     Header(alias="Idempotency-Key", min_length=8, max_length=120),
 ]
 
+UNVERIFIED_REFERENCE_ANSWER = "parent confirmation required"
+
 
 class ConfirmCompletedWorksheetRequest(BaseModel):
     """The parent's reviewed extraction; answers stay attached to the scan."""
@@ -116,6 +118,30 @@ def _validate_uploaded_page_references(
                     f"{page_number}, but this paper only has "
                     f"{uploaded_page_count} uploaded page(s)."
                 )
+
+
+def _validate_verified_reference_answers(document: ImportDocument) -> None:
+    """Keep extraction placeholders out of the grading pipeline.
+
+    A paper scan can locate a handwriting question before its private answer
+    key has been recovered. That draft is useful to a parent, but the literal
+    placeholder emitted by the extraction adapter must never become an answer
+    key used for a real grading job.
+    """
+    unverified_positions = [
+        question.position
+        for question in document.questions
+        if question.type.value in {"handwriting", "photo"}
+        and isinstance(question.answer_key.get("reference"), str)
+        and question.answer_key["reference"].strip().casefold()
+        == UNVERIFIED_REFERENCE_ANSWER
+    ]
+    if unverified_positions:
+        positions = ", ".join(str(position) for position in unverified_positions)
+        raise ValueError(
+            "Before confirmation, replace the unverified reference answer for "
+            f"question(s) {positions} with the real private answer key."
+        )
 
 
 @router.post(
@@ -252,6 +278,7 @@ async def confirm_completed_worksheet_import(
             request.responses,
             uploaded_page_count=len(imported.response_paths),
         )
+        _validate_verified_reference_answers(request.document)
         return await repository.confirm_completed_worksheet_import(
             str(worksheet_id),
             document=request.document,

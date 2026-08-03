@@ -303,6 +303,70 @@ describe("CreateWorkspace", () => {
     );
   });
 
+  it("requires a parent to replace an extracted handwriting placeholder before grading", async () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/parent/create/?completedWorksheetId=completed-unverified-reference",
+    );
+    mocks.getCompletedWorksheetImport.mockResolvedValue({
+      id: "completed-unverified-reference",
+      status: "needs_review",
+      assignment_id: null,
+      attempt_id: null,
+      filenames: ["unverified-scan.jpg"],
+      response_paths: ["family-1/responses/unverified-scan.jpg"],
+      extraction: {
+        schema_version: "1.0",
+        source_page_count: 1,
+        document: {
+          schema_version: "1.0",
+          question_set: {
+            title: "Unverified handwritten scan",
+            subject: "Mathematics",
+            locale: "en",
+            difficulty: "standard",
+            source_mode: "convert",
+            estimated_minutes: 10,
+          },
+          knowledge_tags: [{ code: "factorisation", label: "Factorisation" }],
+          questions: [
+            {
+              position: 1,
+              type: "handwriting",
+              prompt: "Factorise x² - 1.",
+              options: [],
+              answer_key: { reference: "Parent confirmation required" },
+              rubric: { grading_mode: "parent_review" },
+              points: 1,
+              knowledge_code: "factorisation",
+            },
+          ],
+        },
+        answer_regions: [
+          { question_position: 1, page_numbers: [1], legibility: "clear" },
+        ],
+      },
+      job: {
+        id: "analysis-unverified-reference",
+        status: "succeeded",
+        type: "analyze_completed_worksheet",
+      },
+    });
+
+    render(<CreateWorkspace />);
+
+    expect(
+      await screen.findByText(
+        "Question 1 still needs a real private reference answer before grading can start.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Confirm and start grading" }),
+    ).toBeDisabled();
+    expect(mocks.confirmCompletedWorksheetImport).not.toHaveBeenCalled();
+  });
+
   it("refreshes the private paper preview when processing finishes", async () => {
     window.history.replaceState(
       {},

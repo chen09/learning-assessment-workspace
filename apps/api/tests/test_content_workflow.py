@@ -39,6 +39,38 @@ def _structured_question_set() -> dict[str, object]:
     }
 
 
+def _unverified_handwriting_question_set() -> dict[str, object]:
+    """A scan draft may identify a question but not its real answer key yet."""
+    return {
+        "schema_version": "1.0",
+        "question_set": {
+            "title": "Unverified handwritten scan",
+            "subject": "Mathematics",
+            "locale": "ja",
+            "difficulty": "standard",
+            "source_mode": "convert",
+            "instructions": "Review the paper before grading.",
+            "estimated_minutes": 10,
+            "source_summary": {"unit": "factorisation"},
+        },
+        "knowledge_tags": [
+            {"code": "factorisation", "label": "Factorisation"},
+        ],
+        "questions": [
+            {
+                "position": 1,
+                "type": "handwriting",
+                "prompt": "Factorise x² - 1.",
+                "options": [],
+                "answer_key": {"reference": "Parent confirmation required"},
+                "rubric": {"grading_mode": "parent_review"},
+                "points": 1,
+                "knowledge_code": "factorisation",
+            },
+        ],
+    }
+
+
 def test_parent_can_preview_structured_json_without_creating_a_question_set() -> None:
     client = TestClient(create_app())
     fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
@@ -443,6 +475,52 @@ def test_completed_worksheet_review_draft_rejects_invalid_answer_geometry() -> N
 
     assert invalid_legibility.status_code == 422
     assert "legibility" in invalid_legibility.text
+
+
+def test_parent_cannot_confirm_a_scan_with_an_unverified_reference_answer() -> None:
+    """A placeholder from paper extraction must not become a scoring key."""
+    client = TestClient(create_app())
+    fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+    created = client.post(
+        "/v1/completed-worksheets",
+        headers={
+            **PARENT_HEADERS,
+            "Idempotency-Key": "completed-unverified-reference",
+        },
+        json={
+            "family_id": fixture["family"]["id"],
+            "child_id": fixture["child"]["id"],
+            "title": "Unverified handwritten scan",
+            "subject": "Mathematics",
+            "document_language": "ja",
+            "feedback_language": "ja",
+            "filenames": ["unverified-scan.jpg"],
+            "response_paths": ["family/completed/unverified-scan.jpg"],
+        },
+    )
+    assert created.status_code == 202
+    client.post("/v1/demo/jobs/process-next", headers=PARENT_HEADERS)
+
+    confirmed = client.post(
+        f"/v1/completed-worksheets/{created.json()['id']}/confirm",
+        headers={
+            **PARENT_HEADERS,
+            "Idempotency-Key": "confirm-unverified-reference",
+        },
+        json={
+            "document": _unverified_handwriting_question_set(),
+            "responses": [
+                {
+                    "question_position": 1,
+                    "kind": "photo",
+                    "answer": {"page_numbers": [1]},
+                },
+            ],
+        },
+    )
+
+    assert confirmed.status_code == 422
+    assert "replace the unverified reference answer" in confirmed.json()["detail"]
 
 
 def test_parent_confirmation_turns_completed_worksheet_into_submitted_attempt() -> None:

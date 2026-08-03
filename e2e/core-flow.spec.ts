@@ -2219,6 +2219,106 @@ test("parent recovers an unfinished completed-paper review from history", async 
   ).toBeVisible();
 });
 
+test("parent must replace an unverified scan reference before starting grading", async ({
+  page,
+  request,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "The unverified-reference protection runs once; the editable review form has component coverage.",
+  );
+  const apiBaseUrl = "http://127.0.0.1:8017";
+  const parentHeaders = { Authorization: "Bearer parent-fixture" };
+  const fixtureKey = `e2e-unverified-paper-${testInfo.workerIndex}`;
+  const family = (await (
+    await request.post(`${apiBaseUrl}/v1/families`, {
+      headers: { ...parentHeaders, "Idempotency-Key": `${fixtureKey}-family` },
+      data: { name: "Unverified paper family" },
+    })
+  ).json()) as { id: string };
+  const child = (await (
+    await request.post(`${apiBaseUrl}/v1/families/${family.id}/children`, {
+      headers: { ...parentHeaders, "Idempotency-Key": `${fixtureKey}-child` },
+      data: {
+        nickname: "Paper child",
+        grade_stage: "Junior high 1",
+        ui_language: "en",
+        pin: "123456",
+      },
+    })
+  ).json()) as { id: string };
+  const created = await request.post(`${apiBaseUrl}/v1/completed-worksheets`, {
+    headers: { ...parentHeaders, "Idempotency-Key": `${fixtureKey}-paper` },
+    data: {
+      family_id: family.id,
+      child_id: child.id,
+      title: "Unverified factorisation scan",
+      subject: "Mathematics",
+      document_language: "ja",
+      feedback_language: "en",
+      filenames: ["unverified-factorisation.jpg"],
+      response_paths: ["family/responses/unverified-factorisation.jpg"],
+    },
+  });
+  expect(created.ok(), await created.text()).toBeTruthy();
+  const completedPaper = (await created.json()) as { id: string };
+  const processed = await request.post(
+    `${apiBaseUrl}/v1/demo/jobs/process-next`,
+    { headers: parentHeaders },
+  );
+  expect(processed.ok(), await processed.text()).toBeTruthy();
+
+  const reviewDraft = await request.put(
+    `${apiBaseUrl}/v1/completed-worksheets/${completedPaper.id}/review-draft`,
+    {
+      headers: parentHeaders,
+      data: {
+        document: {
+          schema_version: "1.0",
+          question_set: {
+            title: "Unverified factorisation scan",
+            subject: "Mathematics",
+            locale: "en",
+            difficulty: "standard",
+            source_mode: "convert",
+            estimated_minutes: 5,
+          },
+          knowledge_tags: [{ code: "factorisation", label: "Factorisation" }],
+          questions: [
+            {
+              position: 1,
+              type: "handwriting",
+              prompt: "Factorise x² - 1.",
+              options: [],
+              answer_key: { reference: "Parent confirmation required" },
+              rubric: { grading_mode: "parent_review" },
+              points: 1,
+              knowledge_code: "factorisation",
+            },
+          ],
+        },
+        answer_regions: [
+          { question_position: 1, page_numbers: [1], legibility: "clear" },
+        ],
+      },
+    },
+  );
+  expect(reviewDraft.ok(), await reviewDraft.text()).toBeTruthy();
+
+  await page.goto(`/parent/create/?completedWorksheetId=${completedPaper.id}`);
+  await expect(
+    page.getByText(
+      "Question 1 still needs a real private reference answer before grading can start.",
+    ),
+  ).toBeVisible();
+  const confirm = page.getByRole("button", { name: "Confirm and start grading" });
+  await expect(confirm).toBeDisabled();
+  await page
+    .getByLabel("Reference answer for question 1")
+    .fill("(x - 1)(x + 1)");
+  await expect(confirm).toBeEnabled();
+});
+
 test("parent validates a local-AI completed-paper review before submitting it", async ({
   page,
   request,

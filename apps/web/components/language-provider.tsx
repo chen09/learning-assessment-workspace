@@ -919,6 +919,8 @@ const messages = {
     "completedPaper.openOriginalPage": "Open original {label}",
     "completedPaper.confirm": "Confirm and start grading",
     "completedPaper.confirming": "Confirming…",
+    "completedPaper.unverifiedReference":
+      "Question {questions} still needs a real private reference answer before grading can start.",
     "completedPaper.preparingReview": "Preparing private review",
     "completedPaper.error":
       "The reviewed JSON must match every confirmed question and answer region. Nothing was assigned; correct it and try again.",
@@ -1897,6 +1899,8 @@ const messages = {
     "completedPaper.openOriginalPage": "元の{label}を開く",
     "completedPaper.confirm": "確認して採点を始める",
     "completedPaper.confirming": "確認中…",
+    "completedPaper.unverifiedReference":
+      "問題 {questions} は採点を始める前に、実際の非公開参照解答を入力してください。",
     "completedPaper.preparingReview": "非公開の確認を準備中",
     "completedPaper.error":
       "確認用 JSON は、確定するすべての問題と解答エリアに対応する必要があります。割り当ては行われていません。修正してもう一度お試しください。",
@@ -2845,6 +2849,8 @@ const messages = {
     "completedPaper.openOriginalPage": "打开{label}的原始文件",
     "completedPaper.confirm": "确认并开始批改",
     "completedPaper.confirming": "正在确认…",
+    "completedPaper.unverifiedReference":
+      "第 {questions} 题仍需填写真实的私密参考答案，才能开始批改。",
     "completedPaper.preparingReview": "正在准备私密审核",
     "completedPaper.error":
       "审核 JSON 必须匹配每一道已确认题目和答题区域。尚未安排任何练习；请修正后重试。",
