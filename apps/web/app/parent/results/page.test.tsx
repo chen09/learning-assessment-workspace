@@ -78,6 +78,16 @@ describe("ParentResultsPage", () => {
           automated_feedback: {
             summary: "Waiting for a parent to review.",
             action: "A parent can mark this answer correct or incorrect.",
+            annotations: [
+              {
+                kind: "underline",
+                x: 0.42,
+                y: 0.56,
+                width: 0.24,
+                height: 0.08,
+                label: "请检查这里的符号。",
+              },
+            ],
           },
         },
       ],
@@ -114,6 +124,12 @@ describe("ParentResultsPage", () => {
       "viewBox",
       "0 0 1200 700",
     );
+    expect(
+      handwritingPreview.querySelector(
+        '[data-grading-annotation="underline"]',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("请检查这里的符号。")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "判为正确" }));
 

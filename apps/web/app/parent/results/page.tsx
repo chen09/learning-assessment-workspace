@@ -75,8 +75,19 @@ function HandwritingPreview({
     "height" in rawCanvasSize &&
     typeof rawCanvasSize.width === "number" &&
     typeof rawCanvasSize.height === "number"
-      ? rawCanvasSize
+      ? {
+          width: rawCanvasSize.width,
+          height: rawCanvasSize.height,
+        }
       : { width: 900, height: 420 };
+  const annotations = (item.automated_feedback.annotations ?? []).filter(
+    (annotation): annotation is GradingAnnotation =>
+      Number.isFinite(annotation.x) &&
+      Number.isFinite(annotation.y) &&
+      Number.isFinite(annotation.width) &&
+      Number.isFinite(annotation.height) &&
+      typeof annotation.label === "string",
+  );
 
   return (
     <div
@@ -106,10 +117,74 @@ function HandwritingPreview({
               />
             );
           })}
+          {annotations.map((annotation, index) => {
+            const x = annotation.x * canvasSize.width;
+            const y = annotation.y * canvasSize.height;
+            const width = annotation.width * canvasSize.width;
+            const height = annotation.height * canvasSize.height;
+            const commonProps = {
+              "data-grading-annotation": annotation.kind,
+              vectorEffect: "non-scaling-stroke" as const,
+            };
+            if (annotation.kind === "underline") {
+              return (
+                <line
+                  {...commonProps}
+                  key={`annotation-${annotation.kind}-${index}`}
+                  stroke="#d73737"
+                  strokeLinecap="round"
+                  strokeWidth={4}
+                  x1={x}
+                  x2={x + width}
+                  y1={y + height}
+                  y2={y + height}
+                />
+              );
+            }
+            if (annotation.kind === "cross") {
+              return (
+                <g
+                  data-grading-annotation={annotation.kind}
+                  key={`annotation-${annotation.kind}-${index}`}
+                  stroke="#d73737"
+                  strokeLinecap="round"
+                  strokeWidth={4}
+                  vectorEffect="non-scaling-stroke"
+                >
+                  <line x1={x} x2={x + width} y1={y} y2={y + height} />
+                  <line x1={x + width} x2={x} y1={y} y2={y + height} />
+                </g>
+              );
+            }
+            return (
+              <rect
+                {...commonProps}
+                fill="none"
+                height={height}
+                key={`annotation-${annotation.kind}-${index}`}
+                rx={8}
+                stroke="#d73737"
+                strokeWidth={4}
+                width={width}
+                x={x}
+                y={y}
+              />
+            );
+          })}
         </svg>
       ) : (
         <p>—</p>
       )}
+      {annotations.length ? (
+        <ol className="grading-annotation-list">
+          {annotations.map((annotation, index) => (
+            <li key={`annotation-${annotation.kind}-${index}-label`}>
+              <span>{index + 1}</span>
+              {annotation.label}
+            </li>
+          ))}
+        </ol>
+      ) : null}
     </div>
   );
 }
