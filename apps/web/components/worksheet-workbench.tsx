@@ -1585,6 +1585,11 @@ function WorksheetWorkbenchContent() {
           try {
             await uploadReplacementPhoto(index, file);
             updateFailedPhotoReplacement(null);
+            setCropTarget((current) =>
+              current?.questionId === question.id && current.index === index
+                ? null
+                : current,
+            );
           } catch {
             updateFailedPhotoReplacement({ file, index });
             setSaveStatus("offline");
@@ -1609,10 +1614,14 @@ function WorksheetWorkbenchContent() {
         setSaveStatus("saving");
         setPhotoUploadQuestionId(question.id);
         void (async () => {
+          let rotatedFile: File | null = null;
           try {
-            const rotatedFile = await rotateAnswerImage(previewUrl, name);
+            rotatedFile = await rotateAnswerImage(previewUrl, name);
             await uploadReplacementPhoto(index, rotatedFile);
           } catch {
+            if (rotatedFile) {
+              updateFailedPhotoReplacement({ file: rotatedFile, index });
+            }
             setSaveStatus("offline");
           } finally {
             setPhotoUploadQuestionId((current) =>
@@ -1632,11 +1641,15 @@ function WorksheetWorkbenchContent() {
         setSaveStatus("saving");
         setPhotoUploadQuestionId(question.id);
         void (async () => {
+          let croppedFile: File | null = null;
           try {
-            const croppedFile = await cropAnswerImage(previewUrl, name, bounds);
+            croppedFile = await cropAnswerImage(previewUrl, name, bounds);
             await uploadReplacementPhoto(index, croppedFile);
             setCropTarget(null);
           } catch {
+            if (croppedFile) {
+              updateFailedPhotoReplacement({ file: croppedFile, index });
+            }
             setSaveStatus("offline");
           } finally {
             setPhotoUploadQuestionId((current) =>

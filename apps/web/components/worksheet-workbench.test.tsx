@@ -1397,7 +1397,7 @@ describe("WorksheetWorkbench", () => {
 
     expect(
       await screen.findByText(
-        "The replacement image could not be uploaded. Retry it or keep the original image.",
+        "The updated image could not be uploaded. Retry it or keep the original image.",
       ),
     ).toBeVisible();
     expect(
@@ -1411,7 +1411,7 @@ describe("WorksheetWorkbench", () => {
     ).toBeDisabled();
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Retry replacement upload" }),
+      screen.getByRole("button", { name: "Retry image upload" }),
     );
 
     await waitFor(() => {
@@ -1438,7 +1438,94 @@ describe("WorksheetWorkbench", () => {
     ).toHaveTextContent("replacement-answer.jpg");
     expect(
       screen.queryByText(
-        "The replacement image could not be uploaded. Retry it or keep the original image.",
+        "The updated image could not be uploaded. Retry it or keep the original image.",
+      ),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Submit all answers" }),
+    ).not.toBeDisabled();
+  });
+
+  it("keeps a failed rotated image ready to retry without changing the original", async () => {
+    mocks.createChildUploadIntent
+      .mockResolvedValueOnce({
+        bucket: "responses",
+        path: "family-1/attempt-1/original-answer.jpg",
+        upload_url: "https://storage.example.test/upload/original",
+        expires_in: 300,
+      })
+      .mockResolvedValueOnce({
+        bucket: "responses",
+        path: "family-1/attempt-1/answer-page-rotated-90.jpg",
+        upload_url: "https://storage.example.test/upload/rotated",
+        expires_in: 300,
+      })
+      .mockResolvedValueOnce({
+        bucket: "responses",
+        path: "family-1/attempt-1/answer-page-rotated-retry.jpg",
+        upload_url: "https://storage.example.test/upload/rotated-retry",
+        expires_in: 300,
+      });
+    mocks.uploadToSignedUrl
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce(undefined);
+    render(<WorksheetWorkbench />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Go to question 4" }),
+    );
+    fireEvent.change(screen.getByLabelText(/Take a photo or choose images/), {
+      target: {
+        files: [
+          new File(["original"], "original-answer.jpg", {
+            type: "image/jpeg",
+          }),
+        ],
+      },
+    });
+    await screen.findByText("Saved");
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Rotate original-answer.jpg clockwise",
+      }),
+    );
+
+    expect(
+      await screen.findByText(
+        "The updated image could not be uploaded. Retry it or keep the original image.",
+      ),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("list", { name: "Uploaded answer images" }),
+    ).toHaveTextContent("original-answer.jpg");
+    expect(
+      screen.getByRole("button", { name: "Submit all answers" }),
+    ).toBeDisabled();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Retry image upload" }),
+    );
+
+    await waitFor(() => {
+      expect(mocks.saveAttemptResponse).toHaveBeenLastCalledWith(
+        "attempt-1",
+        "math-photo",
+        {
+          kind: "photo",
+          answer: {
+            paths: [
+              "family-1/attempt-1/answer-page-rotated-retry.jpg",
+            ],
+          },
+          expected_version: 1,
+        },
+        "child-token",
+      );
+    });
+    expect(
+      screen.queryByText(
+        "The updated image could not be uploaded. Retry it or keep the original image.",
       ),
     ).not.toBeInTheDocument();
     expect(

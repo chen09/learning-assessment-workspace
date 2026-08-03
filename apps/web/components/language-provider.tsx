@@ -499,8 +499,8 @@ const messages = {
     "worksheet.failedPhotoUploads": "Answer images waiting to retry",
     "worksheet.retryPhotoUploads": "Retry failed uploads",
     "worksheet.photoReplacementUploadFailed":
-      "The replacement image could not be uploaded. Retry it or keep the original image.",
-    "worksheet.retryPhotoReplacement": "Retry replacement upload",
+      "The updated image could not be uploaded. Retry it or keep the original image.",
+    "worksheet.retryPhotoReplacement": "Retry image upload",
     "worksheet.keepOriginalPhoto": "Keep original image",
     "worksheet.photoPreview": "Preview: {name}",
     "worksheet.replacePhoto": "Replace {name}",
@@ -1459,8 +1459,8 @@ const messages = {
     "worksheet.failedPhotoUploads": "再試行待ちの解答画像",
     "worksheet.retryPhotoUploads": "失敗したアップロードを再試行",
     "worksheet.photoReplacementUploadFailed":
-      "置き換え画像をアップロードできませんでした。再試行するか、元の画像を残してください。",
-    "worksheet.retryPhotoReplacement": "置き換え画像を再アップロード",
+      "編集後の画像をアップロードできませんでした。再試行するか、元の画像を残してください。",
+    "worksheet.retryPhotoReplacement": "画像のアップロードを再試行",
     "worksheet.keepOriginalPhoto": "元の画像を残す",
     "worksheet.photoPreview": "{name} のプレビュー",
     "worksheet.replacePhoto": "{name} を差し替え",
@@ -2405,8 +2405,8 @@ const messages = {
     "worksheet.failedPhotoUploads": "等待重新上传的答案图片",
     "worksheet.retryPhotoUploads": "重新上传失败的图片",
     "worksheet.photoReplacementUploadFailed":
-      "替换图片上传失败。请重新上传，或保留原来的图片。",
-    "worksheet.retryPhotoReplacement": "重新上传替换图片",
+      "编辑后的图片上传失败。请重新上传，或保留原来的图片。",
+    "worksheet.retryPhotoReplacement": "重新上传图片",
     "worksheet.keepOriginalPhoto": "保留原图",
     "worksheet.photoPreview": "{name} 的预览",
     "worksheet.replacePhoto": "替换 {name}",
