@@ -2602,11 +2602,24 @@ button {
     padding: 1.5rem 1rem 2rem;
   }
 
+  .canvas-toolbar {
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .canvas-toolbar > div {
+    flex-wrap: wrap;
+  }
+
+  .canvas-toolbar > div:last-child {
+    margin-left: auto;
+  }
+
   .canvas-toolbar .canvas-clear-button {
-    width: 2.75rem;
-    min-width: 0;
+    width: auto;
+    min-width: 6.8rem;
     justify-content: center;
-    padding-inline: 0;
+    padding-inline: 0.65rem;
   }
 
   .shell-tools {
@@ -2848,12 +2861,6 @@ button {
   .landing-assurances > div + div {
     border-top: 1px solid var(--line);
     border-left: 0;
-  }
-}
-
-@media (max-width: 559px) {
-  .canvas-toolbar .canvas-clear-button span {
-    display: none;
   }
 }
 
