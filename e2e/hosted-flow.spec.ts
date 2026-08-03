@@ -638,6 +638,9 @@ test("temporary parent completes the hosted family learning flow", async ({
     const replacementUploadIntent = (await (
       await replacementUploadIntentResponse
     ).json()) as { path: string };
+    const replacementPhotoFilename = replacementUploadIntent.path
+      .split("/")
+      .at(-1);
     uploadedResponsePaths.push(replacementUploadIntent.path);
     expect((await replacementPhotoSave).ok()).toBeTruthy();
 
@@ -700,6 +703,11 @@ test("temporary parent completes the hosted family learning flow", async ({
         { message: "The private signed photo preview should load." },
       )
       .toBeGreaterThan(0);
+    await expect(
+      page.getByRole("link", {
+        name: `Open original answer photo: ${replacementPhotoFilename}`,
+      }),
+    ).toHaveAttribute("href", /\/storage\/v1\/object\/sign\/responses\//);
     await expect(page.getByText("Answer activity")).toBeVisible();
     await expect(
       page.getByText("Removed 1 answer photo(s)"),
