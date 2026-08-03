@@ -14,6 +14,13 @@ import {
 } from "@/lib/api-client";
 
 const EMPTY_PLAN_POLL_MS = 10_000;
+const ACTIVE_PLAN_STATUSES = new Set([
+  "assigned",
+  "in_progress",
+  "submitted",
+  "grading",
+  "correcting",
+]);
 
 function assignmentHref(assignment: ChildAssignmentSummary) {
   if (
@@ -98,7 +105,10 @@ function ChildHomeContent() {
   }, [refreshPlan]);
 
   useEffect(() => {
-    if (loadState !== "ready" || assignments.length > 0) {
+    const shouldRefreshPlan =
+      assignments.length === 0 ||
+      assignments.some((assignment) => ACTIVE_PLAN_STATUSES.has(assignment.status));
+    if (loadState !== "ready" || !shouldRefreshPlan) {
       return;
     }
 
@@ -108,7 +118,7 @@ function ChildHomeContent() {
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [assignments.length, loadState, refreshPlan]);
+  }, [assignments, loadState, refreshPlan]);
 
   const refreshAfterAssignment = async () => {
     setIsRefreshing(true);

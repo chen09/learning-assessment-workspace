@@ -208,6 +208,34 @@ describe("ChildHomePage", () => {
     }
   });
 
+  it("removes a plan that a parent ends while the child home remains open", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mocks.getChildAssignments
+      .mockResolvedValueOnce([assignment])
+      .mockResolvedValueOnce([]);
+
+    try {
+      render(<ChildHomePage />);
+
+      expect(
+        await screen.findByRole("heading", { name: "Algebra & English warm-up" }),
+      ).toBeInTheDocument();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
+
+      expect(
+        await screen.findByText("目前没有待完成的练习。"),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("heading", { name: "Algebra & English warm-up" }),
+      ).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("lets a child retry a temporarily unavailable plan without reloading", async () => {
     mocks.getChildAssignments
       .mockRejectedValueOnce(new Error("network unavailable"))
