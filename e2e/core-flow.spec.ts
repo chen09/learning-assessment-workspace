@@ -1983,11 +1983,11 @@ test("parent validates a local-AI completed-paper review before submitting it", 
   request,
 }, testInfo) => {
   test.skip(
-    testInfo.project.name !== "desktop",
-    "The completed-paper confirmation flow runs once; responsive UI is covered separately.",
+    !["desktop", "ipad-chrome", "ipad-webkit"].includes(testInfo.project.name),
+    "The completed-paper confirmation flow is exercised on desktop and iPad profiles.",
   );
   const apiBaseUrl = "http://127.0.0.1:8017";
-  const fixtureKey = `e2e-completed-paper-${testInfo.workerIndex}`;
+  const fixtureKey = `e2e-completed-paper-${testInfo.project.name}-${testInfo.workerIndex}`;
   const parentHeaders = { Authorization: "Bearer parent-fixture" };
   let completedPaperId: string | undefined;
   // The in-memory API deliberately does not mint Storage URLs.  This route
