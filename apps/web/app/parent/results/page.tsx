@@ -313,6 +313,15 @@ function PhotoPreview({
                     })}
                   </strong>
                   {!isPdf ? <span>{filename}</span> : null}
+                  {!isPdf ? (
+                    <a
+                      href={url}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      {t("parentResults.openOriginalPhoto", { filename })}
+                    </a>
+                  ) : null}
                 </figcaption>
                 {pageAnnotations.length ? (
                   <button

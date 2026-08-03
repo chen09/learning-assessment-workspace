@@ -320,6 +320,12 @@ describe("ParentResultsPage", () => {
       "src",
       "https://storage.example.test/signed/answer.png?token=short-lived",
     );
+    expect(
+      screen.getByRole("link", { name: "打开原始作答照片：answer.png" }),
+    ).toHaveAttribute(
+      "href",
+      "https://storage.example.test/signed/answer.png?token=short-lived",
+    );
   });
 
   it("labels each uploaded answer photo in its saved shooting order", async () => {
@@ -389,6 +395,9 @@ describe("ParentResultsPage", () => {
     expect(screen.getByText("第 2 页，共 2 页")).toBeInTheDocument();
     expect(screen.getByText("first-page.png")).toBeInTheDocument();
     expect(screen.getByText("second-page.png")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /打开原始作答照片/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("keeps a paper photo unchanged until a parent chooses to reveal AI red-pencil marks", async () => {
