@@ -1100,6 +1100,13 @@ function WorksheetWorkbenchContent() {
   );
 
   const questionIndexStatus = (question: Question) => {
+    if (gradingQuestionIds.includes(question.id)) {
+      return {
+        className: "status-grading",
+        label: t("worksheet.questionStatusGrading"),
+        symbol: "…",
+      };
+    }
     const result = questionResults[question.id];
     if (result) {
       switch (result.outcome) {
@@ -1128,13 +1135,6 @@ function WorksheetWorkbenchContent() {
             symbol: "!",
           };
       }
-    }
-    if (gradingQuestionIds.includes(question.id)) {
-      return {
-        className: "status-grading",
-        label: t("worksheet.questionStatusGrading"),
-        symbol: "…",
-      };
     }
     if (submittedQuestionIds.includes(question.id)) {
       return {

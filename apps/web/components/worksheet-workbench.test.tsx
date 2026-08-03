@@ -2105,6 +2105,76 @@ describe("WorksheetWorkbench", () => {
     ).toBeDisabled();
   });
 
+  it("shows regrading in the question rail instead of a stale result", async () => {
+    window.localStorage.setItem("luma-language:demo-child", "zh");
+    mocks.startAssignment.mockResolvedValue({
+      ...assignmentWork,
+      submitted_question_ids: ["algebra-proof"],
+      responses: [
+        {
+          id: "response-1",
+          question_id: "algebra-proof",
+          kind: "strokes",
+          answer: {
+            strokes: [
+              {
+                points: [
+                  { x: 20, y: 30, pressure: 0.5 },
+                  { x: 80, y: 90, pressure: 0.5 },
+                ],
+                width: 2.5,
+                eraser: false,
+              },
+            ],
+            canvas_size: { width: 900, height: 420 },
+          },
+          version: 3,
+        },
+      ],
+    });
+    mocks.getAttemptResults.mockResolvedValue({
+      attempt_id: "attempt-1",
+      complete: false,
+      results: [
+        {
+          id: "result-proof",
+          question_id: "algebra-proof",
+          outcome: "needs_parent_review",
+          awarded_points: null,
+          confidence: 0.72,
+          feedback: {
+            summary: "A parent review is needed.",
+            annotations: [],
+          },
+        },
+      ],
+    });
+    mocks.getQuestionGradingJob.mockImplementationOnce(
+      () => new Promise(() => undefined),
+    );
+
+    render(<WorksheetWorkbench />);
+
+    const questionThreeButton = await screen.findByRole("button", {
+      name: "前往第 3 题",
+    });
+    fireEvent.click(questionThreeButton);
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "保留答案并重新评判",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mocks.regradeQuestion).toHaveBeenCalledTimes(1);
+    });
+    expect(questionThreeButton).toHaveClass("status-grading");
+    expect(
+      questionThreeButton.querySelector(".question-index-state"),
+    ).toHaveTextContent("…");
+    expect(screen.getByText("批改中")).toHaveClass("sr-only");
+  });
+
   it("clears one graded answer into a new attempt and can request review again", async () => {
     mocks.startAssignment.mockResolvedValue({
       ...assignmentWork,
