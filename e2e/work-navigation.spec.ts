@@ -178,6 +178,7 @@ test("child question rail distinguishes saved work from an answer that needs ret
   await expect(page.locator("#question-status-status-saved")).toHaveText(
     "Answer saved",
   );
+  await expect(saved.locator(".question-index-state")).toHaveText("•");
 
   const retry = page.getByRole("button", { name: "Go to question 2" });
   await expect(retry).toHaveClass(/status-incorrect/);
@@ -188,6 +189,7 @@ test("child question rail distinguishes saved work from an answer that needs ret
   await expect(page.locator("#question-status-status-incorrect")).toHaveText(
     "Try again",
   );
+  await expect(retry.locator(".question-index-state")).toHaveText("↻");
 });
 
 test("browser navigation hides the previous practice until the requested attempt loads", async ({

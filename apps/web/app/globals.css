@@ -898,6 +898,7 @@ button {
 }
 
 .question-index button {
+  position: relative;
   display: grid;
   width: 2.3rem;
   height: 2.3rem;
@@ -909,50 +910,43 @@ button {
   font-weight: 800;
 }
 
-.question-index button.answered::after {
+.question-index-state {
   position: absolute;
-  width: 0.42rem;
-  height: 0.42rem;
+  top: -0.3rem;
+  right: -0.3rem;
+  display: grid;
+  min-width: 0.95rem;
+  height: 0.95rem;
+  padding: 0 0.1rem;
+  place-items: center;
   border: 2px solid white;
-  border-radius: 50%;
+  border-radius: 999px;
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 1px 3px rgb(35 40 50 / 24%);
+}
+
+.question-index button.status-answered .question-index-state,
+.question-index button.status-correct .question-index-state {
   background: var(--green);
-  content: "";
-  transform: translate(0.85rem, -0.85rem);
 }
 
-.question-index button.status-submitted::after,
-.question-index button.status-grading::after,
-.question-index button.status-uncertain::after,
-.question-index button.status-parent-review::after,
-.question-index button.status-correct::after,
-.question-index button.status-incorrect::after {
-  position: absolute;
-  width: 0.42rem;
-  height: 0.42rem;
-  border: 2px solid white;
-  border-radius: 50%;
-  content: "";
-  transform: translate(0.85rem, -0.85rem);
-}
-
-.question-index button.status-submitted::after {
+.question-index button.status-submitted .question-index-state {
   background: #65798e;
 }
 
-.question-index button.status-grading::after {
+.question-index button.status-grading .question-index-state {
   background: #8c6ac6;
 }
 
-.question-index button.status-uncertain::after,
-.question-index button.status-parent-review::after {
+.question-index button.status-uncertain .question-index-state,
+.question-index button.status-parent-review .question-index-state {
   background: #bc8731;
 }
 
-.question-index button.status-correct::after {
-  background: var(--green);
-}
-
-.question-index button.status-incorrect::after {
+.question-index button.status-incorrect .question-index-state {
   background: #c75c50;
 }
 

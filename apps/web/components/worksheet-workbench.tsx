@@ -1107,21 +1107,25 @@ function WorksheetWorkbenchContent() {
           return {
             className: "status-correct",
             label: t("worksheet.questionStatusCorrect"),
+            symbol: "✓",
           };
         case "incorrect":
           return {
             className: "status-incorrect",
             label: t("worksheet.questionStatusIncorrect"),
+            symbol: "↻",
           };
         case "uncertain":
           return {
             className: "status-uncertain",
             label: t("worksheet.questionStatusUncertain"),
+            symbol: "?",
           };
         case "needs_parent_review":
           return {
             className: "status-parent-review",
             label: t("worksheet.questionStatusParentReview"),
+            symbol: "!",
           };
       }
     }
@@ -1129,18 +1133,21 @@ function WorksheetWorkbenchContent() {
       return {
         className: "status-grading",
         label: t("worksheet.questionStatusGrading"),
+        symbol: "…",
       };
     }
     if (submittedQuestionIds.includes(question.id)) {
       return {
         className: "status-submitted",
         label: t("worksheet.questionStatusSubmitted"),
+        symbol: "↑",
       };
     }
     if (hasMeaningfulAnswer(answers[question.id])) {
       return {
         className: "status-answered",
         label: t("worksheet.questionStatusAnswered"),
+        symbol: "•",
       };
     }
     return null;
@@ -2367,9 +2374,17 @@ function WorksheetWorkbenchContent() {
                   >
                     {question.number}
                     {status ? (
-                      <span className="sr-only" id={statusDescriptionId}>
-                        {status.label}
-                      </span>
+                      <>
+                        <span
+                          aria-hidden="true"
+                          className="question-index-state"
+                        >
+                          {status.symbol}
+                        </span>
+                        <span className="sr-only" id={statusDescriptionId}>
+                          {status.label}
+                        </span>
+                      </>
                     ) : null}
                   </button>
                 </li>
