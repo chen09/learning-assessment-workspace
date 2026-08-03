@@ -747,7 +747,30 @@ function ParentResultsContent() {
                     )}
                     <div className="ai-observation">
                       <PenLine />
-                      <p>{t("parentResults.parentNeeded")}</p>
+                      <div>
+                        <p>{t("parentResults.parentNeeded")}</p>
+                        {item.automated_feedback.summary ? (
+                          <p className="ai-feedback-summary">
+                            {item.automated_feedback.summary}
+                          </p>
+                        ) : null}
+                        {item.automated_feedback.action ? (
+                          <p className="ai-feedback-action">
+                            {item.automated_feedback.action}
+                          </p>
+                        ) : null}
+                        {item.automated_feedback.evidence?.length ? (
+                          <ul className="ai-feedback-evidence">
+                            {item.automated_feedback.evidence.map(
+                              (evidence, index) => (
+                                <li key={`${item.result_id}-evidence-${index}`}>
+                                  {evidence}
+                                </li>
+                              ),
+                            )}
+                          </ul>
+                        ) : null}
+                      </div>
                     </div>
                     {decision ? (
                       <div className="confirmed-message" role="status">

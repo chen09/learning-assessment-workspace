@@ -76,8 +76,9 @@ describe("ParentResultsPage", () => {
           },
           automated_outcome: "needs_parent_review",
           automated_feedback: {
-            summary: "Waiting for a parent to review.",
-            action: "A parent can mark this answer correct or incorrect.",
+            summary: "请家长确认这份答案。",
+            action: "家长可以确认这份答案是否正确。",
+            evidence: ["符号位置需要核对。"],
             annotations: [
               {
                 kind: "underline",
@@ -130,6 +131,11 @@ describe("ParentResultsPage", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getByText("请检查这里的符号。")).toBeInTheDocument();
+    expect(screen.getByText("请家长确认这份答案。")).toBeInTheDocument();
+    expect(
+      screen.getByText("家长可以确认这份答案是否正确。"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("符号位置需要核对。")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "判为正确" }));
 
@@ -463,7 +469,9 @@ describe("ParentResultsPage", () => {
     );
 
     expect(screen.getAllByTestId("red-pencil-mark")).toHaveLength(1);
-    expect(screen.getByText("平方のかかる範囲を確認")).toBeInTheDocument();
+    expect(
+      document.querySelector(".photo-grading-annotation-list"),
+    ).toHaveTextContent("平方のかかる範囲を確認");
     expect(
       screen.getByRole("button", { name: "隐藏 AI 红笔标注" }),
     ).toBeInTheDocument();

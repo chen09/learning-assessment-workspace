@@ -4338,6 +4338,25 @@ button {
   line-height: 1.5;
 }
 
+.ai-observation .ai-feedback-summary {
+  margin-top: 0.35rem;
+  color: var(--ink);
+  font-weight: 720;
+}
+
+.ai-observation .ai-feedback-action {
+  margin-top: 0.2rem;
+}
+
+.ai-feedback-evidence {
+  display: grid;
+  gap: 0.16rem;
+  margin: 0.45rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
 .decision-row {
   display: flex;
   gap: 0.7rem;
