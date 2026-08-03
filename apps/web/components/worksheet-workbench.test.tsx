@@ -1311,9 +1311,11 @@ describe("WorksheetWorkbench", () => {
         "child-token",
       );
     });
-    expect(
-      screen.getByRole("button", { name: "Submit all answers" }),
-    ).not.toBeDisabled();
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Submit all answers" }),
+      ).not.toBeDisabled();
+    });
   });
 
   it("replaces one uploaded response photo without overwriting the original object", async () => {
@@ -1485,9 +1487,11 @@ describe("WorksheetWorkbench", () => {
         "The updated image could not be uploaded. Retry it or keep the original image.",
       ),
     ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Submit all answers" }),
-    ).not.toBeDisabled();
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Submit all answers" }),
+      ).not.toBeDisabled();
+    });
   });
 
   it("keeps a failed rotated image ready to retry without changing the original", async () => {
@@ -1937,6 +1941,8 @@ describe("WorksheetWorkbench", () => {
           confidence: 0.96,
           feedback: {
             summary: "The last algebra term is incorrect.",
+            action: "Check the final term before you submit again.",
+            evidence: ["The expanded middle term has the wrong sign."],
             annotations: [
               {
                 kind: "box",
@@ -1965,6 +1971,9 @@ describe("WorksheetWorkbench", () => {
     fireEvent.click(questionThreeButton);
 
     expect(await screen.findByText("Check this term.")).toBeInTheDocument();
+    expect(
+      screen.getByText("The expanded middle term has the wrong sign."),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Go to question 3" })).toHaveAttribute(
       "aria-describedby",
       "question-status-algebra-proof",

@@ -2215,6 +2215,16 @@ function WorksheetWorkbenchContent() {
           {!grading && result ? (
             <>
               <p>{resultAction(result.outcome)}</p>
+              {result.outcome !== "correct" &&
+              result.feedback.evidence?.length ? (
+                <ul className="question-grade-evidence">
+                  {result.feedback.evidence.map((evidence, evidenceIndex) => (
+                    <li key={`${result.id}-evidence-${evidenceIndex}`}>
+                      {evidence}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
               <div className="question-grade-actions">
                 <button
                   className="button ghost"
