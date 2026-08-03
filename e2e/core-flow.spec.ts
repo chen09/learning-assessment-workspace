@@ -665,6 +665,7 @@ test("parent reassigns a confirmed library set with an exam limit", async ({
   await expect(
     page.getByRole("heading", { name: "Reusable algebra check" }),
   ).toBeVisible();
+  await expect(page.getByText("Knowledge points: Addition")).toBeVisible();
   await page.getByRole("button", { name: "Assign to child" }).click();
   await expect(
     page.getByRole("heading", { name: "Assign “Reusable algebra check”" }),

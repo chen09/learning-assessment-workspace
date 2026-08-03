@@ -1785,6 +1785,9 @@ class MemoryRepository:
                 "total_points": float(document.total_points),
                 "estimated_minutes": document.question_set.estimated_minutes,
                 "answer_keys_present": True,
+                "knowledge_points": [
+                    tag.label for tag in document.knowledge_tags
+                ],
             },
         )
         self.question_sets[str(question_set.id)] = question_set

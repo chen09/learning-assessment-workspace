@@ -83,6 +83,7 @@ describe("LibraryPage", () => {
         source_summary: {
           artifact_kind: "ai_generated_practice",
           reference_file_count: 27,
+          knowledge_points: ["Coordinating conjunctions", "Imperative sentences"],
           source_material_title: "Lesson 1 textbook",
           source_material_subject: "English",
         },
@@ -105,6 +106,9 @@ describe("LibraryPage", () => {
     expect(screen.getByText("来自 27 份原教材资料")).toBeInTheDocument();
     expect(
       screen.getByText("基于教材：Lesson 1 textbook · English"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("知识点：Coordinating conjunctions · Imperative sentences"),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "继续审核题单" }),

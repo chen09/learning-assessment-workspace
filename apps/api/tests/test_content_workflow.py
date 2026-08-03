@@ -388,6 +388,19 @@ def test_parent_can_confirm_structured_json_and_assign_it_without_exposing_answe
     assert repeated.json()["assignment_id"] == imported.json()["assignment_id"]
     assert repeated.json()["reused_existing"] is True
 
+    library = client.get(
+        f"/v1/library/families/{fixture['family']['id']}/question-sets",
+        headers=PARENT_HEADERS,
+    ).json()
+    imported_set = next(
+        item
+        for item in library
+        if item["id"] == imported.json()["question_set_id"]
+    )
+    assert imported_set["source_summary"]["knowledge_points"] == [
+        "if condition"
+    ]
+
     child_session = client.post(
         f"/v1/children/{fixture['child']['id']}/sessions",
         json={"pin": "123456"},

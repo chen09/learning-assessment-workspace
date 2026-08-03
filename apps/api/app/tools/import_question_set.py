@@ -545,6 +545,9 @@ async def import_question_set(
                     "total_points": float(document.total_points),
                     "estimated_minutes": document.question_set.estimated_minutes,
                     "answer_keys_present": True,
+                    "knowledge_points": [
+                        tag.label for tag in document.knowledge_tags
+                    ],
                 }
             )
             new_status: Literal["needs_review", "confirmed"] = (

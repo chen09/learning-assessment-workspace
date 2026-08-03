@@ -38,6 +38,8 @@ const copy = {
       `Based on ${count} private source ${count === 1 ? "file" : "files"}`,
     source: (title: string, subject: string) =>
       `Based on private material: ${title}${subject ? ` · ${subject}` : ""}`,
+    knowledgePoints: (points: string[]) =>
+      `Knowledge points: ${points.join(" · ")}`,
     empty: "No question sets yet.",
     error: "The family library could not be loaded.",
     reviewLink: "Review submissions",
@@ -87,6 +89,7 @@ const copy = {
     references: (count: number) => `非公開の元教材 ${count}件に基づく`,
     source: (title: string, subject: string) =>
       `元教材：${title}${subject ? ` · ${subject}` : ""}`,
+    knowledgePoints: (points: string[]) => `知識点：${points.join(" · ")}`,
     empty: "問題セットはまだありません。",
     error: "家族の問題ライブラリを読み込めませんでした。",
     reviewLink: "投稿を確認する",
@@ -135,6 +138,7 @@ const copy = {
     references: (count: number) => `来自 ${count} 份原教材资料`,
     source: (title: string, subject: string) =>
       `基于教材：${title}${subject ? ` · ${subject}` : ""}`,
+    knowledgePoints: (points: string[]) => `知识点：${points.join(" · ")}`,
     empty: "还没有题单。",
     error: "无法加载家庭题库。",
     reviewLink: "审核投稿",
@@ -330,6 +334,7 @@ function LibraryContent() {
       [
         set.title,
         set.subject,
+        ...(set.source_summary.knowledge_points ?? []),
         set.source_summary.source_material_title,
         set.source_summary.source_material_subject,
       ]
@@ -562,6 +567,9 @@ function LibraryContent() {
             set.source_summary.source_material_title?.trim();
           const sourceMaterialSubject =
             set.source_summary.source_material_subject?.trim() ?? "";
+          const knowledgePoints = (set.source_summary.knowledge_points ?? [])
+            .map((point) => point.trim())
+            .filter(Boolean);
           const sourceImportFailed =
             set.status === "processing" && set.import_job_status === "failed";
           const isPrivateSourceMaterial =
@@ -581,6 +589,11 @@ function LibraryContent() {
               ) : null}
               {sourceMaterialTitle ? (
                 <p>{text.source(sourceMaterialTitle, sourceMaterialSubject)}</p>
+              ) : null}
+              {knowledgePoints.length > 0 ? (
+                <p className="record-source">
+                  {text.knowledgePoints(knowledgePoints)}
+                </p>
               ) : null}
               <span
                 className={
