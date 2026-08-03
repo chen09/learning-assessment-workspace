@@ -2697,6 +2697,64 @@ describe("CreateWorkspace", () => {
     ).toBeEnabled();
   });
 
+  it("keeps selected completed-paper files and reuses their private upload session after a failed upload", async () => {
+    mocks.createUploadIntent.mockImplementation((payload, _token, key) =>
+      Promise.resolve({
+        bucket: payload.bucket,
+        path: `family-1/${payload.bucket}/${payload.filename}`,
+        signed_url: `https://storage.example/${key}`,
+      }),
+    );
+    mocks.uploadToSignedUrl.mockRejectedValueOnce(new Error("offline"));
+    const completedWorksheetImport = {
+      id: "completed-worksheet-retry",
+      status: "needs_review",
+      assignment_id: null,
+      attempt_id: null,
+      filenames: ["completed-paper.jpg"],
+      response_paths: ["family-1/responses/completed-paper.jpg"],
+    };
+    mocks.createCompletedWorksheetImport.mockResolvedValue(completedWorksheetImport);
+    mocks.getCompletedWorksheetImport.mockResolvedValue(completedWorksheetImport);
+
+    render(<CreateWorkspace />);
+
+    await screen.findByRole("combobox", { name: "Child" });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Grade completed paper" }),
+    );
+    fireEvent.change(screen.getByLabelText("Completed worksheet scans"), {
+      target: {
+        files: [
+          new File(["scan"], "completed-paper.jpg", {
+            type: "image/jpeg",
+          }),
+        ],
+      },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Upload for review" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The upload paused. Your selected pages are still here",
+    );
+    expect(screen.getAllByText("completed-paper.jpg")).not.toHaveLength(0);
+    expect(mocks.createCompletedWorksheetImport).not.toHaveBeenCalled();
+    const firstUploadKey = mocks.createUploadIntent.mock.calls[0][2] as string;
+
+    fireEvent.click(screen.getByRole("button", { name: "Upload for review" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Preparing the review draft" }),
+    ).toBeInTheDocument();
+    const retryUploadKey = mocks.createUploadIntent.mock.calls[1][2] as string;
+    expect(retryUploadKey).toBe(firstUploadKey);
+    expect(mocks.createCompletedWorksheetImport).toHaveBeenCalledWith(
+      expect.any(Object),
+      "parent-token",
+      `completed-worksheet-${firstUploadKey.replace("completed-response-", "").replace(/-0$/, "")}`,
+    );
+  });
+
   it("keeps a completed paper private until the reviewed JSON creates its submitted attempt", async () => {
     mocks.getChildren.mockResolvedValue([
       {

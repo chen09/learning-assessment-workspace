@@ -95,6 +95,11 @@ type WorksheetUploadContentType =
   | "image/png"
   | "image/jpeg";
 
+type CompletedUploadRetrySession = {
+  objectId: string;
+  sourceSignature: string;
+};
+
 const MAX_COMPLETED_PAPER_FILE_BYTES = 15_000_000;
 
 const completedPaperContentType = (
@@ -127,6 +132,24 @@ const completedPaperFileProblem = (
   }
   return null;
 };
+
+const completedPaperUploadSignature = (
+  responseFiles: File[],
+  answerKeyFiles: File[],
+  referenceMaterialFiles: File[],
+) =>
+  [
+    ["response", responseFiles],
+    ["answer", answerKeyFiles],
+    ["reference", referenceMaterialFiles],
+  ]
+    .flatMap(([role, selectedFiles]) =>
+      (selectedFiles as File[]).map(
+        (file, index) =>
+          `${role}:${index}:${file.name}:${file.size}:${file.lastModified}`,
+      ),
+    )
+    .join("|");
 
 const LOCAL_COMPLETED_PAPER_REVIEW_PROMPT = `You are a careful school worksheet reviewer. Read the attached completed worksheet pages locally and return JSON only. Do not return Markdown, explanation, or an annotated image.
 
@@ -637,6 +660,10 @@ function CreateWorkspaceContent() {
   const [completedPaperError, setCompletedPaperError] = useState<string | null>(
     null,
   );
+  const [completedUploadRetrySession, setCompletedUploadRetrySession] =
+    useState<CompletedUploadRetrySession | null>(null);
+  const [completedUploadRetryFailed, setCompletedUploadRetryFailed] =
+    useState(false);
   const [completedResponseFileNames, setCompletedResponseFileNames] = useState<
     string[]
   >([]);
@@ -1543,8 +1570,17 @@ function CreateWorkspaceContent() {
         return;
       }
       setRequestStatus("working");
+      setCompletedUploadRetryFailed(false);
+      const sourceSignature = completedPaperUploadSignature(
+        files,
+        answerFiles,
+        referenceFiles,
+      );
+      const uploadObjectId =
+        completedUploadRetrySession?.sourceSignature === sourceSignature
+          ? completedUploadRetrySession.objectId
+          : crypto.randomUUID();
       try {
-        const uploadObjectId = crypto.randomUUID();
         const responsePaths: string[] = [];
         const answerSourcePaths: string[] = [];
         const referenceSourcePaths: string[] = [];
@@ -1635,8 +1671,14 @@ function CreateWorkspaceContent() {
             imported.response_paths.length,
           ),
         );
+        setCompletedUploadRetrySession(null);
         setRequestStatus("idle");
       } catch {
+        setCompletedUploadRetrySession({
+          objectId: uploadObjectId,
+          sourceSignature,
+        });
+        setCompletedUploadRetryFailed(true);
         setRequestStatus("error");
       }
       return;
@@ -4195,6 +4237,8 @@ function CreateWorkspaceContent() {
                   aria-label={t("completedPaper.scans")}
                   multiple
                   onChange={(event) => {
+                    setCompletedUploadRetrySession(null);
+                    setCompletedUploadRetryFailed(false);
                     selectCompletedPaperFiles(
                       Array.from(event.target.files ?? []),
                       setFiles,
@@ -4246,6 +4290,8 @@ function CreateWorkspaceContent() {
                   aria-label={t("completedPaper.answerKey")}
                   multiple
                   onChange={(event) => {
+                    setCompletedUploadRetrySession(null);
+                    setCompletedUploadRetryFailed(false);
                     selectCompletedPaperFiles(
                       Array.from(event.target.files ?? []),
                       setAnswerFiles,
@@ -4283,6 +4329,8 @@ function CreateWorkspaceContent() {
                   aria-label={t("completedPaper.referenceMaterial")}
                   multiple
                   onChange={(event) => {
+                    setCompletedUploadRetrySession(null);
+                    setCompletedUploadRetryFailed(false);
                     selectCompletedPaperFiles(
                       Array.from(event.target.files ?? []),
                       setReferenceFiles,
@@ -4823,7 +4871,9 @@ function CreateWorkspaceContent() {
           </button>
           {requestStatus === "error" ? (
             <p className="form-error" role="alert">
-              {t("creation.error")}
+              {mode === "completed" && completedUploadRetryFailed
+                ? t("completedPaper.uploadRetryFailed")
+                : t("creation.error")}
             </p>
           ) : null}
         </section>
