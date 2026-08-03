@@ -1254,11 +1254,11 @@ test("parent authors a paper-photo question and assigns it through the reviewed 
   request,
 }, testInfo) => {
   test.skip(
-    testInfo.project.name !== "desktop",
-    "The shared fixture API import runs once; responsive UI is covered separately.",
+    !["desktop", "ipad-chrome", "ipad-webkit"].includes(testInfo.project.name),
+    "The paper-photo authoring flow is exercised on desktop and iPad profiles.",
   );
   const apiBaseUrl = "http://127.0.0.1:8017";
-  const fixtureKey = `e2e-manual-question-${testInfo.workerIndex}`;
+  const fixtureKey = `e2e-manual-question-${testInfo.project.name}-${testInfo.workerIndex}`;
   const family = (await (
     await request.post(`${apiBaseUrl}/v1/families`, {
       headers: {
