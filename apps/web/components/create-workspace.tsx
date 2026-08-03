@@ -2917,7 +2917,13 @@ function CreateWorkspaceContent() {
               {completedResponsePreviewUrls.map((previewUrl, index) => {
                 const filename = completedResponseFileNames[index] ?? "";
                 const page = index + 1;
-                const label = t("completedPaper.page", { pages: page });
+                const label = t("completedPaper.page", {
+                  page,
+                  total: Math.max(
+                    completedResponsePageCount,
+                    completedResponsePreviewUrls.length,
+                  ),
+                });
                 const answerRegions =
                   completedReview?.answer_regions.flatMap((answerRegion) =>
                     answerRegion.page_numbers.includes(page)
@@ -2937,7 +2943,8 @@ function CreateWorkspaceContent() {
                       target="_blank"
                     >
                       <FileText aria-hidden="true" />
-                      <span>{filename || label}</span>
+                      <span>{label}</span>
+                      {filename ? <small>{filename}</small> : null}
                       <small>{t("completedPaper.openOriginal")}</small>
                     </a>
                   );
@@ -2977,7 +2984,10 @@ function CreateWorkspaceContent() {
                           ))
                         : null}
                     </div>
-                    <figcaption>{filename || label}</figcaption>
+                    <figcaption>
+                      <strong>{label}</strong>
+                      {filename ? <span>{filename}</span> : null}
+                    </figcaption>
                   </figure>
                 );
               })}

@@ -2081,6 +2081,7 @@ test("parent validates a local-AI completed-paper review before submitting it", 
         ...imported,
         response_preview_urls: [
           "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='1600'%3E%3Crect width='100%25' height='100%25' fill='%23fffdf8'/%3E%3C/svg%3E",
+          "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='1600'%3E%3Crect width='100%25' height='100%25' fill='%23f5f7ff'/%3E%3C/svg%3E",
         ],
       },
     });
@@ -2211,11 +2212,18 @@ test("parent validates a local-AI completed-paper review before submitting it", 
     `/parent/create/?familyId=${encodeURIComponent(family.id)}&childId=${encodeURIComponent(child.id)}`,
   );
   await page.getByRole("button", { name: "Grade completed paper" }).click();
-  await page.getByLabel("Completed worksheet scans").setInputFiles({
-    name: "completed-paper.jpg",
-    mimeType: "image/jpeg",
-    buffer: Buffer.from("completed-paper"),
-  });
+  await page.getByLabel("Completed worksheet scans").setInputFiles([
+    {
+      name: "completed-paper-front.jpg",
+      mimeType: "image/jpeg",
+      buffer: Buffer.from("completed-paper-front"),
+    },
+    {
+      name: "completed-paper-back.jpg",
+      mimeType: "image/jpeg",
+      buffer: Buffer.from("completed-paper-back"),
+    },
+  ]);
   const uploadResponse = page.waitForResponse(
     (response) =>
       response.url() === `${apiBaseUrl}/v1/completed-worksheets` &&
@@ -2244,6 +2252,10 @@ test("parent validates a local-AI completed-paper review before submitting it", 
   await expect(
     page.getByText("Review ready · questions: 5 · answer regions: 5"),
   ).toBeVisible();
+  await expect(page.getByText("Page 1 of 2")).toBeVisible();
+  await expect(page.getByText("Page 2 of 2")).toBeVisible();
+  await expect(page.getByText("completed-paper-front.jpg")).toBeVisible();
+  await expect(page.getByText("completed-paper-back.jpg")).toBeVisible();
   await expect(
     page.getByLabel("Answer area for question 1 on page 1"),
   ).toBeVisible();

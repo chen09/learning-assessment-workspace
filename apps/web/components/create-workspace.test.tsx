@@ -124,13 +124,18 @@ describe("CreateWorkspace", () => {
       status: "needs_review",
       assignment_id: null,
       attempt_id: null,
-      filenames: ["completed-paper.jpg"],
-      response_paths: ["family-1/responses/completed-paper.jpg"],
+      filenames: ["completed-paper-front.jpg", "completed-paper-back.jpg"],
+      response_paths: [
+        "family-1/responses/completed-paper-front.jpg",
+        "family-1/responses/completed-paper-back.jpg",
+      ],
       response_preview_urls: [
-        "https://storage.example.test/signed/completed-paper.jpg?short-lived=true",
+        "https://storage.example.test/signed/completed-paper-front.jpg?short-lived=true",
+        "https://storage.example.test/signed/completed-paper-back.jpg?short-lived=true",
       ],
       extraction: {
         schema_version: "1.0",
+        source_page_count: 2,
         document: {
           schema_version: "1.0",
           question_set: {
@@ -180,8 +185,18 @@ describe("CreateWorkspace", () => {
       screen.getByRole("img", { name: "Completed worksheet page 1" }),
     ).toHaveAttribute(
       "src",
-      "https://storage.example.test/signed/completed-paper.jpg?short-lived=true",
+      "https://storage.example.test/signed/completed-paper-front.jpg?short-lived=true",
     );
+    expect(
+      screen.getByRole("img", { name: "Completed worksheet page 2" }),
+    ).toHaveAttribute(
+      "src",
+      "https://storage.example.test/signed/completed-paper-back.jpg?short-lived=true",
+    );
+    expect(screen.getByText("Page 1 of 2")).toBeInTheDocument();
+    expect(screen.getByText("Page 2 of 2")).toBeInTheDocument();
+    expect(screen.getByText("completed-paper-front.jpg")).toBeInTheDocument();
+    expect(screen.getByText("completed-paper-back.jpg")).toBeInTheDocument();
     expect(
       screen.queryByText("family-1/responses/completed-paper.jpg"),
     ).not.toBeInTheDocument();
@@ -365,7 +380,7 @@ describe("CreateWorkspace", () => {
     await screen.findByRole("heading", { name: "Preparing the review draft" });
     expect(
       screen.getByRole("link", {
-        name: "two-page-completed-paper.pdfOpen original",
+        name: "Page 1 of 2two-page-completed-paper.pdfOpen original",
       }),
     ).toHaveAttribute(
       "href",

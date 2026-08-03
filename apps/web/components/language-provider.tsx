@@ -871,7 +871,7 @@ const messages = {
     "completedPaper.legibility.uncertain": "Uncertain",
     "completedPaper.legibility.unreadable": "Unreadable",
     "completedPaper.useWholePage": "Use the whole page instead",
-    "completedPaper.page": "Page {pages}",
+    "completedPaper.page": "Page {page} of {total}",
     "completedPaper.privatePreview": "Private parent preview",
     "completedPaper.originalPages": "Original completed pages",
     "completedPaper.originalPagesHelp":
@@ -1783,7 +1783,7 @@ const messages = {
     "completedPaper.legibility.uncertain": "判読が不確か",
     "completedPaper.legibility.unreadable": "判読できない",
     "completedPaper.useWholePage": "ページ全体を解答範囲にする",
-    "completedPaper.page": "{pages} ページ",
+    "completedPaper.page": "{total} ページ中 {page} ページ",
     "completedPaper.privatePreview": "保護者だけのプレビュー",
     "completedPaper.originalPages": "元の解答済みページ",
     "completedPaper.originalPagesHelp":
@@ -2667,7 +2667,7 @@ const messages = {
     "completedPaper.legibility.uncertain": "不确定",
     "completedPaper.legibility.unreadable": "无法辨认",
     "completedPaper.useWholePage": "改用整页作为答题范围",
-    "completedPaper.page": "第 {pages} 页",
+    "completedPaper.page": "第 {page} 页，共 {total} 页",
     "completedPaper.privatePreview": "家长私有预览",
     "completedPaper.originalPages": "原始已作答页面",
     "completedPaper.originalPagesHelp":
