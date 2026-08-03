@@ -542,12 +542,25 @@ function CreateWorkspaceContent() {
     label: string;
     url: string;
   } | null>(null);
+  const [expandedPaperPreviewTrigger, setExpandedPaperPreviewTrigger] =
+    useState<HTMLButtonElement | null>(null);
   const expandedPaperPreviewDialogRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (expandedPaperPreview) {
       expandedPaperPreviewDialogRef.current?.focus();
+      return;
     }
-  }, [expandedPaperPreview]);
+
+    expandedPaperPreviewTrigger?.focus();
+  }, [expandedPaperPreview, expandedPaperPreviewTrigger]);
+  const openExpandedPaperPreview = (
+    preview: { label: string; url: string },
+    trigger: HTMLButtonElement,
+  ) => {
+    setExpandedPaperPreviewTrigger(trigger);
+    setExpandedPaperPreview(preview);
+  };
+  const closeExpandedPaperPreview = () => setExpandedPaperPreview(null);
   const {
     previews: completedPaperPreviews,
     updatePreviews: updateCompletedPaperPreviews,
@@ -842,7 +855,10 @@ function CreateWorkspaceContent() {
     assignFiles: (files: File[]) => void,
     assignFilename: (filename: string) => void,
     updatePreviews: (files: File[]) => void,
-    openPreview: (preview: { label: string; url: string }) => void,
+    openPreview: (
+      preview: { label: string; url: string },
+      trigger: HTMLButtonElement,
+    ) => void,
   ) => (
     <ol aria-label={listLabel} className="completed-paper-selected-pages">
       {selectedFiles.map((file, index) => {
@@ -855,7 +871,9 @@ function CreateWorkspaceContent() {
               <button
                 aria-label={t("completedPaper.openPreview", { label })}
                 className="completed-paper-selected-preview-button"
-                onClick={() => openPreview({ label, url: previewUrl })}
+                onClick={(event) =>
+                  openPreview({ label, url: previewUrl }, event.currentTarget)
+                }
                 type="button"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element -- local, private browser-only preview */}
@@ -4189,7 +4207,7 @@ function CreateWorkspaceContent() {
                   setFiles,
                   setFileName,
                   updateCompletedPaperPreviews,
-                  setExpandedPaperPreview,
+                  openExpandedPaperPreview,
                 )
               ) : null}
               <label className="completed-paper-language">
@@ -4243,7 +4261,7 @@ function CreateWorkspaceContent() {
                   setAnswerFiles,
                   setAnswerFileName,
                   updateCompletedAnswerKeyPreviews,
-                  setExpandedPaperPreview,
+                  openExpandedPaperPreview,
                 )
               ) : null}
               <label className="drop-zone completed-paper-private-file">
@@ -4282,7 +4300,7 @@ function CreateWorkspaceContent() {
                   setReferenceFiles,
                   setReferenceFileName,
                   updateCompletedReferencePreviews,
-                  setExpandedPaperPreview,
+                  openExpandedPaperPreview,
                 )
               ) : null}
               {expandedPaperPreview ? (
@@ -4294,7 +4312,7 @@ function CreateWorkspaceContent() {
                   className="completed-paper-preview-dialog"
                   onKeyDown={(event) => {
                     if (event.key === "Escape") {
-                      setExpandedPaperPreview(null);
+                      closeExpandedPaperPreview();
                     }
                   }}
                   ref={expandedPaperPreviewDialogRef}
@@ -4305,7 +4323,7 @@ function CreateWorkspaceContent() {
                     <button
                       aria-label={t("completedPaper.closePreview")}
                       className="text-button"
-                      onClick={() => setExpandedPaperPreview(null)}
+                      onClick={closeExpandedPaperPreview}
                       type="button"
                     >
                       ×

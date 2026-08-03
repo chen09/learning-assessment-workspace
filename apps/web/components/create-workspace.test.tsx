@@ -920,6 +920,11 @@ describe("CreateWorkspace", () => {
       screen.queryByRole("dialog", { name: "Preview of Page 1 of 2" }),
     ).not.toBeInTheDocument();
     expect(
+      screen.getByRole("button", {
+        name: "Open full-size preview of Page 1 of 2",
+      }),
+    ).toHaveFocus();
+    expect(
       screen.getByRole("button", { name: "Move page 1 later" }),
     ).toBeInTheDocument();
     expect(

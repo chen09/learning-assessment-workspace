@@ -2251,6 +2251,11 @@ test("parent validates a local-AI completed-paper review before submitting it", 
   ).toHaveAttribute("src", /^blob:/);
   await page.keyboard.press("Escape");
   await expect(fullSizePreview).toBeHidden();
+  await expect(
+    page.getByRole("button", {
+      name: "Open full-size preview of Page 1 of 3",
+    }),
+  ).toBeFocused();
   await expect(selectedPages.getByRole("listitem").first()).toContainText(
     "front.jpg",
   );
