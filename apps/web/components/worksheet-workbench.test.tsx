@@ -838,6 +838,29 @@ describe("WorksheetWorkbench", () => {
     expect(mocks.submitQuestion).toHaveBeenCalledTimes(1);
   });
 
+  it("lets a child refresh grading status after reopening a submitted answer whose first result read fails", async () => {
+    mocks.startAssignment.mockResolvedValue({
+      ...assignmentWork,
+      submitted_question_ids: ["algebra-choice"],
+    });
+    mocks.getAttemptResults.mockRejectedValueOnce(
+      new Error("temporary reopened result failure"),
+    );
+    render(<WorksheetWorkbench />);
+
+    expect(
+      await screen.findByText(
+        "We could not check the grading status. Your submitted answer is safe.",
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Check grading status" }),
+    );
+
+    expect(await screen.findByText("Correct.")).toBeInTheDocument();
+    expect(mocks.submitQuestion).not.toHaveBeenCalled();
+  });
+
   it("does not submit one answer for grading while its device-only draft remains unsynced", async () => {
     mocks.saveAttemptResponse.mockRejectedValueOnce(new Error("offline"));
     render(<WorksheetWorkbench />);

@@ -517,7 +517,11 @@ function WorksheetWorkbenchContent() {
                 ),
               );
             })
-            .catch(() => undefined);
+            .catch(() => {
+              if (active) {
+                setQuestionGradingUnavailableIds(submittedIds);
+              }
+            });
         }
         window.history.replaceState(
           {},
