@@ -1656,7 +1656,7 @@ function WorksheetWorkbenchContent() {
                 event.target.value = "";
                 uploadSelectedPhotos(selectedFiles);
               }}
-              disabled={isSavingPhotoAnswer}
+              disabled={isSavingPhotoAnswer || failedUploads.length > 0}
               multiple
               type="file"
             />

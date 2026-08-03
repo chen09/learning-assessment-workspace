@@ -1161,6 +1161,9 @@ describe("WorksheetWorkbench", () => {
     expect(
       screen.getByRole("button", { name: "Submit all answers" }),
     ).toBeDisabled();
+    expect(
+      screen.getByLabelText(/Take a photo or choose images/),
+    ).toBeDisabled();
 
     fireEvent.click(
       screen.getByRole("button", { name: "Retry failed uploads" }),
