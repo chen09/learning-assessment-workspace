@@ -729,6 +729,20 @@ function CreateWorkspaceContent() {
     setCompletedPaperError(null);
   };
 
+  const moveCompletedPaperPage = (index: number, direction: -1 | 1) => {
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= files.length) {
+      return;
+    }
+    const reordered = [...files];
+    [reordered[index], reordered[nextIndex]] = [
+      reordered[nextIndex],
+      reordered[index],
+    ];
+    setFiles(reordered);
+    setFileName(reordered.map((file) => file.name).join(", "));
+  };
+
   useEffect(() => {
     const reopenCreateRouteFromHistory = () => {
       setMode("generate");
@@ -3968,6 +3982,55 @@ function CreateWorkspaceContent() {
                 <strong>{fileName || t("completedPaper.choosePages")}</strong>
                 <span>{t("completedPaper.pagesHelp")}</span>
               </label>
+              {files.length > 0 ? (
+                <ol
+                  aria-label={t("completedPaper.selectedPages")}
+                  className="completed-paper-selected-pages"
+                >
+                  {files.map((file, index) => {
+                    const page = index + 1;
+                    return (
+                      <li key={`${file.name}-${file.lastModified}-${index}`}>
+                        <div>
+                          <strong>
+                            {t("completedPaper.page", {
+                              page,
+                              total: files.length,
+                            })}
+                          </strong>
+                          <span>{file.name}</span>
+                        </div>
+                        <div className="completed-paper-page-actions">
+                          {index > 0 ? (
+                            <button
+                              aria-label={t("completedPaper.movePageEarlier", {
+                                page,
+                              })}
+                              className="text-button"
+                              onClick={() => moveCompletedPaperPage(index, -1)}
+                              type="button"
+                            >
+                              ↑
+                            </button>
+                          ) : null}
+                          {index < files.length - 1 ? (
+                            <button
+                              aria-label={t("completedPaper.movePageLater", {
+                                page,
+                              })}
+                              className="text-button"
+                              onClick={() => moveCompletedPaperPage(index, 1)}
+                              type="button"
+                            >
+                              ↓
+                            </button>
+                          ) : null}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ol>
+              ) : null}
               <label className="completed-paper-language">
                 {t("completedPaper.documentLanguage")}
                 <select

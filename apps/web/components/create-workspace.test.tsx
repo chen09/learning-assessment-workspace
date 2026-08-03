@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CreateWorkspace } from "@/components/create-workspace";
@@ -844,6 +844,47 @@ describe("CreateWorkspace", () => {
     expect(
       screen.getByRole("button", { name: "Upload for review" }),
     ).toBeDisabled();
+  });
+
+  it("keeps selected completed-paper pages in a reviewable upload order", async () => {
+    render(<CreateWorkspace />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Grade completed paper" }),
+    );
+    fireEvent.change(screen.getByLabelText("Completed worksheet scans"), {
+      target: {
+        files: [
+          new File(["front"], "front.jpg", { type: "image/jpeg" }),
+          new File(["back"], "back.jpg", { type: "image/jpeg" }),
+        ],
+      },
+    });
+
+    const selectedPages = screen.getByRole("list", {
+      name: "Selected pages (upload order)",
+    });
+    expect(
+      within(selectedPages)
+        .getAllByRole("listitem")
+        .map((item) => item.querySelector("span")?.textContent),
+    ).toEqual(["front.jpg", "back.jpg"]);
+    expect(
+      screen.getByRole("button", { name: "Move page 1 later" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Move page 2 earlier" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Move page 2 earlier" }),
+    );
+
+    expect(
+      within(selectedPages)
+        .getAllByRole("listitem")
+        .map((item) => item.querySelector("span")?.textContent),
+    ).toEqual(["back.jpg", "front.jpg"]);
   });
 
   it("never substitutes sample questions when a structured preview unexpectedly returns an empty draft", async () => {

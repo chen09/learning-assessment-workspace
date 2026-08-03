@@ -911,6 +911,9 @@ const messages = {
     "completedPaper.choosePages": "Choose completed worksheet pages",
     "completedPaper.pagesHelp":
       "Upload several pages in their photographed order. Nothing is assigned or graded until you confirm the review draft.",
+    "completedPaper.selectedPages": "Selected pages (upload order)",
+    "completedPaper.movePageEarlier": "Move page {page} earlier",
+    "completedPaper.movePageLater": "Move page {page} later",
     "childExit.eyebrow": "Parent check",
     "childExit.title": "Enter your management PIN",
     "childExit.help":
@@ -1823,6 +1826,9 @@ const messages = {
     "completedPaper.choosePages": "解答済みプリントのページを選択",
     "completedPaper.pagesHelp":
       "撮影した順番で複数ページをアップロードできます。確認用下書きを確定するまで、課題の割り当てや採点は行われません。",
+    "completedPaper.selectedPages": "選択したページ（アップロード順）",
+    "completedPaper.movePageEarlier": "{page} ページを前へ移動",
+    "completedPaper.movePageLater": "{page} ページを後へ移動",
     "childExit.eyebrow": "保護者の確認",
     "childExit.title": "保護者管理 PIN を入力",
     "childExit.help":
@@ -2706,6 +2712,9 @@ const messages = {
     "completedPaper.choosePages": "选择已完成试卷页面",
     "completedPaper.pagesHelp":
       "可按拍摄顺序上传多页。在确认审核草稿前，不会安排练习或开始批改。",
+    "completedPaper.selectedPages": "已选页面（上传顺序）",
+    "completedPaper.movePageEarlier": "将第 {page} 页前移",
+    "completedPaper.movePageLater": "将第 {page} 页后移",
     "childExit.eyebrow": "家长确认",
     "childExit.title": "输入家长管理 PIN",
     "childExit.help":

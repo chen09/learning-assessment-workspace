@@ -2224,6 +2224,16 @@ test("parent validates a local-AI completed-paper review before submitting it", 
       buffer: Buffer.from("completed-paper-back"),
     },
   ]);
+  const selectedPages = page.getByRole("list", {
+    name: "Selected pages (upload order)",
+  });
+  await expect(selectedPages.getByRole("listitem").first()).toContainText(
+    "front.jpg",
+  );
+  await page.getByRole("button", { name: "Move page 2 earlier" }).click();
+  await expect(selectedPages.getByRole("listitem").first()).toContainText(
+    "back.jpg",
+  );
   const uploadResponse = page.waitForResponse(
     (response) =>
       response.url() === `${apiBaseUrl}/v1/completed-worksheets` &&
@@ -2254,8 +2264,8 @@ test("parent validates a local-AI completed-paper review before submitting it", 
   ).toBeVisible();
   await expect(page.getByText("Page 1 of 2")).toBeVisible();
   await expect(page.getByText("Page 2 of 2")).toBeVisible();
-  await expect(page.getByText("completed-paper-front.jpg")).toBeVisible();
   await expect(page.getByText("completed-paper-back.jpg")).toBeVisible();
+  await expect(page.getByText("completed-paper-front.jpg")).toBeVisible();
   await expect(
     page.getByLabel("Answer area for question 1 on page 1"),
   ).toBeVisible();
