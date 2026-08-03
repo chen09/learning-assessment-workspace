@@ -2238,6 +2238,18 @@ test("parent validates a local-AI completed-paper review before submitting it", 
   await expect(
     selectedPages.getByRole("img", { name: "Preview of Page 2 of 3" }),
   ).toHaveAttribute("src", /^blob:/);
+  await page
+    .getByRole("button", { name: "Open full-size preview of Page 1 of 3" })
+    .click();
+  const fullSizePreview = page.getByRole("dialog", {
+    name: "Preview of Page 1 of 3",
+  });
+  await expect(fullSizePreview).toBeVisible();
+  await expect(
+    fullSizePreview.getByRole("img", { name: "Preview of Page 1 of 3" }),
+  ).toHaveAttribute("src", /^blob:/);
+  await page.getByRole("button", { name: "Close preview" }).click();
+  await expect(fullSizePreview).toBeHidden();
   await expect(selectedPages.getByRole("listitem").first()).toContainText(
     "front.jpg",
   );

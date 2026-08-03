@@ -4045,6 +4045,22 @@ button {
   width: 3.25rem;
 }
 
+.completed-paper-selected-preview-button {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-radius: 0.5rem;
+  cursor: zoom-in;
+  display: grid;
+  flex: 0 0 auto;
+  padding: 0;
+}
+
+.completed-paper-selected-preview-button:focus-visible {
+  outline: 3px solid var(--primary, #5167d9);
+  outline-offset: 2px;
+}
+
 .completed-paper-selected-preview {
   object-fit: cover;
 }
@@ -4056,6 +4072,48 @@ button {
 .completed-paper-selected-file-icon svg {
   height: 1.35rem;
   width: 1.35rem;
+}
+
+.completed-paper-preview-dialog {
+  align-items: center;
+  background: rgb(20 29 42 / 74%);
+  display: grid;
+  inset: 0;
+  justify-items: center;
+  padding: 1.25rem;
+  position: fixed;
+  z-index: 30;
+}
+
+.completed-paper-preview-dialog-content {
+  background: var(--paper, #fffdf7);
+  border-radius: 0.85rem;
+  max-height: calc(100dvh - 2.5rem);
+  max-width: min(56rem, calc(100vw - 2.5rem));
+  overflow: auto;
+  padding: 0.5rem;
+  position: relative;
+}
+
+.completed-paper-preview-dialog-content > .text-button {
+  background: var(--paper, #fffdf7);
+  border: 1px solid var(--line, #e8e2d7);
+  border-radius: 50%;
+  color: var(--ink, #1f2937);
+  height: 2.25rem;
+  position: absolute;
+  right: 0.85rem;
+  top: 0.85rem;
+  width: 2.25rem;
+  z-index: 1;
+}
+
+.completed-paper-preview-dialog-content img {
+  display: block;
+  height: auto;
+  max-height: calc(100dvh - 3.5rem);
+  max-width: 100%;
+  width: auto;
 }
 
 .completed-paper-selected-pages li > div:first-child {

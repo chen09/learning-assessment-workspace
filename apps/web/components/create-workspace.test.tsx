@@ -902,6 +902,19 @@ describe("CreateWorkspace", () => {
     expect(
       screen.getByRole("img", { name: "Preview of Page 2 of 2" }),
     ).toHaveAttribute("src", "blob:selected-back.jpg");
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Open full-size preview of Page 1 of 2",
+      }),
+    );
+    expect(screen.getByRole("dialog", { name: "Preview of Page 1 of 2" })).toBeVisible();
+    expect(
+      screen.getByRole("dialog", { name: "Preview of Page 1 of 2" }).querySelector("img"),
+    ).toHaveAttribute("src", "blob:selected-front.jpg");
+    fireEvent.click(screen.getByRole("button", { name: "Close preview" }));
+    expect(
+      screen.queryByRole("dialog", { name: "Preview of Page 1 of 2" }),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Move page 1 later" }),
     ).toBeInTheDocument();
