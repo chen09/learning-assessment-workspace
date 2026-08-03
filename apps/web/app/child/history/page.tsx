@@ -39,6 +39,8 @@ const resultStatuses = new Set([
 ]);
 
 const resumableStatuses = new Set(["assigned", "in_progress", "correcting"]);
+const HISTORY_PROGRESS_POLL_MS = 5_000;
+const activeHistoryStatuses = new Set(["submitted", "grading"]);
 
 function ChildHistoryContent() {
   const { language, t } = useLanguage();
@@ -89,6 +91,41 @@ function ChildHistoryContent() {
       window.removeEventListener("focus", refreshWhenReturning);
     };
   }, [refreshHistory]);
+
+  const hasLiveProgress = items.some((item) =>
+    activeHistoryStatuses.has(item.status),
+  );
+
+  useEffect(() => {
+    if (!hasLiveProgress) {
+      return;
+    }
+
+    let active = true;
+    const refreshProgress = async () => {
+      try {
+        const token = getChildAccessToken();
+        if (!token || !active) {
+          return;
+        }
+        const nextItems = await getChildHistory(token);
+        if (active) {
+          setItems(nextItems);
+          setLoadState("ready");
+        }
+      } catch {
+        // Keep the visible records until the next bounded refresh succeeds.
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      void refreshProgress();
+    }, HISTORY_PROGRESS_POLL_MS);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
+  }, [hasLiveProgress]);
 
   const dateLocale = { en: "en-US", ja: "ja-JP", zh: "zh-CN" }[language];
 

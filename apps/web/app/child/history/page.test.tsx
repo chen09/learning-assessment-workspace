@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import ChildHistoryPage from "./page";
@@ -131,6 +131,90 @@ describe("ChildHistoryPage", () => {
     expect(
       screen.getByRole("heading", { name: "刚安排的练习" }),
     ).toBeInTheDocument();
+  });
+
+  it("refreshes a grading result while the child keeps history open", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mocks.getChildHistory
+      .mockResolvedValueOnce([
+        {
+          assignment_id: "assignment-grading",
+          attempt_id: "attempt-grading",
+          child_id: "child-1",
+          child_nickname: "肉肉",
+          title: "正在批改的练习",
+          status: "grading",
+          submitted_at: "2026-08-03T05:00:00Z",
+          awarded_points: 0,
+          available_points: 100,
+          correction_count: 0,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          assignment_id: "assignment-grading",
+          attempt_id: "attempt-grading",
+          child_id: "child-1",
+          child_nickname: "肉肉",
+          title: "正在批改的练习",
+          status: "results_ready",
+          submitted_at: "2026-08-03T05:00:00Z",
+          awarded_points: 92,
+          available_points: 100,
+          correction_count: 0,
+        },
+      ]);
+
+    try {
+      render(<ChildHistoryPage />);
+
+      expect(await screen.findByText("批改中")).toBeInTheDocument();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_000);
+      });
+
+      expect(await screen.findByText("结果已就绪")).toBeInTheDocument();
+      expect(screen.getByText("92 / 100")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps a visible grading record when a background refresh is temporary unavailable", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mocks.getChildHistory
+      .mockResolvedValueOnce([
+        {
+          assignment_id: "assignment-grading",
+          attempt_id: "attempt-grading",
+          child_id: "child-1",
+          child_nickname: "肉肉",
+          title: "仍在批改的练习",
+          status: "grading",
+          submitted_at: "2026-08-03T05:00:00Z",
+          awarded_points: 0,
+          available_points: 100,
+          correction_count: 0,
+        },
+      ])
+      .mockRejectedValueOnce(new Error("temporary network issue"));
+
+    try {
+      render(<ChildHistoryPage />);
+
+      expect(await screen.findByText("批改中")).toBeInTheDocument();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_000);
+      });
+
+      expect(screen.getByText("仍在批改的练习")).toBeInTheDocument();
+      expect(screen.getByText("批改中")).toBeInTheDocument();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("lets a child retry when a transient history request fails", async () => {
