@@ -1928,11 +1928,21 @@ describe("WorksheetWorkbench", () => {
 
     render(<WorksheetWorkbench />);
 
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Go to question 3" }),
+    const questionThreeButton = await screen.findByRole("button", {
+      name: "Go to question 3",
+    });
+    expect(questionThreeButton).toHaveAttribute(
+      "aria-describedby",
+      "question-status-algebra-proof",
     );
+    expect(screen.getByText("Try again")).toHaveClass("sr-only");
+    fireEvent.click(questionThreeButton);
 
     expect(await screen.findByText("Check this term.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Go to question 3" })).toHaveAttribute(
+      "aria-describedby",
+      "question-status-algebra-proof",
+    );
     expect(
       screen.getByRole("button", { name: "Clear handwriting" }),
     ).toBeDisabled();

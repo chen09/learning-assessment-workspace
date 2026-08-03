@@ -920,6 +920,42 @@ button {
   transform: translate(0.85rem, -0.85rem);
 }
 
+.question-index button.status-submitted::after,
+.question-index button.status-grading::after,
+.question-index button.status-uncertain::after,
+.question-index button.status-parent-review::after,
+.question-index button.status-correct::after,
+.question-index button.status-incorrect::after {
+  position: absolute;
+  width: 0.42rem;
+  height: 0.42rem;
+  border: 2px solid white;
+  border-radius: 50%;
+  content: "";
+  transform: translate(0.85rem, -0.85rem);
+}
+
+.question-index button.status-submitted::after {
+  background: #65798e;
+}
+
+.question-index button.status-grading::after {
+  background: #8c6ac6;
+}
+
+.question-index button.status-uncertain::after,
+.question-index button.status-parent-review::after {
+  background: #bc8731;
+}
+
+.question-index button.status-correct::after {
+  background: var(--green);
+}
+
+.question-index button.status-incorrect::after {
+  background: #c75c50;
+}
+
 .question-index button.current {
   border-color: var(--blue);
   background: var(--blue);

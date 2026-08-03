@@ -1099,6 +1099,53 @@ function WorksheetWorkbenchContent() {
     [answers, questions],
   );
 
+  const questionIndexStatus = (question: Question) => {
+    const result = questionResults[question.id];
+    if (result) {
+      switch (result.outcome) {
+        case "correct":
+          return {
+            className: "status-correct",
+            label: t("worksheet.questionStatusCorrect"),
+          };
+        case "incorrect":
+          return {
+            className: "status-incorrect",
+            label: t("worksheet.questionStatusIncorrect"),
+          };
+        case "uncertain":
+          return {
+            className: "status-uncertain",
+            label: t("worksheet.questionStatusUncertain"),
+          };
+        case "needs_parent_review":
+          return {
+            className: "status-parent-review",
+            label: t("worksheet.questionStatusParentReview"),
+          };
+      }
+    }
+    if (gradingQuestionIds.includes(question.id)) {
+      return {
+        className: "status-grading",
+        label: t("worksheet.questionStatusGrading"),
+      };
+    }
+    if (submittedQuestionIds.includes(question.id)) {
+      return {
+        className: "status-submitted",
+        label: t("worksheet.questionStatusSubmitted"),
+      };
+    }
+    if (hasMeaningfulAnswer(answers[question.id])) {
+      return {
+        className: "status-answered",
+        label: t("worksheet.questionStatusAnswered"),
+      };
+    }
+    return null;
+  };
+
   const updateAnswer = (questionId: string, answer: Answer) => {
     if (submittedQuestionIds.includes(questionId)) {
       return;
@@ -2292,28 +2339,42 @@ function WorksheetWorkbenchContent() {
             <span>{t("worksheet.answered")}</span>
           </div>
           <ol>
-            {questions.map((question, index) => (
-              <li key={question.id}>
-                <button
-                  aria-label={t("worksheet.goToQuestion", {
-                    number: question.number,
-                  })}
-                  className={[
-                    index === currentIndex ? "current" : "",
-                    answers[question.id] ? "answered" : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                  onClick={() => {
-                    setCurrentIndex(index);
-                    setMode("focus");
-                  }}
-                  type="button"
-                >
-                  {question.number}
-                </button>
-              </li>
-            ))}
+            {questions.map((question, index) => {
+              const status = questionIndexStatus(question);
+              const questionLabel = t("worksheet.goToQuestion", {
+                number: question.number,
+              });
+              const statusDescriptionId = status
+                ? `question-status-${question.id}`
+                : undefined;
+              return (
+                <li key={question.id}>
+                  <button
+                    aria-describedby={statusDescriptionId}
+                    aria-label={questionLabel}
+                    className={[
+                      index === currentIndex ? "current" : "",
+                      answers[question.id] ? "answered" : "",
+                      status?.className ?? "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    onClick={() => {
+                      setCurrentIndex(index);
+                      setMode("focus");
+                    }}
+                    type="button"
+                  >
+                    {question.number}
+                    {status ? (
+                      <span className="sr-only" id={statusDescriptionId}>
+                        {status.label}
+                      </span>
+                    ) : null}
+                  </button>
+                </li>
+              );
+            })}
           </ol>
           <p>
             {examMode
