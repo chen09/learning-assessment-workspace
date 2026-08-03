@@ -1894,7 +1894,8 @@ button {
 }
 
 .question-grade-status {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 0.2rem;
   margin-top: 1rem;
   border: 1px solid var(--line);
@@ -1927,6 +1928,11 @@ button {
   flex-wrap: wrap;
   gap: 0.65rem;
   margin-top: 0.65rem;
+}
+
+.question-grade-actions.question-redo-action {
+  order: -1;
+  margin-top: 0;
 }
 
 .grading-actions {

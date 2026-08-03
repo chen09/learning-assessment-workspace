@@ -563,7 +563,7 @@ const messages = {
     "worksheet.submitQuestionAgain": "Submit again for review",
     "worksheet.questionSubmitted": "This answer has been submitted",
     "worksheet.submittedLockedHint":
-      "This submitted answer is locked. Use Clear and redo this question below to make a new answer.",
+      "This submitted answer is locked. Use the button below to make a fresh answer.",
     "worksheet.regradeAnswer": "Keep answer and regrade",
     "worksheet.regradingAnswer": "Regrading this answer…",
     "worksheet.redoQuestion": "Clear and redo this question",
@@ -1553,7 +1553,7 @@ const messages = {
     "worksheet.submitQuestionAgain": "もう一度採点に出す",
     "worksheet.questionSubmitted": "この答えは提出済みです",
     "worksheet.submittedLockedHint":
-      "提出済みの答えは変更できません。下の「この問題を消してやり直す」で新しい解答を作れます。",
+      "提出済みの答えは変更できません。下のボタンで消して新しい解答を作れます。",
     "worksheet.regradeAnswer": "答えを残して再採点",
     "worksheet.regradingAnswer": "同じ答えを再採点中…",
     "worksheet.redoQuestion": "この問題を消してやり直す",
@@ -2529,7 +2529,7 @@ const messages = {
     "worksheet.submitQuestionAgain": "重新提交审阅",
     "worksheet.questionSubmitted": "这一题已经提交",
     "worksheet.submittedLockedHint":
-      "已提交的答案不能直接修改。请使用下方“清空并重做这一题”新建一次作答。",
+      "已提交的答案不能直接修改。请用下方按钮清空并新建一次作答。",
     "worksheet.regradeAnswer": "保留答案并重新评判",
     "worksheet.regradingAnswer": "正在重新评判这一答案…",
     "worksheet.redoQuestion": "清空并重做这一题",

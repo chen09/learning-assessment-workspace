@@ -2197,7 +2197,7 @@ function WorksheetWorkbenchContent() {
               </div>
             </>
           ) : null}
-          <div className="question-grade-actions">
+          <div className="question-grade-actions question-redo-action">
             <button
               className="button ghost"
               disabled={

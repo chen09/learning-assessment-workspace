@@ -1946,11 +1946,17 @@ describe("WorksheetWorkbench", () => {
     expect(
       screen.getByRole("button", { name: "Clear handwriting" }),
     ).toBeDisabled();
+    const lockedResponse = screen
+      .getByText(
+      "This submitted answer is locked. Use the button below to make a fresh answer.",
+      )
+      .closest(".response-locked");
+    expect(lockedResponse).not.toBeNull();
     expect(
-      screen.getByText(
-        "This submitted answer is locked. Use Clear and redo this question below to make a new answer.",
-      ),
-    ).toBeInTheDocument();
+      within(lockedResponse!.nextElementSibling as HTMLElement).getByRole("button", {
+        name: "Clear and redo this question",
+      }),
+    ).toBeEnabled();
   });
 
   it("lets a child clear and redo a submitted handwriting answer while grading is pending", async () => {

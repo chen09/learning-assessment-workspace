@@ -3623,8 +3623,13 @@ test("parent creation reaches child grading and correction through the API", asy
   ).toBeDisabled();
   await expect(
     page.getByText(
-      "已提交的答案不能直接修改。请使用下方“清空并重做这一题”新建一次作答。",
+      "已提交的答案不能直接修改。请用下方按钮清空并新建一次作答。",
     ),
+  ).toBeVisible();
+  await expect(
+    page
+      .locator(".response-locked + .question-grade-status")
+      .getByRole("button", { name: "清空并重做这一题" }),
   ).toBeVisible();
 
   const originalWorkUrl = page.url();
