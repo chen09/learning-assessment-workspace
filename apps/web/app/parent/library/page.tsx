@@ -24,6 +24,8 @@ import {
   withdrawLibrarySubmission,
 } from "@/lib/api-client";
 
+const IMPORT_PROGRESS_POLL_MS = 5_000;
+
 const copy = {
   en: {
     eyebrow: "Question library",
@@ -324,6 +326,44 @@ function LibraryContent() {
   const retryLibraryLoad = () => {
     setLoadRequest((current) => current + 1);
   };
+
+  const shouldPollImportProgress =
+    status === "ready" &&
+    Boolean(familyId) &&
+    sets.some(
+      (set) =>
+        set.status === "processing" && set.import_job_status !== "failed",
+    );
+
+  useEffect(() => {
+    if (!shouldPollImportProgress || !familyId) {
+      return;
+    }
+
+    let cancelled = false;
+    const refreshImportProgress = async () => {
+      const token = await getParentAccessToken();
+      if (!token || cancelled) {
+        return;
+      }
+      try {
+        const refreshedSets = await getFamilyQuestionSets(familyId, token);
+        if (!cancelled) {
+          setSets(refreshedSets);
+        }
+      } catch {
+        // Keep the last known library state and try again on the next interval.
+      }
+    };
+    const intervalId = window.setInterval(() => {
+      void refreshImportProgress();
+    }, IMPORT_PROGRESS_POLL_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [familyId, shouldPollImportProgress]);
 
   const filteredSets = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase();

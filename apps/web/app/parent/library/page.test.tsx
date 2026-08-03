@@ -289,6 +289,59 @@ describe("LibraryPage", () => {
     );
   });
 
+  it("refreshes an active source import without requiring a page reload", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mocks.getFamilyQuestionSets
+      .mockResolvedValueOnce([
+        {
+          id: "set-processing",
+          family_id: "family-1",
+          title: "Scanned maths worksheet",
+          subject: "Math",
+          status: "processing",
+          import_job_status: "running",
+          question_count: 0,
+          source_summary: {},
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: "set-ready-for-review",
+          family_id: "family-1",
+          title: "Scanned maths worksheet",
+          subject: "Math",
+          status: "needs_review",
+          question_count: 12,
+          source_summary: {},
+        },
+      ]);
+
+    try {
+      render(<LibraryPage />);
+
+      expect(
+        await screen.findByRole("link", { name: "查看导入进度" }),
+      ).toBeInTheDocument();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_000);
+      });
+
+      await waitFor(() => {
+        expect(mocks.getFamilyQuestionSets).toHaveBeenCalledTimes(2);
+      });
+      expect(
+        await screen.findByRole("heading", {
+          name: "Scanned maths worksheet",
+        }),
+      ).toBeInTheDocument();
+      expect(screen.getByText("待家长确认")).toBeInTheDocument();
+      expect(screen.getByText("12 道题")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("marks a failed source import as retryable in the family library", async () => {
     mocks.getFamilyQuestionSets.mockResolvedValueOnce([
       {
