@@ -62,6 +62,134 @@ const parentReviewFor = (attemptId: string, prompt: string) => ({
   ],
 });
 
+test("child question rail distinguishes saved work from an answer that needs retry", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "A single desktop browser regression covers the accessible question states.",
+  );
+
+  await page.addInitScript(() => {
+    window.localStorage.setItem("luma-language:demo-child", "en");
+    window.localStorage.setItem("luma-child-session", "child-token");
+    window.localStorage.setItem(
+      "luma-child-profile",
+      JSON.stringify({
+        child_id: "status-child",
+        family_id: "status-family",
+        nickname: "Status child",
+        ui_language: "en",
+      }),
+    );
+  });
+
+  await page.route("**/v1/attempts/status-attempt/work", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        title: "Question state practice",
+        assignment: {
+          id: "status-assignment",
+          family_id: "status-family",
+          mode: "practice",
+          time_limit_seconds: null,
+          status: "in_progress",
+        },
+        attempt: {
+          id: "status-attempt",
+          started_at: "2026-08-03T00:00:00.000Z",
+        },
+        questions: [
+          {
+            id: "status-saved",
+            position: 1,
+            type: "typed_text",
+            prompt: "Saved answer.",
+            options: null,
+            points: 1,
+          },
+          {
+            id: "status-incorrect",
+            position: 2,
+            type: "typed_text",
+            prompt: "Retry answer.",
+            options: null,
+            points: 1,
+          },
+        ],
+        responses: [
+          {
+            id: "saved-response",
+            question_id: "status-saved",
+            kind: "text",
+            answer: { text: "draft" },
+            version: 1,
+          },
+          {
+            id: "incorrect-response",
+            question_id: "status-incorrect",
+            kind: "text",
+            answer: { text: "wrong" },
+            version: 1,
+          },
+        ],
+        submitted_question_ids: ["status-incorrect"],
+      }),
+    });
+  });
+  await page.route(
+    "**/v1/attempts/status-attempt/results",
+    async (route) => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          attempt_id: "status-attempt",
+          complete: false,
+          results: [
+            {
+              id: "incorrect-result",
+              question_id: "status-incorrect",
+              outcome: "incorrect",
+              awarded_points: 0,
+              confidence: 0.99,
+              feedback: {
+                summary: "Try this again.",
+                action: "Check the answer and retry.",
+              },
+            },
+          ],
+        }),
+      });
+    },
+  );
+
+  await page.goto("/child/work/?attemptId=status-attempt");
+  await expect(
+    page.getByRole("heading", { name: "Saved answer." }),
+  ).toBeVisible();
+
+  const saved = page.getByRole("button", { name: "Go to question 1" });
+  await expect(saved).toHaveClass(/status-answered/);
+  await expect(saved).toHaveAttribute(
+    "aria-describedby",
+    "question-status-status-saved",
+  );
+  await expect(page.locator("#question-status-status-saved")).toHaveText(
+    "Answer saved",
+  );
+
+  const retry = page.getByRole("button", { name: "Go to question 2" });
+  await expect(retry).toHaveClass(/status-incorrect/);
+  await expect(retry).toHaveAttribute(
+    "aria-describedby",
+    "question-status-status-incorrect",
+  );
+  await expect(page.locator("#question-status-status-incorrect")).toHaveText(
+    "Try again",
+  );
+});
+
 test("browser navigation hides the previous practice until the requested attempt loads", async ({
   page,
 }, testInfo) => {
