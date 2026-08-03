@@ -2113,6 +2113,8 @@ test("parent validates a local-AI completed-paper review before submitting it", 
   const fixtureKey = `e2e-completed-paper-${testInfo.project.name}-${testInfo.workerIndex}`;
   const parentHeaders = { Authorization: "Bearer parent-fixture" };
   let completedPaperId: string | undefined;
+  let failNextConfirmation = false;
+  const confirmationIdempotencyKeys: Array<string | null> = [];
   // The in-memory API deliberately does not mint Storage URLs.  This route
   // models the short-lived, parent-authorized preview returned by PostgreSQL
   // so this browser journey can still verify the review overlay.  The
@@ -2434,16 +2436,44 @@ test("parent validates a local-AI completed-paper review before submitting it", 
     .getByLabel("Answer transcription for question 1")
     .fill("(x - 5)(x + 5)");
 
+  const confirmationUrl = `${apiBaseUrl}/v1/completed-worksheets/${imported.id}/confirm`;
+  await page.route(confirmationUrl, async (route) => {
+    confirmationIdempotencyKeys.push(
+      await route.request().headerValue("Idempotency-Key"),
+    );
+    if (failNextConfirmation) {
+      failNextConfirmation = false;
+      await route.abort("failed");
+      return;
+    }
+    await route.fallback();
+  });
+
+  const failedConfirmRequest = page.waitForRequest(
+    (request) =>
+      request.url() === confirmationUrl &&
+      request.method() === "POST",
+  );
+  failNextConfirmation = true;
+  await page.getByRole("button", { name: "Confirm and start grading" }).click();
+  await failedConfirmRequest;
+  await expect(
+    page.locator(".form-error[role=alert]"),
+  ).toHaveText(
+    "Confirmation paused. Your reviewed questions and answer regions are still here; choose Confirm and start grading to retry safely.",
+  );
+  await expect(
+    page.getByLabel("Question 1 wording"),
+  ).toHaveValue("Factorise x² - 25.");
+
   const confirmRequest = page.waitForRequest(
     (request) =>
-      request.url() ===
-        `${apiBaseUrl}/v1/completed-worksheets/${imported.id}/confirm` &&
+      request.url() === confirmationUrl &&
       request.method() === "POST",
   );
   const confirmResponse = page.waitForResponse(
     (response) =>
-      response.url() ===
-        `${apiBaseUrl}/v1/completed-worksheets/${imported.id}/confirm` &&
+      response.url() === confirmationUrl &&
       response.request().method() === "POST",
   );
   await page.getByRole("button", { name: "Confirm and start grading" }).click();
@@ -2492,6 +2522,10 @@ test("parent validates a local-AI completed-paper review before submitting it", 
   expect(confirmationBody.responses[0]?.answer.page_numbers).toEqual([1]);
   expect(confirmationBody.responses[0]?.answer.transcription).toBe(
     "(x - 5)(x + 5)",
+  );
+  expect(confirmationIdempotencyKeys).toHaveLength(2);
+  expect(confirmationIdempotencyKeys[0]).toBe(
+    confirmationIdempotencyKeys[1],
   );
   const confirmationResponse = await confirmResponse;
   expect(

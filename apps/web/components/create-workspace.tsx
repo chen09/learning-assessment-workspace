@@ -694,6 +694,8 @@ function CreateWorkspaceContent() {
   const [completedPaperError, setCompletedPaperError] = useState<string | null>(
     null,
   );
+  const [completedConfirmationRetryFailed, setCompletedConfirmationRetryFailed] =
+    useState(false);
   const [completedUploadRetrySession, setCompletedUploadRetrySession] =
     useState<CompletedUploadRetrySession | null>(null);
   const [completedUploadRetryFailed, setCompletedUploadRetryFailed] =
@@ -2558,6 +2560,7 @@ function CreateWorkspaceContent() {
       return;
     }
     setCompletedPaperError(null);
+    setCompletedConfirmationRetryFailed(false);
     let validatedReview: CompletedPaperReview;
     try {
       validatedReview = parseCompletedPaperReview(
@@ -2611,6 +2614,7 @@ function CreateWorkspaceContent() {
       setCompletedWorksheetStatus(confirmed.completed_worksheet.status);
       setRequestStatus("idle");
     } catch {
+      setCompletedConfirmationRetryFailed(true);
       setRequestStatus("error");
     }
   };
@@ -3389,7 +3393,10 @@ function CreateWorkspaceContent() {
         ) : null}
         {requestStatus === "error" ? (
           <p className="form-error" role="alert">
-            {completedPaperError ?? t("completedPaper.error")}
+            {completedPaperError ??
+              (completedConfirmationRetryFailed
+                ? t("completedPaper.confirmRetryFailed")
+                : t("completedPaper.error"))}
           </p>
         ) : null}
       </>

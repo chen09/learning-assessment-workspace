@@ -3310,11 +3310,25 @@ describe("CreateWorkspace", () => {
     fireEvent.change(screen.getByLabelText("Reference answer for question 5"), {
       target: { value: "Show the two factors." },
     });
+    mocks.confirmCompletedWorksheetImport.mockRejectedValueOnce(
+      new Error("temporary confirmation failure"),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirm and start grading" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Confirmation paused. Your reviewed questions and answer regions are still here; choose Confirm and start grading to retry safely.",
+    );
+    expect(screen.getByDisplayValue("Factorise x² − 25.")).toBeInTheDocument();
+    expect(mocks.confirmCompletedWorksheetImport).toHaveBeenCalledTimes(1);
+
     fireEvent.click(
       screen.getByRole("button", { name: "Confirm and start grading" }),
     );
 
     await waitFor(() => {
+      expect(mocks.confirmCompletedWorksheetImport).toHaveBeenCalledTimes(2);
       expect(mocks.confirmCompletedWorksheetImport).toHaveBeenCalledWith(
         "completed-worksheet-1",
         {
@@ -3406,6 +3420,9 @@ describe("CreateWorkspace", () => {
         "confirm-completed-completed-worksheet-1",
       );
     });
+    expect(mocks.confirmCompletedWorksheetImport.mock.calls[0]?.[3]).toBe(
+      mocks.confirmCompletedWorksheetImport.mock.calls[1]?.[3],
+    );
     expect(
       await screen.findByRole("link", { name: "Open grading results" }),
     ).toHaveAttribute("href", "/parent/results?attemptId=attempt-1");

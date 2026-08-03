@@ -911,6 +911,8 @@ const messages = {
     "completedPaper.preparingReview": "Preparing private review",
     "completedPaper.error":
       "The reviewed JSON must match every confirmed question and answer region. Nothing was assigned; correct it and try again.",
+    "completedPaper.confirmRetryFailed":
+      "Confirmation paused. Your reviewed questions and answer regions are still here; choose Confirm and start grading to retry safely.",
     "completedPaper.uploadRetryFailed":
       "The upload paused. Your selected pages are still here; choose Upload for review to retry safely.",
     "materialImport.uploadRetryFailed":
@@ -1874,6 +1876,8 @@ const messages = {
     "completedPaper.preparingReview": "非公開の確認を準備中",
     "completedPaper.error":
       "確認用 JSON は、確定するすべての問題と解答エリアに対応する必要があります。割り当ては行われていません。修正してもう一度お試しください。",
+    "completedPaper.confirmRetryFailed":
+      "確認が中断されました。確認済みの問題と解答範囲はそのまま残っています。「確認して採点を始める」を選んで安全に再試行できます。",
     "completedPaper.uploadRetryFailed":
       "アップロードが中断されました。選択済みのページは残っています。「確認用にアップロード」を選んで安全に再試行できます。",
     "materialImport.uploadRetryFailed":
@@ -2807,6 +2811,8 @@ const messages = {
     "completedPaper.preparingReview": "正在准备私密审核",
     "completedPaper.error":
       "审核 JSON 必须匹配每一道已确认题目和答题区域。尚未安排任何练习；请修正后重试。",
+    "completedPaper.confirmRetryFailed":
+      "确认已中断。审核过的题目和答题区域仍保留在这里；点击“确认并开始批改”即可安全重试。",
     "completedPaper.uploadRetryFailed":
       "上传已中断。你选择的页面仍保留在这里；点击“上传以供审核”即可安全重试。",
     "materialImport.uploadRetryFailed":
