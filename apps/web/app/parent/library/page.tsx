@@ -63,6 +63,7 @@ const copy = {
     cancel: "Cancel",
     assigning: "Assigning…",
     assigned: (child: string) => `Assigned to ${child}.`,
+    assignedDetails: "Assigned practice details",
     printAssignment: "Print A4 worksheet",
     assignmentError: "The practice could not be assigned. Please try again.",
     childrenError: "Children could not be loaded for this family.",
@@ -111,6 +112,7 @@ const copy = {
     cancel: "キャンセル",
     assigning: "割り当て中…",
     assigned: (child: string) => `${child}さんに割り当てました。`,
+    assignedDetails: "割り当て済みの練習詳細",
     printAssignment: "A4プリントを印刷",
     assignmentError: "割り当てられませんでした。もう一度お試しください。",
     childrenError: "この家族の子どもを読み込めませんでした。",
@@ -158,6 +160,7 @@ const copy = {
     cancel: "取消",
     assigning: "正在分配…",
     assigned: (child: string) => `已分配给${child}。`,
+    assignedDetails: "已分配的练习详情",
     printAssignment: "打印 A4 试卷",
     assignmentError: "无法分配题单，请重试。",
     childrenError: "无法加载这个家庭的孩子资料。",
@@ -714,7 +717,7 @@ function LibraryContent() {
                 <div
                   aria-label={
                     assignmentStatus === "success"
-                      ? "Assigned practice details"
+                      ? text.assignedDetails
                       : undefined
                   }
                   className="library-assignment-fields"

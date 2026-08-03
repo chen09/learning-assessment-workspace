@@ -354,6 +354,7 @@ describe("LibraryPage", () => {
     });
     expect(await screen.findByText("已分配给肉肉。"))
       .toBeInTheDocument();
+    expect(screen.getByLabelText("已分配的练习详情")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "确认分配" })).toBeDisabled();
     expect(screen.getByRole("link", { name: "打印 A4 试卷" })).toHaveAttribute(
       "href",
