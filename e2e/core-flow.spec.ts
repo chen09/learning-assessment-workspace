@@ -1608,6 +1608,25 @@ test("parent authors a typed listening question and the child completes it", asy
       await route.fulfill({ status: 503, body: "temporary upload failure" });
     },
   );
+  let interruptFirstConfirmation = true;
+  await page.route(
+    `${apiBaseUrl}/v1/question-sets/imports/structured`,
+    async (route) => {
+      if (
+        route.request().method() !== "POST" ||
+        !interruptFirstConfirmation
+      ) {
+        await route.fallback();
+        return;
+      }
+      interruptFirstConfirmation = false;
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ detail: "temporary confirmation failure" }),
+      });
+    },
+  );
   await page.getByLabel("Audio for question 1").setInputFiles({
     name: "morning-announcement.mp3",
     mimeType: "audio/mpeg",
@@ -1623,6 +1642,16 @@ test("parent authors a typed listening question and the child completes it", asy
   await expect(page.getByText("morning-announcement.mp3")).toBeVisible();
   expect(audioIntentRequests).toHaveLength(1);
 
+  await page.getByRole("button", { name: "Confirm and assign" }).click();
+  expect(audioIntentRequests).toHaveLength(2);
+  expect(audioIntentRequests[1]).toEqual(audioIntentRequests[0]);
+  await expect(
+    page.getByText(
+      "Confirmation paused. Your reviewed questions and edits are still here; choose Confirm and assign to retry safely.",
+    ),
+  ).toBeVisible();
+  await expect(page.getByText("morning-announcement.mp3")).toBeVisible();
+
   const importResponse = page.waitForResponse(
     (response) =>
       response.url() === `${apiBaseUrl}/v1/question-sets/imports/structured` &&
@@ -1630,8 +1659,8 @@ test("parent authors a typed listening question and the child completes it", asy
   );
   await page.getByRole("button", { name: "Confirm and assign" }).click();
   const importedRequest = await importResponse;
-  expect(audioIntentRequests).toHaveLength(2);
-  expect(audioIntentRequests[1]).toEqual(audioIntentRequests[0]);
+  expect(audioIntentRequests).toHaveLength(3);
+  expect(audioIntentRequests[2]).toEqual(audioIntentRequests[0]);
   expect(importedRequest.request().postDataJSON()).toMatchObject({
     source_name: "Manual question",
     document: {

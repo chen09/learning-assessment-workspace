@@ -2345,6 +2345,98 @@ describe("CreateWorkspace", () => {
     expect(secondIdempotencyKey).toBe(firstIdempotencyKey);
   });
 
+  it("labels a failed final confirmation correctly after private audio has uploaded", async () => {
+    const document = {
+      schema_version: "1.0" as const,
+      question_set: {
+        title: "Confirmation recovery",
+        subject: "English",
+        locale: "en" as const,
+        difficulty: "standard" as const,
+        source_mode: "convert" as const,
+        estimated_minutes: 5,
+      },
+      knowledge_tags: [{ code: "listening", label: "Listening" }],
+      questions: [
+        {
+          position: 1,
+          type: "listening" as const,
+          prompt: "Listen and choose.",
+          options: ["School", "Library"],
+          answer_key: { choice: 0 },
+          rubric: { grading_mode: "exact" },
+          points: 1,
+          knowledge_code: "listening",
+          listening: {
+            replay_limit: 1,
+            transcript: "I go to school.",
+            transcript_policy: "after_submission" as const,
+          },
+        },
+      ],
+    };
+    mocks.previewStructuredQuestionSet.mockResolvedValue({
+      title: "Confirmation recovery",
+      subject: "English",
+      locale: "en",
+      question_count: 1,
+      total_points: 1,
+      estimated_minutes: 5,
+      knowledge_tag_count: 1,
+      answer_keys_present: true,
+      checksum: "confirmation-recovery-preview",
+      source_summary: {},
+      questions: document.questions,
+    });
+    mocks.createUploadIntent.mockResolvedValue({
+      bucket: "audio",
+      path: "family-1/audio/confirmation-recovery.mp3",
+      upload_url: "fixture://audio-upload",
+      expires_in: 300,
+    });
+    mocks.uploadToSignedUrl.mockResolvedValue(undefined);
+    mocks.importStructuredQuestionSet
+      .mockRejectedValueOnce(new Error("temporary confirmation failure"))
+      .mockResolvedValueOnce({
+        question_set_id: "confirmation-recovery-set",
+        assignment_id: "confirmation-recovery-assignment",
+        status: "confirmed",
+        reused_existing: false,
+      });
+    window.history.replaceState(
+      {},
+      "",
+      "/parent/create/?familyId=family-1&childId=child-1",
+    );
+
+    render(<CreateWorkspace />);
+    await screen.findByRole("combobox", { name: "Child" });
+    fireEvent.click(screen.getByRole("button", { name: "Import AI question JSON" }));
+    fireEvent.change(screen.getByLabelText("AI question JSON"), {
+      target: { files: [new File([JSON.stringify(document)], "confirmation-recovery.json")] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Preview questions" }));
+    await screen.findByRole("heading", { name: "Review before assigning" });
+    fireEvent.change(screen.getByLabelText("Audio for question 1"), {
+      target: { files: [new File(["audio"], "lesson.mp3", { type: "audio/mpeg" })] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm and assign" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Confirmation paused. Your reviewed questions and edits are still here",
+    );
+    expect(screen.getByText("lesson.mp3")).toBeInTheDocument();
+    expect(mocks.uploadToSignedUrl).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Confirm and assign" }));
+    await waitFor(() => {
+      expect(mocks.importStructuredQuestionSet).toHaveBeenCalledTimes(2);
+    });
+    const [firstIntentRequest] = mocks.createUploadIntent.mock.calls[0];
+    const [secondIntentRequest] = mocks.createUploadIntent.mock.calls[1];
+    expect(secondIntentRequest.object_id).toBe(firstIntentRequest.object_id);
+  });
+
   it("lets a parent author a listening choice and attach its private audio during review", async () => {
     mocks.previewStructuredQuestionSet.mockResolvedValue({
       title: "Morning announcement",

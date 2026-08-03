@@ -2057,11 +2057,21 @@ function CreateWorkspaceContent() {
       setRequestStatus("working");
       setReviewMediaUploadRetryFailed(false);
       setReviewConfirmationRetryFailed(false);
-      let attemptedReviewMediaUpload = false;
+      let reviewMediaUploadFailed = false;
       const pendingReviewMediaUploadSessions: Record<
         string,
         ReviewMediaUploadRetrySession
       > = {};
+      const uploadReviewMedia = async (
+        ...args: Parameters<typeof uploadToSignedUrl>
+      ) => {
+        try {
+          await uploadToSignedUrl(...args);
+        } catch (error) {
+          reviewMediaUploadFailed = true;
+          throw error;
+        }
+      };
       try {
         const draftQuestionByPosition = new Map(
           draftQuestions.map((question) => [question.position, question]),
@@ -2078,7 +2088,6 @@ function CreateWorkspaceContent() {
                 : undefined;
               let questionWithPrivateMedia = question;
               if (figureFile) {
-                attemptedReviewMediaUpload = true;
                 const contentType =
                   figureFile.type === "image/png" ||
                   figureFile.name.toLowerCase().endsWith(".png")
@@ -2119,7 +2128,7 @@ function CreateWorkspaceContent() {
                   parentToken,
                   `question-figure-${structuredImportKey}-${question.position}`,
                 );
-                await uploadToSignedUrl(intent, figureFile);
+                await uploadReviewMedia(intent, figureFile);
                 questionWithPrivateMedia = {
                   ...question,
                   figure: {
@@ -2142,7 +2151,6 @@ function CreateWorkspaceContent() {
               if (!audioFile) {
                 return questionWithPrivateMedia;
               }
-              attemptedReviewMediaUpload = true;
               const contentType =
                 audioFile.type === "audio/mpeg" ||
                 audioFile.name.toLowerCase().endsWith(".mp3")
@@ -2184,7 +2192,7 @@ function CreateWorkspaceContent() {
                 parentToken,
                 `listening-audio-${structuredImportKey}-${question.position}`,
               );
-              await uploadToSignedUrl(intent, audioFile);
+              await uploadReviewMedia(intent, audioFile);
               return {
                 ...questionWithPrivateMedia,
                 listening: {
@@ -2215,11 +2223,13 @@ function CreateWorkspaceContent() {
         setReviewMediaUploadRetryFailed(false);
         setRequestStatus("idle");
       } catch {
-        if (attemptedReviewMediaUpload) {
+        if (Object.keys(pendingReviewMediaUploadSessions).length > 0) {
           setReviewMediaUploadRetrySessions((current) => ({
             ...current,
             ...pendingReviewMediaUploadSessions,
           }));
+        }
+        if (reviewMediaUploadFailed) {
           setReviewMediaUploadRetryFailed(true);
         } else {
           setReviewConfirmationRetryFailed(true);
