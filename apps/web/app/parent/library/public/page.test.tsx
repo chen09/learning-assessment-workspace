@@ -95,4 +95,18 @@ describe("PublicLibraryPage", () => {
       await screen.findByRole("heading", { name: "Retryable practice" }),
     ).toBeInTheDocument();
   });
+
+  it("localizes the target-family chooser for Japanese parents", async () => {
+    mocks.getFamilies.mockResolvedValue([
+      { id: "family-1", name: "肉肉如意" },
+      { id: "family-2", name: "学びの家" },
+    ]);
+    window.localStorage.setItem("luma-language:demo-parent", "ja");
+
+    render(<PublicLibraryPage />);
+
+    expect(
+      await screen.findByRole("combobox", { name: "コピー先の家族" }),
+    ).toBeInTheDocument();
+  });
 });

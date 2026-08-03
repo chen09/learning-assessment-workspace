@@ -29,6 +29,7 @@ const copy = {
     retry: "Try again",
     questions: (count: number, revision: number) =>
       `${count} questions · revision ${revision}`,
+    targetFamily: "Target family",
     copy: "Copy to my family",
     copying: "Copying…",
     copied: (family: string) => `Copied to ${family}'s family library.`,
@@ -48,6 +49,7 @@ const copy = {
     error: "公開問題ライブラリを読み込めませんでした。",
     retry: "もう一度試す",
     questions: (count: number, revision: number) => `${count}問 · 版 ${revision}`,
+    targetFamily: "コピー先の家族",
     copy: "自分の家族にコピー",
     copying: "コピー中…",
     copied: (family: string) => `「${family}」の家族ライブラリにコピーしました。`,
@@ -66,6 +68,7 @@ const copy = {
     error: "无法加载公共题库。",
     retry: "重试",
     questions: (count: number, revision: number) => `${count} 道题 · 版本 ${revision}`,
+    targetFamily: "复制目标家庭",
     copy: "复制到我的家庭",
     copying: "正在复制…",
     copied: (family: string) => `已复制到「${family}」的家庭题库。`,
@@ -195,7 +198,7 @@ function PublicLibraryContent() {
           </Link>
           {families.length > 1 ? (
             <select
-              aria-label={language === "zh" ? "复制目标家庭" : "Target family"}
+              aria-label={text.targetFamily}
               value={selectedFamilyId}
               onChange={(event) => setSelectedFamilyId(event.target.value)}
             >
