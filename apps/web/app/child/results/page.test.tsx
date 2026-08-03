@@ -165,6 +165,7 @@ describe("ChildResultsPage", () => {
           feedback: {
             summary: "平方差的两个括号需要使用相反符号。",
             action: "请查看这道题后重新作答。",
+            evidence: ["展开后中间项的符号与原式不一致。"],
           },
           parent_comment: "请检查平方差的两个括号。",
         },
@@ -202,6 +203,9 @@ describe("ChildResultsPage", () => {
     expect(screen.getByText("正确。")).toBeInTheDocument();
     expect(
       screen.getByText("平方差的两个括号需要使用相反符号。"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("展开后中间项的符号与原式不一致。"),
     ).toBeInTheDocument();
     expect(
       screen.getByText("笔迹不够清楚，需由家长确认。"),

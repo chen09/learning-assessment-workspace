@@ -253,6 +253,15 @@ function ChildResultsContent() {
                         {result.feedback.action}
                       </p>
                     ) : null}
+                    {!isCorrect && result.feedback.evidence?.length ? (
+                      <ul className="result-evidence">
+                        {result.feedback.evidence.map((evidence, evidenceIndex) => (
+                          <li key={`${result.id}-evidence-${evidenceIndex}`}>
+                            {evidence}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
                     {result.parent_comment ? (
                       <p className="result-parent-comment">
                         {t("results.parentComment", {
