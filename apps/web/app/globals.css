@@ -1311,6 +1311,32 @@ button {
   line-height: 1.35;
 }
 
+.photo-upload-retry {
+  display: grid;
+  width: min(100%, 32rem);
+  gap: 0.55rem;
+  border: 1px solid #e3b870;
+  border-radius: 0.75rem;
+  background: #fff8e8;
+  padding: 0.75rem;
+  color: #754912;
+  text-align: left;
+}
+
+.photo-upload-retry p,
+.photo-upload-retry ol {
+  margin: 0;
+}
+
+.photo-upload-retry ol {
+  padding-left: 1.2rem;
+  font-size: 0.76rem;
+}
+
+.photo-upload-retry .button {
+  justify-self: start;
+}
+
 .photo-file-preview {
   display: block;
   width: 2.6rem;

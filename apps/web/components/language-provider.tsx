@@ -492,6 +492,12 @@ const messages = {
       "This image may be too small to read clearly. Retake it if the preview is blurry.",
     "worksheet.uploadingImages": "Uploading answer images…",
     "worksheet.uploadedImages": "Uploaded answer images",
+    "worksheet.photoUploadFailedOne":
+      "1 answer image could not be uploaded. Retry it before submitting.",
+    "worksheet.photoUploadFailedMany":
+      "{count} answer images could not be uploaded. Retry them before submitting.",
+    "worksheet.failedPhotoUploads": "Answer images waiting to retry",
+    "worksheet.retryPhotoUploads": "Retry failed uploads",
     "worksheet.photoPreview": "Preview: {name}",
     "worksheet.replacePhoto": "Replace {name}",
     "worksheet.rotatePhoto": "Rotate {name} clockwise",
@@ -1442,6 +1448,12 @@ const messages = {
       "画像が小さすぎて読めない可能性があります。プレビューがぼやけている場合は撮り直してください。",
     "worksheet.uploadingImages": "解答画像をアップロードしています…",
     "worksheet.uploadedImages": "アップロード済みの解答画像",
+    "worksheet.photoUploadFailedOne":
+      "解答画像を1枚アップロードできませんでした。提出前に再試行してください。",
+    "worksheet.photoUploadFailedMany":
+      "解答画像を {count} 枚アップロードできませんでした。提出前に再試行してください。",
+    "worksheet.failedPhotoUploads": "再試行待ちの解答画像",
+    "worksheet.retryPhotoUploads": "失敗したアップロードを再試行",
     "worksheet.photoPreview": "{name} のプレビュー",
     "worksheet.replacePhoto": "{name} を差し替え",
     "worksheet.rotatePhoto": "{name} を右に回転",
@@ -2379,6 +2391,11 @@ const messages = {
       "这张图片可能太小而无法清楚识别。若预览模糊，请重新拍摄。",
     "worksheet.uploadingImages": "正在上传答案图片…",
     "worksheet.uploadedImages": "已上传的答案图片",
+    "worksheet.photoUploadFailedOne": "1 张答案图片上传失败。请在提交前重新上传。",
+    "worksheet.photoUploadFailedMany":
+      "{count} 张答案图片上传失败。请在提交前重新上传。",
+    "worksheet.failedPhotoUploads": "等待重新上传的答案图片",
+    "worksheet.retryPhotoUploads": "重新上传失败的图片",
     "worksheet.photoPreview": "{name} 的预览",
     "worksheet.replacePhoto": "替换 {name}",
     "worksheet.rotatePhoto": "将 {name} 顺时针旋转",

@@ -1132,6 +1132,143 @@ describe("WorksheetWorkbench", () => {
     await waitFor(() => expect(answerInput).not.toBeDisabled());
   });
 
+  it("keeps a failed answer-photo upload out of the answer until the child retries it", async () => {
+    mocks.uploadToSignedUrl
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce(undefined);
+
+    render(<WorksheetWorkbench />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Go to question 4" }),
+    );
+    fireEvent.change(screen.getByLabelText(/Take a photo or choose images/), {
+      target: {
+        files: [
+          new File(["answer"], "retry-answer.jpg", { type: "image/jpeg" }),
+        ],
+      },
+    });
+
+    expect(
+      await screen.findByText(
+        "1 answer image could not be uploaded. Retry it before submitting.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("list", { name: "Uploaded answer images" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Submit all answers" }),
+    ).toBeDisabled();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Retry failed uploads" }),
+    );
+
+    await waitFor(() => {
+      expect(mocks.uploadToSignedUrl).toHaveBeenCalledTimes(2);
+    });
+    expect(
+      await screen.findByRole("list", { name: "Uploaded answer images" }),
+    ).toHaveTextContent("retry-answer.jpg");
+    await waitFor(() => {
+      expect(mocks.saveAttemptResponse).toHaveBeenLastCalledWith(
+        "attempt-1",
+        "math-photo",
+        {
+          kind: "photo",
+          answer: { paths: ["family-1/attempt-1/answer.png"] },
+          expected_version: 0,
+        },
+        "child-token",
+      );
+    });
+  });
+
+  it("keeps successful photos when a later photo upload fails, then retries only the failed file", async () => {
+    mocks.createChildUploadIntent
+      .mockResolvedValueOnce({
+        bucket: "responses",
+        path: "family-1/attempt-1/first-answer.jpg",
+        upload_url: "https://storage.example.test/upload/first",
+        expires_in: 300,
+      })
+      .mockResolvedValueOnce({
+        bucket: "responses",
+        path: "family-1/attempt-1/second-answer.jpg",
+        upload_url: "https://storage.example.test/upload/second",
+        expires_in: 300,
+      })
+      .mockResolvedValueOnce({
+        bucket: "responses",
+        path: "family-1/attempt-1/second-answer-retry.jpg",
+        upload_url: "https://storage.example.test/upload/second-retry",
+        expires_in: 300,
+      });
+    mocks.uploadToSignedUrl
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce(undefined);
+
+    render(<WorksheetWorkbench />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Go to question 4" }),
+    );
+    fireEvent.change(screen.getByLabelText(/Take a photo or choose images/), {
+      target: {
+        files: [
+          new File(["first"], "first-answer.jpg", { type: "image/jpeg" }),
+          new File(["second"], "second-answer.jpg", { type: "image/jpeg" }),
+        ],
+      },
+    });
+
+    expect(
+      await screen.findByText(
+        "1 answer image could not be uploaded. Retry it before submitting.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("list", { name: "Uploaded answer images" }),
+    ).toHaveTextContent("first-answer.jpg");
+    expect(
+      screen.getByRole("list", { name: "Uploaded answer images" }),
+    ).not.toHaveTextContent("second-answer.jpg");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Retry failed uploads" }),
+    );
+
+    await waitFor(() => {
+      expect(mocks.uploadToSignedUrl).toHaveBeenCalledTimes(3);
+    });
+    expect(
+      await screen.findByRole("list", { name: "Uploaded answer images" }),
+    ).toHaveTextContent("second-answer.jpg");
+    await waitFor(() => {
+      expect(mocks.saveAttemptResponse).toHaveBeenLastCalledWith(
+        "attempt-1",
+        "math-photo",
+        {
+          kind: "photo",
+          answer: {
+            paths: [
+              "family-1/attempt-1/first-answer.jpg",
+              "family-1/attempt-1/second-answer-retry.jpg",
+            ],
+          },
+          expected_version: 0,
+        },
+        "child-token",
+      );
+    });
+    expect(
+      screen.getByRole("button", { name: "Submit all answers" }),
+    ).not.toBeDisabled();
+  });
+
   it("replaces one uploaded response photo without overwriting the original object", async () => {
     mocks.createChildUploadIntent
       .mockResolvedValueOnce({

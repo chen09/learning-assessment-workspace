@@ -248,6 +248,9 @@ function WorksheetWorkbenchContent() {
   const [photoClarityWarnings, setPhotoClarityWarnings] = useState<
     Record<string, boolean[]>
   >({});
+  const [failedPhotoUploads, setFailedPhotoUploads] = useState<
+    Record<string, File[]>
+  >({});
   const [photoUploadQuestionId, setPhotoUploadQuestionId] = useState<
     string | null
   >(null);
@@ -298,6 +301,9 @@ function WorksheetWorkbenchContent() {
   const timeLimitAwaitingSyncAttemptId = useRef<string | null>(null);
   const photoObjectUrls = useRef(new Set<string>());
   const currentQuestion = questions[currentIndex];
+  const hasFailedPhotoUploads = Object.values(failedPhotoUploads).some(
+    (files) => files.length > 0,
+  );
 
   function syncPendingDraftsWithVersions(token: string) {
     return syncPendingDrafts(token, undefined, (request, responseVersion) => {
@@ -343,6 +349,7 @@ function WorksheetWorkbenchContent() {
       setAnswers({});
       setPhotoPreviewUrls({});
       setPhotoClarityWarnings({});
+      setFailedPhotoUploads({});
       setCurrentIndex(0);
       setSubmittedQuestionIds([]);
       setQuestionResults({});
@@ -804,6 +811,9 @@ function WorksheetWorkbenchContent() {
   }
 
   async function submitAll(reason = "completed") {
+    if (hasFailedPhotoUploads) {
+      return;
+    }
     if (attemptId && childToken) {
       try {
         if (!(await flushAttemptDrafts(attemptId, childToken))) {
@@ -884,6 +894,9 @@ function WorksheetWorkbenchContent() {
       return;
     }
     const questionId = currentQuestion.id;
+    if ((failedPhotoUploads[questionId] ?? []).length > 0) {
+      return;
+    }
     try {
       await Promise.all(
         [...saveChains.current.values()].map((pendingSave) =>
@@ -949,6 +962,9 @@ function WorksheetWorkbenchContent() {
         ),
       );
       setAnswers({});
+      setPhotoPreviewUrls({});
+      setPhotoClarityWarnings({});
+      setFailedPhotoUploads({});
       responseVersions.current = {};
       saveChains.current.clear();
       for (const timer of autosaveTimers.current.values()) {
@@ -1326,6 +1342,7 @@ function WorksheetWorkbenchContent() {
       const photoPaths = answer.photoPaths ?? [];
       const photoPreviews = photoPreviewUrls[question.id] ?? [];
       const clarityWarnings = photoClarityWarnings[question.id] ?? [];
+      const failedUploads = failedPhotoUploads[question.id] ?? [];
       const isUploadingPhotos = photoUploadQuestionId === question.id;
       const isSavingPhotoAnswer =
         isUploadingPhotos ||
@@ -1345,6 +1362,98 @@ function WorksheetWorkbenchContent() {
           ...current,
           [question.id]: warnings,
         }));
+      };
+      const updateFailedPhotoUploads = (files: File[]) => {
+        setFailedPhotoUploads((current) => ({
+          ...current,
+          [question.id]: files,
+        }));
+      };
+      const appendUploadedPhotos = (
+        uploaded: Array<{ file: File; path: string }>,
+      ) => {
+        if (uploaded.length === 0) {
+          return;
+        }
+        const newPreviews = uploaded.map(({ file }) => {
+          const previewUrl = URL.createObjectURL(file);
+          photoObjectUrls.current.add(previewUrl);
+          return previewUrl;
+        });
+        updatePhotos(
+          [...photoNames, ...uploaded.map(({ file }) => file.name)],
+          [...photoPaths, ...uploaded.map(({ path }) => path)],
+        );
+        updatePhotoPreviews([...photoPreviews, ...newPreviews]);
+        updateClarityWarnings([
+          ...photoNames.map((_, index) => clarityWarnings[index] ?? false),
+          ...uploaded.map(
+            ({ file }) => file.size < MINIMUM_PHOTO_FILE_BYTES,
+          ),
+        ]);
+      };
+      const uploadSelectedPhotos = (selectedFiles: File[]) => {
+        if (selectedFiles.length === 0 || isSavingPhotoAnswer) {
+          return;
+        }
+
+        if (!attemptId || !familyId || !childToken) {
+          const newPreviews = selectedFiles.map((file) => {
+            const previewUrl = URL.createObjectURL(file);
+            photoObjectUrls.current.add(previewUrl);
+            return previewUrl;
+          });
+          updateAnswer(question.id, {
+            photoNames: [...photoNames, ...selectedFiles.map((file) => file.name)],
+            photoPaths,
+          });
+          updatePhotoPreviews([...photoPreviews, ...newPreviews]);
+          updateClarityWarnings([
+            ...photoNames.map((_, index) => clarityWarnings[index] ?? false),
+            ...selectedFiles.map(
+              (file) => file.size < MINIMUM_PHOTO_FILE_BYTES,
+            ),
+          ]);
+          return;
+        }
+
+        updateFailedPhotoUploads([]);
+        setSaveStatus("saving");
+        setPhotoUploadQuestionId(question.id);
+        void (async () => {
+          const uploaded: Array<{ file: File; path: string }> = [];
+          let failedFiles: File[] = [];
+          for (const [index, file] of selectedFiles.entries()) {
+            try {
+              const uploadKey = `response-${attemptId}-${question.id}-${file.lastModified}-${index}`;
+              const intent = await createChildUploadIntent(
+                {
+                  family_id: familyId,
+                  bucket: "responses",
+                  object_id: attemptId,
+                  filename: file.name,
+                  content_type:
+                    file.type === "image/png" ? "image/png" : "image/jpeg",
+                },
+                childToken,
+                uploadKey,
+              );
+              await uploadToSignedUrl(intent, file);
+              uploaded.push({ file, path: intent.path });
+            } catch {
+              failedFiles = selectedFiles.slice(index);
+              break;
+            }
+          }
+          appendUploadedPhotos(uploaded);
+          if (failedFiles.length > 0) {
+            updateFailedPhotoUploads(failedFiles);
+            setSaveStatus("offline");
+          }
+          setPhotoUploadQuestionId((current) =>
+            current === question.id ? null : current,
+          );
+        })();
       };
       const movePhoto = (from: number, to: number) => {
         if (!canManagePhotoOrder || to < 0 || to >= photoNames.length) {
@@ -1543,84 +1652,9 @@ function WorksheetWorkbenchContent() {
               }
               capture="environment"
               onChange={(event) => {
-                if (isSavingPhotoAnswer) {
-                  return;
-                }
                 const selectedFiles = Array.from(event.target.files ?? []);
                 event.target.value = "";
-                if (selectedFiles.length === 0) {
-                  return;
-                }
-
-                const newPreviews = selectedFiles.map((file) => {
-                  const previewUrl = URL.createObjectURL(file);
-                  photoObjectUrls.current.add(previewUrl);
-                  return previewUrl;
-                });
-                updatePhotoPreviews([...photoPreviews, ...newPreviews]);
-                updateClarityWarnings([
-                  ...photoNames.map((_, index) => clarityWarnings[index] ?? false),
-                  ...selectedFiles.map(
-                    (file) => file.size < MINIMUM_PHOTO_FILE_BYTES,
-                  ),
-                ]);
-
-                if (!attemptId || !familyId || !childToken) {
-                  updateAnswer(question.id, {
-                    photoNames: [
-                      ...photoNames,
-                      ...selectedFiles.map((file) => file.name),
-                    ],
-                    photoPaths,
-                  });
-                  return;
-                }
-
-                setSaveStatus("saving");
-                setPhotoUploadQuestionId(question.id);
-                void (async () => {
-                  const uploadedNames: string[] = [];
-                  const uploadedPaths: string[] = [];
-                  try {
-                    for (const [index, file] of selectedFiles.entries()) {
-                      const uploadKey = `response-${attemptId}-${question.id}-${file.lastModified}-${index}`;
-                      const intent = await createChildUploadIntent(
-                        {
-                          family_id: familyId,
-                          bucket: "responses",
-                          object_id: attemptId,
-                          filename: file.name,
-                          content_type:
-                            file.type === "image/png"
-                              ? "image/png"
-                              : "image/jpeg",
-                        },
-                        childToken,
-                        uploadKey,
-                      );
-                      await uploadToSignedUrl(intent, file);
-                      uploadedNames.push(file.name);
-                      uploadedPaths.push(intent.path);
-                    }
-                    updateAnswer(question.id, {
-                      photoNames: [...photoNames, ...uploadedNames],
-                      photoPaths: [...photoPaths, ...uploadedPaths],
-                    });
-                  } catch {
-                    updateAnswer(question.id, {
-                      photoNames: [
-                        ...photoNames,
-                        ...selectedFiles.map((file) => file.name),
-                      ],
-                      photoPaths: [...photoPaths, ...uploadedPaths],
-                    });
-                    setSaveStatus("offline");
-                  } finally {
-                    setPhotoUploadQuestionId((current) =>
-                      current === question.id ? null : current,
-                    );
-                  }
-                })();
+                uploadSelectedPhotos(selectedFiles);
               }}
               disabled={isSavingPhotoAnswer}
               multiple
@@ -1637,6 +1671,33 @@ function WorksheetWorkbenchContent() {
               <span role="status">{t("worksheet.uploadingImages")}</span>
             ) : null}
           </label>
+          {failedUploads.length > 0 ? (
+            <section aria-live="polite" className="photo-upload-retry">
+              <p role="status">
+                {t(
+                  failedUploads.length === 1
+                    ? "worksheet.photoUploadFailedOne"
+                    : "worksheet.photoUploadFailedMany",
+                  { count: failedUploads.length },
+                )}
+              </p>
+              <ol aria-label={t("worksheet.failedPhotoUploads")}>
+                {failedUploads.map((file, index) => (
+                  <li key={`${file.name}-${file.lastModified}-${index}`}>
+                    {file.name}
+                  </li>
+                ))}
+              </ol>
+              <button
+                className="button ghost"
+                disabled={isSavingPhotoAnswer}
+                onClick={() => uploadSelectedPhotos(failedUploads)}
+                type="button"
+              >
+                {t("worksheet.retryPhotoUploads")}
+              </button>
+            </section>
+          ) : null}
           {photoNames.length > 0 ? (
             <ol
               aria-label={t("worksheet.uploadedImages")}
@@ -2222,7 +2283,8 @@ function WorksheetWorkbenchContent() {
               disabled={
                 submittedQuestionIds.includes(currentQuestion.id) ||
                 !hasMeaningfulAnswer(answers[currentQuestion.id]) ||
-                saveStatus === "saving"
+                saveStatus === "saving" ||
+                hasFailedPhotoUploads
               }
               onClick={() => setSubmissionConfirmation("question")}
               type="button"
@@ -2239,7 +2301,7 @@ function WorksheetWorkbenchContent() {
             {!isRetryAttempt ? (
               <button
                 className="button primary"
-                disabled={saveStatus === "saving"}
+                disabled={saveStatus === "saving" || hasFailedPhotoUploads}
                 onClick={() => setSubmissionConfirmation("all")}
                 type="button"
               >
