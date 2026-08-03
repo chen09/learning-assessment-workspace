@@ -102,6 +102,11 @@ type CropTarget = {
   bounds: CropBounds;
 };
 
+type FailedPhotoReplacement = {
+  file: File;
+  index: number;
+};
+
 type DirtyQuestion = {
   id: string;
   revision: number;
@@ -251,6 +256,9 @@ function WorksheetWorkbenchContent() {
   const [failedPhotoUploads, setFailedPhotoUploads] = useState<
     Record<string, File[]>
   >({});
+  const [failedPhotoReplacements, setFailedPhotoReplacements] = useState<
+    Record<string, FailedPhotoReplacement>
+  >({});
   const [photoUploadQuestionId, setPhotoUploadQuestionId] = useState<
     string | null
   >(null);
@@ -304,6 +312,11 @@ function WorksheetWorkbenchContent() {
   const hasFailedPhotoUploads = Object.values(failedPhotoUploads).some(
     (files) => files.length > 0,
   );
+  const hasFailedPhotoReplacements = Object.values(
+    failedPhotoReplacements,
+  ).some(Boolean);
+  const hasFailedPhotoTransfers =
+    hasFailedPhotoUploads || hasFailedPhotoReplacements;
 
   function syncPendingDraftsWithVersions(token: string) {
     return syncPendingDrafts(token, undefined, (request, responseVersion) => {
@@ -350,6 +363,7 @@ function WorksheetWorkbenchContent() {
       setPhotoPreviewUrls({});
       setPhotoClarityWarnings({});
       setFailedPhotoUploads({});
+      setFailedPhotoReplacements({});
       setCurrentIndex(0);
       setSubmittedQuestionIds([]);
       setQuestionResults({});
@@ -811,7 +825,7 @@ function WorksheetWorkbenchContent() {
   }
 
   async function submitAll(reason = "completed") {
-    if (hasFailedPhotoUploads) {
+    if (hasFailedPhotoTransfers) {
       return;
     }
     if (attemptId && childToken) {
@@ -894,7 +908,10 @@ function WorksheetWorkbenchContent() {
       return;
     }
     const questionId = currentQuestion.id;
-    if ((failedPhotoUploads[questionId] ?? []).length > 0) {
+    if (
+      (failedPhotoUploads[questionId] ?? []).length > 0 ||
+      failedPhotoReplacements[questionId]
+    ) {
       return;
     }
     try {
@@ -965,6 +982,7 @@ function WorksheetWorkbenchContent() {
       setPhotoPreviewUrls({});
       setPhotoClarityWarnings({});
       setFailedPhotoUploads({});
+      setFailedPhotoReplacements({});
       responseVersions.current = {};
       saveChains.current.clear();
       for (const timer of autosaveTimers.current.values()) {
@@ -1343,6 +1361,7 @@ function WorksheetWorkbenchContent() {
       const photoPreviews = photoPreviewUrls[question.id] ?? [];
       const clarityWarnings = photoClarityWarnings[question.id] ?? [];
       const failedUploads = failedPhotoUploads[question.id] ?? [];
+      const failedReplacement = failedPhotoReplacements[question.id];
       const isUploadingPhotos = photoUploadQuestionId === question.id;
       const isSavingPhotoAnswer =
         isUploadingPhotos ||
@@ -1368,6 +1387,18 @@ function WorksheetWorkbenchContent() {
           ...current,
           [question.id]: files,
         }));
+      };
+      const updateFailedPhotoReplacement = (
+        replacement: FailedPhotoReplacement | null,
+      ) => {
+        setFailedPhotoReplacements((current) => {
+          if (replacement) {
+            return { ...current, [question.id]: replacement };
+          }
+          const remaining = { ...current };
+          delete remaining[question.id];
+          return remaining;
+        });
       };
       const appendUploadedPhotos = (
         uploaded: Array<{ file: File; path: string }>,
@@ -1553,7 +1584,9 @@ function WorksheetWorkbenchContent() {
         void (async () => {
           try {
             await uploadReplacementPhoto(index, file);
+            updateFailedPhotoReplacement(null);
           } catch {
+            updateFailedPhotoReplacement({ file, index });
             setSaveStatus("offline");
           } finally {
             setPhotoUploadQuestionId((current) =>
@@ -1656,7 +1689,11 @@ function WorksheetWorkbenchContent() {
                 event.target.value = "";
                 uploadSelectedPhotos(selectedFiles);
               }}
-              disabled={isSavingPhotoAnswer || failedUploads.length > 0}
+              disabled={
+                isSavingPhotoAnswer ||
+                failedUploads.length > 0 ||
+                Boolean(failedReplacement)
+              }
               multiple
               type="file"
             />
@@ -1698,6 +1735,37 @@ function WorksheetWorkbenchContent() {
               </button>
             </section>
           ) : null}
+          {failedReplacement ? (
+            <section aria-live="polite" className="photo-upload-retry">
+              <p role="status">
+                {t("worksheet.photoReplacementUploadFailed")}
+              </p>
+              <p>{failedReplacement.file.name}</p>
+              <div className="photo-upload-retry-actions">
+                <button
+                  className="button ghost"
+                  disabled={isSavingPhotoAnswer}
+                  onClick={() =>
+                    replacePhoto(
+                      failedReplacement.index,
+                      failedReplacement.file,
+                    )
+                  }
+                  type="button"
+                >
+                  {t("worksheet.retryPhotoReplacement")}
+                </button>
+                <button
+                  className="button ghost"
+                  disabled={isSavingPhotoAnswer}
+                  onClick={() => updateFailedPhotoReplacement(null)}
+                  type="button"
+                >
+                  {t("worksheet.keepOriginalPhoto")}
+                </button>
+              </div>
+            </section>
+          ) : null}
           {photoNames.length > 0 ? (
             <ol
               aria-label={t("worksheet.uploadedImages")}
@@ -1731,7 +1799,7 @@ function WorksheetWorkbenchContent() {
                           accept="image/jpeg,image/png"
                           aria-label={t("worksheet.replacePhoto", { name })}
                           capture="environment"
-                          disabled={isSavingPhotoAnswer}
+                          disabled={isSavingPhotoAnswer || Boolean(failedReplacement)}
                           onChange={(event) => {
                             const replacement = event.target.files?.[0];
                             event.target.value = "";
@@ -1745,7 +1813,11 @@ function WorksheetWorkbenchContent() {
                       </label>
                       <button
                         aria-label={t("worksheet.rotatePhoto", { name })}
-                        disabled={isSavingPhotoAnswer || !photoPreviews[index]}
+                        disabled={
+                          isSavingPhotoAnswer ||
+                          Boolean(failedReplacement) ||
+                          !photoPreviews[index]
+                        }
                         onClick={() => rotatePhoto(index)}
                         type="button"
                       >
@@ -1753,7 +1825,11 @@ function WorksheetWorkbenchContent() {
                       </button>
                       <button
                         aria-label={t("worksheet.cropPhoto", { name })}
-                        disabled={isSavingPhotoAnswer || !photoPreviews[index]}
+                        disabled={
+                          isSavingPhotoAnswer ||
+                          Boolean(failedReplacement) ||
+                          !photoPreviews[index]
+                        }
                         onClick={() =>
                           setCropTarget({
                             questionId: question.id,
@@ -1771,7 +1847,11 @@ function WorksheetWorkbenchContent() {
                         aria-label={t("worksheet.movePhotoEarlier", {
                           name,
                         })}
-                        disabled={isSavingPhotoAnswer || index === 0}
+                        disabled={
+                          isSavingPhotoAnswer ||
+                          Boolean(failedReplacement) ||
+                          index === 0
+                        }
                         onClick={() => movePhoto(index, index - 1)}
                         type="button"
                       >
@@ -1780,7 +1860,9 @@ function WorksheetWorkbenchContent() {
                       <button
                         aria-label={t("worksheet.movePhotoLater", { name })}
                         disabled={
-                          isSavingPhotoAnswer || index === photoNames.length - 1
+                          isSavingPhotoAnswer ||
+                          Boolean(failedReplacement) ||
+                          index === photoNames.length - 1
                         }
                         onClick={() => movePhoto(index, index + 1)}
                         type="button"
@@ -1789,7 +1871,7 @@ function WorksheetWorkbenchContent() {
                       </button>
                       <button
                         aria-label={t("worksheet.removePhoto", { name })}
-                        disabled={isSavingPhotoAnswer}
+                        disabled={isSavingPhotoAnswer || Boolean(failedReplacement)}
                         onClick={() => removePhoto(index)}
                         type="button"
                       >
@@ -2284,7 +2366,7 @@ function WorksheetWorkbenchContent() {
                 submittedQuestionIds.includes(currentQuestion.id) ||
                 !hasMeaningfulAnswer(answers[currentQuestion.id]) ||
                 saveStatus === "saving" ||
-                hasFailedPhotoUploads
+                hasFailedPhotoTransfers
               }
               onClick={() => setSubmissionConfirmation("question")}
               type="button"
@@ -2301,7 +2383,7 @@ function WorksheetWorkbenchContent() {
             {!isRetryAttempt ? (
               <button
                 className="button primary"
-                disabled={saveStatus === "saving" || hasFailedPhotoUploads}
+                disabled={saveStatus === "saving" || hasFailedPhotoTransfers}
                 onClick={() => setSubmissionConfirmation("all")}
                 type="button"
               >

@@ -1341,6 +1341,111 @@ describe("WorksheetWorkbench", () => {
     );
   });
 
+  it("keeps a failed replacement photo ready to retry without changing the original", async () => {
+    mocks.createChildUploadIntent
+      .mockResolvedValueOnce({
+        bucket: "responses",
+        path: "family-1/attempt-1/original-answer.jpg",
+        upload_url: "https://storage.example.test/upload/original",
+        expires_in: 300,
+      })
+      .mockResolvedValueOnce({
+        bucket: "responses",
+        path: "family-1/attempt-1/replacement-answer.jpg",
+        upload_url: "https://storage.example.test/upload/replacement",
+        expires_in: 300,
+      })
+      .mockResolvedValueOnce({
+        bucket: "responses",
+        path: "family-1/attempt-1/replacement-answer-retry.jpg",
+        upload_url: "https://storage.example.test/upload/replacement-retry",
+        expires_in: 300,
+      });
+    mocks.uploadToSignedUrl
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce(undefined);
+    render(<WorksheetWorkbench />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Go to question 4" }),
+    );
+    fireEvent.change(screen.getByLabelText(/Take a photo or choose images/), {
+      target: {
+        files: [
+          new File(["original"], "original-answer.jpg", {
+            type: "image/jpeg",
+          }),
+        ],
+      },
+    });
+    await screen.findByLabelText("Replace original-answer.jpg");
+    await screen.findByText("Saved");
+
+    fireEvent.change(
+      screen.getByLabelText("Replace original-answer.jpg"),
+      {
+        target: {
+          files: [
+            new File(["replacement"], "replacement-answer.jpg", {
+              type: "image/jpeg",
+            }),
+          ],
+        },
+      },
+    );
+
+    expect(
+      await screen.findByText(
+        "The replacement image could not be uploaded. Retry it or keep the original image.",
+      ),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("list", { name: "Uploaded answer images" }),
+    ).toHaveTextContent("original-answer.jpg");
+    expect(
+      screen.getByRole("list", { name: "Uploaded answer images" }),
+    ).not.toHaveTextContent("replacement-answer.jpg");
+    expect(
+      screen.getByRole("button", { name: "Submit all answers" }),
+    ).toBeDisabled();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Retry replacement upload" }),
+    );
+
+    await waitFor(() => {
+      expect(mocks.uploadToSignedUrl).toHaveBeenCalledTimes(3);
+    });
+    await waitFor(() => {
+      expect(mocks.saveAttemptResponse).toHaveBeenLastCalledWith(
+        "attempt-1",
+        "math-photo",
+        {
+          kind: "photo",
+          answer: {
+            paths: [
+              "family-1/attempt-1/replacement-answer-retry.jpg",
+            ],
+          },
+          expected_version: 1,
+        },
+        "child-token",
+      );
+    });
+    expect(
+      await screen.findByRole("list", { name: "Uploaded answer images" }),
+    ).toHaveTextContent("replacement-answer.jpg");
+    expect(
+      screen.queryByText(
+        "The replacement image could not be uploaded. Retry it or keep the original image.",
+      ),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Submit all answers" }),
+    ).not.toBeDisabled();
+  });
+
   it("rotates an uploaded response photo into a new private answer object", async () => {
     mocks.createChildUploadIntent
       .mockResolvedValueOnce({
