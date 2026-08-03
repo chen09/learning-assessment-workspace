@@ -2773,7 +2773,13 @@ function CreateWorkspaceContent() {
       setCompletedAttemptId(confirmed.attempt.id);
       setCompletedWorksheetStatus(confirmed.completed_worksheet.status);
       setRequestStatus("idle");
-    } catch {
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message.includes("original assignment already has a digital attempt")
+      ) {
+        setCompletedPaperError(t("completedPaper.sourceAssignmentConflict"));
+      }
       setCompletedConfirmationRetryFailed(true);
       setRequestStatus("error");
       confirmingCompletedPaperRef.current = false;

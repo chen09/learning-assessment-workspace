@@ -566,6 +566,164 @@ def test_parent_confirmation_turns_completed_worksheet_into_submitted_attempt() 
     assert results.json()["results"][0]["outcome"] == "needs_parent_review"
 
 
+def test_confirming_a_linked_print_scan_reuses_the_original_assignment() -> None:
+    """A printed assignment keeps its existing questions and answer keys."""
+    client = TestClient(create_app())
+    fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+    created = client.post(
+        "/v1/completed-worksheets",
+        headers={
+            **PARENT_HEADERS,
+            "Idempotency-Key": "confirm-linked-print-scan",
+        },
+        json={
+            "family_id": fixture["family"]["id"],
+            "child_id": fixture["child"]["id"],
+            "source_assignment_id": fixture["assignment"]["id"],
+            "title": "Printed original practice",
+            "subject": "Mixed practice",
+            "document_language": "en",
+            "feedback_language": "zh",
+            "filenames": ["original-print.jpg"],
+            "response_paths": ["family/completed/original-print.jpg"],
+        },
+    )
+    assert created.status_code == 202
+    client.post("/v1/demo/jobs/process-next", headers=PARENT_HEADERS)
+    reviewed_document = _structured_question_set()
+    reviewed_document["questions"] = [
+        {
+            "position": 1,
+            "type": "single_choice",
+            "prompt": "Original choice",
+            "options": ["A", "B"],
+            "answer_key": {"choice": 0},
+            "rubric": {"grading_mode": "exact"},
+            "points": 1,
+            "knowledge_code": "if-condition",
+        },
+        {
+            "position": 2,
+            "type": "typed_text",
+            "prompt": "Original text",
+            "options": [],
+            "answer_key": {"text": "goes"},
+            "rubric": {"grading_mode": "exact"},
+            "points": 1,
+            "knowledge_code": "if-condition",
+        },
+        {
+            "position": 3,
+            "type": "handwriting",
+            "prompt": "Original handwriting",
+            "options": [],
+            "answer_key": {"reference": "Explanation"},
+            "rubric": {"grading_mode": "parent_review"},
+            "points": 1,
+            "knowledge_code": "if-condition",
+        },
+    ]
+
+    confirmed = client.post(
+        f"/v1/completed-worksheets/{created.json()['id']}/confirm",
+        headers={
+            **PARENT_HEADERS,
+            "Idempotency-Key": "confirm-linked-print-scan",
+        },
+        json={
+            "document": reviewed_document,
+            "responses": [
+                {
+                    "question_position": 1,
+                    "kind": "choice",
+                    "answer": {"choices": [0], "page_numbers": [1]},
+                },
+                {
+                    "question_position": 2,
+                    "kind": "text",
+                    "answer": {"text": "goes", "page_numbers": [1]},
+                },
+                {
+                    "question_position": 3,
+                    "kind": "photo",
+                    "answer": {"page_numbers": [1]},
+                },
+            ],
+        },
+    )
+
+    assert confirmed.status_code == 201
+    assert confirmed.json()["assignment"]["id"] == fixture["assignment"]["id"]
+    assert confirmed.json()["question_set_id"] == fixture["question_set"]["id"]
+    assert (
+        confirmed.json()["completed_worksheet"]["source_assignment_id"]
+        == fixture["assignment"]["id"]
+    )
+
+
+def test_linked_print_scan_does_not_replace_an_existing_digital_attempt() -> None:
+    """Parents get a clear conflict instead of merging two answer sources."""
+    client = TestClient(create_app())
+    fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()
+    created = client.post(
+        "/v1/completed-worksheets",
+        headers={
+            **PARENT_HEADERS,
+            "Idempotency-Key": "linked-print-scan-digital-conflict",
+        },
+        json={
+            "family_id": fixture["family"]["id"],
+            "child_id": fixture["child"]["id"],
+            "source_assignment_id": fixture["assignment"]["id"],
+            "title": "Conflicting printed original",
+            "subject": "Mixed practice",
+            "document_language": "en",
+            "feedback_language": "zh",
+            "filenames": ["conflict-print.jpg"],
+            "response_paths": ["family/completed/conflict-print.jpg"],
+        },
+    )
+    assert created.status_code == 202
+    client.post("/v1/demo/jobs/process-next", headers=PARENT_HEADERS)
+
+    child_session = client.post(
+        f"/v1/children/{fixture['child']['id']}/sessions",
+        json={"pin": "123456"},
+    ).json()
+    started = client.post(
+        f"/v1/assignments/{fixture['assignment']['id']}/start",
+        headers={"Authorization": f"Bearer {child_session['access_token']}"},
+    )
+    assert started.status_code == 200
+
+    confirmed = client.post(
+        f"/v1/completed-worksheets/{created.json()['id']}/confirm",
+        headers={
+            **PARENT_HEADERS,
+            "Idempotency-Key": "confirm-linked-print-scan-conflict",
+        },
+        json={
+            "document": _structured_question_set(),
+            "responses": [
+                {
+                    "question_position": 1,
+                    "kind": "photo",
+                    "answer": {"page_numbers": [1]},
+                },
+            ],
+        },
+    )
+
+    assert confirmed.status_code == 409
+    assert "digital attempt" in confirmed.json()["detail"]
+    imported = client.get(
+        f"/v1/completed-worksheets/{created.json()['id']}",
+        headers=PARENT_HEADERS,
+    )
+    assert imported.json()["status"] == "needs_review"
+    assert imported.json()["assignment_id"] is None
+
+
 def test_parent_can_confirm_structured_json_and_assign_it_without_exposing_answers() -> None:
     client = TestClient(create_app())
     fixture = client.post("/v1/demo/bootstrap", headers=PARENT_HEADERS).json()

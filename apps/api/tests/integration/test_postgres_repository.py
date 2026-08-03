@@ -13,6 +13,7 @@ from app.domain.errors import (
     SubmittedQuestionImmutable,
 )
 from app.domain.models import (
+    CompletedWorksheetResponseInput,
     CompleteReviewRequest,
     CreateAssignmentRequest,
     CreateCompletedWorksheetRequest,
@@ -31,6 +32,7 @@ from app.domain.models import (
 from app.repositories.postgres import PostgresRepository
 from app.services.child_sessions import ChildSessionService
 from app.services.database_jobs import DatabaseJobWorker
+from app.tools.import_question_set import ImportDocument
 
 DATABASE_URL = os.getenv("TEST_DATABASE_URL")
 
@@ -310,11 +312,17 @@ async def test_postgres_vertical_flow_and_family_isolation() -> None:
             str(assignment.id),
             str(parent_a),
         )
+        printed_assignment = await repository.assign_question_set(
+            str(confirmed.id),
+            CreateAssignmentRequest(child_id=child_a),
+            "integration-assign-paper-copy",
+            str(parent_a),
+        )
         linked_completed_paper = await repository.create_completed_worksheet_import(
             CreateCompletedWorksheetRequest(
                 family_id=family_a,
                 child_id=child_a,
-                source_assignment_id=assignment.id,
+                source_assignment_id=printed_assignment.id,
                 title="Linked printed assignment",
                 subject="English",
                 document_language="ja",
@@ -325,7 +333,7 @@ async def test_postgres_vertical_flow_and_family_isolation() -> None:
             "integration-linked-completed-paper",
             str(parent_a),
         )
-        assert linked_completed_paper.source_assignment_id == assignment.id
+        assert linked_completed_paper.source_assignment_id == printed_assignment.id
         linked_completed_papers = await repository.list_completed_worksheet_imports(
             family_a,
             str(parent_a),
@@ -335,9 +343,57 @@ async def test_postgres_vertical_flow_and_family_isolation() -> None:
             for item in linked_completed_papers
             if item.id == linked_completed_paper.id
         )
-        assert linked_summary.source_assignment_id == assignment.id
+        assert linked_summary.source_assignment_id == printed_assignment.id
         # Keep the shared single-worker queue in the same state expected by
         # the remaining assignment-grading assertions below.
+        assert await worker.run_once() is True
+        linked_confirmation = await repository.confirm_completed_worksheet_import(
+            str(linked_completed_paper.id),
+            document=ImportDocument.model_validate(
+                {
+                    "schema_version": "1.0",
+                    "question_set": {
+                        "title": "Reviewed printed copy",
+                        "subject": "English",
+                        "locale": "en",
+                        "difficulty": "standard",
+                        "source_mode": "convert",
+                        "estimated_minutes": 1,
+                    },
+                    "knowledge_tags": [
+                        {"code": "paper-review", "label": "paper review"}
+                    ],
+                    "questions": [
+                        {
+                            "position": position,
+                            "type": "photo",
+                            "prompt": f"Printed answer {position}",
+                            "options": [],
+                            "answer_key": {"reference": "Private answer key"},
+                            "rubric": {"grading_mode": "parent_review"},
+                            "points": 1,
+                            "knowledge_code": "paper-review",
+                        }
+                        for position in range(1, 4)
+                    ],
+                }
+            ),
+            responses=[
+                CompletedWorksheetResponseInput(
+                    question_position=position,
+                    kind=ResponseKind.PHOTO,
+                    answer={"page_numbers": [1]},
+                )
+                for position in range(1, 4)
+            ],
+            idempotency_key="integration-confirm-linked-paper",
+            parent_id=str(parent_a),
+        )
+        assert linked_confirmation.assignment.id == printed_assignment.id
+        assert linked_confirmation.question_set_id == confirmed.id
+        assert linked_confirmation.completed_worksheet.source_assignment_id == printed_assignment.id
+        # Consume the linked paper's grading job before the original online
+        # assignment enters its own normal submission assertions.
         assert await worker.run_once() is True
         assert printable.template_version == "a4-v1"
         assert len(printable.questions) == 3

@@ -922,6 +922,8 @@ const messages = {
       "The reviewed JSON must match every confirmed question and answer region. Nothing was assigned; correct it and try again.",
     "completedPaper.confirmRetryFailed":
       "Confirmation paused. Your reviewed questions and answer regions are still here; choose Confirm and start grading to retry safely.",
+    "completedPaper.sourceAssignmentConflict":
+      "This printed copy belongs to an assignment the child has already started online. To avoid mixing answer sources, this scan has not been submitted. Use a fresh copy or review the online attempt.",
     "completedPaper.uploadRetryFailed":
       "The upload paused. Your selected pages are still here; choose Upload for review to retry safely.",
     "materialImport.uploadRetryFailed":
@@ -1896,6 +1898,8 @@ const messages = {
       "確認用 JSON は、確定するすべての問題と解答エリアに対応する必要があります。割り当ては行われていません。修正してもう一度お試しください。",
     "completedPaper.confirmRetryFailed":
       "確認が中断されました。確認済みの問題と解答範囲はそのまま残っています。「確認して採点を始める」を選んで安全に再試行できます。",
+    "completedPaper.sourceAssignmentConflict":
+      "この紙の答案に対応する課題は、すでにオンラインで解答が始まっています。解答元を混在させないため、このスキャンは提出されていません。新しい印刷版を使うか、オンラインの解答を確認してください。",
     "completedPaper.uploadRetryFailed":
       "アップロードが中断されました。選択済みのページは残っています。「確認用にアップロード」を選んで安全に再試行できます。",
     "materialImport.uploadRetryFailed":
@@ -2840,6 +2844,8 @@ const messages = {
       "审核 JSON 必须匹配每一道已确认题目和答题区域。尚未安排任何练习；请修正后重试。",
     "completedPaper.confirmRetryFailed":
       "确认已中断。审核过的题目和答题区域仍保留在这里；点击“确认并开始批改”即可安全重试。",
+    "completedPaper.sourceAssignmentConflict":
+      "这份纸质作答对应的题单已在线开始作答。为避免混合作答来源，本扫描件尚未提交；请使用新的打印卷，或先处理线上作答。",
     "completedPaper.uploadRetryFailed":
       "上传已中断。你选择的页面仍保留在这里；点击“上传以供审核”即可安全重试。",
     "materialImport.uploadRetryFailed":

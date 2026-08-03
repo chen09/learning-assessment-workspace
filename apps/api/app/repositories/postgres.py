@@ -3645,7 +3645,10 @@ class PostgresRepository:
         """Persist a reviewed scan as one submitted, non-editable attempt."""
         worksheet_uuid = _uuid(worksheet_id)
         imported = await self.get_completed_worksheet_import(worksheet_id, parent_id)
-        if imported.status == CompletedWorksheetStatus.NEEDS_REVIEW:
+        if (
+            imported.status == CompletedWorksheetStatus.NEEDS_REVIEW
+            and imported.source_assignment_id is None
+        ):
             import_result = await self.import_structured_question_set(
                 document,
                 family_id=imported.family_id,
@@ -3663,7 +3666,8 @@ class PostgresRepository:
                 await connection.execute(
                     text(
                         """
-                        select id, family_id, child_id, status, assignment_id, attempt_id
+                        select id, family_id, child_id, status, source_assignment_id,
+                               assignment_id, attempt_id
                         from public.completed_worksheet_imports
                         where id = :id
                         for update
@@ -3727,33 +3731,71 @@ class PostgresRepository:
                     grading_job=_job(job_row),
                 )
 
-            if (
-                imported_row["status"] != CompletedWorksheetStatus.NEEDS_REVIEW
-                or question_set_id is None
-            ):
+            if imported_row["status"] != CompletedWorksheetStatus.NEEDS_REVIEW:
                 raise NotFoundError
-
-            assignment_row = (
-                await connection.execute(
+            if imported_row["source_assignment_id"] is not None:
+                source_assignment_row = (
+                    await connection.execute(
+                        text(
+                            """
+                            select id, family_id, question_set_id, child_id, status, mode,
+                                   time_limit_seconds
+                            from public.assignments
+                            where id = :assignment_id
+                              and family_id = :family_id
+                              and child_id = :child_id
+                            for update
+                            """
+                        ),
+                        {
+                            "assignment_id": imported_row["source_assignment_id"],
+                            "family_id": imported_row["family_id"],
+                            "child_id": imported_row["child_id"],
+                        },
+                    )
+                ).mappings().one_or_none()
+                if source_assignment_row is None:
+                    raise NotFoundError
+                existing_attempt = await connection.scalar(
                     text(
                         """
-                        insert into public.assignments (
-                          family_id, question_set_id, child_id, assigned_by, mode
-                        ) values (
-                          :family_id, :question_set_id, :child_id, :parent_id, 'practice'
-                        )
-                        returning id, family_id, question_set_id, child_id, status, mode,
-                                  time_limit_seconds
+                        select 1 from public.attempts
+                        where assignment_id = :assignment_id
+                        limit 1
                         """
                     ),
-                    {
-                        "family_id": imported_row["family_id"],
-                        "question_set_id": question_set_id,
-                        "child_id": imported_row["child_id"],
-                        "parent_id": _uuid(parent_id),
-                    },
+                    {"assignment_id": source_assignment_row["id"]},
                 )
-            ).mappings().one()
+                if existing_attempt is not None:
+                    raise AssignmentStatusConflict(
+                        "The original assignment already has a digital attempt."
+                    )
+                assignment_row = source_assignment_row
+                question_set_id = assignment_row["question_set_id"]
+            else:
+                if question_set_id is None:
+                    raise NotFoundError
+                assignment_row = (
+                    await connection.execute(
+                        text(
+                            """
+                            insert into public.assignments (
+                              family_id, question_set_id, child_id, assigned_by, mode
+                            ) values (
+                              :family_id, :question_set_id, :child_id, :parent_id, 'practice'
+                            )
+                            returning id, family_id, question_set_id, child_id, status, mode,
+                                      time_limit_seconds
+                            """
+                        ),
+                        {
+                            "family_id": imported_row["family_id"],
+                            "question_set_id": question_set_id,
+                            "child_id": imported_row["child_id"],
+                            "parent_id": _uuid(parent_id),
+                        },
+                    )
+                ).mappings().one()
             attempt_row = (
                 await connection.execute(
                     text(

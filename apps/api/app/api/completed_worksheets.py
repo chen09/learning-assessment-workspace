@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.api.dependencies import Repository, get_repository, require_parent
-from app.domain.errors import NotFoundError
+from app.domain.errors import AssignmentStatusConflict, NotFoundError
 from app.domain.models import (
     CompletedWorksheetConfirmation,
     CompletedWorksheetImport,
@@ -263,6 +263,11 @@ async def confirm_completed_worksheet_import(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="The completed worksheet is not available for confirmation.",
+        ) from error
+    except AssignmentStatusConflict as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(error),
         ) from error
     except ValueError as error:
         raise HTTPException(

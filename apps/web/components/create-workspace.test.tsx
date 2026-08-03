@@ -3624,12 +3624,22 @@ describe("CreateWorkspace", () => {
     expect(screen.getByDisplayValue("Factorise x² − 25.")).toBeInTheDocument();
     expect(mocks.confirmCompletedWorksheetImport).toHaveBeenCalledTimes(1);
 
+    mocks.confirmCompletedWorksheetImport.mockRejectedValueOnce(
+      new Error("The original assignment already has a digital attempt."),
+    );
     fireEvent.click(
       screen.getByRole("button", { name: "Confirm and start grading" }),
     );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "This printed copy belongs to an assignment the child has already started online.",
+    );
+    expect(screen.getByDisplayValue("Factorise x² − 25.")).toBeInTheDocument();
 
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirm and start grading" }),
+    );
     await waitFor(() => {
-      expect(mocks.confirmCompletedWorksheetImport).toHaveBeenCalledTimes(2);
+      expect(mocks.confirmCompletedWorksheetImport).toHaveBeenCalledTimes(3);
       expect(mocks.confirmCompletedWorksheetImport).toHaveBeenCalledWith(
         "completed-worksheet-1",
         {

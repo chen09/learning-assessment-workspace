@@ -1908,23 +1908,48 @@ class MemoryRepository:
                 grading_job=job,
             )
 
-        imported_result = await self.import_structured_question_set(
-            document,
-            family_id=imported.family_id,
-            child_id=imported.child_id,
-            source_name=f"completed-worksheet:{imported.id}",
-            parent_id=parent_id,
-            assign=False,
-        )
-        assignment = Assignment(
-            family_id=imported.family_id,
-            question_set_id=imported_result.question_set_id,
-            child_id=imported.child_id,
-            # This is an already-completed paper. It enters the normal
-            # submission transition without exposing an editable task.
-            status=AssignmentStatus.IN_PROGRESS,
-        )
-        self.assignments[str(assignment.id)] = assignment
+        if imported.source_assignment_id is not None:
+            source_assignment = self.assignments.get(
+                str(imported.source_assignment_id)
+            )
+            if source_assignment is None:
+                raise NotFoundError
+            if (
+                source_assignment.family_id != imported.family_id
+                or source_assignment.child_id != imported.child_id
+            ):
+                raise NotFoundError
+            if any(
+                attempt.assignment_id == source_assignment.id
+                for attempt in self.attempts.values()
+            ):
+                raise AssignmentStatusConflict(
+                    "The original assignment already has a digital attempt."
+                )
+            # A printed assignment has no child attempt yet. Move it through
+            # the same submitted/grading transition while retaining its own
+            # questions and private answer keys.
+            assignment = source_assignment
+            assignment.status = AssignmentStatus.IN_PROGRESS
+            self.assignments[str(assignment.id)] = assignment
+        else:
+            imported_result = await self.import_structured_question_set(
+                document,
+                family_id=imported.family_id,
+                child_id=imported.child_id,
+                source_name=f"completed-worksheet:{imported.id}",
+                parent_id=parent_id,
+                assign=False,
+            )
+            assignment = Assignment(
+                family_id=imported.family_id,
+                question_set_id=imported_result.question_set_id,
+                child_id=imported.child_id,
+                # This is an already-completed paper. It enters the normal
+                # submission transition without exposing an editable task.
+                status=AssignmentStatus.IN_PROGRESS,
+            )
+            self.assignments[str(assignment.id)] = assignment
         attempt = Attempt(
             family_id=imported.family_id,
             assignment_id=assignment.id,
