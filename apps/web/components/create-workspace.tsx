@@ -3221,6 +3221,13 @@ function CreateWorkspaceContent() {
                     <figcaption>
                       <strong>{label}</strong>
                       {filename ? <span>{filename}</span> : null}
+                      <a
+                        href={previewUrl}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        {t("completedPaper.openOriginalPage", { label })}
+                      </a>
                     </figcaption>
                   </figure>
                 );

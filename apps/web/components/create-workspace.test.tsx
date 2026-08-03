@@ -212,6 +212,12 @@ describe("CreateWorkspace", () => {
     );
     expect(screen.getByText("Page 1 of 2")).toBeInTheDocument();
     expect(screen.getByText("Page 2 of 2")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Open original Page 1 of 2" }),
+    ).toHaveAttribute(
+      "href",
+      "https://storage.example.test/signed/completed-paper-front.jpg?short-lived=true",
+    );
     expect(screen.getByText("completed-paper-front.jpg")).toBeInTheDocument();
     expect(screen.getByText("completed-paper-back.jpg")).toBeInTheDocument();
     expect(

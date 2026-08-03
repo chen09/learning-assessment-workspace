@@ -1455,8 +1455,8 @@ test("parent authors a paper-photo question and assigns it through the reviewed 
       name: "Solve on paper, then take a clear photo of your work.",
     }),
   ).toBeVisible();
-  await expect(page.getByText("Page 1 of 2")).toBeVisible();
-  await expect(page.getByText("Page 2 of 2")).toBeVisible();
+  await expect(page.getByText("Page 1 of 2", { exact: true })).toBeVisible();
+  await expect(page.getByText("Page 2 of 2", { exact: true })).toBeVisible();
   await expect(page.getByText("paper-answer-first.png")).toBeVisible();
   await expect(page.getByText("paper-answer-replacement.png")).toBeVisible();
   await page
@@ -2335,8 +2335,11 @@ test("parent validates a local-AI completed-paper review before submitting it", 
   await expect(
     page.getByText("Review ready · questions: 5 · answer regions: 5"),
   ).toBeVisible();
-  await expect(page.getByText("Page 1 of 2")).toBeVisible();
-  await expect(page.getByText("Page 2 of 2")).toBeVisible();
+  await expect(page.getByText("Page 1 of 2", { exact: true })).toBeVisible();
+  await expect(page.getByText("Page 2 of 2", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Open original Page 1 of 2" }),
+  ).toHaveAttribute("href", /^data:image\/svg\+xml/);
   await expect(page.getByText("completed-paper-back.jpg")).toBeVisible();
   await expect(page.getByText("completed-paper-front.jpg")).toBeVisible();
   await expect(

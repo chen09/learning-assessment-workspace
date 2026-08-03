@@ -882,6 +882,7 @@ const messages = {
     "completedPaper.answerRegionOnPage":
       "Answer area for question {position} on page {page}",
     "completedPaper.openOriginal": "Open original",
+    "completedPaper.openOriginalPage": "Open original {label}",
     "completedPaper.confirm": "Confirm and start grading",
     "completedPaper.confirming": "Confirming…",
     "completedPaper.preparingReview": "Preparing private review",
@@ -1817,6 +1818,7 @@ const messages = {
     "completedPaper.answerRegionOnPage":
       "問題 {position} の {page} ページの解答範囲",
     "completedPaper.openOriginal": "元のファイルを開く",
+    "completedPaper.openOriginalPage": "元の{label}を開く",
     "completedPaper.confirm": "確認して採点を始める",
     "completedPaper.confirming": "確認中…",
     "completedPaper.preparingReview": "非公開の確認を準備中",
@@ -2723,6 +2725,7 @@ const messages = {
     "completedPaper.pagePreview": "已作答试卷第 {page} 页",
     "completedPaper.answerRegionOnPage": "第 {position} 题在第 {page} 页的答题区域",
     "completedPaper.openOriginal": "打开原始文件",
+    "completedPaper.openOriginalPage": "打开{label}的原始文件",
     "completedPaper.confirm": "确认并开始批改",
     "completedPaper.confirming": "正在确认…",
     "completedPaper.preparingReview": "正在准备私密审核",
