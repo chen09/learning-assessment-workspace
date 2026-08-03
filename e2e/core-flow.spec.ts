@@ -1535,11 +1535,63 @@ test("parent authors a typed listening question and the child completes it", asy
       name: "Listen and type the destination.",
     }),
   ).toBeVisible();
+  const audioIntentRequests: Array<{
+    objectId: string;
+    idempotencyKey: string | undefined;
+  }> = [];
+  let interruptFirstAudioUpload = true;
+  await page.route(`${apiBaseUrl}/v1/uploads/intents`, async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.fallback();
+      return;
+    }
+    const payload = route.request().postDataJSON() as {
+      bucket?: string;
+      object_id?: string;
+    };
+    if (payload.bucket !== "audio") {
+      await route.fallback();
+      return;
+    }
+    audioIntentRequests.push({
+      objectId: payload.object_id ?? "",
+      idempotencyKey: route.request().headers()["idempotency-key"],
+    });
+    if (!interruptFirstAudioUpload) {
+      await route.fallback();
+      return;
+    }
+    interruptFirstAudioUpload = false;
+    const response = await route.fetch();
+    const intent = (await response.json()) as Record<string, unknown>;
+    await route.fulfill({
+      response,
+      json: {
+        ...intent,
+        upload_url: `${apiBaseUrl}/e2e-interrupted-parent-media-upload`,
+      },
+    });
+  });
+  await page.route(
+    `${apiBaseUrl}/e2e-interrupted-parent-media-upload`,
+    async (route) => {
+      await route.fulfill({ status: 503, body: "temporary upload failure" });
+    },
+  );
   await page.getByLabel("Audio for question 1").setInputFiles({
     name: "morning-announcement.mp3",
     mimeType: "audio/mpeg",
     buffer: Buffer.from("private listening audio"),
   });
+
+  await page.getByRole("button", { name: "Confirm and assign" }).click();
+  await expect(
+    page.getByText(
+      "The media upload paused. Your selected files are still here; choose Confirm and assign to retry safely.",
+    ),
+  ).toBeVisible();
+  await expect(page.getByText("morning-announcement.mp3")).toBeVisible();
+  expect(audioIntentRequests).toHaveLength(1);
 
   const importResponse = page.waitForResponse(
     (response) =>
@@ -1548,6 +1600,8 @@ test("parent authors a typed listening question and the child completes it", asy
   );
   await page.getByRole("button", { name: "Confirm and assign" }).click();
   const importedRequest = await importResponse;
+  expect(audioIntentRequests).toHaveLength(2);
+  expect(audioIntentRequests[1]).toEqual(audioIntentRequests[0]);
   expect(importedRequest.request().postDataJSON()).toMatchObject({
     source_name: "Manual question",
     document: {
