@@ -110,6 +110,7 @@ test("parent dashboard refreshes an assigned worksheet when a child starts work"
     "The timed dashboard refresh is covered once at desktop size.",
   );
   let historyRequests = 0;
+  let returnInProgress = false;
   await page.route("**/v1/families", async (route) => {
     if (route.request().method() !== "GET") {
       await route.fallback();
@@ -146,12 +147,11 @@ test("parent dashboard refreshes an assigned worksheet when a child starts work"
         body: JSON.stringify([
           {
             assignment_id: "refresh-dashboard-assignment",
-            attempt_id:
-              historyRequests === 1 ? null : "refresh-dashboard-attempt",
+            attempt_id: returnInProgress ? "refresh-dashboard-attempt" : null,
             child_id: "refresh-dashboard-child",
             child_nickname: "肉肉",
             title: "Vocabulary practice",
-            status: historyRequests === 1 ? "assigned" : "in_progress",
+            status: returnInProgress ? "in_progress" : "assigned",
             submitted_at: null,
             awarded_points: 0,
             available_points: 10,
@@ -166,7 +166,11 @@ test("parent dashboard refreshes an assigned worksheet when a child starts work"
 
   await page.goto("/parent/");
   await expect(page.getByText("Assigned")).toBeVisible();
-  await expect.poll(() => historyRequests, { timeout: 7_000 }).toBeGreaterThan(1);
+  const historyRequestsBeforeRefresh = historyRequests;
+  returnInProgress = true;
+  await expect
+    .poll(() => historyRequests, { timeout: 7_000 })
+    .toBeGreaterThan(historyRequestsBeforeRefresh);
   await expect(page.getByText("In progress")).toBeVisible();
 });
 
