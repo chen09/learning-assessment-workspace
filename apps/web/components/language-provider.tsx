@@ -556,6 +556,9 @@ const messages = {
     "worksheet.confirmAllAction": "Confirm full submission",
     "worksheet.cancel": "Cancel",
     "worksheet.grading": "Grading this answer…",
+    "worksheet.gradingUnavailable":
+      "We could not check the grading status. Your submitted answer is safe.",
+    "worksheet.refreshGradingStatus": "Check grading status",
     "worksheet.result.correct": "Correct.",
     "worksheet.result.incorrect": "Review this answer.",
     "worksheet.result.uncertain": "The grader is not certain.",
@@ -1503,6 +1506,9 @@ const messages = {
     "worksheet.confirmAllAction": "全体を提出する",
     "worksheet.cancel": "キャンセル",
     "worksheet.grading": "この答えを採点中…",
+    "worksheet.gradingUnavailable":
+      "採点状況を確認できませんでした。提出済みの答えは安全に保存されています。",
+    "worksheet.refreshGradingStatus": "採点状況を確認する",
     "worksheet.result.correct": "正解です。",
     "worksheet.result.incorrect": "この答えを見直しましょう。",
     "worksheet.result.uncertain": "自動採点では判断できませんでした。",
@@ -2437,6 +2443,9 @@ const messages = {
     "worksheet.confirmAllAction": "确认提交整份",
     "worksheet.cancel": "取消",
     "worksheet.grading": "正在批改这一题…",
+    "worksheet.gradingUnavailable":
+      "暂时无法确认批改状态。已提交的答案已安全保存。",
+    "worksheet.refreshGradingStatus": "刷新批改状态",
     "worksheet.result.correct": "回答正确。",
     "worksheet.result.incorrect": "请订正这一题。",
     "worksheet.result.uncertain": "自动批改暂时无法确定。",

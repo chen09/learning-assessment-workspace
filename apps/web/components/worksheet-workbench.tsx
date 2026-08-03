@@ -280,6 +280,8 @@ function WorksheetWorkbenchContent() {
     Record<string, AttemptResult>
   >({});
   const [gradingQuestionIds, setGradingQuestionIds] = useState<string[]>([]);
+  const [questionGradingUnavailableIds, setQuestionGradingUnavailableIds] =
+    useState<string[]>([]);
   const [submissionConfirmation, setSubmissionConfirmation] = useState<
     "question" | "all" | null
   >(null);
@@ -345,6 +347,7 @@ function WorksheetWorkbenchContent() {
       setSubmittedQuestionIds([]);
       setQuestionResults({});
       setGradingQuestionIds([]);
+      setQuestionGradingUnavailableIds([]);
       setSubmissionConfirmation(null);
       setAttemptId(null);
       setFamilyId(null);
@@ -485,6 +488,7 @@ function WorksheetWorkbenchContent() {
         );
         const submittedIds = work.submitted_question_ids ?? [];
         setSubmittedQuestionIds(submittedIds);
+        setQuestionGradingUnavailableIds([]);
         setPlayCounts(
           Object.fromEntries(
             work.questions
@@ -826,26 +830,49 @@ function WorksheetWorkbenchContent() {
     if (!attemptId || !childToken) {
       return;
     }
-    for (let attempt = 0; attempt < 20; attempt += 1) {
-      const resultSet = await getAttemptResults(attemptId, childToken);
-      const result = resultSet.results.find(
-        (candidate) => candidate.question_id === questionId,
-      );
-      if (result) {
-        setQuestionResults((current) => ({
-          ...current,
-          [questionId]: result,
-        }));
-        setGradingQuestionIds((current) =>
-          current.filter((id) => id !== questionId),
+    try {
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        const resultSet = await getAttemptResults(attemptId, childToken);
+        const result = resultSet.results.find(
+          (candidate) => candidate.question_id === questionId,
         );
-        return;
+        if (result) {
+          setQuestionResults((current) => ({
+            ...current,
+            [questionId]: result,
+          }));
+          setQuestionGradingUnavailableIds((current) =>
+            current.filter((id) => id !== questionId),
+          );
+          return;
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 1500));
       }
-      await new Promise((resolve) => window.setTimeout(resolve, 1500));
+      throw new Error("question_grading_result_timed_out");
+    } catch {
+      setQuestionGradingUnavailableIds((current) =>
+        current.includes(questionId) ? current : [...current, questionId],
+      );
+    } finally {
+      setGradingQuestionIds((current) =>
+        current.filter((id) => id !== questionId),
+      );
     }
-    setGradingQuestionIds((current) =>
+  }
+
+  function refreshQuestionGradingStatus(questionId: string) {
+    if (
+      !attemptId ||
+      !childToken ||
+      gradingQuestionIds.includes(questionId)
+    ) {
+      return;
+    }
+    setQuestionGradingUnavailableIds((current) =>
       current.filter((id) => id !== questionId),
     );
+    setGradingQuestionIds((current) => [...current, questionId]);
+    void waitForQuestionResult(questionId);
   }
 
   async function submitCurrentQuestion() {
@@ -929,6 +956,7 @@ function WorksheetWorkbenchContent() {
       setSubmittedQuestionIds([]);
       setQuestionResults({});
       setGradingQuestionIds([]);
+      setQuestionGradingUnavailableIds([]);
       setSubmissionConfirmation(null);
       setCurrentIndex(0);
       setMode("focus");
@@ -1847,6 +1875,9 @@ function WorksheetWorkbenchContent() {
   const questionCard = (question: Question) => {
     const submitted = submittedQuestionIds.includes(question.id);
     const grading = gradingQuestionIds.includes(question.id);
+    const gradingUnavailable = questionGradingUnavailableIds.includes(
+      question.id,
+    );
     const result = questionResults[question.id];
     return (
     <article className="question-card" key={question.id}>
@@ -1903,13 +1934,30 @@ function WorksheetWorkbenchContent() {
         ) : null}
       </div>
       {submitted ? (
-        <div className={`question-grade-status ${result?.outcome ?? "grading"}`}>
+        <div
+          className={`question-grade-status ${
+            result?.outcome ?? (gradingUnavailable ? "pending" : "grading")
+          }`}
+        >
           <strong>
             {grading
               ? t("worksheet.grading")
               : result?.feedback.summary ??
-                resultLabel(result?.outcome)}
+                (gradingUnavailable
+                  ? t("worksheet.gradingUnavailable")
+                  : resultLabel(result?.outcome))}
           </strong>
+          {!grading && !result && gradingUnavailable ? (
+            <div className="question-grade-actions">
+              <button
+                className="button ghost"
+                onClick={() => refreshQuestionGradingStatus(question.id)}
+                type="button"
+              >
+                {t("worksheet.refreshGradingStatus")}
+              </button>
+            </div>
+          ) : null}
           {!grading && result ? (
             <>
               <p>{resultAction(result.outcome)}</p>

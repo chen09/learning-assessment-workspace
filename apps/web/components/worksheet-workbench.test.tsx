@@ -804,6 +804,40 @@ describe("WorksheetWorkbench", () => {
     ).toBeInTheDocument();
   });
 
+  it("lets a child refresh an unavailable single-question grading result without submitting it again", async () => {
+    mocks.getAttemptResults.mockRejectedValueOnce(
+      new Error("temporary grading result failure"),
+    );
+    render(<WorksheetWorkbench />);
+
+    fireEvent.click(
+      await screen.findByRole("radio", { name: "a² − b²" }),
+    );
+    await screen.findByText("Saved");
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Submit this answer for grading",
+      }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Confirm single-answer submission",
+      }),
+    );
+
+    expect(
+      await screen.findByText(
+        "We could not check the grading status. Your submitted answer is safe.",
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Check grading status" }),
+    );
+
+    expect(await screen.findByText("Correct.")).toBeInTheDocument();
+    expect(mocks.submitQuestion).toHaveBeenCalledTimes(1);
+  });
+
   it("does not submit one answer for grading while its device-only draft remains unsynced", async () => {
     mocks.saveAttemptResponse.mockRejectedValueOnce(new Error("offline"));
     render(<WorksheetWorkbench />);

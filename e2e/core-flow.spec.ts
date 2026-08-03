@@ -3275,6 +3275,15 @@ test("parent creation reaches child grading and correction through the API", asy
 
   await page.getByLabel("Language").selectOption("zh");
   await addChineseHandwritingFeedback(originalAttemptId!);
+  const originalResultsUrl =
+    `${apiBaseUrl}/v1/attempts/${originalAttemptId}/results`;
+  await page.route(originalResultsUrl, async (route) => {
+    await route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ detail: "temporary result status failure" }),
+    });
+  });
   const originalQuestionSubmission = page.waitForResponse(
     (response) =>
       response
@@ -3290,6 +3299,11 @@ test("parent creation reaches child grading and correction through the API", asy
     .getByRole("button", { name: "确认只提交这一题" })
     .click();
   expect((await originalQuestionSubmission).status()).toBe(202);
+  await expect(
+    page.getByText("暂时无法确认批改状态。已提交的答案已安全保存。"),
+  ).toBeVisible();
+  await page.unroute(originalResultsUrl);
+  await page.getByRole("button", { name: "刷新批改状态" }).click();
   const originalProcessedResponse = await request.post(
     `${apiBaseUrl}/v1/demo/jobs/process-next`,
     { headers: parentHeaders },
