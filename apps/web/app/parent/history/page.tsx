@@ -185,6 +185,9 @@ function ParentHistoryContent() {
   const recoverablePaperImports = completedWorksheetImports.filter((item) =>
     ["processing", "needs_review", "failed"].includes(item.status),
   );
+  const submittedPaperImports = completedWorksheetImports.filter((item) =>
+    ["grading", "results_ready"].includes(item.status),
+  );
   const paperImportStatusLabel = (status: string) =>
     t(
       status === "needs_review"
@@ -315,6 +318,47 @@ function ParentHistoryContent() {
               >
                 {t("parentHistory.paperContinue")}
               </Link>
+            </article>
+          ))}
+        </section>
+      ) : null}
+      {loadState === "ready" && submittedPaperImports.length > 0 ? (
+        <section
+          aria-labelledby="submitted-paper-imports-title"
+          className="record-table paper-review-table"
+        >
+          <header>
+            <h2 id="submitted-paper-imports-title">
+              {t("parentHistory.submittedPapersTitle")}
+            </h2>
+            <p>{t("parentHistory.submittedPapersDescription")}</p>
+          </header>
+          {submittedPaperImports.map((item) => (
+            <article key={item.id}>
+              <span className="record-icon">
+                {item.status === "grading" ? <Clock3 /> : <FileCheck2 />}
+              </span>
+              <div>
+                <p>
+                  {item.child_nickname} · {item.subject}
+                </p>
+                <h2>{item.title}</h2>
+              </div>
+              <span className="status-pill">
+                {t(
+                  item.status === "results_ready"
+                    ? "parentHistory.paperResultsReady"
+                    : "parentHistory.paperGrading",
+                )}
+              </span>
+              {item.attempt_id ? (
+                <Link
+                  className="record-action"
+                  href={`/parent/results/?attemptId=${encodeURIComponent(item.attempt_id)}`}
+                >
+                  {t("parentHistory.paperOpenResults")}
+                </Link>
+              ) : null}
             </article>
           ))}
         </section>

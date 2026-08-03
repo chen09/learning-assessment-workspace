@@ -182,6 +182,8 @@ def test_parent_can_reopen_a_pending_completed_worksheet_from_the_family_list() 
             "subject": "Mathematics",
             "status": "processing",
             "job_status": "queued",
+            "assignment_id": None,
+            "attempt_id": None,
         }
     ]
 
@@ -318,6 +320,14 @@ def test_parent_confirmation_turns_completed_worksheet_into_submitted_attempt() 
     assert payload["attempt"]["submitted_at"] is not None
     assert payload["grading_job"]["type"] == "grade_submission"
     assert repeated.json()["attempt"]["id"] == payload["attempt"]["id"]
+    listed = client.get(
+        f"/v1/completed-worksheets/families/{fixture['family']['id']}",
+        headers=PARENT_HEADERS,
+    )
+    assert listed.status_code == 200
+    summary = next(item for item in listed.json() if item["id"] == created.json()["id"])
+    assert summary["assignment_id"] == payload["assignment"]["id"]
+    assert summary["attempt_id"] == payload["attempt"]["id"]
     stored_response = next(
         iter(
             client.app.state.repository.responses_for_attempt(

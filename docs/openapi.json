@@ -1237,8 +1237,32 @@
         "type": "object"
       },
       "FamilyCompletedWorksheetImport": {
-        "description": "Safe parent-facing summary used to recover an unfinished paper review.",
+        "description": "Safe parent-facing summary for a family paper scan and its learning record.",
         "properties": {
+          "assignment_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignment Id"
+          },
+          "attempt_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id"
+          },
           "child_id": {
             "format": "uuid",
             "title": "Child Id",

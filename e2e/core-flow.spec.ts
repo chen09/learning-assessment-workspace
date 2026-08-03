@@ -2460,6 +2460,14 @@ test("parent validates a local-AI completed-paper review before submitting it", 
   await expect(
     page.getByRole("link", { name: "Print a clean A4 copy" }),
   ).toHaveAttribute("href", /\/parent\/print\/?\?assignmentId=.+/);
+
+  await page.goto(`/parent/history/?familyId=${encodeURIComponent(family.id)}`);
+  await expect(
+    page.getByRole("heading", { name: "Submitted paper grading" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Open paper results" }),
+  ).toHaveAttribute("href", /\/parent\/results\/?\?attemptId=.+/);
 });
 
 test("an expired child session returns to PIN login and resumes the requested page", async ({

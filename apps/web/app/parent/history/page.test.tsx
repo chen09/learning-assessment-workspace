@@ -79,6 +79,35 @@ describe("ParentHistoryPage", () => {
     expect(screen.queryByText("Completed, grading, and archived work for every child in this family.")).not.toBeInTheDocument();
   });
 
+  it("links a reviewed paper scan to its real grading results", async () => {
+    mocks.getFamilyHistory.mockResolvedValue([]);
+    mocks.getCompletedWorksheetImports.mockResolvedValue([
+      {
+        id: "paper-1",
+        family_id: "family-1",
+        child_id: "child-1",
+        child_nickname: "Maya",
+        title: "Factorisation day 4",
+        subject: "Mathematics",
+        status: "results_ready",
+        job_status: "succeeded",
+        assignment_id: "assignment-1",
+        attempt_id: "attempt-1",
+      },
+    ]);
+
+    render(<ParentHistoryPage />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Submitted paper grading" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Results ready")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open paper results" })).toHaveAttribute(
+      "href",
+      "/parent/results?attemptId=attempt-1",
+    );
+  });
+
   it("opens the first family when history is opened from the sidebar", async () => {
     window.history.replaceState({}, "", "/parent/history/");
     mocks.getFamilies.mockResolvedValue([

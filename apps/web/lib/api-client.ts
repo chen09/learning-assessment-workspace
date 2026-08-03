@@ -137,6 +137,8 @@ export type FamilyCompletedWorksheetImport = {
   subject: string;
   status: "processing" | "needs_review" | "grading" | "results_ready" | "failed";
   job_status: "queued" | "running" | "succeeded" | "failed";
+  assignment_id: string | null;
+  attempt_id: string | null;
 };
 
 const CHILD_TOKEN_KEY = "luma-child-session";

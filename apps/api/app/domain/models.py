@@ -579,7 +579,7 @@ class CompletedWorksheetImport(BaseModel):
 
 
 class FamilyCompletedWorksheetImport(BaseModel):
-    """Safe parent-facing summary used to recover an unfinished paper review."""
+    """Safe parent-facing summary for a family paper scan and its learning record."""
 
     id: UUID
     family_id: UUID
@@ -589,6 +589,8 @@ class FamilyCompletedWorksheetImport(BaseModel):
     subject: str
     status: CompletedWorksheetStatus
     job_status: JobStatus
+    assignment_id: UUID | None = None
+    attempt_id: UUID | None = None
 
 
 class CompletedWorksheetResponseInput(BaseModel):

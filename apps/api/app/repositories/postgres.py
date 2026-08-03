@@ -3556,7 +3556,8 @@ class PostgresRepository:
                     """
                     select cwi.id, cwi.family_id, cwi.child_id,
                            c.nickname as child_nickname, cwi.title, cwi.subject,
-                           cwi.status, latest_job.status as job_status
+                           cwi.status, latest_job.status as job_status,
+                           cwi.assignment_id, cwi.attempt_id
                     from public.completed_worksheet_imports cwi
                     join public.children c on c.id = cwi.child_id
                     join lateral (

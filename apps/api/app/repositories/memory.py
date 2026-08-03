@@ -1699,6 +1699,8 @@ class MemoryRepository:
                     subject=imported.subject,
                     status=imported.status,
                     job_status=job.status,
+                    assignment_id=imported.assignment_id,
+                    attempt_id=imported.attempt_id,
                 )
             )
         return summaries
