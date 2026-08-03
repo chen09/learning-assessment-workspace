@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CreateWorkspace } from "@/components/create-workspace";
 
@@ -22,9 +22,25 @@ const mocks = vi.hoisted(() => ({
   uploadToSignedUrl: vi.fn(),
 }));
 
+const defaultCreateObjectURL = URL.createObjectURL;
+const defaultRevokeObjectURL = URL.revokeObjectURL;
+
 vi.mock("@/lib/api-client", () => mocks);
 
 describe("CreateWorkspace", () => {
+  afterEach(() => {
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: defaultCreateObjectURL,
+      writable: true,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: defaultRevokeObjectURL,
+      writable: true,
+    });
+  });
+
   beforeEach(() => {
     Object.values(mocks).forEach((mock) => mock.mockReset());
     mocks.getParentAccessToken.mockResolvedValue("parent-token");
@@ -847,6 +863,17 @@ describe("CreateWorkspace", () => {
   });
 
   it("keeps selected completed-paper pages in a reviewable upload order", async () => {
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: vi.fn((file: File) => `blob:selected-${file.name}`),
+      writable: true,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: vi.fn(),
+      writable: true,
+    });
+
     render(<CreateWorkspace />);
 
     fireEvent.click(
@@ -869,6 +896,12 @@ describe("CreateWorkspace", () => {
         .getAllByRole("listitem")
         .map((item) => item.querySelector("span")?.textContent),
     ).toEqual(["front.jpg", "back.jpg"]);
+    expect(
+      await screen.findByRole("img", { name: "Preview of Page 1 of 2" }),
+    ).toHaveAttribute("src", "blob:selected-front.jpg");
+    expect(
+      screen.getByRole("img", { name: "Preview of Page 2 of 2" }),
+    ).toHaveAttribute("src", "blob:selected-back.jpg");
     expect(
       screen.getByRole("button", { name: "Move page 1 later" }),
     ).toBeInTheDocument();

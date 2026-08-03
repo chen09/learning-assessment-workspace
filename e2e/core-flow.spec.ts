@@ -2232,6 +2232,12 @@ test("parent validates a local-AI completed-paper review before submitting it", 
   const selectedPages = page.getByRole("list", {
     name: "Selected pages (upload order)",
   });
+  await expect(
+    selectedPages.getByRole("img", { name: "Preview of Page 1 of 3" }),
+  ).toHaveAttribute("src", /^blob:/);
+  await expect(
+    selectedPages.getByRole("img", { name: "Preview of Page 2 of 3" }),
+  ).toHaveAttribute("src", /^blob:/);
   await expect(selectedPages.getByRole("listitem").first()).toContainText(
     "front.jpg",
   );
@@ -2257,6 +2263,11 @@ test("parent validates a local-AI completed-paper review before submitting it", 
   const selectedAnswerKeyPages = page.getByRole("list", {
     name: "Answer key pages (upload order)",
   });
+  await expect(
+    selectedAnswerKeyPages.getByRole("img", {
+      name: "Preview of Answer key page 1 of 2",
+    }),
+  ).toHaveAttribute("src", /^blob:/);
   await expect(
     selectedAnswerKeyPages.getByRole("listitem").first(),
   ).toContainText("answer-key-front.jpg");
